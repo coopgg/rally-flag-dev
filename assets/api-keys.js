@@ -10,7 +10,7 @@
    window.RallyFlagAPI (e.g. before god-rolls.html's inline script).
    ============================================================ */
 window.RallyFlagAPI = {
-  BUNGIE_API_KEY: "6299b9c9d3124d83ac607b10dd582eb7"
+  BUNGIE_API_KEY: "910ddacf41f646a68fefdeb315f1c800"
   // Add future API keys here as new ones come up, e.g.:
   // SOME_OTHER_API_KEY: "PASTE_HERE"
 };
