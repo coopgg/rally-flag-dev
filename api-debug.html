@@ -673,6 +673,11 @@
         return (costs || []).map(c => c.itemHash + ":" + c.quantity).sort().join(",");
       }
 
+      // Sales resolved once per unique vendor hash, not once per
+      // character — Bright Dust vendor stubs aren't class-restricted, so
+      // there's no reason to re-fetch the same stub 3x.
+      const resolvedSalesByVendor = new Map(); // vendorHash -> saleItems[]
+
       for (let i = 0; i < characters.length; i++){
         const { characterId, classLabel } = characters[i];
         statusEl.textContent = "Discovering vendors for " + classLabel + " character (" + (i + 1) + "/" + characters.length + ")…";
@@ -685,10 +690,38 @@
         const salesData = (resp.sales && resp.sales.data) || {};
         Object.keys(vendorsData).forEach(h => vendorHashesSeen.add(h));
 
+        let stubIndex = 0;
+        const stubHashes = Object.keys(vendorsData).filter(h => !salesData[h] && !resolvedSalesByVendor.has(h));
+
         for (const vHash of Object.keys(vendorsData)){
-          const sales = salesData[vHash];
-          if (!sales) continue;
-          const saleItems = Object.values(sales.saleItems || {});
+          let saleItems;
+
+          if (resolvedSalesByVendor.has(vHash)){
+            saleItems = resolvedSalesByVendor.get(vHash);
+          } else if (salesData[vHash]){
+            // Bulk response actually included this vendor's sales.
+            saleItems = Object.values(salesData[vHash].saleItems || {});
+            resolvedSalesByVendor.set(vHash, saleItems);
+          } else {
+            // Confirmed live: the bulk Vendors/ call lists every vendor
+            // (including the one-item Bright Dust stubs) in vendors.data,
+            // but only actually populates sales.data for a subset of
+            // them — the stubs need their own individual
+            // Vendors/{hash}/ call to see what they're selling at all.
+            stubIndex++;
+            statusEl.textContent = "Discovering vendors for " + classLabel + " character — checking stub vendor " +
+              stubIndex + "/" + stubHashes.length + "…";
+            try {
+              const singlePath = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
+                "/Character/" + characterId + "/Vendors/" + vHash + "/?components=402";
+              const singleResp = await authedApiGet(singlePath);
+              saleItems = Object.values((singleResp.sales && singleResp.sales.data) || {});
+            } catch (e){
+              saleItems = [];
+            }
+            resolvedSalesByVendor.set(vHash, saleItems);
+          }
+
           for (const sale of saleItems){
             const key = sale.itemHash + "|" + costSignature(sale.costs);
             if (!itemsByKey.has(key)) itemsByKey.set(key, { sale, seenOn: new Set(), vendorHashes: new Set() });
@@ -726,6 +759,8 @@
       statusEl.textContent = "OK: " + resolved.length + " vendor(s) live across " + characters.length + " character(s)" +
         (tessLike.length ? " — " + tessLike.length + " named Tess/Eververse, but pulling sales from all of them" : " — none named Tess/Eververse, pulling Bright Dust sales from every vendor stub instead");
 
+      // Built now, appended to outputEl at the very end — Bright Dust
+      // catalog renders first, this discovered-vendors list comes after.
       const listWrap = document.createElement("div");
       listWrap.className = "vendor-grid";
       resolved.forEach(v => {
@@ -741,10 +776,19 @@
             '</div>' +
           '</div>');
       });
-      outputEl.appendChild(listWrap);
+
+      function appendVendorList(){
+        const label = document.createElement("div");
+        label.className = "section-label";
+        label.style.marginTop = "24px";
+        label.textContent = "All Discovered Vendors (" + resolved.length + ")";
+        outputEl.appendChild(label);
+        outputEl.appendChild(listWrap);
+      }
 
       if (!itemsByKey.size){
-        outputEl.insertAdjacentHTML("beforeend", '<div class="desc" style="margin-top:16px;">No sale items came back from any discovered vendor this pull.</div>');
+        outputEl.insertAdjacentHTML("beforeend", '<div class="desc">No sale items came back from any discovered vendor this pull.</div>');
+        appendVendorList();
         return;
       }
 
@@ -835,6 +879,8 @@
         groupGrid.innerHTML = groupItems.join("");
         outputEl.appendChild(groupGrid);
       }
+
+      appendVendorList();
     } catch (err){
       statusEl.className = "status err";
       statusEl.textContent = "Error: " + err.message;
