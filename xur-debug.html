@@ -292,8 +292,13 @@
           html += '<div id="stats-' + idx + '"></div>';
         }
 
+        // Bungie includes structural/bookkeeping sockets (catalyst trackers,
+        // hidden intrinsic slots, etc.) that carry a real plugHash but no
+        // displayProperties.name and isVisible:false — DIM and other tools
+        // hide these rather than show them as junk "Unknown" entries.
         const socketEntry = socketsByIndex[idx];
-        const sockets = (socketEntry && socketEntry.sockets) || [];
+        const allSockets = (socketEntry && socketEntry.sockets) || [];
+        const sockets = allSockets.filter(s => s.isVisible !== false);
         html += '<div class="roll-section-label">Sockets (' + sockets.length + ')</div>';
         if (!sockets.length){
           html += '<div class="empty-note">no socket data on this item</div>';
