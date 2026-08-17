@@ -171,6 +171,14 @@ nav.site-nav{
 }
 .nav-auth-signout:hover{ color:var(--accent-bright); }
 
+/* ---------- Dev/test-environment banner (dev branch only) ---------- */
+.dev-banner{
+  max-width:800px; margin:32px auto 0; padding:12px 20px;
+  border:1px solid #5a3a1a; background:#2a1c0c; color:#e0b070;
+  font-family:'JetBrains Mono', monospace; font-size:12.5px; line-height:1.6;
+  border-radius:8px; text-align:center;
+}
+
 /* ---------- Local section sub-nav (per page-group header) ---------- */
 .subnav{
   display:flex; justify-content:center; gap:8px; margin:26px auto 0; flex-wrap:wrap;

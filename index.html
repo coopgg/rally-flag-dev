@@ -2,20 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="favicon.ico">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Rally Flag - Destiny 2 Database</title>
-<meta name="description" content="A companion site for Destiny 2: live Distortion tracking, the full armor set bonus database, guides, and god rolls, all in one place.">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="Rally Flag">
-<meta property="og:title" content="Rally Flag">
-<meta property="og:description" content="A companion site for Destiny 2: live Distortion tracking, the full armor set bonus database, guides, and god rolls, all in one place.">
-<meta property="og:url" content="https://rallyflag.gg/">
-<meta property="og:image" content="https://rallyflag.gg/assets/icon-512.png">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Rally Flag">
-<meta name="twitter:description" content="A companion site for Destiny 2: live Distortion tracking, the full armor set bonus database, guides, and god rolls, all in one place.">
-<meta name="twitter:image" content="https://rallyflag.gg/assets/icon-512.png">
+<title>Rally Flag (Dev) - Test Environment</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -38,27 +28,15 @@
   .info-body p:last-child{ margin-bottom:0; }
   .info-body strong{ color:var(--text); }
 
-  .twitch-player-wrap{
-    position:relative; width:100%; aspect-ratio:16/9; border-radius:8px; overflow:hidden;
-    background:#000; border:1px solid var(--panel-border); margin-top:20px;
+  .dev-status-list{ list-style:none; padding:0; margin:0; }
+  .dev-status-list li{
+    display:flex; justify-content:space-between; gap:12px;
+    padding:10px 0; border-bottom:1px solid var(--panel-border);
+    font-size:13.5px;
   }
-  .twitch-player-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
-  .twitch-links{ display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
-  .twitch-link{
-    font-size:12.5px; font-family:'JetBrains Mono', monospace; color:var(--accent-bright);
-    text-decoration:none; background:var(--accent-dim); border:1px solid var(--panel-border);
-    padding:8px 14px; border-radius:999px; transition: border-color 0.2s ease;
-  }
-  .twitch-link:hover, .twitch-link:focus-visible{ border-color:var(--accent-bright); }
-
-  .faq-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; }
-  @media (max-width:640px){ .faq-grid{ grid-template-columns:1fr; } }
-  .faq-card{ padding:22px; }
-  .faq-q{
-    font-family:'Oswald', sans-serif; font-weight:600; font-size:15px; color:var(--accent-bright);
-    margin-bottom:9px; text-transform:uppercase; letter-spacing:0.02em;
-  }
-  .faq-a{ font-size:13.5px; color:var(--text-dim); line-height:1.6; }
+  .dev-status-list li:last-child{ border-bottom:none; }
+  .dev-status-list .label{ color:var(--text); }
+  .dev-status-list .state{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--text-dim); }
 </style>
 </head>
 <body data-nav-group="">
@@ -66,82 +44,34 @@
 <div id="site-nav"></div>
 
 <div class="hero">
-  <div class="eyebrow">Destiny 2 Database</div>
+  <div class="eyebrow">Dev / Test Environment</div>
   <h1 class="title">Rally Flag</h1>
-  <p class="subtitle">A companion site for Destiny 2: live Distortion tracking, the full armor set bonus database, guides, and god rolls, all in one place.</p>
+  <p class="subtitle">This is the dev build, not rallyflag.gg. Same pages as prod, plus whatever's currently in progress.</p>
 </div>
 
 <section>
 
+  <div class="dev-banner">Served from <code>coopgg.github.io/rally-flag-dev</code>, deployed off the <code>main</code> branch of this repo. Noindexed on purpose — don't link to it from anywhere real.</div>
+
   <div class="info-block">
-    <div class="info-label">Overview</div>
-    <div class="info-body">
-      <p>Rally Flag pulls together everything we keep looking up while playing and streaming Destiny 2, so it lives in one place instead of a dozen scattered tabs.</p>
-      <p>Use the menu at the top to get to any of it: raid and dungeon guides, armor set bonuses, artifact perks, weapon god rolls, puzzle solvers, live Distortion tracking, redemption codes, and what's active this week.</p>
-    </div>
+    <div class="info-label">In Progress</div>
+    <ul class="dev-status-list">
+      <li><span class="label">Bungie.net OAuth sign-in</span><span class="state">live — sign in from the menu above</span></li>
+      <li><span class="label">Live vendor rolls (OAuth pilot)</span><span class="state">on the Debug page</span></li>
+    </ul>
   </div>
 
   <div class="info-block">
-    <div class="info-label">About Us</div>
+    <div class="info-label">Where To Look</div>
     <div class="info-body">
-      <p>We're a small stream team that got tired of digging through the same handful of sites every raid night, so we started building the tool we actually wanted.</p>
-      <p>Everything here comes from our own playtime and our own runs: the rolls we chase, the builds we actually use, the puzzle solutions we've verified ourselves. When we're not sure about a mechanic, we don't guess. We test it, or we leave it out until we can.</p>
-    </div>
-  </div>
-
-  <div class="info-block">
-    <div class="info-label">Watch Live</div>
-    <div class="info-body">
-      <p>We stream while we build and play this stuff. Pull up the player below to watch live, or catch a past broadcast on Twitch.</p>
-    </div>
-    <div class="twitch-player-wrap">
-      <iframe
-        src="https://player.twitch.tv/?channel=coopgg__&parent=rallyflag.gg&parent=coopgg.github.io&parent=localhost&autoplay=false&muted=true"
-        allowfullscreen
-        scrolling="no">
-      </iframe>
-    </div>
-    <div class="twitch-links">
-      <a class="twitch-link" href="https://www.twitch.tv/coopgg__" target="_blank" rel="noopener">Watch on Twitch →</a>
-      <a class="twitch-link" href="https://www.twitch.tv/coopgg__/videos?filter=archives&sort=time" target="_blank" rel="noopener">Past Broadcasts →</a>
-    </div>
-  </div>
-
-  <div class="info-block">
-    <div class="info-label">Site FAQ</div>
-    <div class="faq-grid">
-      <div class="faq-card panel-card">
-        <div class="faq-q">Is this official?</div>
-        <div class="faq-a">No. Rally Flag is an unofficial fan project. We're not affiliated with or endorsed by Bungie.</div>
-      </div>
-      <div class="faq-card panel-card">
-        <div class="faq-q">Where does the data come from?</div>
-        <div class="faq-a">A mix of our own in-game verification and trusted community sources like light.gg and GameRant, plus Bungie's own public API for anything live: god rolls, Xur, and weekly milestones pull real-time data straight from Bungie.</div>
-      </div>
-      <div class="faq-card panel-card">
-        <div class="faq-q">How current is it?</div>
-        <div class="faq-a">We update it as the game changes: new seasons, new artifacts, balance passes. If something's out of date, it means we haven't caught up to it yet, not that it's been abandoned.</div>
-      </div>
-      <div class="faq-card panel-card">
-        <div class="faq-q">Something looks wrong? What do I do?</div>
-        <div class="faq-a">Let us know. We'd rather fix a mistake than leave it up, and we don't publish anything we haven't been able to verify.</div>
-      </div>
-      <div class="faq-card panel-card">
-        <div class="faq-q">Is it free?</div>
-        <div class="faq-a">Yes. No accounts, no paywalls, no ads.</div>
-      </div>
-      <div class="faq-card panel-card">
-        <div class="faq-q">Does it work on mobile?</div>
-        <div class="faq-a">Yes. The whole site is built to work on phones and tablets, not just desktop.</div>
-      </div>
+      <p>Every real page is in the nav above, same as prod. <a href="debug.html">Debug</a> has the throwaway API test pages this build's OAuth work depends on.</p>
     </div>
   </div>
 
 </section>
 
 <footer>
-  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
-  <p>Destiny data and set bonus text sourced from public game data. Data and icons © Bungie.</p>
+  <div>Dev build — not affiliated with or endorsed by Bungie.</div>
 </footer>
 
 <script src="assets/nav.js"></script>
