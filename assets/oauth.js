@@ -86,14 +86,20 @@ window.RallyFlagAuth = (function(){
     clearAuth();
   }
 
+  // No X-API-Key here on purpose: the token endpoint identifies the app
+  // via client_id in the body, and adding a custom header would force a
+  // CORS preflight (OPTIONS) that this specific Bungie endpoint doesn't
+  // handle, breaking the request with an opaque "Failed to fetch" even
+  // though the same header works fine on every GET call elsewhere in
+  // the site. Content-Type: application/x-www-form-urlencoded is a
+  // CORS-safelisted value, so this stays a preflight-free simple request.
   async function exchangeToken(body){
     const clientId = window.RallyFlagAPI.BUNGIE_OAUTH_CLIENT_ID;
     const params = new URLSearchParams(Object.assign({ client_id: clientId }, body));
     const res = await fetch(TOKEN_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        "X-API-Key": window.RallyFlagAPI.BUNGIE_API_KEY
+        "Content-Type": "application/x-www-form-urlencoded"
       },
       body: params.toString()
     });
