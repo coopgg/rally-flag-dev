@@ -70,6 +70,7 @@
 <h2>Eververse (Tess Everis)</h2>
 <p class="note">Prod already chased this down once, before this site had OAuth: Bungie's <em>public/anonymous</em> Vendors endpoint drops Tess entirely, confirmed via a 3-way diagnostic (full request, bare Vendors-only request, and her own definition fetched directly — she came back <code>enabled:true</code>, genuinely active, the endpoint just can't serve her). Matches Bungie's documented rule that a vendor gets dropped wholesale from the public endpoint if any part of it can't be computed identically for everyone. Prod ended up sourcing her from a third-party feed, <a href="https://eververse.report/" target="_blank" rel="noopener">eververse.report</a>, instead — noted then as a stopgap "until this site has its own OAuth login."</p>
 <p class="note">That's now. This calls the <em>authenticated, character-scoped</em> <code>Character/{id}/Vendors/?components=400,402</code> — untested territory, since it wasn't an option before. No hash is hardcoded or guessed: whatever resolves to "Tess Everis" or "Eververse" among every vendor live for the signed-in character gets its real hash surfaced here. Confirmed working — she showed up. Since her catalog is per-character (an already-owned item drops off <em>that</em> character's list even though another character could still buy it), this queries every character on the account and merges the results; anything that isn't universal across all of them gets tagged with which class(es) it actually showed up for. If she still doesn't turn up this way, eververse.report is the proven fallback.</p>
+<p class="note">Catalog below is grouped by whatever currency each item's own cost data resolves to (not hardcoded/assumed) — the Bright Dust rotation refreshes at daily reset, so what shows up here is only good until tomorrow's reset. Bungie's API generally can't carry real-money Silver costs at all (those purchases route through platform stores, not this endpoint), so items with no cost data get their own bucket rather than being labeled "free" — that bucket is most likely Silver items, worth confirming against what actually shows in-game.</p>
 <div id="ev-status" class="status">Sign in above to load this.</div>
 <div id="ev-output"></div>
 
@@ -633,15 +634,15 @@
       const allItems = Array.from(itemsByHash.values());
       const allClassLabels = characters.map(c => c.classLabel);
 
-      const catalogHeader = document.createElement("div");
-      catalogHeader.className = "section-label";
-      catalogHeader.style.marginTop = "20px";
-      catalogHeader.textContent = tessName + " — Full Sale Catalog, merged across " + characters.length + " character(s) (" + allItems.length + ")";
-      outputEl.appendChild(catalogHeader);
-
-      const catalogGrid = document.createElement("div");
-      catalogGrid.className = "vendor-grid";
-      outputEl.appendChild(catalogGrid);
+      // Resolve names/costs for every item first, and group by currency —
+      // Bungie's API generally can't carry real-money Silver costs at all
+      // (those purchases go through platform stores, not this endpoint),
+      // so an item with no costs array showing up here is most likely a
+      // Silver item read by elimination, not actually free. Grouping by
+      // whatever currency name the API itself returns (not hardcoded) so
+      // it's visible exactly what's coming back today, not assumed.
+      const NO_COST_GROUP = "No listed cost (likely Silver — the API can't carry real-money costs)";
+      const groups = new Map(); // currency label -> resolved item entries[]
 
       for (const { sale, seenOn } of allItems){
         const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
@@ -649,34 +650,62 @@
         const itemIcon = itemDef ? iconUrl(itemDef.displayProperties) : null;
 
         const costChips = [];
+        let groupKey = NO_COST_GROUP;
         for (const cost of (sale.costs || [])){
           const costDef = await fetchDef("DestinyInventoryItemDefinition", cost.itemHash);
           const costName = (costDef && costDef.displayProperties && costDef.displayProperties.name) || ("Unknown (" + cost.itemHash + ")");
           costChips.push(cost.quantity + " " + costName);
+          if (groupKey === NO_COST_GROUP) groupKey = costName;
         }
 
-        // Most Eververse items are universal, but some drop off a
-        // character's sale list once that specific character already
-        // owns them — flag anything that isn't showing up everywhere
-        // instead of silently only listing whichever character(s) it
-        // happened to appear on.
         const isUniversal = allClassLabels.every(c => seenOn.has(c));
         const availabilityBadge = isUniversal ? "" :
           '<span class="badge unavailable">' + Array.from(seenOn).join(", ") + " only</span>";
 
-        const card = document.createElement("div");
-        card.className = "card";
-        card.innerHTML =
-          '<div class="card-head">' +
-            (itemIcon ? '<img src="' + itemIcon + '" alt="">' : '') +
-            '<div>' +
-              '<div class="card-name">' + itemName + '</div>' +
-              '<div class="card-hash">hash: ' + sale.itemHash + '</div>' +
-              availabilityBadge +
+        const cardHtml =
+          '<div class="card">' +
+            '<div class="card-head">' +
+              (itemIcon ? '<img src="' + itemIcon + '" alt="">' : '') +
+              '<div>' +
+                '<div class="card-name">' + itemName + '</div>' +
+                '<div class="card-hash">hash: ' + sale.itemHash + '</div>' +
+                availabilityBadge +
+              '</div>' +
             '</div>' +
-          '</div>' +
-          '<div class="desc">' + (costChips.length ? costChips.join(", ") : "Free / no listed cost") + '</div>';
-        catalogGrid.appendChild(card);
+            '<div class="desc">' + (costChips.length ? costChips.join(", ") : "Free / no listed cost") + '</div>' +
+          '</div>';
+
+        if (!groups.has(groupKey)) groups.set(groupKey, []);
+        groups.get(groupKey).push(cardHtml);
+      }
+
+      const catalogHeader = document.createElement("div");
+      catalogHeader.className = "section-label";
+      catalogHeader.style.marginTop = "20px";
+      const groupCounts = Array.from(groups.entries()).map(([k, v]) => v.length + " " + k).join(" · ");
+      catalogHeader.textContent = tessName + " — Full Sale Catalog, merged across " + characters.length + " character(s) (" + allItems.length + " total: " + groupCounts + ")";
+      outputEl.appendChild(catalogHeader);
+
+      // Sort so real currencies (Bright Dust, event tokens, etc.) come
+      // first and the "likely Silver" fallback bucket sits last.
+      const sortedGroupKeys = Array.from(groups.keys()).sort((a, b) => {
+        if (a === NO_COST_GROUP) return 1;
+        if (b === NO_COST_GROUP) return -1;
+        return a.localeCompare(b);
+      });
+
+      for (const groupKey of sortedGroupKeys){
+        const groupItems = groups.get(groupKey);
+        const groupLabel = document.createElement("div");
+        groupLabel.className = "section-label";
+        groupLabel.style.marginTop = "16px";
+        groupLabel.textContent = groupKey + " (" + groupItems.length + ")";
+        outputEl.appendChild(groupLabel);
+
+        const groupGrid = document.createElement("div");
+        groupGrid.className = "vendor-grid";
+        groupGrid.innerHTML = groupItems.join("");
+        outputEl.appendChild(groupGrid);
       }
     } catch (err){
       statusEl.className = "status err";
