@@ -69,7 +69,7 @@
 
 <h2>Eververse (Tess Everis)</h2>
 <p class="note">Prod already chased this down once, before this site had OAuth: Bungie's <em>public/anonymous</em> Vendors endpoint drops Tess entirely, confirmed via a 3-way diagnostic (full request, bare Vendors-only request, and her own definition fetched directly — she came back <code>enabled:true</code>, genuinely active, the endpoint just can't serve her). Matches Bungie's documented rule that a vendor gets dropped wholesale from the public endpoint if any part of it can't be computed identically for everyone. Prod ended up sourcing her from a third-party feed, <a href="https://eververse.report/" target="_blank" rel="noopener">eververse.report</a>, instead — noted then as a stopgap "until this site has its own OAuth login."</p>
-<p class="note">That's now. This calls the <em>authenticated, character-scoped</em> <code>Character/{id}/Vendors/?components=400,402</code> — untested territory, since it wasn't an option before. No hash is hardcoded or guessed: whatever resolves to "Tess Everis" or "Eververse" among every vendor live for the signed-in character gets its real hash surfaced here, with her full sale catalog (Bright Dust/Silver costs) pulled below. If she still doesn't turn up this way, eververse.report is the proven fallback.</p>
+<p class="note">That's now. This calls the <em>authenticated, character-scoped</em> <code>Character/{id}/Vendors/?components=400,402</code> — untested territory, since it wasn't an option before. No hash is hardcoded or guessed: whatever resolves to "Tess Everis" or "Eververse" among every vendor live for the signed-in character gets its real hash surfaced here. Confirmed working — she showed up. Since her catalog is per-character (an already-owned item drops off <em>that</em> character's list even though another character could still buy it), this queries every character on the account and merges the results; anything that isn't universal across all of them gets tagged with which class(es) it actually showed up for. If she still doesn't turn up this way, eververse.report is the proven fallback.</p>
 <div id="ev-status" class="status">Sign in above to load this.</div>
 <div id="ev-output"></div>
 
@@ -421,6 +421,30 @@
     return data.Response;
   }
 
+  const CHARACTER_CLASS_LABELS = { 0: "Titan", 1: "Hunter", 2: "Warlock" };
+
+  // Same membership resolution as resolvePrimaryCharacter, but returns
+  // every character instead of just the most recently played one — a
+  // vendor's sale catalog (Tess's especially) can differ per character,
+  // since items already owned on one get hidden from that character's
+  // list even though a different character can still buy them.
+  async function resolveAllCharacters(){
+    const memberships = await authedApiGet("/Platform/User/GetMembershipsForCurrentUser/");
+    const destinyMemberships = memberships.destinyMemberships || [];
+    if (!destinyMemberships.length) throw new Error("This Bungie account has no linked Destiny 2 platform.");
+    const primary = destinyMemberships.find(m => m.membershipId === memberships.primaryMembershipId) || destinyMemberships[0];
+
+    const profile = await authedApiGet("/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId + "/?components=200");
+    const characters = (profile.characters && profile.characters.data) || {};
+    const characterList = Object.keys(characters).map(id => ({
+      characterId: id,
+      classLabel: CHARACTER_CLASS_LABELS[characters[id].classType] || "Unknown"
+    }));
+    if (!characterList.length) throw new Error("No characters found on this account's primary membership.");
+
+    return { membershipType: primary.membershipType, membershipId: primary.membershipId, characters: characterList };
+  }
+
   // Picks the account's primary Destiny membership, then its most
   // recently-played character — same pair every vendor call below needs.
   async function resolvePrimaryCharacter(){
@@ -525,46 +549,72 @@
     const statusEl = document.getElementById("ev-status");
     const outputEl = document.getElementById("ev-output");
     statusEl.className = "status";
-    statusEl.textContent = "Resolving your Destiny character…";
+    statusEl.textContent = "Resolving your Destiny characters…";
     outputEl.innerHTML = "";
 
     try {
-      const { membershipType, membershipId, characterId } = await resolvePrimaryCharacter();
+      const { membershipType, membershipId, characters } = await resolveAllCharacters();
 
-      statusEl.textContent = "Discovering every vendor live for this character…";
-      const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
-        "/Character/" + characterId + "/Vendors/?components=400,402";
-      const resp = await authedApiGet(path);
+      const vendorHashesSeen = new Set();
+      const itemsByHash = new Map(); // itemHash -> { sale, seenOn: Set<classLabel> }
+      let tessHash = null;
+      let tessName = null;
 
-      const vendorsData = (resp.vendors && resp.vendors.data) || {};
-      const salesData = (resp.sales && resp.sales.data) || {};
-      const vendorHashes = Object.keys(vendorsData);
+      for (let i = 0; i < characters.length; i++){
+        const { characterId, classLabel } = characters[i];
+        statusEl.textContent = "Discovering vendors for " + classLabel + " character (" + (i + 1) + "/" + characters.length + ")…";
 
-      if (!vendorHashes.length){
+        const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
+          "/Character/" + characterId + "/Vendors/?components=400,402";
+        const resp = await authedApiGet(path);
+
+        const vendorsData = (resp.vendors && resp.vendors.data) || {};
+        const salesData = (resp.sales && resp.sales.data) || {};
+        Object.keys(vendorsData).forEach(h => vendorHashesSeen.add(h));
+
+        if (!tessHash){
+          for (const hash of Object.keys(vendorsData)){
+            const vDef = await fetchDef("DestinyVendorDefinition", hash);
+            const name = (vDef && vDef.displayProperties && vDef.displayProperties.name) || "";
+            if (/tess|eververse/i.test(name)){
+              tessHash = hash;
+              tessName = name;
+              break;
+            }
+          }
+        }
+
+        if (tessHash && salesData[tessHash]){
+          const saleItems = Object.values(salesData[tessHash].saleItems || {});
+          for (const sale of saleItems){
+            if (!itemsByHash.has(sale.itemHash)) itemsByHash.set(sale.itemHash, { sale, seenOn: new Set() });
+            itemsByHash.get(sale.itemHash).seenOn.add(classLabel);
+          }
+        }
+      }
+
+      if (!vendorHashesSeen.size){
         statusEl.className = "status err";
-        statusEl.textContent = "Signed in, but no vendors came back live for this character right now.";
+        statusEl.textContent = "Signed in, but no vendors came back live across any character right now.";
         return;
       }
 
       const resolved = [];
-      for (const hash of vendorHashes){
+      for (const hash of vendorHashesSeen){
         const vDef = await fetchDef("DestinyVendorDefinition", hash);
         const name = (vDef && vDef.displayProperties && vDef.displayProperties.name) || ("Unknown (" + hash + ")");
         resolved.push({ hash, name, icon: vDef ? iconUrl(vDef.displayProperties) : null });
       }
       resolved.sort((a, b) => a.name.localeCompare(b.name));
 
-      const tess = resolved.find(v => /tess|eververse/i.test(v.name));
-
       statusEl.className = "status ok";
-      statusEl.textContent = "OK: " + resolved.length + " vendor(s) live for this character" +
-        (tess ? " — found " + tess.name + " (hash " + tess.hash + ")" : " — no Tess Everis/Eververse among them this pull");
+      statusEl.textContent = "OK: " + resolved.length + " vendor(s) live across " + characters.length + " character(s)" +
+        (tessHash ? " — found " + tessName + " (hash " + tessHash + ")" : " — no Tess Everis/Eververse among them this pull");
 
       const listWrap = document.createElement("div");
       listWrap.className = "vendor-grid";
       resolved.forEach(v => {
-        const isTess = tess && v.hash === tess.hash;
-        const saleCount = (salesData[v.hash] && Object.keys(salesData[v.hash].saleItems || {}).length) || 0;
+        const isTess = tessHash && v.hash === tessHash;
         listWrap.insertAdjacentHTML("beforeend",
           '<div class="card">' +
             '<div class="card-head">' +
@@ -572,27 +622,28 @@
               '<div>' +
                 '<div class="card-name">' + v.name + (isTess ? " ⭐" : "") + '</div>' +
                 '<div class="card-hash">hash: ' + v.hash + '</div>' +
-                '<span class="badge available">' + saleCount + ' item(s) for sale</span>' +
               '</div>' +
             '</div>' +
           '</div>');
       });
       outputEl.appendChild(listWrap);
 
-      if (!tess) return;
+      if (!tessHash) return;
 
-      const tessSales = Object.values((salesData[tess.hash] && salesData[tess.hash].saleItems) || {});
+      const allItems = Array.from(itemsByHash.values());
+      const allClassLabels = characters.map(c => c.classLabel);
+
       const catalogHeader = document.createElement("div");
       catalogHeader.className = "section-label";
       catalogHeader.style.marginTop = "20px";
-      catalogHeader.textContent = tess.name + " — Full Sale Catalog (" + tessSales.length + ")";
+      catalogHeader.textContent = tessName + " — Full Sale Catalog, merged across " + characters.length + " character(s) (" + allItems.length + ")";
       outputEl.appendChild(catalogHeader);
 
       const catalogGrid = document.createElement("div");
       catalogGrid.className = "vendor-grid";
       outputEl.appendChild(catalogGrid);
 
-      for (const sale of tessSales){
+      for (const { sale, seenOn } of allItems){
         const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
         const itemName = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
         const itemIcon = itemDef ? iconUrl(itemDef.displayProperties) : null;
@@ -604,6 +655,15 @@
           costChips.push(cost.quantity + " " + costName);
         }
 
+        // Most Eververse items are universal, but some drop off a
+        // character's sale list once that specific character already
+        // owns them — flag anything that isn't showing up everywhere
+        // instead of silently only listing whichever character(s) it
+        // happened to appear on.
+        const isUniversal = allClassLabels.every(c => seenOn.has(c));
+        const availabilityBadge = isUniversal ? "" :
+          '<span class="badge unavailable">' + Array.from(seenOn).join(", ") + " only</span>";
+
         const card = document.createElement("div");
         card.className = "card";
         card.innerHTML =
@@ -612,6 +672,7 @@
             '<div>' +
               '<div class="card-name">' + itemName + '</div>' +
               '<div class="card-hash">hash: ' + sale.itemHash + '</div>' +
+              availabilityBadge +
             '</div>' +
           '</div>' +
           '<div class="desc">' + (costChips.length ? costChips.join(", ") : "Free / no listed cost") + '</div>';
