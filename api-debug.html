@@ -68,7 +68,7 @@
 <div id="live-vendor-output"></div>
 
 <h2>Vendor Hash Lookup (OAuth)</h2>
-<p class="note">Ad-hoc tool for checking any specific vendor hash directly — <code>Character/{id}/Vendors/{hash}/?components=402</code> against your most recently played character. Prefilled with <code>153857624</code>, a guess at Zavala's weekly-purchasable weapon rotation.</p>
+<p class="note">Ad-hoc tool for checking any specific vendor hash directly — <code>Character/{id}/Vendors/{hash}/?components=402</code> against your most recently played character. Prefilled with <code>153857624</code>, now confirmed: it resolves live to <strong>"Weekly: Vanguard Arms Rewards"</strong> — Zavala's own vendor entry (<code>69482069</code>) carries a blank "Weapons"/"Armor" portal-tile pair the same way Xur's main hash did, but unlike Xur there's no separate hash those tiles link to. This <em>is</em> the weekly offering: Chronologs-purchasable "Vanguard Arsenal I/II/III" weapon-focus tiers plus rank-based free armor, not a pick-an-exact-gun storefront. Scanned all 232 vendors live for a signed-in character (every subclass/loadout kiosk, every NPC, everything) looking for anything better and found nothing — the other "Weapons"-named entries are generic per-subclass loadout tabs, not vendors.</p>
 <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
   <input type="text" id="lookup-hash-input" value="153857624" style="background:#1a1a1f; border:1px solid #2c2c33; color:#e4e4e8; padding:6px 10px; border-radius:3px; font-family:'JetBrains Mono', monospace; font-size:12px; width:160px;">
   <button id="lookup-hash-btn" style="background:#1a2a3a; color:#7fbfff; border:1px solid #2c2c33; padding:6px 14px; border-radius:3px; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:12px;">Look up</button>
@@ -82,6 +82,11 @@
 <p class="note">Items are grouped by whatever currency each one's own cost data resolves to (not hardcoded/assumed), but only the Bright Dust group actually renders below — Silver and no-cost items are still counted in the header for context, just not shown as cards. Each card also lists which vendor hash(es) it actually sold through, since most are unnamed stubs. The Bright Dust rotation refreshes at daily reset, so what's here is only good until tomorrow's reset.</p>
 <div id="ev-status" class="status">Sign in above to load this.</div>
 <div id="ev-output"></div>
+
+<h2>Ada-1 (Shaders)</h2>
+<p class="note">Unlike Zavala and Xur, Ada-1's own confirmed identity hash (<code>350061650</code>) directly serves her real live sale data — no portal-tile/sub-vendor indirection needed, confirmed via a direct <code>Character/{id}/Vendors/350061650/?components=402</code> call. Her catalog is a mix of real purchasable shaders (10,000 Glimmer each), Armor Synthesis bounties, and several no-cost "Exotic Focusing" stub items (Gunner/Bulwark/Specialist/etc.) that are themselves further interaction points, not simple purchases — out of scope here. Queries every character, not just the most recent, same reasoning as Eververse: an already-owned shader can drop off one character's list while still buying on another.</p>
+<div id="ada-status" class="status">Sign in above to load this.</div>
+<div id="ada-output"></div>
 
 <script src="assets/api-keys.js"></script>
 <script src="assets/oauth.js"></script>
@@ -408,6 +413,7 @@
       runLiveVendorSales();
       runVendorLookup(document.getElementById("lookup-hash-input").value.trim());
       runEververse();
+      runAda1();
     } else {
       box.className = "status";
       box.innerHTML = '<a href="#" id="auth-signin" style="color:inherit;">Sign in with Bungie.net</a> to load live vendor sales below.';
@@ -424,6 +430,10 @@
       evStatus.className = "status";
       evStatus.textContent = "Sign in above to load this.";
       document.getElementById("ev-output").innerHTML = "";
+      const adaStatus = document.getElementById("ada-status");
+      adaStatus.className = "status";
+      adaStatus.textContent = "Sign in above to load this.";
+      document.getElementById("ada-output").innerHTML = "";
     }
   }
 
@@ -881,6 +891,111 @@
       }
 
       appendVendorList();
+    } catch (err){
+      statusEl.className = "status err";
+      statusEl.textContent = "Error: " + err.message;
+    }
+  }
+
+  const ADA_1_VENDOR_HASH = "350061650";
+
+  // ---------------- Ada-1 (shaders) ----------------
+  // Simpler than Eververse/Zavala: Ada-1's own confirmed identity hash
+  // serves her real sale items directly (confirmed live), no sub-vendor
+  // or portal-tile indirection to chase. Still queries every character
+  // rather than just the most recent — same lesson learned from
+  // Eververse, an already-owned shader drops off one character's list
+  // while remaining purchasable on another.
+  async function runAda1(){
+    const statusEl = document.getElementById("ada-status");
+    const outputEl = document.getElementById("ada-output");
+    statusEl.className = "status";
+    statusEl.textContent = "Resolving your Destiny characters…";
+    outputEl.innerHTML = "";
+
+    try {
+      const { membershipType, membershipId, characters } = await resolveAllCharacters();
+
+      function costSignature(costs){
+        return (costs || []).map(c => c.itemHash + ":" + c.quantity).sort().join(",");
+      }
+      const itemsByKey = new Map(); // itemHash|costSignature -> { sale, seenOn: Set<classLabel> }
+
+      for (let i = 0; i < characters.length; i++){
+        const { characterId, classLabel } = characters[i];
+        statusEl.textContent = "Checking Ada-1 for " + classLabel + " character (" + (i + 1) + "/" + characters.length + ")…";
+
+        const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
+          "/Character/" + characterId + "/Vendors/" + ADA_1_VENDOR_HASH + "/?components=402";
+        let saleItems;
+        try {
+          const resp = await authedApiGet(path);
+          saleItems = Object.values((resp.sales && resp.sales.data) || {});
+        } catch (e){
+          saleItems = [];
+        }
+
+        for (const sale of saleItems){
+          const key = sale.itemHash + "|" + costSignature(sale.costs);
+          if (!itemsByKey.has(key)) itemsByKey.set(key, { sale, seenOn: new Set() });
+          itemsByKey.get(key).seenOn.add(classLabel);
+        }
+      }
+
+      if (!itemsByKey.size){
+        statusEl.className = "status err";
+        statusEl.textContent = "Signed in, but no sale data came back from Ada-1 across any character right now.";
+        return;
+      }
+
+      const allClassLabels = characters.map(c => c.classLabel);
+      const shaderCards = [];
+      let shaderCount = 0;
+      let otherCount = 0;
+
+      for (const { sale, seenOn } of itemsByKey.values()){
+        const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
+        const isShader = itemDef && itemDef.itemTypeDisplayName === "Shader";
+        if (!isShader){ otherCount++; continue; }
+        shaderCount++;
+
+        const itemName = (itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
+        const itemIcon = iconUrl(itemDef.displayProperties);
+
+        const costChips = [];
+        for (const cost of (sale.costs || [])){
+          const costDef = await fetchDef("DestinyInventoryItemDefinition", cost.itemHash);
+          const costName = (costDef && costDef.displayProperties && costDef.displayProperties.name) || ("Unknown (" + cost.itemHash + ")");
+          costChips.push(cost.quantity + " " + costName);
+        }
+
+        const isUniversal = allClassLabels.every(c => seenOn.has(c));
+        const availabilityBadge = isUniversal ? "" :
+          '<span class="badge unavailable">' + Array.from(seenOn).join(", ") + " only</span>";
+
+        shaderCards.push(
+          '<div class="card">' +
+            '<div class="card-head">' +
+              (itemIcon ? '<img src="' + itemIcon + '" alt="">' : '') +
+              '<div>' +
+                '<div class="card-name">' + itemName + '</div>' +
+                '<div class="card-hash">hash: ' + sale.itemHash + '</div>' +
+                availabilityBadge +
+              '</div>' +
+            '</div>' +
+            '<div class="desc">' + (costChips.length ? costChips.join(", ") : "Free / no listed cost") + '</div>' +
+          '</div>'
+        );
+      }
+
+      statusEl.className = "status ok";
+      statusEl.textContent = "OK: " + shaderCount + " shader(s) for sale across " + characters.length + " character(s)" +
+        (otherCount ? " (" + otherCount + " other Ada-1 item(s) — bounties/focusing stubs — not shown)" : "");
+
+      const grid = document.createElement("div");
+      grid.className = "vendor-grid";
+      grid.innerHTML = shaderCards.join("");
+      outputEl.appendChild(grid);
     } catch (err){
       statusEl.className = "status err";
       statusEl.textContent = "Error: " + err.message;
