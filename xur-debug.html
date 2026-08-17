@@ -21,17 +21,41 @@
   .item-type{ color:#999; font-size:10.5px; }
   .item-class{ color:#7fd9d9; font-size:10.5px; }
   .item-hash{ color:#666; font-size:9.5px; }
+  .status.ok{ background:#1a3a1a; color:#7fd97f; }
+  .auth-link{ color:inherit; }
+  .roll-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px; }
+  .roll-card{ border:1px solid #333; border-radius:4px; padding:14px; background:#1a1508; }
+  .roll-head{ display:flex; gap:10px; align-items:flex-start; margin-bottom:10px; }
+  .roll-head img{ width:40px; height:40px; object-fit:cover; border-radius:3px; flex-shrink:0; background:#000; }
+  .roll-section-label{ color:#f0a830; font-size:10px; text-transform:uppercase; letter-spacing:0.06em; margin:10px 0 5px; }
+  .stat-row{ display:flex; justify-content:space-between; font-size:11px; color:#d8cfba; padding:2px 0; }
+  .stat-row .val{ color:#f0a830; font-family:'JetBrains Mono', monospace; }
+  .socket-chip{ display:flex; align-items:center; gap:6px; background:#241c0c; border:1px solid #3a3020; border-radius:3px; padding:4px 7px; margin-bottom:5px; }
+  .socket-chip img{ width:18px; height:18px; object-fit:cover; border-radius:2px; background:#000; flex-shrink:0; }
+  .socket-chip.disabled{ opacity:0.45; }
+  .empty-note{ color:#666; font-style:italic; font-size:11px; }
+  .roll-raw-toggle{ color:#666; cursor:pointer; font-size:10px; margin-top:8px; display:inline-block; }
+  .roll-raw{ display:none; white-space:pre-wrap; background:#000; color:#8f8; padding:8px; border-radius:3px; margin-top:6px; max-height:220px; overflow:auto; font-size:9.5px; }
+  .roll-raw.open{ display:block; }
 </style>
 </head>
 <body>
 
 <h1>Xur: Full Unfiltered Inventory Debug</h1>
 <p class="note">Shows every category Bungie's API actually returns for Xur this pull, with real category names and every item resolved (name/type/class), nothing filtered out. Point of this page is to see the whole picture before deciding what goes on this-week.html. Delete once done.</p>
+<p class="note" style="color:#f0a830;">Note: the names/types below are just item definitions, the same for every player. To see the actual stat rolls, sockets, and perks on Xur's gear, sign in with a Bungie.net account in the "Live Roll Detail" section further down this page.</p>
 
 <div id="status" class="status">Loading…</div>
 <div id="output"></div>
 
+<h1 style="margin-top:36px;">Live Roll Detail (OAuth)</h1>
+<p class="note">The item picture above is just the definition — same for every player. This pulls the actual stat roll, sockets, and perks on <em>your</em> signed-in character's copy of each Xûr sale item via <code>Character/{id}/Vendors/2190858386/?components=402,300,302,304,305</code>.</p>
+<div id="roll-auth-box" class="status">Checking sign-in status…</div>
+<div id="roll-status" class="status">Sign in above to load this.</div>
+<div id="roll-output"></div>
+
 <script src="assets/api-keys.js"></script>
+<script src="assets/oauth.js"></script>
 <script>
 (function(){
   const BUNGIE_API_KEY = window.RallyFlagAPI.BUNGIE_API_KEY;
@@ -147,7 +171,185 @@
     }
   }
 
+  // ---------------- Live roll detail (OAuth) ----------------
+  const statDefCache = {};
+  async function fetchStatName(hash){
+    if (statDefCache[hash] !== undefined) return statDefCache[hash];
+    try {
+      const def = await apiGet("/Platform/Destiny2/Manifest/DestinyStatDefinition/" + hash + "/");
+      const name = (def.displayProperties && def.displayProperties.name) || ("Stat " + hash);
+      statDefCache[hash] = name;
+      return name;
+    } catch (err){
+      statDefCache[hash] = "Stat " + hash;
+      return statDefCache[hash];
+    }
+  }
+
+  async function authedApiGet(path){
+    const res = await RallyFlagAuth.authedFetch(path);
+    const data = await res.json();
+    if (!res.ok || data.ErrorCode !== 1){
+      throw new Error((data && data.Message) || ("HTTP " + res.status));
+    }
+    return data.Response;
+  }
+
+  // Same pair every OAuth-gated call on this page needs: the account's
+  // primary Destiny membership, then its most recently-played character.
+  async function resolvePrimaryCharacter(){
+    const memberships = await authedApiGet("/Platform/User/GetMembershipsForCurrentUser/");
+    const destinyMemberships = memberships.destinyMemberships || [];
+    if (!destinyMemberships.length) throw new Error("This Bungie account has no linked Destiny 2 platform.");
+    const primary = destinyMemberships.find(m => m.membershipId === memberships.primaryMembershipId) || destinyMemberships[0];
+
+    const profile = await authedApiGet("/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId + "/?components=200");
+    const characters = (profile.characters && profile.characters.data) || {};
+    const characterIds = Object.keys(characters);
+    if (!characterIds.length) throw new Error("No characters found on this account's primary membership.");
+    characterIds.sort((a, b) => new Date(characters[b].dateLastPlayed) - new Date(characters[a].dateLastPlayed));
+
+    return { membershipType: primary.membershipType, membershipId: primary.membershipId, characterId: characterIds[0] };
+  }
+
+  function renderAuthBox(){
+    const box = document.getElementById("roll-auth-box");
+    if (RallyFlagAuth.isSignedIn()){
+      box.className = "status ok";
+      box.innerHTML = 'Signed in as ' + (RallyFlagAuth.getDisplayName() || "Bungie.net user") +
+        ' — <a href="#" id="roll-auth-signout" class="auth-link">sign out</a>';
+      document.getElementById("roll-auth-signout").addEventListener("click", (e) => { e.preventDefault(); RallyFlagAuth.signOut(); });
+      runLiveRollDetail();
+    } else {
+      box.className = "status";
+      box.innerHTML = '<a href="#" id="roll-auth-signin" class="auth-link">Sign in with Bungie.net</a> to load live roll detail below.';
+      document.getElementById("roll-auth-signin").addEventListener("click", (e) => { e.preventDefault(); RallyFlagAuth.signIn(); });
+      const statusEl = document.getElementById("roll-status");
+      statusEl.className = "status";
+      statusEl.textContent = "Sign in above to load this.";
+      document.getElementById("roll-output").innerHTML = "";
+    }
+  }
+
+  async function runLiveRollDetail(){
+    const statusEl = document.getElementById("roll-status");
+    const outputEl = document.getElementById("roll-output");
+    statusEl.className = "status";
+    statusEl.textContent = "Resolving your Destiny character…";
+    outputEl.innerHTML = "";
+
+    try {
+      const { membershipType, membershipId, characterId } = await resolvePrimaryCharacter();
+
+      statusEl.textContent = "Pulling live roll detail from Xur…";
+      const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
+        "/Character/" + characterId + "/Vendors/" + XUR_VENDOR_HASH + "/?components=402,300,302,304,305";
+      const vendorResp = await authedApiGet(path);
+
+      const sales = (vendorResp.sales && vendorResp.sales.data) || {};
+      const saleList = Object.values(sales);
+      if (!saleList.length){
+        statusEl.className = "status err";
+        statusEl.textContent = "Signed in, but no live sale items came back for Xur this pull.";
+        return;
+      }
+
+      const itemComponents = vendorResp.itemComponents || {};
+      const statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
+      const socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
+
+      statusEl.className = "status ok";
+      statusEl.textContent = "OK: roll detail pulled for " + saleList.length + " item(s)";
+
+      const grid = document.createElement("div");
+      grid.className = "roll-grid";
+      outputEl.appendChild(grid);
+
+      let rawIdCounter = 0;
+      for (const saleItem of saleList){
+        const idx = saleItem.vendorItemIndex;
+        const itemDef = await fetchItemDef(saleItem.itemHash);
+
+        const card = document.createElement("div");
+        card.className = "roll-card";
+
+        let html =
+          '<div class="roll-head">' +
+            (itemDef.icon ? '<img src="' + itemDef.icon + '" alt="">' : '') +
+            '<div>' +
+              '<div class="item-name">' + itemDef.name + '</div>' +
+              '<div class="item-type">' + itemDef.typeName + '</div>' +
+              '<div class="item-class">' + CLASS_LABELS[itemDef.classType] + '</div>' +
+            '</div>' +
+          '</div>';
+
+        const statEntry = statsByIndex[idx];
+        const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
+        html += '<div class="roll-section-label">Stats</div>';
+        if (!stats.length){
+          html += '<div class="empty-note">no stat roll on this item</div>';
+        } else {
+          html += '<div id="stats-' + idx + '"></div>';
+        }
+
+        const socketEntry = socketsByIndex[idx];
+        const sockets = (socketEntry && socketEntry.sockets) || [];
+        html += '<div class="roll-section-label">Sockets (' + sockets.length + ')</div>';
+        if (!sockets.length){
+          html += '<div class="empty-note">no socket data on this item</div>';
+        } else {
+          html += '<div id="sockets-' + idx + '"></div>';
+        }
+
+        const rawId = "roll-raw-" + (rawIdCounter++);
+        html += '<span class="roll-raw-toggle" data-target="' + rawId + '">▸ raw item components</span>';
+        html += '<pre class="roll-raw" id="' + rawId + '"></pre>';
+
+        card.innerHTML = html;
+        grid.appendChild(card);
+
+        const rawEl = document.getElementById(rawId);
+        rawEl.textContent = JSON.stringify({ sale: saleItem, stats: statEntry, sockets: socketEntry }, null, 2);
+        card.querySelector(".roll-raw-toggle").addEventListener("click", (e) => {
+          rawEl.classList.toggle("open");
+          e.target.textContent = (e.target.textContent[0] === "▸" ? "▾" : "▸") + " raw item components";
+        });
+
+        if (stats.length){
+          const statsEl = document.getElementById("stats-" + idx);
+          for (const stat of stats){
+            const name = await fetchStatName(stat.statHash);
+            statsEl.insertAdjacentHTML("beforeend",
+              '<div class="stat-row"><span>' + name + '</span><span class="val">' + stat.value + '</span></div>');
+          }
+        }
+
+        if (sockets.length){
+          const socketsEl = document.getElementById("sockets-" + idx);
+          for (const socket of sockets){
+            if (!socket.plugHash){
+              socketsEl.insertAdjacentHTML("beforeend", '<div class="socket-chip disabled">empty socket</div>');
+              continue;
+            }
+            const plugDef = await fetchItemDef(socket.plugHash);
+            const cls = socket.isEnabled === false ? "socket-chip disabled" : "socket-chip";
+            socketsEl.insertAdjacentHTML("beforeend",
+              '<div class="' + cls + '">' +
+                (plugDef.icon ? '<img src="' + plugDef.icon + '" alt="">' : '') +
+                '<span>' + plugDef.name + (socket.isEnabled === false ? " (disabled)" : "") + '</span>' +
+              '</div>');
+          }
+        }
+      }
+    } catch (err){
+      statusEl.className = "status err";
+      statusEl.textContent = "Error: " + err.message;
+    }
+  }
+
   run();
+  renderAuthBox();
+  RallyFlagAuth.onChange(renderAuthBox);
 })();
 </script>
 
