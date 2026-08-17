@@ -557,7 +557,16 @@
       const { membershipType, membershipId, characters } = await resolveAllCharacters();
 
       const vendorHashesSeen = new Set();
-      const itemsByHash = new Map(); // itemHash -> { sale, seenOn: Set<classLabel> }
+      // Keyed by itemHash + a normalized signature of its costs, not just
+      // itemHash — Tess can list the same item more than once at genuinely
+      // different prices (e.g. a Bright Dust rotation slot AND a separate
+      // permanent Silver listing). Keying on itemHash alone collapsed
+      // those into one and silently dropped whichever was seen second,
+      // which is exactly why Bright Dust items were vanishing.
+      const itemsByKey = new Map(); // itemHash|costSignature -> { sale, seenOn: Set<classLabel> }
+      function costSignature(costs){
+        return (costs || []).map(c => c.itemHash + ":" + c.quantity).sort().join(",");
+      }
       let tessHash = null;
       let tessName = null;
 
@@ -588,8 +597,9 @@
         if (tessHash && salesData[tessHash]){
           const saleItems = Object.values(salesData[tessHash].saleItems || {});
           for (const sale of saleItems){
-            if (!itemsByHash.has(sale.itemHash)) itemsByHash.set(sale.itemHash, { sale, seenOn: new Set() });
-            itemsByHash.get(sale.itemHash).seenOn.add(classLabel);
+            const key = sale.itemHash + "|" + costSignature(sale.costs);
+            if (!itemsByKey.has(key)) itemsByKey.set(key, { sale, seenOn: new Set() });
+            itemsByKey.get(key).seenOn.add(classLabel);
           }
         }
       }
@@ -631,7 +641,7 @@
 
       if (!tessHash) return;
 
-      const allItems = Array.from(itemsByHash.values());
+      const allItems = Array.from(itemsByKey.values());
       const allClassLabels = characters.map(c => c.classLabel);
 
       // Resolve names/costs for every item first, and group by currency —
