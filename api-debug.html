@@ -70,7 +70,7 @@
 <h2>Eververse (Tess Everis)</h2>
 <p class="note">Prod already chased this down once, before this site had OAuth: Bungie's <em>public/anonymous</em> Vendors endpoint drops Tess entirely, confirmed via a 3-way diagnostic (full request, bare Vendors-only request, and her own definition fetched directly — she came back <code>enabled:true</code>, genuinely active, the endpoint just can't serve her). Matches Bungie's documented rule that a vendor gets dropped wholesale from the public endpoint if any part of it can't be computed identically for everyone. Prod ended up sourcing her from a third-party feed, <a href="https://eververse.report/" target="_blank" rel="noopener">eververse.report</a>, instead — noted then as a stopgap "until this site has its own OAuth login."</p>
 <p class="note">That's now. This calls the <em>authenticated, character-scoped</em> <code>Character/{id}/Vendors/?components=400,402</code> — untested territory, since it wasn't an option before. No hash is hardcoded or guessed: whatever resolves to "Tess Everis" or "Eververse" among every vendor live for the signed-in character gets its real hash surfaced here. Confirmed working — she showed up. Since her catalog is per-character (an already-owned item drops off <em>that</em> character's list even though another character could still buy it), this queries every character on the account and merges the results; anything that isn't universal across all of them gets tagged with which class(es) it actually showed up for. If she still doesn't turn up this way, eververse.report is the proven fallback.</p>
-<p class="note">Catalog below is grouped by whatever currency each item's own cost data resolves to (not hardcoded/assumed) — the Bright Dust rotation refreshes at daily reset, so what shows up here is only good until tomorrow's reset. Bungie's API generally can't carry real-money Silver costs at all (those purchases route through platform stores, not this endpoint), so items with no cost data get their own bucket rather than being labeled "free" — that bucket is most likely Silver items, worth confirming against what actually shows in-game.</p>
+<p class="note">Items are grouped by whatever currency each one's own cost data resolves to (not hardcoded/assumed), but only the Bright Dust group actually renders below — Silver and no-cost items are still counted in the header for context, just not shown as cards. The Bright Dust rotation refreshes at daily reset, so what's here is only good until tomorrow's reset.</p>
 <div id="ev-status" class="status">Sign in above to load this.</div>
 <div id="ev-output"></div>
 
@@ -693,16 +693,19 @@
       catalogHeader.className = "section-label";
       catalogHeader.style.marginTop = "20px";
       const groupCounts = Array.from(groups.entries()).map(([k, v]) => v.length + " " + k).join(" · ");
-      catalogHeader.textContent = tessName + " — Full Sale Catalog, merged across " + characters.length + " character(s) (" + allItems.length + " total: " + groupCounts + ")";
+      catalogHeader.textContent = tessName + " — Bright Dust only (full breakdown across " + characters.length + " character(s), " + allItems.length + " total: " + groupCounts + ")";
       outputEl.appendChild(catalogHeader);
 
-      // Sort so real currencies (Bright Dust, event tokens, etc.) come
-      // first and the "likely Silver" fallback bucket sits last.
-      const sortedGroupKeys = Array.from(groups.keys()).sort((a, b) => {
-        if (a === NO_COST_GROUP) return 1;
-        if (b === NO_COST_GROUP) return -1;
-        return a.localeCompare(b);
-      });
+      // Only render Bright Dust groups — Silver/other currencies are
+      // still counted in the header above for context, just not shown
+      // as cards.
+      const sortedGroupKeys = Array.from(groups.keys())
+        .filter(k => /bright dust/i.test(k))
+        .sort((a, b) => a.localeCompare(b));
+
+      if (!sortedGroupKeys.length){
+        outputEl.insertAdjacentHTML("beforeend", '<div class="desc">No Bright Dust offers came back this pull.</div>');
+      }
 
       for (const groupKey of sortedGroupKeys){
         const groupItems = groups.get(groupKey);
