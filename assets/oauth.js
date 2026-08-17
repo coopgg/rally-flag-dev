@@ -162,7 +162,22 @@ window.RallyFlagAuth = (function(){
 
     const returnTo = sessionStorage.getItem(RETURN_KEY) || "index.html";
     sessionStorage.removeItem(RETURN_KEY);
-    return returnTo;
+
+    // Diagnostic summary for oauth-callback.html to display — Bungie's
+    // token response field names are assumed (access_token, expires_in,
+    // refresh_token, refresh_expires_in); this surfaces what actually
+    // came back so a mismatch is visible instead of silently producing
+    // an auth object that reads as "signed out".
+    return {
+      returnTo,
+      displayName: auth.display_name,
+      responseKeys: Object.keys(data || {}),
+      hasAccessToken: !!auth.access_token,
+      hasRefreshToken: !!auth.refresh_token,
+      accessExpiresInSec: typeof data.expires_in === "number" ? data.expires_in : null,
+      refreshExpiresInSec: typeof data.refresh_expires_in === "number" ? data.refresh_expires_in : null,
+      isSignedIn: isSignedIn()
+    };
   }
 
   async function refresh(auth){
