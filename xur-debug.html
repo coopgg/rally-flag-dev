@@ -43,13 +43,14 @@
 
 <h1>Xur: Full Unfiltered Inventory Debug</h1>
 <p class="note">Shows every category Bungie's API actually returns for Xur this pull, with real category names and every item resolved (name/type/class), nothing filtered out. Point of this page is to see the whole picture before deciding what goes on this-week.html. Delete once done.</p>
+<p class="note" style="color:#f0a830;">Confirmed live: Xur's boutique is actually 3 separate vendor hashes, not one — his main storefront (2190858386) plus two clickable sub-menus, "More Strange Offers" (3751514131) and "Strange Gear Offers" (537912098), each a full vendor in its own right with its own sale items. The "More Strange Offers"/"Strange Gear Offers" entries under his main hash's own category are just portal tiles pointing at these two — this page now pulls all three separately, below.</p>
 <p class="note" style="color:#f0a830;">Note: the names/types below are just item definitions, the same for every player. To see the actual stat rolls, sockets, and perks on Xur's gear, sign in with a Bungie.net account in the "Live Roll Detail" section further down this page.</p>
 
 <div id="status" class="status">Loading…</div>
 <div id="output"></div>
 
 <h1 style="margin-top:36px;">Live Roll Detail (OAuth)</h1>
-<p class="note">The item picture above is just the definition — same for every player. This pulls the actual stat roll, sockets, and perks on <em>your</em> signed-in character's copy of each Xûr sale item via <code>Character/{id}/Vendors/2190858386/?components=402,300,302,304,305</code>.</p>
+<p class="note">The item picture above is just the definition — same for every player. This pulls the actual stat roll, sockets, and perks on <em>your</em> signed-in character's copy of each sale item across all 3 of Xur's vendor hashes via <code>Character/{id}/Vendors/{hash}/?components=402,300,302,304,305</code>.</p>
 <div id="roll-auth-box" class="status">Checking sign-in status…</div>
 <div id="roll-status" class="status">Sign in above to load this.</div>
 <div id="roll-output"></div>
@@ -61,6 +62,15 @@
   const BUNGIE_API_KEY = window.RallyFlagAPI.BUNGIE_API_KEY;
   const BUNGIE_ROOT = "https://www.bungie.net";
   const XUR_VENDOR_HASH = "2190858386";
+  // Confirmed live: Xur's boutique is actually 3 separate vendor hashes,
+  // not one — his main storefront plus two clickable sub-menus ("More
+  // Strange Offers" and "Strange Gear Offers") that are each their own
+  // full DestinyVendorDefinition with their own sale items, not just
+  // categories under his main hash. The "More Strange Offers"/"Strange
+  // Gear Offers" items shown under his main hash's own category are just
+  // portal tiles that point at these two.
+  const XUR_SUBVENDOR_HASHES = ["3751514131", "537912098"];
+  const ALL_XUR_VENDOR_HASHES = [XUR_VENDOR_HASH, ...XUR_SUBVENDOR_HASHES];
 
   async function apiGet(path){
     const res = await fetch(BUNGIE_ROOT + path, { headers: { "X-API-Key": BUNGIE_API_KEY } });
@@ -97,74 +107,92 @@
   async function run(){
     const statusEl = document.getElementById("status");
     const outputEl = document.getElementById("output");
+    outputEl.innerHTML = "";
     try {
       const vendorsResp = await apiGet("/Platform/Destiny2/Vendors/?components=Vendors,VendorCategories,VendorSales");
-      const vendorEntry = vendorsResp.vendors && vendorsResp.vendors.data && vendorsResp.vendors.data[XUR_VENDOR_HASH];
 
-      if (!vendorEntry){
-        statusEl.className = "status err";
-        statusEl.textContent = "Xur vendor entry not present this pull. He may not be active right now.";
-        return;
-      }
+      let totalCategories = 0;
+      let totalItems = 0;
+      let anyVendorFound = false;
 
-      const saleItems = (vendorsResp.sales && vendorsResp.sales.data && vendorsResp.sales.data[XUR_VENDOR_HASH] && vendorsResp.sales.data[XUR_VENDOR_HASH].saleItems) || {};
-      const categoriesRaw = (vendorsResp.categories && vendorsResp.categories.data && vendorsResp.categories.data[XUR_VENDOR_HASH] && vendorsResp.categories.data[XUR_VENDOR_HASH].categories) || [];
-      const saleList = Object.values(saleItems);
+      for (const vendorHash of ALL_XUR_VENDOR_HASHES){
+        const vendorEntry = vendorsResp.vendors && vendorsResp.vendors.data && vendorsResp.vendors.data[vendorHash];
+        const vendorDef = await apiGet("/Platform/Destiny2/Manifest/DestinyVendorDefinition/" + vendorHash + "/").catch(() => null);
+        const vName = (vendorDef && vendorDef.displayProperties && vendorDef.displayProperties.name) || ("Unknown (" + vendorHash + ")");
 
-      if (!saleList.length){
-        statusEl.className = "status err";
-        statusEl.textContent = "Vendor entry present, but no sale items came back.";
-        return;
-      }
+        const sectionHeader = document.createElement("h1");
+        sectionHeader.style.fontSize = "14px";
+        sectionHeader.style.marginTop = "28px";
+        sectionHeader.textContent = vName + " (hash " + vendorHash + ")";
+        outputEl.appendChild(sectionHeader);
 
-      const vendorDef = await apiGet("/Platform/Destiny2/Manifest/DestinyVendorDefinition/" + XUR_VENDOR_HASH + "/");
-      const categoryNames = {};
-      (vendorDef.displayCategories || []).forEach((cat, i) => {
-        categoryNames[i] = (cat.displayProperties && cat.displayProperties.name) || ("Category " + i);
-      });
+        if (!vendorEntry){
+          outputEl.insertAdjacentHTML("beforeend", '<div class="note" style="color:#ff8080;">Not present in the anonymous Vendors response this pull — try the Live Roll Detail (OAuth) section below instead.</div>');
+          continue;
+        }
 
-      const bySaleIndex = {};
-      saleList.forEach(item => { bySaleIndex[item.vendorItemIndex] = item; });
+        const saleItems = (vendorsResp.sales && vendorsResp.sales.data && vendorsResp.sales.data[vendorHash] && vendorsResp.sales.data[vendorHash].saleItems) || {};
+        const categoriesRaw = (vendorsResp.categories && vendorsResp.categories.data && vendorsResp.categories.data[vendorHash] && vendorsResp.categories.data[vendorHash].categories) || [];
+        const saleList = Object.values(saleItems);
 
-      statusEl.className = "status ok";
-      statusEl.textContent = "OK: " + categoriesRaw.length + " categories, " + saleList.length + " total sale items";
+        if (!saleList.length){
+          outputEl.insertAdjacentHTML("beforeend", '<div class="note">Vendor entry present, but no sale items came back.</div>');
+          continue;
+        }
 
-      outputEl.innerHTML = "";
-      for (const cat of categoriesRaw){
-        const catName = categoryNames[cat.displayCategoryIndex] || ("Category " + cat.displayCategoryIndex);
-        const itemsInCat = (cat.itemIndexes || []).map(i => bySaleIndex[i]).filter(Boolean);
+        anyVendorFound = true;
+        totalCategories += categoriesRaw.length;
+        totalItems += saleList.length;
 
-        const catWrap = document.createElement("div");
-        catWrap.className = "category";
-        const nameEl = document.createElement("div");
-        nameEl.className = "category-name";
-        nameEl.textContent = catName;
-        catWrap.appendChild(nameEl);
-        const countEl = document.createElement("div");
-        countEl.className = "category-count";
-        countEl.textContent = itemsInCat.length + " item(s)";
-        catWrap.appendChild(countEl);
+        const categoryNames = {};
+        (vendorDef.displayCategories || []).forEach((cat, i) => {
+          categoryNames[i] = (cat.displayProperties && cat.displayProperties.name) || ("Category " + i);
+        });
 
-        const grid = document.createElement("div");
-        grid.className = "item-grid";
-        catWrap.appendChild(grid);
-        outputEl.appendChild(catWrap);
+        const bySaleIndex = {};
+        saleList.forEach(item => { bySaleIndex[item.vendorItemIndex] = item; });
 
-        for (const saleItem of itemsInCat){
-          const itemDef = await fetchItemDef(saleItem.itemHash);
-          const itemEl = document.createElement("div");
-          itemEl.className = "item";
-          itemEl.innerHTML =
-            (itemDef.icon ? '<img src="' + itemDef.icon + '" alt="">' : '<div style="width:40px;height:40px;background:#000;border-radius:3px;flex-shrink:0;"></div>') +
-            '<div>' +
-              '<div class="item-name">' + itemDef.name + '</div>' +
-              '<div class="item-type">' + itemDef.typeName + '</div>' +
-              '<div class="item-class">' + CLASS_LABELS[itemDef.classType] + '</div>' +
-              '<div class="item-hash">hash: ' + saleItem.itemHash + '</div>' +
-            '</div>';
-          grid.appendChild(itemEl);
+        for (const cat of categoriesRaw){
+          const catName = categoryNames[cat.displayCategoryIndex] || ("Category " + cat.displayCategoryIndex);
+          const itemsInCat = (cat.itemIndexes || []).map(i => bySaleIndex[i]).filter(Boolean);
+
+          const catWrap = document.createElement("div");
+          catWrap.className = "category";
+          const nameEl = document.createElement("div");
+          nameEl.className = "category-name";
+          nameEl.textContent = catName;
+          catWrap.appendChild(nameEl);
+          const countEl = document.createElement("div");
+          countEl.className = "category-count";
+          countEl.textContent = itemsInCat.length + " item(s)";
+          catWrap.appendChild(countEl);
+
+          const grid = document.createElement("div");
+          grid.className = "item-grid";
+          catWrap.appendChild(grid);
+          outputEl.appendChild(catWrap);
+
+          for (const saleItem of itemsInCat){
+            const itemDef = await fetchItemDef(saleItem.itemHash);
+            const itemEl = document.createElement("div");
+            itemEl.className = "item";
+            itemEl.innerHTML =
+              (itemDef.icon ? '<img src="' + itemDef.icon + '" alt="">' : '<div style="width:40px;height:40px;background:#000;border-radius:3px;flex-shrink:0;"></div>') +
+              '<div>' +
+                '<div class="item-name">' + itemDef.name + '</div>' +
+                '<div class="item-type">' + itemDef.typeName + '</div>' +
+                '<div class="item-class">' + CLASS_LABELS[itemDef.classType] + '</div>' +
+                '<div class="item-hash">hash: ' + saleItem.itemHash + '</div>' +
+              '</div>';
+            grid.appendChild(itemEl);
+          }
         }
       }
+
+      statusEl.className = anyVendorFound ? "status ok" : "status err";
+      statusEl.textContent = anyVendorFound
+        ? "OK: " + totalCategories + " categories, " + totalItems + " total sale items across " + ALL_XUR_VENDOR_HASHES.length + " vendor(s)"
+        : "None of Xur's vendor hashes came back in the anonymous response this pull.";
     } catch (err){
       statusEl.className = "status err";
       statusEl.textContent = "Error: " + err.message;
@@ -241,111 +269,135 @@
     try {
       const { membershipType, membershipId, characterId } = await resolvePrimaryCharacter();
 
-      statusEl.textContent = "Pulling live roll detail from Xur…";
-      const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
-        "/Character/" + characterId + "/Vendors/" + XUR_VENDOR_HASH + "/?components=402,300,302,304,305";
-      const vendorResp = await authedApiGet(path);
-
-      const sales = (vendorResp.sales && vendorResp.sales.data) || {};
-      const saleList = Object.values(sales);
-      if (!saleList.length){
-        statusEl.className = "status err";
-        statusEl.textContent = "Signed in, but no live sale items came back for Xur this pull.";
-        return;
-      }
-
-      const itemComponents = vendorResp.itemComponents || {};
-      const statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
-      const socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
-
-      statusEl.className = "status ok";
-      statusEl.textContent = "OK: roll detail pulled for " + saleList.length + " item(s)";
-
-      const grid = document.createElement("div");
-      grid.className = "roll-grid";
-      outputEl.appendChild(grid);
-
+      let totalItems = 0;
       let rawIdCounter = 0;
-      for (const saleItem of saleList){
-        const idx = saleItem.vendorItemIndex;
-        const itemDef = await fetchItemDef(saleItem.itemHash);
 
-        const card = document.createElement("div");
-        card.className = "roll-card";
+      for (const vendorHash of ALL_XUR_VENDOR_HASHES){
+        statusEl.textContent = "Pulling live roll detail (vendor " + vendorHash + ")…";
 
-        let html =
-          '<div class="roll-head">' +
-            (itemDef.icon ? '<img src="' + itemDef.icon + '" alt="">' : '') +
-            '<div>' +
-              '<div class="item-name">' + itemDef.name + '</div>' +
-              '<div class="item-type">' + itemDef.typeName + '</div>' +
-              '<div class="item-class">' + CLASS_LABELS[itemDef.classType] + '</div>' +
-            '</div>' +
-          '</div>';
-
-        const statEntry = statsByIndex[idx];
-        const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
-        html += '<div class="roll-section-label">Stats</div>';
-        if (!stats.length){
-          html += '<div class="empty-note">no stat roll on this item</div>';
-        } else {
-          html += '<div id="stats-' + idx + '"></div>';
+        let vendorResp;
+        try {
+          const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
+            "/Character/" + characterId + "/Vendors/" + vendorHash + "/?components=402,300,302,304,305";
+          vendorResp = await authedApiGet(path);
+        } catch (err){
+          outputEl.insertAdjacentHTML("beforeend",
+            '<h1 style="font-size:14px;margin-top:24px;">Vendor ' + vendorHash + '</h1>' +
+            '<div class="note" style="color:#ff8080;">' + err.message + '</div>');
+          continue;
         }
 
-        // Bungie includes structural/bookkeeping sockets (catalyst trackers,
-        // hidden intrinsic slots, etc.) that carry a real plugHash but no
-        // displayProperties.name and isVisible:false — DIM and other tools
-        // hide these rather than show them as junk "Unknown" entries.
-        const socketEntry = socketsByIndex[idx];
-        const allSockets = (socketEntry && socketEntry.sockets) || [];
-        const sockets = allSockets.filter(s => s.isVisible !== false);
-        html += '<div class="roll-section-label">Sockets (' + sockets.length + ')</div>';
-        if (!sockets.length){
-          html += '<div class="empty-note">no socket data on this item</div>';
-        } else {
-          html += '<div id="sockets-' + idx + '"></div>';
+        const sales = (vendorResp.sales && vendorResp.sales.data) || {};
+        const saleList = Object.values(sales);
+        if (!saleList.length){
+          outputEl.insertAdjacentHTML("beforeend",
+            '<h1 style="font-size:14px;margin-top:24px;">Vendor ' + vendorHash + '</h1>' +
+            '<div class="note">Signed in, but no live sale items came back for this vendor.</div>');
+          continue;
         }
 
-        const rawId = "roll-raw-" + (rawIdCounter++);
-        html += '<span class="roll-raw-toggle" data-target="' + rawId + '">▸ raw item components</span>';
-        html += '<pre class="roll-raw" id="' + rawId + '"></pre>';
+        totalItems += saleList.length;
 
-        card.innerHTML = html;
-        grid.appendChild(card);
+        const itemComponents = vendorResp.itemComponents || {};
+        const statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
+        const socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
 
-        const rawEl = document.getElementById(rawId);
-        rawEl.textContent = JSON.stringify({ sale: saleItem, stats: statEntry, sockets: socketEntry }, null, 2);
-        card.querySelector(".roll-raw-toggle").addEventListener("click", (e) => {
-          rawEl.classList.toggle("open");
-          e.target.textContent = (e.target.textContent[0] === "▸" ? "▾" : "▸") + " raw item components";
-        });
+        const sectionHeader = document.createElement("h1");
+        sectionHeader.style.fontSize = "14px";
+        sectionHeader.style.marginTop = "24px";
+        sectionHeader.textContent = "Vendor " + vendorHash + " — " + saleList.length + " item(s)";
+        outputEl.appendChild(sectionHeader);
 
-        if (stats.length){
-          const statsEl = document.getElementById("stats-" + idx);
-          for (const stat of stats){
-            const name = await fetchStatName(stat.statHash);
-            statsEl.insertAdjacentHTML("beforeend",
-              '<div class="stat-row"><span>' + name + '</span><span class="val">' + stat.value + '</span></div>');
+        const grid = document.createElement("div");
+        grid.className = "roll-grid";
+        outputEl.appendChild(grid);
+
+        for (const saleItem of saleList){
+          const idx = vendorHash + "-" + saleItem.vendorItemIndex;
+          const itemDef = await fetchItemDef(saleItem.itemHash);
+
+          const card = document.createElement("div");
+          card.className = "roll-card";
+
+          let html =
+            '<div class="roll-head">' +
+              (itemDef.icon ? '<img src="' + itemDef.icon + '" alt="">' : '') +
+              '<div>' +
+                '<div class="item-name">' + itemDef.name + '</div>' +
+                '<div class="item-type">' + itemDef.typeName + '</div>' +
+                '<div class="item-class">' + CLASS_LABELS[itemDef.classType] + '</div>' +
+              '</div>' +
+            '</div>';
+
+          const statEntry = statsByIndex[idx];
+          const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
+          html += '<div class="roll-section-label">Stats</div>';
+          if (!stats.length){
+            html += '<div class="empty-note">no stat roll on this item</div>';
+          } else {
+            html += '<div id="stats-' + idx + '"></div>';
           }
-        }
 
-        if (sockets.length){
-          const socketsEl = document.getElementById("sockets-" + idx);
-          for (const socket of sockets){
-            if (!socket.plugHash){
-              socketsEl.insertAdjacentHTML("beforeend", '<div class="socket-chip disabled">empty socket</div>');
-              continue;
+          // Bungie includes structural/bookkeeping sockets (catalyst trackers,
+          // hidden intrinsic slots, etc.) that carry a real plugHash but no
+          // displayProperties.name and isVisible:false — DIM and other tools
+          // hide these rather than show them as junk "Unknown" entries.
+          const socketEntry = socketsByIndex[idx];
+          const allSockets = (socketEntry && socketEntry.sockets) || [];
+          const sockets = allSockets.filter(s => s.isVisible !== false);
+          html += '<div class="roll-section-label">Sockets (' + sockets.length + ')</div>';
+          if (!sockets.length){
+            html += '<div class="empty-note">no socket data on this item</div>';
+          } else {
+            html += '<div id="sockets-' + idx + '"></div>';
+          }
+
+          const rawId = "roll-raw-" + (rawIdCounter++);
+          html += '<span class="roll-raw-toggle" data-target="' + rawId + '">▸ raw item components</span>';
+          html += '<pre class="roll-raw" id="' + rawId + '"></pre>';
+
+          card.innerHTML = html;
+          grid.appendChild(card);
+
+          const rawEl = document.getElementById(rawId);
+          rawEl.textContent = JSON.stringify({ sale: saleItem, stats: statEntry, sockets: socketEntry }, null, 2);
+          card.querySelector(".roll-raw-toggle").addEventListener("click", (e) => {
+            rawEl.classList.toggle("open");
+            e.target.textContent = (e.target.textContent[0] === "▸" ? "▾" : "▸") + " raw item components";
+          });
+
+          if (stats.length){
+            const statsEl = document.getElementById("stats-" + idx);
+            for (const stat of stats){
+              const name = await fetchStatName(stat.statHash);
+              statsEl.insertAdjacentHTML("beforeend",
+                '<div class="stat-row"><span>' + name + '</span><span class="val">' + stat.value + '</span></div>');
             }
-            const plugDef = await fetchItemDef(socket.plugHash);
-            const cls = socket.isEnabled === false ? "socket-chip disabled" : "socket-chip";
-            socketsEl.insertAdjacentHTML("beforeend",
-              '<div class="' + cls + '">' +
-                (plugDef.icon ? '<img src="' + plugDef.icon + '" alt="">' : '') +
-                '<span>' + plugDef.name + (socket.isEnabled === false ? " (disabled)" : "") + '</span>' +
-              '</div>');
+          }
+
+          if (sockets.length){
+            const socketsEl = document.getElementById("sockets-" + idx);
+            for (const socket of sockets){
+              if (!socket.plugHash){
+                socketsEl.insertAdjacentHTML("beforeend", '<div class="socket-chip disabled">empty socket</div>');
+                continue;
+              }
+              const plugDef = await fetchItemDef(socket.plugHash);
+              const cls = socket.isEnabled === false ? "socket-chip disabled" : "socket-chip";
+              socketsEl.insertAdjacentHTML("beforeend",
+                '<div class="' + cls + '">' +
+                  (plugDef.icon ? '<img src="' + plugDef.icon + '" alt="">' : '') +
+                  '<span>' + plugDef.name + (socket.isEnabled === false ? " (disabled)" : "") + '</span>' +
+                '</div>');
+            }
           }
         }
       }
+
+      statusEl.className = totalItems ? "status ok" : "status err";
+      statusEl.textContent = totalItems
+        ? "OK: roll detail pulled for " + totalItems + " item(s) across " + ALL_XUR_VENDOR_HASHES.length + " vendor(s)"
+        : "Signed in, but no live sale items came back from any of Xur's vendor hashes this pull.";
     } catch (err){
       statusEl.className = "status err";
       statusEl.textContent = "Error: " + err.message;
