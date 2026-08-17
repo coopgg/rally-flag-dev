@@ -88,6 +88,11 @@
 <div id="ada-status" class="status">Sign in above to load this.</div>
 <div id="ada-output"></div>
 
+<h2>All Vendors Dump (OAuth)</h2>
+<p class="note">Every vendor hash <code>Character/{id}/Vendors/?components=400,402</code> returns for the signed-in character(s) — not just the curated <code>KNOWN_VENDORS</code> list above. This is exactly how Xur's two sub-vendors, Zavala's Arsenal hash, and Eververse's Bright Dust stubs all got found: some of what shows up here as its own "vendor" is really a menu living inside another vendor's kiosk (a class-loadout tab, a focusing sub-screen, a portal tile), not a real NPC — sorted by name so real vendors and reused menu labels are easy to tell apart at a glance. Sale item counts come from the bulk response only, so a genuine stub vendor can still show 0 here even when it has real items — paste its hash into Vendor Hash Lookup above to check directly, the same way Zavala's and Ada-1's hashes got confirmed.</p>
+<div id="dump-status" class="status">Sign in above to load this.</div>
+<div id="dump-output"></div>
+
 <script src="assets/api-keys.js"></script>
 <script src="assets/oauth.js"></script>
 <script>
@@ -414,6 +419,7 @@
       runVendorLookup(document.getElementById("lookup-hash-input").value.trim());
       runEververse();
       runAda1();
+      runAllVendorsDump();
     } else {
       box.className = "status";
       box.innerHTML = '<a href="#" id="auth-signin" style="color:inherit;">Sign in with Bungie.net</a> to load live vendor sales below.';
@@ -434,6 +440,10 @@
       adaStatus.className = "status";
       adaStatus.textContent = "Sign in above to load this.";
       document.getElementById("ada-output").innerHTML = "";
+      const dumpStatus = document.getElementById("dump-status");
+      dumpStatus.className = "status";
+      dumpStatus.textContent = "Sign in above to load this.";
+      document.getElementById("dump-output").innerHTML = "";
     }
   }
 
@@ -995,6 +1005,95 @@
       const grid = document.createElement("div");
       grid.className = "vendor-grid";
       grid.innerHTML = shaderCards.join("");
+      outputEl.appendChild(grid);
+    } catch (err){
+      statusEl.className = "status err";
+      statusEl.textContent = "Error: " + err.message;
+    }
+  }
+
+  // ---------------- All Vendors Dump ----------------
+  // Every vendor hash the bulk Character/Vendors/ call returns, not just
+  // KNOWN_VENDORS — the browse-everything tool that found Xur's two
+  // sub-vendors, Zavala's Arsenal hash, and Eververse's Bright Dust
+  // stubs in the first place. Sale item counts come from the bulk
+  // response only (no per-stub individual fallback call, unlike
+  // Eververse/Ada-1/Vanguard above) — with 200+ vendors typically live
+  // per character, resolving every stub's real contents here would mean
+  // hundreds of extra sequential calls just to browse names. A vendor
+  // showing "0 items" here can still have real contents when queried
+  // directly — that's what Vendor Hash Lookup above is for.
+  async function runAllVendorsDump(){
+    const statusEl = document.getElementById("dump-status");
+    const outputEl = document.getElementById("dump-output");
+    statusEl.className = "status";
+    statusEl.textContent = "Resolving your Destiny characters…";
+    outputEl.innerHTML = "";
+
+    try {
+      const { membershipType, membershipId, characters } = await resolveAllCharacters();
+      const byHash = new Map(); // hash -> { seenOn: Set<classLabel>, maxSaleCount: number }
+
+      for (let i = 0; i < characters.length; i++){
+        const { characterId, classLabel } = characters[i];
+        statusEl.textContent = "Pulling vendor list for " + classLabel + " character (" + (i + 1) + "/" + characters.length + ")…";
+
+        const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
+          "/Character/" + characterId + "/Vendors/?components=400,402";
+        const resp = await authedApiGet(path);
+        const vendorsData = (resp.vendors && resp.vendors.data) || {};
+        const salesData = (resp.sales && resp.sales.data) || {};
+
+        for (const hash of Object.keys(vendorsData)){
+          const saleCount = salesData[hash] ? Object.keys(salesData[hash].saleItems || {}).length : 0;
+          if (!byHash.has(hash)) byHash.set(hash, { seenOn: new Set(), maxSaleCount: 0 });
+          const entry = byHash.get(hash);
+          entry.seenOn.add(classLabel);
+          entry.maxSaleCount = Math.max(entry.maxSaleCount, saleCount);
+        }
+      }
+
+      if (!byHash.size){
+        statusEl.className = "status err";
+        statusEl.textContent = "Signed in, but no vendors came back live across any character right now.";
+        return;
+      }
+
+      statusEl.textContent = "Resolving " + byHash.size + " vendor name(s)…";
+      const resolved = [];
+      for (const [hash, entry] of byHash.entries()){
+        let vDef = await fetchDef("DestinyVendorDefinition", hash);
+        if (!vDef){
+          delete defCache["DestinyVendorDefinition:" + hash];
+          vDef = await fetchDef("DestinyVendorDefinition", hash);
+        }
+        const name = (vDef && vDef.displayProperties && vDef.displayProperties.name) || ("Unknown (" + hash + ")");
+        resolved.push({ hash, name, icon: vDef ? iconUrl(vDef.displayProperties) : null, seenOn: entry.seenOn, saleCount: entry.maxSaleCount });
+      }
+      resolved.sort((a, b) => a.name.localeCompare(b.name) || a.hash.localeCompare(b.hash));
+
+      statusEl.className = "status ok";
+      statusEl.textContent = "OK: " + resolved.length + " vendor(s) live across " + characters.length + " character(s)";
+
+      const allClassLabels = characters.map(c => c.classLabel);
+      const grid = document.createElement("div");
+      grid.className = "vendor-grid";
+      resolved.forEach(v => {
+        const isUniversal = allClassLabels.every(c => v.seenOn.has(c));
+        const classBadge = isUniversal ? "" : '<span class="badge unavailable">' + Array.from(v.seenOn).join(", ") + " only</span>";
+        const saleBadge = '<span class="badge ' + (v.saleCount ? "available" : "unknown") + '">' + v.saleCount + " item(s)</span>";
+        grid.insertAdjacentHTML("beforeend",
+          '<div class="card">' +
+            '<div class="card-head">' +
+              (v.icon ? '<img src="' + v.icon + '" alt="">' : '') +
+              '<div>' +
+                '<div class="card-name">' + v.name + '</div>' +
+                '<div class="card-hash">hash: ' + v.hash + '</div>' +
+                saleBadge + classBadge +
+              '</div>' +
+            '</div>' +
+          '</div>');
+      });
       outputEl.appendChild(grid);
     } catch (err){
       statusEl.className = "status err";
