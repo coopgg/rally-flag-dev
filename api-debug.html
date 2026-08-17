@@ -67,6 +67,15 @@
 <div id="live-vendor-status" class="status">Sign in above to load this.</div>
 <div id="live-vendor-output"></div>
 
+<h2>Vendor Hash Lookup (OAuth)</h2>
+<p class="note">Ad-hoc tool for checking any specific vendor hash directly — <code>Character/{id}/Vendors/{hash}/?components=402</code> against your most recently played character. Prefilled with <code>153857624</code>, a guess at Zavala's weekly-purchasable weapon rotation.</p>
+<div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
+  <input type="text" id="lookup-hash-input" value="153857624" style="background:#1a1a1f; border:1px solid #2c2c33; color:#e4e4e8; padding:6px 10px; border-radius:3px; font-family:'JetBrains Mono', monospace; font-size:12px; width:160px;">
+  <button id="lookup-hash-btn" style="background:#1a2a3a; color:#7fbfff; border:1px solid #2c2c33; padding:6px 14px; border-radius:3px; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:12px;">Look up</button>
+</div>
+<div id="lookup-status" class="status">Sign in above to load this.</div>
+<div id="lookup-output"></div>
+
 <h2>Eververse (Tess Everis)</h2>
 <p class="note">Prod already chased this down once, before this site had OAuth: Bungie's <em>public/anonymous</em> Vendors endpoint drops Tess entirely, confirmed via a 3-way diagnostic (full request, bare Vendors-only request, and her own definition fetched directly — she came back <code>enabled:true</code>, genuinely active, the endpoint just can't serve her). Matches Bungie's documented rule that a vendor gets dropped wholesale from the public endpoint if any part of it can't be computed identically for everyone. Prod ended up sourcing her from a third-party feed, <a href="https://eververse.report/" target="_blank" rel="noopener">eververse.report</a>, instead — noted then as a stopgap "until this site has its own OAuth login."</p>
 <p class="note">That's now. This calls the <em>authenticated, character-scoped</em> <code>Character/{id}/Vendors/?components=400,402</code> — untested territory, since it wasn't an option before. No hash is hardcoded or guessed: whatever resolves to "Tess Everis" or "Eververse" among every vendor live for the signed-in character gets its real hash surfaced here. Confirmed working — she showed up. Since her catalog is per-character (an already-owned item drops off <em>that</em> character's list even though another character could still buy it), this queries every character on the account and merges the results; anything that isn't universal across all of them gets tagged with which class(es) it actually showed up for. If she still doesn't turn up this way, eververse.report is the proven fallback.</p>
@@ -397,6 +406,7 @@
         ' — <a href="#" id="auth-signout" style="color:inherit;">sign out</a>';
       document.getElementById("auth-signout").addEventListener("click", (e) => { e.preventDefault(); RallyFlagAuth.signOut(); });
       runLiveVendorSales();
+      runVendorLookup(document.getElementById("lookup-hash-input").value.trim());
       runEververse();
     } else {
       box.className = "status";
@@ -406,6 +416,10 @@
       liveStatus.className = "status";
       liveStatus.textContent = "Sign in above to load this.";
       document.getElementById("live-vendor-output").innerHTML = "";
+      const lookupStatus = document.getElementById("lookup-status");
+      lookupStatus.className = "status";
+      lookupStatus.textContent = "Sign in above to load this.";
+      document.getElementById("lookup-output").innerHTML = "";
       const evStatus = document.getElementById("ev-status");
       evStatus.className = "status";
       evStatus.textContent = "Sign in above to load this.";
@@ -540,6 +554,87 @@
       statusEl.textContent = "Error: " + err.message;
     }
   }
+
+  // ---------------- Ad-hoc vendor hash lookup ----------------
+  async function runVendorLookup(hash){
+    const statusEl = document.getElementById("lookup-status");
+    const outputEl = document.getElementById("lookup-output");
+    statusEl.className = "status";
+    outputEl.innerHTML = "";
+
+    if (!hash){
+      statusEl.className = "status err";
+      statusEl.textContent = "Enter a vendor hash first.";
+      return;
+    }
+
+    statusEl.textContent = "Resolving your Destiny character…";
+    try {
+      const { membershipType, membershipId, characterId } = await resolvePrimaryCharacter();
+
+      statusEl.textContent = "Pulling vendor " + hash + "…";
+      const vDef = await fetchDef("DestinyVendorDefinition", hash);
+      const vName = (vDef && vDef.displayProperties && vDef.displayProperties.name) || ("Unknown (" + hash + ")");
+      const vIcon = vDef ? iconUrl(vDef.displayProperties) : null;
+
+      const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
+        "/Character/" + characterId + "/Vendors/" + hash + "/?components=402";
+      const resp = await authedApiGet(path);
+      const saleItems = Object.values((resp.sales && resp.sales.data) || {});
+
+      statusEl.className = "status ok";
+      statusEl.textContent = "OK: " + vName + " — " + saleItems.length + " item(s) for sale";
+
+      const header = document.createElement("div");
+      header.className = "card-name";
+      header.style.marginBottom = "10px";
+      header.innerHTML = (vIcon ? '<img src="' + vIcon + '" alt="" style="width:20px;height:20px;vertical-align:middle;border-radius:3px;margin-right:6px;">' : '') +
+        vName + ' <span style="color:#666;font-weight:normal;">(hash ' + hash + ')</span>';
+      outputEl.appendChild(header);
+
+      if (!saleItems.length){
+        outputEl.insertAdjacentHTML("beforeend", '<div class="desc">Vendor definition resolved, but no sale items came back for this character right now.</div>');
+        return;
+      }
+
+      const grid = document.createElement("div");
+      grid.className = "vendor-grid";
+      outputEl.appendChild(grid);
+
+      for (const sale of saleItems){
+        const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
+        const itemName = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
+        const itemIcon = itemDef ? iconUrl(itemDef.displayProperties) : null;
+
+        const costChips = [];
+        for (const cost of (sale.costs || [])){
+          const costDef = await fetchDef("DestinyInventoryItemDefinition", cost.itemHash);
+          const costName = (costDef && costDef.displayProperties && costDef.displayProperties.name) || ("Unknown (" + cost.itemHash + ")");
+          costChips.push(cost.quantity + " " + costName);
+        }
+
+        const card = document.createElement("div");
+        card.className = "card";
+        card.innerHTML =
+          '<div class="card-head">' +
+            (itemIcon ? '<img src="' + itemIcon + '" alt="">' : '') +
+            '<div>' +
+              '<div class="card-name">' + itemName + '</div>' +
+              '<div class="card-hash">hash: ' + sale.itemHash + '</div>' +
+            '</div>' +
+          '</div>' +
+          '<div class="desc">' + (costChips.length ? costChips.join(", ") : "Free / no listed cost") + '</div>';
+        grid.appendChild(card);
+      }
+    } catch (err){
+      statusEl.className = "status err";
+      statusEl.textContent = "Error: " + err.message;
+    }
+  }
+
+  document.getElementById("lookup-hash-btn").addEventListener("click", () => {
+    runVendorLookup(document.getElementById("lookup-hash-input").value.trim());
+  });
 
   // ---------------- Eververse (Tess Everis) discovery ----------------
   // Nobody's confirmed Tess's vendor hash live, so this doesn't guess it —
