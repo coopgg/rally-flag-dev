@@ -3,7 +3,7 @@
    Every page includes this file and a `<div id="site-nav"></div>`
    right after the opening <body> tag. Set `<body data-nav-group="...">`
    to control which top-level nav link is marked active:
-     "distortions" | "setbonuses" | "guides" | "godrolls" | "artifacts" | "builds" | "puzzlehelper" | "codes" | "tracker"
+     "distortions" | "setbonuses" | "guides" | "godrolls" | "artifacts" | "builds" | "puzzlehelper" | "codes" | "tracker" | "debug"
 
    Theme (element) and mode (dark/light) are stored in localStorage
    so they persist across every page on the site, not just the one
@@ -26,7 +26,10 @@
     { label: "God Rolls", href: "god-rolls.html", group: "godrolls" },
     { label: "Armor Sets", href: "armor-set-bonuses.html", group: "setbonuses" },
     { label: "Artifacts", href: "artifacts.html", group: "artifacts" },
-    { label: "Codes", href: "codes.html", group: "codes" }
+    { label: "Codes", href: "codes.html", group: "codes" },
+    // Dev-branch only — links to throwaway/noindexed API test pages.
+    // Remove this entry before merging toward the production branch/site.
+    { label: "🐞 Debug", href: "debug.html", group: "debug" }
   ];
 
   const BUNGIE_ROOT = "https://www.bungie.net";

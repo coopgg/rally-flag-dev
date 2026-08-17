@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Debug - Rally Flag (dev only)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  .dev-banner{
+    max-width:800px; margin:32px auto 0; padding:12px 20px;
+    border:1px solid #5a3a1a; background:#2a1c0c; color:#e0b070;
+    font-family:'JetBrains Mono', monospace; font-size:12.5px; line-height:1.6;
+    border-radius:8px; text-align:center;
+  }
+  .link-grid{
+    max-width:800px; margin:32px auto 0; padding:0 24px 90px;
+    display:grid; grid-template-columns:repeat(2, 1fr); gap:16px;
+  }
+  @media (max-width:640px){ .link-grid{ grid-template-columns:1fr; } }
+
+  .link-card{
+    position:relative; display:block; text-decoration:none;
+    padding:28px 24px; text-align:left;
+    transition: border-color 0.2s ease, background 0.2s ease;
+  }
+  .link-card:hover, .link-card:focus-visible{ border-color:var(--accent); background:var(--accent-dim); }
+  .link-eyebrow{
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.1em;
+    color:var(--accent); text-transform:uppercase; margin-bottom:10px;
+  }
+  .link-title{ font-family:'Oswald', sans-serif; font-weight:700; font-size:22px; color:var(--text); margin-bottom:8px; }
+  .link-desc{ font-size:13px; color:var(--text-dim); line-height:1.55; }
+  .link-tags{ margin-top:12px; display:flex; flex-wrap:wrap; gap:6px; }
+  .link-tag{
+    font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.05em;
+    text-transform:uppercase; color:var(--text-dimmer); border:1px solid var(--panel-border);
+    border-radius:999px; padding:3px 9px;
+  }
+</style>
+</head>
+<body data-nav-group="debug">
+
+<div id="site-nav"></div>
+
+<div class="hero">
+  <div class="eyebrow">Dev Only</div>
+  <h1 class="title">Debug</h1>
+  <p class="subtitle">Throwaway pages for probing the Bungie API directly — not linked from the real nav, noindexed, and not meant to survive to production.</p>
+</div>
+
+<div class="dev-banner">This page and everything it links to only exist on the dev branch/site. Delete or unlink before anything here merges toward rallyflag.gg.</div>
+
+<div class="link-grid">
+  <a href="api-debug.html" class="link-card panel-card">
+    <div class="link-eyebrow">Bungie API</div>
+    <div class="link-title">API Debug</div>
+    <div class="link-desc">Full dump of GetPublicMilestones (raids, quests, activities) and known vendor definitions, plus the OAuth-gated live vendor rolls pilot.</div>
+    <div class="link-tags"><span class="link-tag">Milestones</span><span class="link-tag">Vendors</span><span class="link-tag">OAuth</span></div>
+  </a>
+  <a href="xur-debug.html" class="link-card panel-card">
+    <div class="link-eyebrow">Bungie API</div>
+    <div class="link-title">Xûr Debug</div>
+    <div class="link-desc">Full inventory dump for Xûr, resolved to real item names/icons, used to build the real Xûr-facing pages.</div>
+    <div class="link-tags"><span class="link-tag">Xûr</span><span class="link-tag">Inventory</span></div>
+  </a>
+</div>
+
+<footer>
+  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
+</footer>
+
+<script src="assets/nav.js"></script>
+</body>
+</html>
