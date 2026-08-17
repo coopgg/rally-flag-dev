@@ -105,8 +105,51 @@
           '<div class="nav-menu-section-label">Subclass Theme</div>' +
           '<div class="element-grid">' + swatchesHtml + '</div>' +
         '</div>' +
+        '<div class="nav-menu-section" id="nav-auth-section"></div>' +
       '</div>'
     );
+  }
+
+  // Loads assets/api-keys.js and assets/oauth.js on demand so pages don't
+  // have to remember to include them just to get the sign-in widget in
+  // the menu — same "one place to maintain" idea as setupPWA() below.
+  // Skips a script that's already on the page (several pages include
+  // api-keys.js themselves for their own Bungie API calls).
+  function loadScript(src){
+    return new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+  }
+
+  function ensureAuthReady(){
+    const apiKeysReady = window.RallyFlagAPI ? Promise.resolve() : loadScript("assets/api-keys.js");
+    return apiKeysReady
+      .then(() => window.RallyFlagAuth ? Promise.resolve() : loadScript("assets/oauth.js"));
+  }
+
+  function renderAuthSection(){
+    const section = document.getElementById("nav-auth-section");
+    if (!section || !window.RallyFlagAuth) return;
+
+    if (RallyFlagAuth.isSignedIn()){
+      const name = RallyFlagAuth.getDisplayName() || "Signed in";
+      section.innerHTML =
+        '<div class="nav-menu-section-label">Bungie.net</div>' +
+        '<div class="nav-auth-signed-in">' +
+          '<span class="nav-auth-name" title="' + name + '">' + name + '</span>' +
+          '<button class="nav-auth-signout" id="nav-auth-signout">Sign out</button>' +
+        '</div>';
+      document.getElementById("nav-auth-signout").addEventListener("click", () => RallyFlagAuth.signOut());
+    } else {
+      section.innerHTML =
+        '<div class="nav-menu-section-label">Bungie.net</div>' +
+        '<button class="nav-auth-btn" id="nav-auth-signin">Sign in with Bungie.net</button>';
+      document.getElementById("nav-auth-signin").addEventListener("click", () => RallyFlagAuth.signIn());
+    }
   }
 
   // Installs the manifest/icons/service worker on every page that loads
@@ -209,4 +252,9 @@
   buildNav();
   applyTheme(getStoredTheme());
   applyMode(getStoredMode());
+
+  ensureAuthReady().then(() => {
+    renderAuthSection();
+    RallyFlagAuth.onChange(renderAuthSection);
+  }).catch(() => {});
 })();

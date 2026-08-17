@@ -57,10 +57,18 @@
 <h2>Vendors</h2>
 <p class="note">DestinyVendorDefinition (name/icon/location) resolves fine for anyone with just an API key, confirmed below. Live <em>sale</em> data is different: Bungie's anonymous Vendors endpoint only ever returns Xûr, no matter which vendor you ask for, confirmed by testing directly, not assumed. Every other vendor needs a signed-in character context (OAuth) to see what they're actually selling this week.</p>
 
+<div id="vendor-auth-box" class="status">Checking sign-in status…</div>
+
 <div id="vendor-status" class="status">Loading…</div>
 <div id="vendor-output"></div>
 
+<h2>Live Vendor Rolls (OAuth)</h2>
+<p class="note">Once signed in, pulls the current character's actual sale inventory per vendor via <code>Character/{id}/Vendors/{vendorHash}/?components=402</code> — the piece the anonymous key can't see. This is the pilot for the site's OAuth login.</p>
+<div id="live-vendor-status" class="status">Sign in above to load this.</div>
+<div id="live-vendor-output"></div>
+
 <script src="assets/api-keys.js"></script>
+<script src="assets/oauth.js"></script>
 <script>
 (function(){
   const BUNGIE_API_KEY = window.RallyFlagAPI.BUNGIE_API_KEY;
@@ -373,8 +381,134 @@
     }
   }
 
+  // ---------------- OAuth sign-in box + live vendor sales ----------------
+  function renderAuthBox(){
+    const box = document.getElementById("vendor-auth-box");
+    if (RallyFlagAuth.isSignedIn()){
+      box.className = "status ok";
+      box.innerHTML = 'Signed in as ' + (RallyFlagAuth.getDisplayName() || "Bungie.net user") +
+        ' — <a href="#" id="auth-signout" style="color:inherit;">sign out</a>';
+      document.getElementById("auth-signout").addEventListener("click", (e) => { e.preventDefault(); RallyFlagAuth.signOut(); });
+      runLiveVendorSales();
+    } else {
+      box.className = "status";
+      box.innerHTML = '<a href="#" id="auth-signin" style="color:inherit;">Sign in with Bungie.net</a> to load live vendor sales below.';
+      document.getElementById("auth-signin").addEventListener("click", (e) => { e.preventDefault(); RallyFlagAuth.signIn(); });
+      const liveStatus = document.getElementById("live-vendor-status");
+      liveStatus.className = "status";
+      liveStatus.textContent = "Sign in above to load this.";
+      document.getElementById("live-vendor-output").innerHTML = "";
+    }
+  }
+
+  async function authedApiGet(path){
+    const res = await RallyFlagAuth.authedFetch(path);
+    const data = await res.json();
+    if (!res.ok || data.ErrorCode !== 1){
+      throw new Error((data && data.Message) || ("HTTP " + res.status));
+    }
+    return data.Response;
+  }
+
+  // Picks the account's primary Destiny membership, then its most
+  // recently-played character — same pair every vendor call below needs.
+  async function resolvePrimaryCharacter(){
+    const memberships = await authedApiGet("/Platform/User/GetMembershipsForCurrentUser/");
+    const destinyMemberships = memberships.destinyMemberships || [];
+    if (!destinyMemberships.length) throw new Error("This Bungie account has no linked Destiny 2 platform.");
+    const primary = destinyMemberships.find(m => m.membershipId === memberships.primaryMembershipId) || destinyMemberships[0];
+
+    const profile = await authedApiGet("/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId + "/?components=200");
+    const characters = (profile.characters && profile.characters.data) || {};
+    const characterIds = Object.keys(characters);
+    if (!characterIds.length) throw new Error("No characters found on this account's primary membership.");
+    characterIds.sort((a, b) => new Date(characters[b].dateLastPlayed) - new Date(characters[a].dateLastPlayed));
+
+    return { membershipType: primary.membershipType, membershipId: primary.membershipId, characterId: characterIds[0] };
+  }
+
+  async function runLiveVendorSales(){
+    const statusEl = document.getElementById("live-vendor-status");
+    const outputEl = document.getElementById("live-vendor-output");
+    statusEl.className = "status";
+    statusEl.textContent = "Resolving your Destiny character…";
+    outputEl.innerHTML = "";
+
+    try {
+      const { membershipType, membershipId, characterId } = await resolvePrimaryCharacter();
+
+      statusEl.textContent = "Pulling live sales for " + Object.keys(KNOWN_VENDORS).length + " known vendors…";
+      const grid = document.createElement("div");
+      grid.className = "vendor-grid";
+      outputEl.appendChild(grid);
+
+      let okCount = 0;
+      for (const [label, vendorHash] of Object.entries(KNOWN_VENDORS)){
+        const vDef = await fetchDef("DestinyVendorDefinition", vendorHash);
+        const name = (vDef && vDef.displayProperties && vDef.displayProperties.name) || label;
+        const icon = vDef ? iconUrl(vDef.displayProperties) : null;
+
+        const card = document.createElement("div");
+        card.className = "card";
+
+        let saleItems = [];
+        let errMsg = null;
+        try {
+          const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
+            "/Character/" + characterId + "/Vendors/" + vendorHash + "/?components=402";
+          const vendorResp = await authedApiGet(path);
+          const sales = (vendorResp.sales && vendorResp.sales.data) || {};
+          saleItems = Object.values(sales);
+        } catch (err){
+          errMsg = err.message;
+        }
+
+        let html =
+          '<div class="card-head">' +
+            (icon ? '<img src="' + icon + '" alt="">' : '') +
+            '<div>' +
+              '<div class="card-name">' + name + '</div>' +
+              '<span class="badge ' + (errMsg ? "unavailable" : "available") + '">' +
+                (errMsg ? "Not selling / unavailable" : saleItems.length + " item(s) for sale") +
+              '</span>' +
+            '</div>' +
+          '</div>';
+
+        if (errMsg){
+          html += '<div class="desc">' + errMsg + '</div>';
+        } else {
+          html += '<div class="section-label">Sale Items</div>';
+          html += saleItems.length ? '<div class="chip-row" id="live-sale-' + vendorHash + '"></div>' : '<div class="empty">nothing this pull</div>';
+        }
+
+        card.innerHTML = html;
+        grid.appendChild(card);
+
+        if (!errMsg && saleItems.length){
+          const chipsEl = document.getElementById("live-sale-" + vendorHash);
+          for (const sale of saleItems){
+            const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
+            const itemName = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
+            const itemIcon = itemDef ? iconUrl(itemDef.displayProperties) : null;
+            chipsEl.insertAdjacentHTML("beforeend", chipHtml(itemName, "qty " + (sale.quantity || 1), itemIcon));
+          }
+        }
+
+        if (!errMsg) okCount++;
+      }
+
+      statusEl.className = "status ok";
+      statusEl.textContent = "OK: live sales pulled for " + okCount + "/" + Object.keys(KNOWN_VENDORS).length + " vendors";
+    } catch (err){
+      statusEl.className = "status err";
+      statusEl.textContent = "Error: " + err.message;
+    }
+  }
+
   run();
   runVendors();
+  renderAuthBox();
+  RallyFlagAuth.onChange(renderAuthBox);
 })();
 </script>
 

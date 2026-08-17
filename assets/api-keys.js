@@ -10,7 +10,12 @@
    window.RallyFlagAPI (e.g. before god-rolls.html's inline script).
    ============================================================ */
 window.RallyFlagAPI = {
-  BUNGIE_API_KEY: "910ddacf41f646a68fefdeb315f1c800"
+  BUNGIE_API_KEY: "910ddacf41f646a68fefdeb315f1c800",
+  // Public OAuth client (bungie.net/en/Application) — no client_secret,
+  // since this site has no server to keep one on. Public client type
+  // means the authorization-code exchange happens straight from the
+  // browser; see assets/oauth.js.
+  BUNGIE_OAUTH_CLIENT_ID: "54476"
   // Add future API keys here as new ones come up, e.g.:
   // SOME_OTHER_API_KEY: "PASTE_HERE"
 };

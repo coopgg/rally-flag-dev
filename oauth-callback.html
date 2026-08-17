@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Signing in… - Rally Flag</title>
+<link rel="icon" href="favicon.ico">
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  .callback-wrap{
+    min-height:60vh; display:flex; flex-direction:column; align-items:center;
+    justify-content:center; text-align:center; padding:24px; gap:10px;
+  }
+  .callback-status{ font-family:'JetBrains Mono', monospace; font-size:14px; color:var(--text-dim); }
+  .callback-error{ color:#ff8080; max-width:480px; }
+  .callback-link{ color:var(--accent-bright); text-decoration:none; margin-top:10px; }
+</style>
+</head>
+<body data-nav-group="">
+
+<div id="site-nav"></div>
+
+<div class="callback-wrap">
+  <div class="callback-status" id="callback-status">Signing you in with Bungie.net…</div>
+</div>
+
+<script src="assets/api-keys.js"></script>
+<script src="assets/oauth.js"></script>
+<script src="assets/nav.js"></script>
+<script>
+(function(){
+  const statusEl = document.getElementById("callback-status");
+  RallyFlagAuth.completeCallback()
+    .then((returnTo) => {
+      statusEl.textContent = "Signed in — redirecting…";
+      window.location.replace(returnTo);
+    })
+    .catch((err) => {
+      statusEl.className = "callback-status callback-error";
+      statusEl.textContent = "Sign-in failed: " + err.message;
+      statusEl.insertAdjacentHTML("afterend", '<a class="callback-link" href="index.html">Back to Rally Flag</a>');
+    });
+})();
+</script>
+
+</body>
+</html>

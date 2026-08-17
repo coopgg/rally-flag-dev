@@ -153,6 +153,24 @@ nav.site-nav{
 .element-swatch.active{ border-color:var(--text); }
 .element-swatch img{ width:22px; height:22px; object-fit:contain; }
 
+.nav-auth-btn{
+  width:100%; font-family:'JetBrains Mono', monospace; font-size:11.5px;
+  background:var(--panel); border:1px solid var(--panel-border); border-radius:6px;
+  color:var(--text-dim); padding:8px 10px; cursor:pointer; text-align:center;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.nav-auth-btn:hover, .nav-auth-btn:focus-visible{ border-color:var(--accent); color:var(--accent-bright); }
+.nav-auth-signed-in{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.nav-auth-name{
+  font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--text);
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.nav-auth-signout{
+  font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--text-dimmer);
+  background:none; border:none; cursor:pointer; padding:0; flex-shrink:0;
+}
+.nav-auth-signout:hover{ color:var(--accent-bright); }
+
 /* ---------- Local section sub-nav (per page-group header) ---------- */
 .subnav{
   display:flex; justify-content:center; gap:8px; margin:26px auto 0; flex-wrap:wrap;
