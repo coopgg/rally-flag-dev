@@ -50,7 +50,7 @@
 <div id="output"></div>
 
 <h1 style="margin-top:36px;">Live Roll Detail (OAuth)</h1>
-<p class="note">The item picture above is just the definition — same for every player. This pulls the actual stat roll, sockets, and perks on <em>your</em> signed-in character's copy of each sale item across all 3 of Xur's vendor hashes via <code>Character/{id}/Vendors/{hash}/?components=402,300,302,304,305</code>.</p>
+<p class="note">The item picture above is just the definition — same for every player. This pulls the actual stat roll, sockets, and perks on <em>your</em> signed-in character's copy of each sale item across all 3 of Xur's vendor hashes via <code>Character/{id}/Vendors/{hash}/?components=402,300,302,304,305</code>. Queried and merged across every character on the account, not just one — an item already owned on one character can drop off that character's own sale list while still being purchasable on another, so checking only one risks silently missing things. Anything that isn't showing up on all characters gets tagged with which one(s) it actually appeared for.</p>
 <div id="roll-auth-box" class="status">Checking sign-in status…</div>
 <div id="roll-status" class="status">Sign in above to load this.</div>
 <div id="roll-output"></div>
@@ -223,9 +223,16 @@
     return data.Response;
   }
 
-  // Same pair every OAuth-gated call on this page needs: the account's
-  // primary Destiny membership, then its most recently-played character.
-  async function resolvePrimaryCharacter(){
+  const CHARACTER_CLASS_LABELS = { 0: "Titan", 1: "Hunter", 2: "Warlock" };
+
+  // Same trio every OAuth-gated call on this page needs: the account's
+  // primary Destiny membership, then every character on it — not just
+  // the most recently played one. Xur's roll is the same fixed roll for
+  // everyone that week (not randomized per character like a drop would
+  // be), but an item already owned on one character can still drop off
+  // that character's own sale list, so querying only one character risks
+  // silently missing things that are still purchasable on another.
+  async function resolveAllCharacters(){
     const memberships = await authedApiGet("/Platform/User/GetMembershipsForCurrentUser/");
     const destinyMemberships = memberships.destinyMemberships || [];
     if (!destinyMemberships.length) throw new Error("This Bungie account has no linked Destiny 2 platform.");
@@ -233,11 +240,17 @@
 
     const profile = await authedApiGet("/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId + "/?components=200");
     const characters = (profile.characters && profile.characters.data) || {};
-    const characterIds = Object.keys(characters);
-    if (!characterIds.length) throw new Error("No characters found on this account's primary membership.");
-    characterIds.sort((a, b) => new Date(characters[b].dateLastPlayed) - new Date(characters[a].dateLastPlayed));
+    const characterList = Object.keys(characters).map(id => ({
+      characterId: id,
+      classLabel: CHARACTER_CLASS_LABELS[characters[id].classType] || "Unknown"
+    }));
+    if (!characterList.length) throw new Error("No characters found on this account's primary membership.");
 
-    return { membershipType: primary.membershipType, membershipId: primary.membershipId, characterId: characterIds[0] };
+    return { membershipType: primary.membershipType, membershipId: primary.membershipId, characters: characterList };
+  }
+
+  function costSignature(costs){
+    return (costs || []).map(c => c.itemHash + ":" + c.quantity).sort().join(",");
   }
 
   function renderAuthBox(){
@@ -263,58 +276,89 @@
     const statusEl = document.getElementById("roll-status");
     const outputEl = document.getElementById("roll-output");
     statusEl.className = "status";
-    statusEl.textContent = "Resolving your Destiny character…";
+    statusEl.textContent = "Resolving your Destiny characters…";
     outputEl.innerHTML = "";
 
     try {
-      const { membershipType, membershipId, characterId } = await resolvePrimaryCharacter();
+      const { membershipType, membershipId, characters } = await resolveAllCharacters();
 
       let totalItems = 0;
       let rawIdCounter = 0;
 
       for (const vendorHash of ALL_XUR_VENDOR_HASHES){
-        statusEl.textContent = "Pulling live roll detail (vendor " + vendorHash + ")…";
+        // Merged across every character — keyed by itemHash + a
+        // normalized cost signature, not by vendorItemIndex, since that
+        // index isn't stable across characters. Xur's roll is fixed for
+        // the week (not randomized per character), so the same item at
+        // the same price seen on two characters is one entry, not two;
+        // stat/socket data is kept from whichever character it was first
+        // seen on since it should be identical either way.
+        const itemsByKey = new Map(); // itemHash|costSignature -> { sale, statEntry, socketEntry, seenOn: Set }
 
-        let vendorResp;
-        try {
-          const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
-            "/Character/" + characterId + "/Vendors/" + vendorHash + "/?components=402,300,302,304,305";
-          vendorResp = await authedApiGet(path);
-        } catch (err){
+        for (let i = 0; i < characters.length; i++){
+          const { characterId, classLabel } = characters[i];
+          statusEl.textContent = "Pulling vendor " + vendorHash + " for " + classLabel + " character (" + (i + 1) + "/" + characters.length + ")…";
+
+          let vendorResp;
+          try {
+            const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
+              "/Character/" + characterId + "/Vendors/" + vendorHash + "/?components=402,300,302,304,305";
+            vendorResp = await authedApiGet(path);
+          } catch (err){
+            continue;
+          }
+
+          const sales = (vendorResp.sales && vendorResp.sales.data) || {};
+          const itemComponents = vendorResp.itemComponents || {};
+          const statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
+          const socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
+
+          for (const saleItem of Object.values(sales)){
+            const key = saleItem.itemHash + "|" + costSignature(saleItem.costs);
+            if (!itemsByKey.has(key)){
+              itemsByKey.set(key, {
+                sale: saleItem,
+                statEntry: statsByIndex[saleItem.vendorItemIndex],
+                socketEntry: socketsByIndex[saleItem.vendorItemIndex],
+                seenOn: new Set()
+              });
+            }
+            itemsByKey.get(key).seenOn.add(classLabel);
+          }
+        }
+
+        if (!itemsByKey.size){
           outputEl.insertAdjacentHTML("beforeend",
             '<h1 style="font-size:14px;margin-top:24px;">Vendor ' + vendorHash + '</h1>' +
-            '<div class="note" style="color:#ff8080;">' + err.message + '</div>');
+            '<div class="note">No live sale items came back from any character for this vendor.</div>');
           continue;
         }
 
-        const sales = (vendorResp.sales && vendorResp.sales.data) || {};
-        const saleList = Object.values(sales);
-        if (!saleList.length){
-          outputEl.insertAdjacentHTML("beforeend",
-            '<h1 style="font-size:14px;margin-top:24px;">Vendor ' + vendorHash + '</h1>' +
-            '<div class="note">Signed in, but no live sale items came back for this vendor.</div>');
-          continue;
-        }
-
-        totalItems += saleList.length;
-
-        const itemComponents = vendorResp.itemComponents || {};
-        const statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
-        const socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
+        const allClassLabels = characters.map(c => c.classLabel);
+        const allItems = Array.from(itemsByKey.values());
+        totalItems += allItems.length;
 
         const sectionHeader = document.createElement("h1");
         sectionHeader.style.fontSize = "14px";
         sectionHeader.style.marginTop = "24px";
-        sectionHeader.textContent = "Vendor " + vendorHash + " — " + saleList.length + " item(s)";
+        sectionHeader.textContent = "Vendor " + vendorHash + " — " + allItems.length + " item(s), merged across " + characters.length + " character(s)";
         outputEl.appendChild(sectionHeader);
 
         const grid = document.createElement("div");
         grid.className = "roll-grid";
         outputEl.appendChild(grid);
 
-        for (const saleItem of saleList){
-          const idx = vendorHash + "-" + saleItem.vendorItemIndex;
-          const itemDef = await fetchItemDef(saleItem.itemHash);
+        for (const { sale, statEntry, socketEntry, seenOn } of allItems){
+          // Not vendorItemIndex — that's only unique within one
+          // character's response, and two different merged items can
+          // land on the same index once results from multiple characters
+          // are combined, which would collide their DOM ids below.
+          const idx = "item-" + (rawIdCounter++);
+          const itemDef = await fetchItemDef(sale.itemHash);
+
+          const isUniversal = allClassLabels.every(c => seenOn.has(c));
+          const availabilityBadge = isUniversal ? "" :
+            '<span class="item-class" style="color:#ff8080;"> · ' + Array.from(seenOn).join(", ") + " only</span>";
 
           const card = document.createElement("div");
           card.className = "roll-card";
@@ -325,11 +369,10 @@
               '<div>' +
                 '<div class="item-name">' + itemDef.name + '</div>' +
                 '<div class="item-type">' + itemDef.typeName + '</div>' +
-                '<div class="item-class">' + CLASS_LABELS[itemDef.classType] + '</div>' +
+                '<div class="item-class">' + CLASS_LABELS[itemDef.classType] + availabilityBadge + '</div>' +
               '</div>' +
             '</div>';
 
-          const statEntry = statsByIndex[idx];
           const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
           html += '<div class="roll-section-label">Stats</div>';
           if (!stats.length){
@@ -342,7 +385,6 @@
           // hidden intrinsic slots, etc.) that carry a real plugHash but no
           // displayProperties.name and isVisible:false — DIM and other tools
           // hide these rather than show them as junk "Unknown" entries.
-          const socketEntry = socketsByIndex[idx];
           const allSockets = (socketEntry && socketEntry.sockets) || [];
           const sockets = allSockets.filter(s => s.isVisible !== false);
           html += '<div class="roll-section-label">Sockets (' + sockets.length + ')</div>';
@@ -360,7 +402,7 @@
           grid.appendChild(card);
 
           const rawEl = document.getElementById(rawId);
-          rawEl.textContent = JSON.stringify({ sale: saleItem, stats: statEntry, sockets: socketEntry }, null, 2);
+          rawEl.textContent = JSON.stringify({ sale, stats: statEntry, sockets: socketEntry }, null, 2);
           card.querySelector(".roll-raw-toggle").addEventListener("click", (e) => {
             rawEl.classList.toggle("open");
             e.target.textContent = (e.target.textContent[0] === "▸" ? "▾" : "▸") + " raw item components";
@@ -396,8 +438,8 @@
 
       statusEl.className = totalItems ? "status ok" : "status err";
       statusEl.textContent = totalItems
-        ? "OK: roll detail pulled for " + totalItems + " item(s) across " + ALL_XUR_VENDOR_HASHES.length + " vendor(s)"
-        : "Signed in, but no live sale items came back from any of Xur's vendor hashes this pull.";
+        ? "OK: roll detail pulled for " + totalItems + " item(s) across " + ALL_XUR_VENDOR_HASHES.length + " vendor(s) and " + characters.length + " character(s)"
+        : "Signed in, but no live sale items came back from any of Xur's vendor hashes on any character this pull.";
     } catch (err){
       statusEl.className = "status err";
       statusEl.textContent = "Error: " + err.message;
