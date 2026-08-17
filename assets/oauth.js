@@ -56,9 +56,13 @@ window.RallyFlagAuth = (function(){
     notifyChange();
   }
 
+  // This app's token responses don't include a refresh_token (confirmed
+  // live — Bungie only sends access_token/token_type/expires_in/
+  // membership_id here), so "signed in" has to key off the access
+  // token's own lifetime rather than assuming a refresh token exists.
   function isSignedIn(){
     const auth = loadAuth();
-    return !!(auth && auth.refresh_token && Date.now() < auth.refresh_expires_at);
+    return !!(auth && auth.access_token && Date.now() < auth.access_expires_at);
   }
 
   function getDisplayName(){
@@ -114,9 +118,11 @@ window.RallyFlagAuth = (function(){
     const now = Date.now();
     return {
       access_token: data.access_token,
-      refresh_token: data.refresh_token,
+      // Not present in this app's responses, but handled in case Bungie
+      // ever starts including one (e.g. a future scope/consent change).
+      refresh_token: data.refresh_token || null,
       access_expires_at: now + (data.expires_in * 1000),
-      refresh_expires_at: now + (data.refresh_expires_in * 1000),
+      refresh_expires_at: data.refresh_expires_in ? now + (data.refresh_expires_in * 1000) : null,
       membership_id: data.membership_id,
       display_name: previousDisplayName || null
     };
@@ -187,18 +193,22 @@ window.RallyFlagAuth = (function(){
     return next;
   }
 
-  // Returns a valid access token, refreshing first if it's expired or
-  // close to it. Returns null if signed out or the refresh token itself
-  // has expired (Bungie refresh tokens are long-lived but not eternal).
+  // Returns a valid access token. If it's expired and a refresh token
+  // exists, refreshes first. This app's token responses don't actually
+  // include a refresh token (see tokenResponseToAuth), so in practice an
+  // expired access token just means the session is over — the user has
+  // to sign in again rather than getting a silent renewal.
   async function getAccessToken(){
     let auth = loadAuth();
-    if (!auth || !auth.refresh_token) return null;
-    if (Date.now() >= auth.refresh_expires_at) {
-      clearAuth();
-      return null;
-    }
+    if (!auth || !auth.access_token) return null;
+
     if (Date.now() < auth.access_expires_at - EXPIRY_BUFFER_MS) {
       return auth.access_token;
+    }
+
+    if (!auth.refresh_token || (auth.refresh_expires_at && Date.now() >= auth.refresh_expires_at)) {
+      clearAuth();
+      return null;
     }
     try {
       auth = await refresh(auth);
