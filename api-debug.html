@@ -78,8 +78,8 @@
 
 <h2>Eververse (Tess Everis)</h2>
 <p class="note">Prod already chased this down once, before this site had OAuth: Bungie's <em>public/anonymous</em> Vendors endpoint drops Tess entirely, confirmed via a 3-way diagnostic (full request, bare Vendors-only request, and her own definition fetched directly — she came back <code>enabled:true</code>, genuinely active, the endpoint just can't serve her). Matches Bungie's documented rule that a vendor gets dropped wholesale from the public endpoint if any part of it can't be computed identically for everyone. Prod ended up sourcing her from a third-party feed, <a href="https://eververse.report/" target="_blank" rel="noopener">eververse.report</a>, instead — noted then as a stopgap "until this site has its own OAuth login."</p>
-<p class="note">That's now. This calls the <em>authenticated, character-scoped</em> <code>Character/{id}/Vendors/?components=400,402</code> — untested territory, since it wasn't an option before. No hash is hardcoded or guessed: whatever resolves to "Tess Everis" or "Eververse" among every vendor live for the signed-in character gets its real hash surfaced here. Confirmed working — she showed up. Since her catalog is per-character (an already-owned item drops off <em>that</em> character's list even though another character could still buy it), this queries every character on the account and merges the results; anything that isn't universal across all of them gets tagged with which class(es) it actually showed up for. If she still doesn't turn up this way, eververse.report is the proven fallback.</p>
-<p class="note">Items are grouped by whatever currency each one's own cost data resolves to (not hardcoded/assumed), but only the Bright Dust group actually renders below — Silver and no-cost items are still counted in the header for context, just not shown as cards. The Bright Dust rotation refreshes at daily reset, so what's here is only good until tomorrow's reset.</p>
+<p class="note">That's now. This calls the <em>authenticated, character-scoped</em> <code>Character/{id}/Vendors/?components=400,402</code> — untested territory, since it wasn't an option before. Confirmed working, and confirmed via live testing to be structured very differently than expected: Bright Dust offers aren't nested as sale items under a single Tess Everis vendor hash at all. Each Bright Dust item is its own separate one-item vendor stub — dozens of them, most with no display name of their own (shown as "Unknown (hash)" in the discovered-vendors list below), sitting alongside the handful of real, named NPC vendors. So this pulls sale items from <em>every</em> discovered vendor, not just whichever one happens to be named "Tess Everis"/"Eververse" — that name match now only stars the likely-Eververse entries in the list, it doesn't gate what gets collected. If nothing turns up this way, eververse.report is the proven fallback.</p>
+<p class="note">Items are grouped by whatever currency each one's own cost data resolves to (not hardcoded/assumed), but only the Bright Dust group actually renders below — Silver and no-cost items are still counted in the header for context, just not shown as cards. Each card also lists which vendor hash(es) it actually sold through, since most are unnamed stubs. The Bright Dust rotation refreshes at daily reset, so what's here is only good until tomorrow's reset.</p>
 <div id="ev-status" class="status">Sign in above to load this.</div>
 <div id="ev-output"></div>
 
@@ -639,8 +639,18 @@
   // ---------------- Eververse (Tess Everis) discovery ----------------
   // Nobody's confirmed Tess's vendor hash live, so this doesn't guess it —
   // it calls Character/Vendors/ with no specific hash, which returns
-  // every vendor actually present for the signed-in character right now,
-  // and picks out whatever resolves to "Tess Everis"/"Eververse" by name.
+  // every vendor actually present for the signed-in character right now.
+  //
+  // Confirmed live (screenshot testing, not assumed): Bright Dust offers
+  // are NOT all nested as sale items under Tess Everis's own vendor hash.
+  // Each Bright Dust item shows up as its OWN separate vendor entry in
+  // vendors.data — dozens of one-item vendor stubs alongside the "real"
+  // NPC vendors, most of which have no displayProperties.name (hence
+  // "Unknown (hash)" here) but still carry a real, purchasable sale item.
+  // So this pulls sale items from EVERY discovered vendor, not just
+  // whichever one resolves to "Tess Everis"/"Eververse" by name — that
+  // name match is now only used to star likely-Eververse vendors in the
+  // discovered-vendors list below, not to gate which sales get collected.
   async function runEververse(){
     const statusEl = document.getElementById("ev-status");
     const outputEl = document.getElementById("ev-output");
@@ -653,17 +663,15 @@
 
       const vendorHashesSeen = new Set();
       // Keyed by itemHash + a normalized signature of its costs, not just
-      // itemHash — Tess can list the same item more than once at genuinely
-      // different prices (e.g. a Bright Dust rotation slot AND a separate
-      // permanent Silver listing). Keying on itemHash alone collapsed
-      // those into one and silently dropped whichever was seen second,
-      // which is exactly why Bright Dust items were vanishing.
-      const itemsByKey = new Map(); // itemHash|costSignature -> { sale, seenOn: Set<classLabel> }
+      // itemHash — the same item can be listed more than once at
+      // genuinely different prices (e.g. a Bright Dust vendor-stub AND a
+      // separate permanent Silver listing). Keying on itemHash alone
+      // collapsed those into one and silently dropped whichever was seen
+      // second, which is exactly why Bright Dust items were vanishing.
+      const itemsByKey = new Map(); // itemHash|costSignature -> { sale, seenOn: Set<classLabel>, vendorHashes: Set }
       function costSignature(costs){
         return (costs || []).map(c => c.itemHash + ":" + c.quantity).sort().join(",");
       }
-      let tessHash = null;
-      let tessName = null;
 
       for (let i = 0; i < characters.length; i++){
         const { characterId, classLabel } = characters[i];
@@ -677,24 +685,15 @@
         const salesData = (resp.sales && resp.sales.data) || {};
         Object.keys(vendorsData).forEach(h => vendorHashesSeen.add(h));
 
-        if (!tessHash){
-          for (const hash of Object.keys(vendorsData)){
-            const vDef = await fetchDef("DestinyVendorDefinition", hash);
-            const name = (vDef && vDef.displayProperties && vDef.displayProperties.name) || "";
-            if (/tess|eververse/i.test(name)){
-              tessHash = hash;
-              tessName = name;
-              break;
-            }
-          }
-        }
-
-        if (tessHash && salesData[tessHash]){
-          const saleItems = Object.values(salesData[tessHash].saleItems || {});
+        for (const vHash of Object.keys(vendorsData)){
+          const sales = salesData[vHash];
+          if (!sales) continue;
+          const saleItems = Object.values(sales.saleItems || {});
           for (const sale of saleItems){
             const key = sale.itemHash + "|" + costSignature(sale.costs);
-            if (!itemsByKey.has(key)) itemsByKey.set(key, { sale, seenOn: new Set() });
+            if (!itemsByKey.has(key)) itemsByKey.set(key, { sale, seenOn: new Set(), vendorHashes: new Set() });
             itemsByKey.get(key).seenOn.add(classLabel);
+            itemsByKey.get(key).vendorHashes.add(vHash);
           }
         }
       }
@@ -705,22 +704,32 @@
         return;
       }
 
+      // Retries once — this loop already fires a lot of sequential
+      // manifest calls, and fetchDef caches a single failure permanently,
+      // so an "Unknown" name here isn't necessarily a real name-less
+      // vendor stub; sometimes it's just a rate-limited lookup.
       const resolved = [];
       for (const hash of vendorHashesSeen){
-        const vDef = await fetchDef("DestinyVendorDefinition", hash);
+        let vDef = await fetchDef("DestinyVendorDefinition", hash);
+        if (!vDef){
+          delete defCache["DestinyVendorDefinition:" + hash];
+          vDef = await fetchDef("DestinyVendorDefinition", hash);
+        }
         const name = (vDef && vDef.displayProperties && vDef.displayProperties.name) || ("Unknown (" + hash + ")");
         resolved.push({ hash, name, icon: vDef ? iconUrl(vDef.displayProperties) : null });
       }
       resolved.sort((a, b) => a.name.localeCompare(b.name));
 
+      const tessLike = resolved.filter(v => /tess|eververse/i.test(v.name));
+
       statusEl.className = "status ok";
       statusEl.textContent = "OK: " + resolved.length + " vendor(s) live across " + characters.length + " character(s)" +
-        (tessHash ? " — found " + tessName + " (hash " + tessHash + ")" : " — no Tess Everis/Eververse among them this pull");
+        (tessLike.length ? " — " + tessLike.length + " named Tess/Eververse, but pulling sales from all of them" : " — none named Tess/Eververse, pulling Bright Dust sales from every vendor stub instead");
 
       const listWrap = document.createElement("div");
       listWrap.className = "vendor-grid";
       resolved.forEach(v => {
-        const isTess = tessHash && v.hash === tessHash;
+        const isTess = tessLike.some(t => t.hash === v.hash);
         listWrap.insertAdjacentHTML("beforeend",
           '<div class="card">' +
             '<div class="card-head">' +
@@ -734,7 +743,13 @@
       });
       outputEl.appendChild(listWrap);
 
-      if (!tessHash) return;
+      if (!itemsByKey.size){
+        outputEl.insertAdjacentHTML("beforeend", '<div class="desc" style="margin-top:16px;">No sale items came back from any discovered vendor this pull.</div>');
+        return;
+      }
+
+      const vendorNameByHash = {};
+      resolved.forEach(v => { vendorNameByHash[v.hash] = v.name; });
 
       const allItems = Array.from(itemsByKey.values());
       const allClassLabels = characters.map(c => c.classLabel);
@@ -749,7 +764,7 @@
       const NO_COST_GROUP = "No listed cost (likely Silver — the API can't carry real-money costs)";
       const groups = new Map(); // currency label -> resolved item entries[]
 
-      for (const { sale, seenOn } of allItems){
+      for (const { sale, seenOn, vendorHashes } of allItems){
         const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
         const itemName = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
         const itemIcon = itemDef ? iconUrl(itemDef.displayProperties) : null;
@@ -767,13 +782,18 @@
         const availabilityBadge = isUniversal ? "" :
           '<span class="badge unavailable">' + Array.from(seenOn).join(", ") + " only</span>";
 
+        // Most items each get their own dedicated one-item vendor stub —
+        // showing which hash(es) it actually sold through, since most of
+        // those stubs have no display name of their own.
+        const sourceVendors = Array.from(vendorHashes).map(h => vendorNameByHash[h] || h).join(", ");
+
         const cardHtml =
           '<div class="card">' +
             '<div class="card-head">' +
               (itemIcon ? '<img src="' + itemIcon + '" alt="">' : '') +
               '<div>' +
                 '<div class="card-name">' + itemName + '</div>' +
-                '<div class="card-hash">hash: ' + sale.itemHash + '</div>' +
+                '<div class="card-hash">hash: ' + sale.itemHash + ' · sold via ' + sourceVendors + '</div>' +
                 availabilityBadge +
               '</div>' +
             '</div>' +
@@ -788,7 +808,7 @@
       catalogHeader.className = "section-label";
       catalogHeader.style.marginTop = "20px";
       const groupCounts = Array.from(groups.entries()).map(([k, v]) => v.length + " " + k).join(" · ");
-      catalogHeader.textContent = tessName + " — Bright Dust only (full breakdown across " + characters.length + " character(s), " + allItems.length + " total: " + groupCounts + ")";
+      catalogHeader.textContent = "Bright Dust only (full breakdown across " + characters.length + " character(s) and " + resolved.length + " vendor(s), " + allItems.length + " total: " + groupCounts + ")";
       outputEl.appendChild(catalogHeader);
 
       // Only render Bright Dust groups — Silver/other currencies are
