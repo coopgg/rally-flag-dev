@@ -617,6 +617,45 @@
     }
   }
 
+  // This is the vendor's actual current roll — fixed for the whole
+  // rotation and identical for every player until reset, not a random
+  // per-instance drop — read straight off the sale's stats/sockets
+  // components (304/305) without needing to already own the item.
+  async function vendorSaleRollHtml(statEntry, socketEntry){
+    const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
+    const allSockets = (socketEntry && socketEntry.sockets) || [];
+    const visibleSockets = allSockets.filter(s => s.isVisible !== false && s.plugHash);
+
+    const [statRows, perkChips] = await Promise.all([
+      mapWithConcurrency(stats, 5, async (stat) => {
+        const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
+        const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
+        if (!statName) return null;
+        const pct = Math.max(0, Math.min(100, stat.value));
+        return (
+          '<div class="stat-bar-row">' +
+            '<div class="stat-bar-head"><span>' + statName + '</span><span class="val">' + stat.value + '</span></div>' +
+            '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%"></div></div>' +
+          '</div>'
+        );
+      }).then(rows => rows.filter(Boolean)),
+      mapWithConcurrency(visibleSockets, 5, async (socket) => {
+        const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
+        const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
+        if (!plugName || isJunkSocketPlug(plugName)) return null;
+        const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
+        return chipHtml(plugName, null, plugIcon);
+      }).then(chips => chips.filter(Boolean))
+    ]);
+
+    if (!statRows.length && !perkChips.length) return "";
+
+    let html = "";
+    if (statRows.length) html += '<div class="section-label">Current Roll — Stats</div>' + statRows.join("");
+    if (perkChips.length) html += '<div class="section-label">Current Roll — Perks</div><div class="chip-row">' + perkChips.join("") + '</div>';
+    return html;
+  }
+
   // ---------------- Ad-hoc vendor hash lookup ----------------
   async function runVendorLookup(hash){
     const statusEl = document.getElementById("lookup-status");
@@ -639,10 +678,18 @@
       const vName = (vDef && vDef.displayProperties && vDef.displayProperties.name) || ("Unknown (" + hash + ")");
       const vIcon = vDef ? iconUrl(vDef.displayProperties) : null;
 
+      // Components 304 (stats) and 305 (sockets) ride along with the sale
+      // itself, keyed by each sale's vendorItemIndex — this is the vendor's
+      // actual current roll (same for every player until reset), not a
+      // random per-instance drop, so it's readable straight off the sale
+      // without needing to already own the item.
       const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
-        "/Character/" + characterId + "/Vendors/" + hash + "/?components=402";
+        "/Character/" + characterId + "/Vendors/" + hash + "/?components=402,304,305";
       const resp = await authedApiGet(path);
       const saleItems = Object.values((resp.sales && resp.sales.data) || {});
+      const itemComponents = resp.itemComponents || {};
+      const statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
+      const socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
 
       statusEl.className = "status ok";
       statusEl.textContent = "OK: " + vName + " — " + saleItems.length + " item(s) for sale";
@@ -675,6 +722,8 @@
           costChips.push(cost.quantity + " " + costName);
         }
 
+        const rollHtml = await vendorSaleRollHtml(statsByIndex[sale.vendorItemIndex], socketsByIndex[sale.vendorItemIndex]);
+
         const card = document.createElement("div");
         card.className = "card";
         card.innerHTML =
@@ -685,7 +734,8 @@
               '<div class="card-hash">hash: ' + sale.itemHash + '</div>' +
             '</div>' +
           '</div>' +
-          '<div class="desc">' + (costChips.length ? costChips.join(", ") : "Free / no listed cost") + '</div>';
+          '<div class="desc">' + (costChips.length ? costChips.join(", ") : "Free / no listed cost") + '</div>' +
+          rollHtml;
         grid.appendChild(card);
       }
     } catch (err){
