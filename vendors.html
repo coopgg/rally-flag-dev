@@ -134,6 +134,12 @@
     color:var(--text-dim); margin-bottom:24px;
   }
   .vend-departure-note .clock{ color:var(--accent-bright); font-weight:700; }
+  .vend-build-note{
+    margin-top:10px; padding-top:10px; border-top:1px solid var(--panel-border);
+    font-size:11.5px; color:var(--text-dim);
+  }
+  .vend-build-note a{ color:var(--accent-bright); text-decoration:none; }
+  .vend-build-note a:hover{ text-decoration:underline; }
 </style>
 </head>
 <body data-nav-group="vendors">
@@ -190,6 +196,7 @@
 
 <script src="assets/api-keys.js"></script>
 <script src="assets/oauth.js"></script>
+<script src="assets/builds-data.js"></script>
 <script src="assets/nav.js"></script>
 <script>
 (function(){
@@ -906,6 +913,18 @@
   // name-based check below instead of getting filtered out with the junk.
   const XUR_SKIP_TYPES = new Set(["", "Material", "Engram", "Weapon Engram", "Armor Engram", "Emblem", "Faction Reward", "Quest Step", "Currency", "Container", "Buff", "Consumable"]);
 
+  // Ported from the old this-week.html Xur section: flags an exotic sale
+  // item that a curated build calls for, with a link straight to it.
+  function findBuildMatch(itemHash){
+    const builds = (window.BuildsData && window.BuildsData.BUILDS) || [];
+    for (const b of builds){
+      if ((b.exoticArmor && b.exoticArmor.itemHash === itemHash) || (b.exoticWeapon && b.exoticWeapon.itemHash === itemHash)){
+        return b;
+      }
+    }
+    return null;
+  }
+
   async function runXur(){
     const statusEl = document.getElementById("xur-status");
     const outputEl = document.getElementById("xur-output");
@@ -982,11 +1001,15 @@
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const tag = isCatalyst ? "Catalyst" : (tier === "Exotic" ? "Exotic" : null);
         const isArmor = XUR_ARMOR_TYPES.has(typeName);
-        const [costText, extraHtml] = await Promise.all([
+        const [costText, rollHtml] = await Promise.all([
           costChipsHtml(sale.costs),
           isArmor ? rollDetailHtml(statEntry, socketEntry) : weaponRollHtml(statEntry, socketEntry)
         ]);
-        const card = itemCardHtml(name, icon, typeName || (isCatalyst ? "Catalyst" : ""), costText, tag, extraHtml);
+        const buildMatch = findBuildMatch(sale.itemHash);
+        const buildHtml = buildMatch
+          ? '<div class="vend-build-note">We recommend this in <a href="builds.html#build-' + buildMatch.slug + '">' + buildMatch.title + '</a></div>'
+          : "";
+        const card = itemCardHtml(name, icon, typeName || (isCatalyst ? "Catalyst" : ""), costText, tag, rollHtml + buildHtml);
         const classType = isArmor ? ((itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3) : null;
         return { card, isArmor, classType };
       });
