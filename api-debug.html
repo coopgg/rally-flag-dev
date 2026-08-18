@@ -673,7 +673,17 @@
   // rotation and identical for every player until reset, not a random
   // per-instance drop — read straight off the sale's stats/sockets
   // components (304/305) without needing to already own the item.
-  async function vendorSaleRollHtml(statEntry, socketEntry){
+  // Confirmed live on a Luminopotent Grips vendor roll: its archetype
+  // trait ("Demolitionist", matching Grenade being its highest stat)
+  // resolved out of socket category 3154740035 — the same category that
+  // item's raw definition showed as four hidden, non-swappable,
+  // roll-at-drop sockets. Only verified against one armor piece (arms);
+  // if a different armor slot (helmet/chest/legs/class item) uses a
+  // different category hash for its archetype socket, this constant will
+  // need updating for that slot.
+  const ARCHETYPE_SOCKET_CATEGORY_HASH = 3154740035;
+
+  async function vendorSaleRollHtml(itemDef, statEntry, socketEntry){
     const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
     // No isVisible filter here — an armor piece's archetype (Powerhouse,
     // Paragon, Grenadier, etc.) lives in sockets Bungie flags
@@ -683,30 +693,38 @@
     // dropping exactly the trait this is meant to surface. isJunkSocketPlug
     // below still catches genuinely empty/placeholder plugs.
     const allSockets = (socketEntry && socketEntry.sockets) || [];
-    const visibleSockets = allSockets.filter(s => s.plugHash);
+    const visibleSockets = allSockets.map((s, i) => ({ socket: s, index: i })).filter(s => s.socket.plugHash);
 
-    const [resolvedStats, perkChips] = await Promise.all([
+    const categoryHashByIndex = {};
+    ((itemDef.sockets && itemDef.sockets.socketCategories) || []).forEach(cat => {
+      (cat.socketIndexes || []).forEach(idx => { categoryHashByIndex[idx] = cat.socketCategoryHash; });
+    });
+
+    const [resolvedStats, resolvedPerks] = await Promise.all([
       mapWithConcurrency(stats, 5, async (stat) => {
         const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
         const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
         if (!statName) return null;
         return { name: statName, value: stat.value };
       }).then(rows => sortStatsToGameOrder(rows.filter(Boolean))),
-      mapWithConcurrency(visibleSockets, 5, async (socket) => {
+      mapWithConcurrency(visibleSockets, 5, async ({ socket, index }) => {
         const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
         const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
         if (!plugName || isJunkSocketPlug(plugName)) return null;
         const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
-        return perkIconHtml(plugName, plugIcon);
-      }).then(tiles => tiles.filter(Boolean))
+        return { isArchetype: categoryHashByIndex[index] === ARCHETYPE_SOCKET_CATEGORY_HASH, name: plugName, icon: plugIcon };
+      }).then(rows => rows.filter(Boolean))
     ]);
 
+    const archetype = resolvedPerks.find(p => p.isArchetype);
+    const otherPerkTiles = resolvedPerks.filter(p => !p.isArchetype).map(p => perkIconHtml(p.name, p.icon));
     const statsHtml = statBarsHtml(resolvedStats);
-    if (!statsHtml && !perkChips.length) return "";
+    if (!archetype && !statsHtml && !otherPerkTiles.length) return "";
 
     let html = "";
-    if (statsHtml) html += '<div class="section-label">Current Roll — Stats</div>' + statsHtml;
-    if (perkChips.length) html += '<div class="section-label">Current Roll — Perks</div><div class="perk-grid">' + perkChips.join("") + '</div>';
+    if (archetype) html += '<div class="chip" style="margin-bottom:8px;">' + (archetype.icon ? '<img src="' + archetype.icon + '" alt="">' : '') + '<div class="chip-name">' + archetype.name + '</div></div>';
+    if (statsHtml) html += statsHtml;
+    if (otherPerkTiles.length) html += '<div class="perk-grid">' + otherPerkTiles.join("") + '</div>';
     return html;
   }
 
@@ -776,7 +794,7 @@
           costChips.push(cost.quantity + " " + costName);
         }
 
-        const rollHtml = await vendorSaleRollHtml(statsByIndex[sale.vendorItemIndex], socketsByIndex[sale.vendorItemIndex]);
+        const rollHtml = await vendorSaleRollHtml(itemDef, statsByIndex[sale.vendorItemIndex], socketsByIndex[sale.vendorItemIndex]);
 
         const card = document.createElement("div");
         card.className = "card";
@@ -788,8 +806,8 @@
               '<div class="card-hash">hash: ' + sale.itemHash + '</div>' +
             '</div>' +
           '</div>' +
-          '<div class="desc">' + (costChips.length ? costChips.join(", ") : "Free / no listed cost") + '</div>' +
-          rollHtml;
+          rollHtml +
+          '<div class="desc">' + (costChips.length ? costChips.join(", ") : "Free / no listed cost") + '</div>';
         grid.appendChild(card);
       }
     } catch (err){
