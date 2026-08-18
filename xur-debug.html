@@ -253,6 +253,19 @@
     return (costs || []).map(c => c.itemHash + ":" + c.quantity).sort().join(",");
   }
 
+  const ARMOR_TYPES = new Set(["Helmet", "Gauntlets", "Chest Armor", "Leg Armor", "Titan Mark", "Hunter Cloak", "Warlock Bond"]);
+
+  // Universal placeholder plugs that sit in every piece of armor's sockets
+  // regardless of roll — an empty mod/tuning slot, the default (unselected)
+  // shader/ornament, and the "insert to upgrade" prompt. None of these say
+  // anything about this specific item, unlike an actual archetype perk
+  // (Grenadier, Specialist, Bulwark, etc.) or a socketed mod.
+  function isJunkSocketPlug(name){
+    if (/^empty .*socket$/i.test(name)) return true;
+    if (/^(default shader|upgrade armor|default ornament)$/i.test(name)) return true;
+    return false;
+  }
+
   function renderAuthBox(){
     const box = document.getElementById("roll-auth-box");
     if (RallyFlagAuth.isSignedIn()){
@@ -281,20 +294,18 @@
 
     try {
       const { membershipType, membershipId, characters } = await resolveAllCharacters();
-
-      let totalItems = 0;
       let rawIdCounter = 0;
 
-      for (const vendorHash of ALL_XUR_VENDOR_HASHES){
-        // Merged across every character — keyed by itemHash + a
-        // normalized cost signature, not by vendorItemIndex, since that
-        // index isn't stable across characters. Xur's roll is fixed for
-        // the week (not randomized per character), so the same item at
-        // the same price seen on two characters is one entry, not two;
-        // stat/socket data is kept from whichever character it was first
-        // seen on since it should be identical either way.
-        const itemsByKey = new Map(); // itemHash|costSignature -> { sale, statEntry, socketEntry, seenOn: Set }
+      // Pooled across all 3 vendor hashes and every character — keyed by
+      // itemHash + cost + a signature of the actual socketed plugs, not
+      // just itemHash + cost. Xur can (rarely, but really) offer the same
+      // item at the same price with two different rolls at once; keying
+      // on itemHash+cost alone silently collapsed those into one card.
+      // True duplicates (same roll, seen again on another character or
+      // vendor hash) still merge into one, tagged with where they showed up.
+      const itemsByKey = new Map();
 
+      for (const vendorHash of ALL_XUR_VENDOR_HASHES){
         for (let i = 0; i < characters.length; i++){
           const { characterId, classLabel } = characters[i];
           statusEl.textContent = "Pulling vendor " + vendorHash + " for " + classLabel + " character (" + (i + 1) + "/" + characters.length + ")…";
@@ -314,51 +325,64 @@
           const socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
 
           for (const saleItem of Object.values(sales)){
-            const key = saleItem.itemHash + "|" + costSignature(saleItem.costs);
+            const socketEntry = socketsByIndex[saleItem.vendorItemIndex];
+            const rollSignature = (socketEntry && socketEntry.sockets) ? socketEntry.sockets.map(s => s.plugHash || 0).join(",") : "";
+            const key = saleItem.itemHash + "|" + costSignature(saleItem.costs) + "|" + rollSignature;
             if (!itemsByKey.has(key)){
               itemsByKey.set(key, {
                 sale: saleItem,
                 statEntry: statsByIndex[saleItem.vendorItemIndex],
-                socketEntry: socketsByIndex[saleItem.vendorItemIndex],
+                socketEntry,
                 seenOn: new Set()
               });
             }
-            itemsByKey.get(key).seenOn.add(classLabel);
+            itemsByKey.get(key).seenOn.add(classLabel + " · " + vendorHash);
           }
         }
+      }
 
-        if (!itemsByKey.size){
-          outputEl.insertAdjacentHTML("beforeend",
-            '<h1 style="font-size:14px;margin-top:24px;">Vendor ' + vendorHash + '</h1>' +
-            '<div class="note">No live sale items came back from any character for this vendor.</div>');
-          continue;
-        }
+      if (!itemsByKey.size){
+        statusEl.className = "status err";
+        statusEl.textContent = "Signed in, but no live sale items came back from any of Xur's vendor hashes on any character this pull.";
+        return;
+      }
 
-        const allClassLabels = characters.map(c => c.classLabel);
-        const allItems = Array.from(itemsByKey.values());
-        totalItems += allItems.length;
+      // Resolve every item's def once up front so it can be bucketed into
+      // Weapons vs. Armor-by-class before rendering, instead of one flat
+      // list per vendor hash.
+      const resolvedItems = [];
+      for (const { sale, statEntry, socketEntry, seenOn } of itemsByKey.values()){
+        const itemDef = await fetchItemDef(sale.itemHash);
+        resolvedItems.push({ sale, statEntry, socketEntry, seenOn, itemDef });
+      }
 
+      const weapons = resolvedItems.filter(r => !ARMOR_TYPES.has(r.itemDef.typeName));
+      const armorByClass = new Map();
+      for (const r of resolvedItems){
+        if (!ARMOR_TYPES.has(r.itemDef.typeName)) continue;
+        const classType = typeof r.itemDef.classType === "number" ? r.itemDef.classType : 3;
+        if (!armorByClass.has(classType)) armorByClass.set(classType, []);
+        armorByClass.get(classType).push(r);
+      }
+
+      async function renderGroup(title, items){
+        if (!items.length) return;
         const sectionHeader = document.createElement("h1");
         sectionHeader.style.fontSize = "14px";
         sectionHeader.style.marginTop = "24px";
-        sectionHeader.textContent = "Vendor " + vendorHash + " — " + allItems.length + " item(s), merged across " + characters.length + " character(s)";
+        sectionHeader.textContent = title + " (" + items.length + ")";
         outputEl.appendChild(sectionHeader);
 
         const grid = document.createElement("div");
         grid.className = "roll-grid";
         outputEl.appendChild(grid);
 
-        for (const { sale, statEntry, socketEntry, seenOn } of allItems){
+        for (const { sale, statEntry, socketEntry, seenOn, itemDef } of items){
           // Not vendorItemIndex — that's only unique within one
-          // character's response, and two different merged items can
-          // land on the same index once results from multiple characters
-          // are combined, which would collide their DOM ids below.
+          // character/vendor response, and two different merged items can
+          // land on the same index once results are combined, which would
+          // collide their DOM ids below.
           const idx = "item-" + (rawIdCounter++);
-          const itemDef = await fetchItemDef(sale.itemHash);
-
-          const isUniversal = allClassLabels.every(c => seenOn.has(c));
-          const availabilityBadge = isUniversal ? "" :
-            '<span class="item-class" style="color:#ff8080;"> · ' + Array.from(seenOn).join(", ") + " only</span>";
 
           const card = document.createElement("div");
           card.className = "roll-card";
@@ -369,7 +393,6 @@
               '<div>' +
                 '<div class="item-name">' + itemDef.name + '</div>' +
                 '<div class="item-type">' + itemDef.typeName + '</div>' +
-                '<div class="item-class">' + CLASS_LABELS[itemDef.classType] + availabilityBadge + '</div>' +
               '</div>' +
             '</div>';
 
@@ -383,13 +406,21 @@
 
           // Bungie includes structural/bookkeeping sockets (catalyst trackers,
           // hidden intrinsic slots, etc.) that carry a real plugHash but no
-          // displayProperties.name and isVisible:false — DIM and other tools
-          // hide these rather than show them as junk "Unknown" entries.
+          // displayProperties.name and isVisible:false — hidden same as
+          // DIM does. On top of that, universal placeholder plugs (empty
+          // mod/tuning slots, default shader/ornament, "upgrade armor")
+          // are filtered by name — real per-item content only.
           const allSockets = (socketEntry && socketEntry.sockets) || [];
-          const sockets = allSockets.filter(s => s.isVisible !== false);
-          html += '<div class="roll-section-label">Sockets (' + sockets.length + ')</div>';
-          if (!sockets.length){
-            html += '<div class="empty-note">no socket data on this item</div>';
+          const candidateSockets = allSockets.filter(s => s.isVisible !== false && s.plugHash);
+          const socketInfo = [];
+          for (const socket of candidateSockets){
+            const plugDef = await fetchItemDef(socket.plugHash);
+            if (isJunkSocketPlug(plugDef.name)) continue;
+            socketInfo.push({ socket, plugDef });
+          }
+          html += '<div class="roll-section-label">Perks (' + socketInfo.length + ')</div>';
+          if (!socketInfo.length){
+            html += '<div class="empty-note">no archetype/perk data on this item</div>';
           } else {
             html += '<div id="sockets-' + idx + '"></div>';
           }
@@ -402,7 +433,7 @@
           grid.appendChild(card);
 
           const rawEl = document.getElementById(rawId);
-          rawEl.textContent = JSON.stringify({ sale, stats: statEntry, sockets: socketEntry }, null, 2);
+          rawEl.textContent = JSON.stringify({ sale, stats: statEntry, sockets: socketEntry, seenOn: Array.from(seenOn) }, null, 2);
           card.querySelector(".roll-raw-toggle").addEventListener("click", (e) => {
             rawEl.classList.toggle("open");
             e.target.textContent = (e.target.textContent[0] === "▸" ? "▾" : "▸") + " raw item components";
@@ -417,14 +448,9 @@
             }
           }
 
-          if (sockets.length){
+          if (socketInfo.length){
             const socketsEl = document.getElementById("sockets-" + idx);
-            for (const socket of sockets){
-              if (!socket.plugHash){
-                socketsEl.insertAdjacentHTML("beforeend", '<div class="socket-chip disabled">empty socket</div>');
-                continue;
-              }
-              const plugDef = await fetchItemDef(socket.plugHash);
+            for (const { socket, plugDef } of socketInfo){
               const cls = socket.isEnabled === false ? "socket-chip disabled" : "socket-chip";
               socketsEl.insertAdjacentHTML("beforeend",
                 '<div class="' + cls + '">' +
@@ -436,6 +462,12 @@
         }
       }
 
+      await renderGroup("Weapons", weapons);
+      for (const classType of [0, 1, 2, 3]){
+        if (armorByClass.has(classType)) await renderGroup(CLASS_LABELS[classType] + " Armor", armorByClass.get(classType));
+      }
+
+      const totalItems = resolvedItems.length;
       statusEl.className = totalItems ? "status ok" : "status err";
       statusEl.textContent = totalItems
         ? "OK: roll detail pulled for " + totalItems + " item(s) across " + ALL_XUR_VENDOR_HASHES.length + " vendor(s) and " + characters.length + " character(s)"
