@@ -73,6 +73,20 @@
     border:1px solid var(--accent); color:var(--accent-bright); margin-top:8px;
   }
 
+  .vend-stats-row{ display:flex; flex-wrap:wrap; gap:5px; margin-top:10px; }
+  .vend-stat-chip{
+    font-family:'JetBrains Mono', monospace; font-size:9.5px; color:var(--text-dim);
+    background:rgba(255,255,255,0.05); border:1px solid var(--panel-border);
+    border-radius:4px; padding:2px 6px;
+  }
+  .vend-perks-row{ display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
+  .vend-perk-chip{
+    display:flex; align-items:center; gap:4px; font-family:'JetBrains Mono', monospace;
+    font-size:9.5px; color:var(--text-dim); background:rgba(255,255,255,0.05);
+    border:1px solid var(--panel-border); border-radius:999px; padding:2px 7px 2px 3px;
+  }
+  .vend-perk-chip img{ width:14px; height:14px; border-radius:2px; }
+
   .tw-status{
     text-align:center; padding:30px 20px; color:var(--text-dimmer);
     font-family:'JetBrains Mono', monospace; font-size:13px;
@@ -232,7 +246,7 @@
     return parts.join(", ");
   }
 
-  function itemCardHtml(name, icon, typeName, costText, tagText){
+  function itemCardHtml(name, icon, typeName, costText, tagText, extraHtml){
     return (
       '<div class="vend-card panel-card">' +
         '<div class="vend-card-top">' +
@@ -244,8 +258,44 @@
           '</div>' +
         '</div>' +
         (tagText ? '<div class="vend-tag">' + tagText + '</div>' : '') +
+        (extraHtml || "") +
       '</div>'
     );
+  }
+
+  // Compact stat-roll + socketed-perk markup for a vendor sale item,
+  // built from the same itemComponents.stats/sockets shape xur-debug.html's
+  // Live Roll Detail already proved out — empty when Bungie doesn't expose
+  // roll data for this particular sale item (not every vendor offer does).
+  async function rollDetailHtml(statEntry, socketEntry){
+    let html = "";
+    const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
+    if (stats.length){
+      const chips = [];
+      for (const stat of stats){
+        const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
+        const statName = (statDef && statDef.displayProperties && statDef.displayProperties.name) || ("Stat " + stat.statHash);
+        chips.push('<span class="vend-stat-chip">' + statName + " " + stat.value + "</span>");
+      }
+      html += '<div class="vend-stats-row">' + chips.join("") + '</div>';
+    }
+
+    // Same isVisible filter as xur-debug.html — hides structural/bookkeeping
+    // sockets (catalyst trackers, hidden intrinsic slots) that carry a real
+    // plugHash but no display name and would otherwise render as junk.
+    const allSockets = (socketEntry && socketEntry.sockets) || [];
+    const visibleSockets = allSockets.filter(s => s.isVisible !== false && s.plugHash);
+    if (visibleSockets.length){
+      const chips = [];
+      for (const socket of visibleSockets){
+        const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
+        const plugName = (plugDef && plugDef.displayProperties && plugDef.displayProperties.name) || ("Plug " + socket.plugHash);
+        const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
+        chips.push('<span class="vend-perk-chip">' + (plugIcon ? '<img src="' + plugIcon + '" alt="">' : '') + plugName + '</span>');
+      }
+      html += '<div class="vend-perks-row">' + chips.join("") + '</div>';
+    }
+    return html;
   }
 
   function formatDate(iso){
@@ -352,6 +402,8 @@
   const VANGUARD_SKIP_NAMES = new Set(["Legacy Gear", "Vanguard Ops", "Armor", "Weapons", "Weekly: Vanguard Arms Rewards", "Reset Rank"]);
   const VANGUARD_SKIP_TYPES = new Set(["", "Material", "Emblem", "Faction Reward"]);
 
+  const VANGUARD_CLASS_LABELS = { 0: "Titan", 1: "Hunter", 2: "Warlock", 3: "Any Class" };
+
   async function runVanguard(){
     const statusEl = document.getElementById("vanguard-status");
     const outputEl = document.getElementById("vanguard-output");
@@ -367,18 +419,28 @@
         const { characterId, classLabel } = characters[i];
         statusEl.textContent = "Checking Zavala for " + classLabel + " character (" + (i + 1) + "/" + characters.length + ")…";
         for (const vHash of [ZAVALA_HASH, ZAVALA_ARSENAL_HASH]){
-          let saleItems;
+          let saleItems = [], statsByIndex = {}, socketsByIndex = {};
           try {
             const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
-              "/Character/" + characterId + "/Vendors/" + vHash + "/?components=402";
+              "/Character/" + characterId + "/Vendors/" + vHash + "/?components=402,300,302,304,305";
             const resp = await authedApiGet(path);
             saleItems = Object.values((resp.sales && resp.sales.data) || {});
+            const itemComponents = resp.itemComponents || {};
+            statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
+            socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
           } catch (e){
             saleItems = [];
           }
           for (const sale of saleItems){
             const key = sale.itemHash + "|" + costSignature(sale.costs);
-            if (!itemsByKey.has(key)) itemsByKey.set(key, { sale, seenOn: new Set() });
+            if (!itemsByKey.has(key)){
+              itemsByKey.set(key, {
+                sale,
+                statEntry: statsByIndex[sale.vendorItemIndex],
+                socketEntry: socketsByIndex[sale.vendorItemIndex],
+                seenOn: new Set()
+              });
+            }
             itemsByKey.get(key).seenOn.add(classLabel);
           }
         }
@@ -390,19 +452,25 @@
         return;
       }
 
-      const cards = [];
-      let skipped = 0;
-      for (const { sale } of itemsByKey.values()){
+      const byClass = new Map(); // classType -> card html[]
+      let cardCount = 0;
+      for (const { sale, statEntry, socketEntry } of itemsByKey.values()){
         const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
         const name = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
         const typeName = (itemDef && itemDef.itemTypeDisplayName) || "";
-        if (VANGUARD_SKIP_NAMES.has(name) || VANGUARD_SKIP_TYPES.has(typeName)){ skipped++; continue; }
+        if (VANGUARD_SKIP_NAMES.has(name) || VANGUARD_SKIP_TYPES.has(typeName)) continue;
+
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const costText = await costChipsHtml(sale.costs);
-        cards.push(itemCardHtml(name, icon, typeName, costText, null));
+        const extraHtml = await rollDetailHtml(statEntry, socketEntry);
+        const classType = (itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3;
+
+        if (!byClass.has(classType)) byClass.set(classType, []);
+        byClass.get(classType).push(itemCardHtml(name, icon, typeName, costText, null, extraHtml));
+        cardCount++;
       }
 
-      if (!cards.length){
+      if (!cardCount){
         outputEl.innerHTML = '<div class="tw-status">Nothing this pull beyond reputation/material filler.</div>';
         statusEl.className = "tw-status";
         statusEl.textContent = "OK: checked " + characters.length + " character(s), nothing worth showing right now";
@@ -410,11 +478,21 @@
       }
 
       statusEl.className = "tw-status";
-      statusEl.textContent = "OK: " + cards.length + " offer(s) across " + characters.length + " character(s)";
-      const grid = document.createElement("div");
-      grid.className = "vend-grid";
-      grid.innerHTML = cards.join("");
-      outputEl.appendChild(grid);
+      statusEl.textContent = "OK: " + cardCount + " offer(s) across " + characters.length + " character(s)";
+
+      const classOrder = [0, 1, 2, 3];
+      for (const classType of classOrder){
+        if (!byClass.has(classType)) continue;
+        const items = byClass.get(classType);
+        const labelEl = document.createElement("div");
+        labelEl.className = "vend-category-label";
+        labelEl.textContent = VANGUARD_CLASS_LABELS[classType] + " (" + items.length + ")";
+        outputEl.appendChild(labelEl);
+        const grid = document.createElement("div");
+        grid.className = "vend-grid";
+        grid.innerHTML = items.join("");
+        outputEl.appendChild(grid);
+      }
     } catch (err){
       statusEl.className = "tw-status tw-error";
       statusEl.textContent = "Error: " + err.message;
