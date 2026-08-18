@@ -50,6 +50,19 @@
   }
   .vend-category-label:first-child{ margin-top:0; }
 
+  /* Per-class armor groups collapse by default — most players only care
+     about their own class, and there can be up to 4 of these stacked
+     under one vendor. Weapons stay always-expanded (a plain label+grid,
+     not one of these), since that group applies to everyone. */
+  .vend-category-collapsible{ margin:0; }
+  .vend-category-collapsible:first-child{ margin-top:0; }
+  .vend-category-collapsible summary.vend-category-label{
+    cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between;
+  }
+  .vend-category-collapsible summary.vend-category-label::-webkit-details-marker{ display:none; }
+  .vend-category-chevron{ font-size:11px; transition:transform 0.15s ease; }
+  .vend-category-collapsible[open] .vend-category-chevron{ transform:rotate(90deg); }
+
   .vend-grid{ display:flex; flex-wrap:wrap; justify-content:center; gap:12px; }
   .vend-card{ flex:0 1 250px; padding:14px; }
   .vend-card-top{ display:flex; gap:12px; align-items:center; }
@@ -354,6 +367,16 @@
         (extraHtml || "") +
       '</div>'
     );
+  }
+
+  // Per-class armor group, collapsed by default (see .vend-category-collapsible).
+  function appendCollapsibleCategory(outputEl, label, cardsHtml){
+    const details = document.createElement("details");
+    details.className = "vend-category-collapsible";
+    details.innerHTML =
+      '<summary class="vend-category-label">' + label + '<span class="vend-category-chevron">&#9656;</span></summary>' +
+      '<div class="vend-grid">' + cardsHtml.join("") + '</div>';
+    outputEl.appendChild(details);
   }
 
   // Universal placeholder plugs that sit in every piece of armor's sockets
@@ -911,14 +934,7 @@
       for (const classType of [0, 1, 2, 3]){
         if (!armorByClass.has(classType)) continue;
         const items = armorByClass.get(classType);
-        const labelEl = document.createElement("div");
-        labelEl.className = "vend-category-label";
-        labelEl.textContent = VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")";
-        outputEl.appendChild(labelEl);
-        const grid = document.createElement("div");
-        grid.className = "vend-grid";
-        grid.innerHTML = items.join("");
-        outputEl.appendChild(grid);
+        appendCollapsibleCategory(outputEl, VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")", items);
       }
     } catch (err){
       statusEl.className = "tw-status tw-error";
@@ -1295,14 +1311,7 @@
       for (const classType of [0, 1, 2, 3]){
         if (!armorByClass.has(classType)) continue;
         const items = armorByClass.get(classType);
-        const labelEl = document.createElement("div");
-        labelEl.className = "vend-category-label";
-        labelEl.textContent = VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")";
-        outputEl.appendChild(labelEl);
-        const grid = document.createElement("div");
-        grid.className = "vend-grid";
-        grid.innerHTML = items.join("");
-        outputEl.appendChild(grid);
+        appendCollapsibleCategory(outputEl, VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")", items);
       }
     } catch (err){
       statusEl.className = "tw-status tw-error";
