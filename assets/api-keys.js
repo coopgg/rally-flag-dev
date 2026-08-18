@@ -31,14 +31,13 @@ window.RallyFlagAPI = (function(){
       BUNGIE_OAUTH_CLIENT_ID: "54476"
     },
     "rallyflag.gg": {
-      // Not registered yet — fill these in once the prod Bungie
-      // Application exists. Until then, anything on rallyflag.gg
-      // falls back to the dev row below (safe: the dev key is
-      // origin-restricted to coopgg.github.io, so it will simply fail
-      // Bungie's origin check rather than silently working under the
-      // wrong identity).
-      BUNGIE_API_KEY: "REPLACE_WITH_PROD_BUNGIE_API_KEY",
-      BUNGIE_OAUTH_CLIENT_ID: "REPLACE_WITH_PROD_BUNGIE_OAUTH_CLIENT_ID"
+      // Same Bungie Application prod's anon-only key always used —
+      // OAuth was added to it directly (redirect URL
+      // https://rallyflag.gg/oauth-callback.html) rather than
+      // registering a separate one, so this API key is unchanged from
+      // what prod already had; only the OAuth client ID is new.
+      BUNGIE_API_KEY: "6299b9c9d3124d83ac607b10dd582eb7",
+      BUNGIE_OAUTH_CLIENT_ID: "54187"
     }
   };
 
