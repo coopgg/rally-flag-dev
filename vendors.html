@@ -505,16 +505,26 @@
         const name = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
         if (/decryption$/i.test(name)) continue;
 
-        const typeName = (itemDef && itemDef.itemTypeDisplayName) || "Other";
+        const rawTypeName = (itemDef && itemDef.itemTypeDisplayName) || "Other";
         // "Package" is Bungie's own type for the Warlock/Hunter/Titan Set
         // and Pack bundles — a grab-bag of several ornament pieces sold
         // as one unit, not a single specific cosmetic — excluded per
         // request same as the Decryption engrams above.
-        if (typeName === "Package") continue;
+        if (rawTypeName === "Package") continue;
+
+        // "Hunter Ornament"/"Titan Ornament"/"Warlock Ornament"/"Weapon
+        // Ornament" are all real distinct Bungie types, but they read as
+        // one concept — condensed into a single "Ornaments" section with
+        // the specific kind (Hunter/Titan/Warlock/Weapon) as a tag on the
+        // card instead of splitting into 4 near-identical sections.
+        const ornamentMatch = /^(.*) Ornament$/.exec(rawTypeName);
+        const groupKey = ornamentMatch ? "Ornaments" : rawTypeName;
+        const tagText = ornamentMatch ? ornamentMatch[1] : null;
+
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const costText = await costChipsHtml(sale.costs);
-        if (!groups.has(typeName)) groups.set(typeName, []);
-        groups.get(typeName).push(itemCardHtml(name, icon, null, costText, null));
+        if (!groups.has(groupKey)) groups.set(groupKey, []);
+        groups.get(groupKey).push(itemCardHtml(name, icon, null, costText, tagText));
         totalCount++;
       }
 
