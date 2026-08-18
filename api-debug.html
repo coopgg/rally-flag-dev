@@ -242,18 +242,22 @@
   // its relative order, appended after — same fallback armor's STAT_ORDER
   // uses), `bottom` renders as a bare number below the bars.
   //
-  // Every name below is copied verbatim from real screenshots (not
-  // guessed) — "Airborne" and "Ammo Gen" specifically replace an earlier
-  // "Airborne Effectiveness"/"Ammo Generation" guess that never matched
-  // anything, silently falling through to "unlisted, appended at the
-  // end" on every weapon rendered before this fix.
+  // Every name below is copied verbatim from real rendered cards. Both
+  // prior guesses at the rate/airborne/ammo-gen stat names were wrong —
+  // "RPM"/"Airborne"/"Ammo Gen" (this file's original guess) AND
+  // "Airborne"/"Ammo Gen" alone (a later "fix" that swapped in more
+  // abbreviations without checking) — Bungie's real displayProperties.name
+  // strings are the full "Rounds Per Minute", "Airborne Effectiveness",
+  // "Ammo Generation", confirmed on Inbound Surveillance screenshots
+  // showing all three landing in "unlisted, appended at the end" instead
+  // of their real positions.
   //
   // Sword and Bow confirmed via Eighty-Six and Anamnesis (Adept). Weapon
-  // types not listed here (Shotgun, Rocket Launcher, Machine Gun,
-  // Sidearm, Trace Rifle, Glaive) fall back to DEFAULT_GUN_STAT_LAYOUT —
-  // untested for those specifically, so worst case an unconfirmed type's
-  // "top" stat just renders as a normal bar instead of being pulled out
-  // specially, never a fabricated number.
+  // types not listed here (Shotgun, Machine Gun, Sidearm, Trace Rifle)
+  // fall back to DEFAULT_GUN_STAT_LAYOUT — untested for those
+  // specifically, so worst case an unconfirmed type's "top" stat just
+  // renders as a normal bar instead of being pulled out specially, never
+  // a fabricated number.
   const WEAPON_STAT_LAYOUT = {
     "Sword": {
       top: "Swing Speed",
@@ -262,47 +266,48 @@
     },
     "Bow": {
       top: "Draw Time",
-      order: ["Impact", "Accuracy", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne", "Zoom", "Ammo Gen", "Recoil Direction"],
+      order: ["Impact", "Accuracy", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
       bottom: null
     },
     // Confirmed via Festival Flight, Truthteller, Deafening Whisper,
     // Salvager's Salvo — same shape as the default gun layout, but the
     // second/third bars are Blast Radius/Velocity instead of Impact/Range.
     // Also confirmed identical on Rocket Launcher (Apex Predator,
-    // Dragon's Breath, Hezen Vengeance) — top stat is still literally
-    // "RPM" even at values like 15-25, not renamed to anything else.
+    // Dragon's Breath, Hezen Vengeance) — top stat is still the rate
+    // stat, even at values like 15-25, not renamed to anything else.
     "Grenade Launcher": {
-      top: "RPM",
-      order: ["Blast Radius", "Velocity", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne", "Zoom", "Ammo Gen", "Recoil Direction"],
+      top: "Rounds Per Minute",
+      order: ["Blast Radius", "Velocity", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
       bottom: "Magazine"
     },
     // Confirmed via Refusal of the Call — same shape as the RPM default,
     // but with a Shield Duration stat (the block mechanic) inserted
     // after Range, and no Stability stat at all.
     "Glaive": {
-      top: "RPM",
-      order: ["Impact", "Range", "Shield Duration", "Handling", "Reload Speed", "Aim Assistance", "Airborne", "Zoom", "Ammo Gen", "Recoil Direction"],
+      top: "Rounds Per Minute",
+      order: ["Impact", "Range", "Shield Duration", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
       bottom: "Magazine"
     }
   };
   WEAPON_STAT_LAYOUT["Rocket Launcher"] = WEAPON_STAT_LAYOUT["Grenade Launcher"];
   // Confirmed via Scatter Signal (Fusion Rifle) and Arbalest (Linear
   // Fusion Rifle) — identical to the RPM default except the top stat is
-  // Charge Time (in ms) instead of RPM.
+  // Charge Time (in ms) instead of the rate stat.
   const CHARGE_TIME_GUN_STAT_LAYOUT = {
     top: "Charge Time",
-    order: ["Impact", "Range", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne", "Zoom", "Ammo Gen", "Recoil Direction"],
+    order: ["Impact", "Range", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
     bottom: "Magazine"
   };
   WEAPON_STAT_LAYOUT["Fusion Rifle"] = CHARGE_TIME_GUN_STAT_LAYOUT;
   WEAPON_STAT_LAYOUT["Linear Fusion Rifle"] = CHARGE_TIME_GUN_STAT_LAYOUT;
   // Confirmed via Survivor's Epitaph, Modified B-7 Pistol, Agape (Hand
   // Cannon), Izanagi's Burden (Sniper Rifle), Sublimation/Taraxippos
-  // (Scout Rifle), Gnawing Hunger/Quicksilver Storm (Auto Rifle),
-  // Nightshade (Pulse Rifle), Prolonged Engagement (SMG).
+  // (Scout Rifle), Gnawing Hunger/Quicksilver Storm/Inbound Surveillance
+  // (Auto Rifle/Pulse Rifle), Nightshade (Pulse Rifle), Prolonged
+  // Engagement (SMG).
   const DEFAULT_GUN_STAT_LAYOUT = {
-    top: "RPM",
-    order: ["Impact", "Range", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne", "Zoom", "Ammo Gen", "Recoil Direction"],
+    top: "Rounds Per Minute",
+    order: ["Impact", "Range", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
     bottom: "Magazine"
   };
   function weaponStatLayoutFor(itemTypeDisplayName){
