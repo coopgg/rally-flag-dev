@@ -699,6 +699,7 @@
     ((itemDef.sockets && itemDef.sockets.socketCategories) || []).forEach(cat => {
       (cat.socketIndexes || []).forEach(idx => { categoryHashByIndex[idx] = cat.socketCategoryHash; });
     });
+    const defSocketEntries = (itemDef.sockets && itemDef.sockets.socketEntries) || [];
 
     const [resolvedStats, resolvedPerks] = await Promise.all([
       mapWithConcurrency(stats, 5, async (stat) => {
@@ -708,11 +709,26 @@
         return { name: statName, value: stat.value };
       }).then(rows => sortStatsToGameOrder(rows.filter(Boolean))),
       mapWithConcurrency(visibleSockets, 5, async ({ socket, index }) => {
+        const categoryHash = categoryHashByIndex[index];
+        // A live roll only ever carries ONE resolved plug per socket (not
+        // the full pool), so the pool-size-based exclusion rule only
+        // means anything for the one mixed category (Origin Trait vs.
+        // Ornament) — computed from the item's definition-level pool at
+        // this same socket index, not from anything on the live roll.
+        // Any category with no confirmed evidence yet defaults to kept
+        // (a single stray icon here is low-risk, unlike showing an
+        // entire unfiltered pool on the Item Hash Lookup side).
+        let poolSize = 1;
+        if (categoryHash === WEAPON_COSMETICS_MIXED_CATEGORY_HASH && defSocketEntries[index]){
+          poolSize = (await resolveSocketPlugPool(defSocketEntries[index])).plugHashes.length || 1;
+        }
+        if (isExcludedSocket(categoryHash, null, poolSize)) return null;
+
         const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
         const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
         if (!plugName || isJunkSocketPlug(plugName)) return null;
         const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
-        return { isArchetype: categoryHashByIndex[index] === ARCHETYPE_SOCKET_CATEGORY_HASH, name: plugName, icon: plugIcon };
+        return { isArchetype: categoryHash === ARCHETYPE_SOCKET_CATEGORY_HASH, name: plugName, icon: plugIcon };
       }).then(rows => rows.filter(Boolean))
     ]);
 
@@ -835,6 +851,57 @@
     return /mods?\b|cosmetics?|shaders?|ornaments?|trackers?/i.test(name);
   }
 
+  // Evidence-based socket-category overrides, confirmed against real raw
+  // JSON (an Eighty-Six sword, cross-checked against a Luminopotent Grips
+  // armor piece) rather than guessed — these take priority over the
+  // generic name-pattern fallback above, because some legitimate
+  // multi-option pools (a sword's Origin Trait, 9 options) sit inside a
+  // category whose resolved name matches the generic "cosmetics" pattern
+  // and would otherwise be wrongly excluded by it.
+  const WEAPON_PERKS_CATEGORY_HASH = 4241085061;    // frame-adjacent trait/perk columns (edge, guard, perk 1, perk 2, etc.) — always kept
+  const WEAPON_MOD_TIER_CATEGORY_HASH = 2048875504; // same universal mod pool armor's tier slot uses — always excluded
+  // Mixes Origin Trait (small pool, ~9 options on the confirmed sword)
+  // with Ornament/pattern slots (huge pool, 90+ options) under one
+  // category — kept only when the pool is small enough to plausibly be
+  // a real trait, not cosmetics. Threshold sits well above the observed
+  // trait pool size and well below the observed ornament pool size.
+  const WEAPON_COSMETICS_MIXED_CATEGORY_HASH = 2685412949;
+  const COSMETICS_MIXED_POOL_SIZE_CUTOFF = 20;
+
+  function isExcludedSocket(categoryHash, label, plugCount){
+    if (categoryHash === WEAPON_PERKS_CATEGORY_HASH) return false;
+    if (categoryHash === WEAPON_MOD_TIER_CATEGORY_HASH) return true;
+    if (categoryHash === WEAPON_COSMETICS_MIXED_CATEGORY_HASH) return plugCount > COSMETICS_MIXED_POOL_SIZE_CUTOFF;
+    // Fallback for every category without confirmed evidence yet (armor's
+    // mod/cosmetic categories, other weapon types, etc.): only a genuine
+    // multi-option swappable pool under a mod/cosmetic-named category is
+    // treated as noise. A socket with just one possible plug isn't
+    // swappable at all, so it's far more likely to be real hash-level
+    // info (an archetype trait, an exotic intrinsic perk) than clutter.
+    return plugCount > 1 && isNoiseSocketCategory(label);
+  }
+
+  // Resolves one socket entry's raw plug-hash pool plus a stable identity
+  // key for that pool's source (used to dedupe exact-duplicate sockets).
+  async function resolveSocketPlugPool(entry){
+    if (entry.reusablePlugSetHash){
+      const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.reusablePlugSetHash);
+      return { plugHashes: ((plugSet && plugSet.reusablePlugItems) || []).map(p => p.plugItemHash), sourceKey: "rps:" + entry.reusablePlugSetHash };
+    }
+    if (entry.randomizedPlugSetHash){
+      const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.randomizedPlugSetHash);
+      return { plugHashes: ((plugSet && plugSet.reusablePlugItems) || []).map(p => p.plugItemHash), sourceKey: "rnd:" + entry.randomizedPlugSetHash };
+    }
+    if (entry.reusablePlugItems && entry.reusablePlugItems.length){
+      const plugHashes = entry.reusablePlugItems.map(p => p.plugItemHash);
+      return { plugHashes, sourceKey: "inline:" + plugHashes.slice().sort().join(",") };
+    }
+    if (entry.singleInitialItemHash){
+      return { plugHashes: [entry.singleInitialItemHash], sourceKey: "single:" + entry.singleInitialItemHash };
+    }
+    return { plugHashes: [], sourceKey: null };
+  }
+
   // Definition-level stats/sockets, not a live rolled instance (there's no
   // character context here) — stats come from the item's base investment
   // stats, and perks are every possible plug a non-noise socket can carry
@@ -851,41 +918,23 @@
 
     const categories = (itemDef.sockets && itemDef.sockets.socketCategories) || [];
     const categoryNameByIndex = {};
+    const categoryHashByIndex = {};
     await mapWithConcurrency(categories, 5, async (cat) => {
       const catDef = await fetchDef("DestinySocketCategoryDefinition", cat.socketCategoryHash);
       const catName = (catDef && catDef.displayProperties && catDef.displayProperties.name) || null;
-      (cat.socketIndexes || []).forEach(idx => { categoryNameByIndex[idx] = catName; });
+      (cat.socketIndexes || []).forEach(idx => {
+        categoryNameByIndex[idx] = catName;
+        categoryHashByIndex[idx] = cat.socketCategoryHash;
+      });
     });
 
     const perSocket = await mapWithConcurrency(socketEntries, 5, async (entry, index) => {
       const label = categoryNameByIndex[index] || ("Socket " + index);
 
-      let plugHashes = [];
-      let sourceKey;
-      if (entry.reusablePlugSetHash){
-        const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.reusablePlugSetHash);
-        plugHashes = ((plugSet && plugSet.reusablePlugItems) || []).map(p => p.plugItemHash);
-        sourceKey = "rps:" + entry.reusablePlugSetHash;
-      } else if (entry.randomizedPlugSetHash){
-        const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.randomizedPlugSetHash);
-        plugHashes = ((plugSet && plugSet.reusablePlugItems) || []).map(p => p.plugItemHash);
-        sourceKey = "rnd:" + entry.randomizedPlugSetHash;
-      } else if (entry.reusablePlugItems && entry.reusablePlugItems.length){
-        plugHashes = entry.reusablePlugItems.map(p => p.plugItemHash);
-        sourceKey = "inline:" + plugHashes.slice().sort().join(",");
-      } else if (entry.singleInitialItemHash){
-        plugHashes = [entry.singleInitialItemHash];
-        sourceKey = "single:" + entry.singleInitialItemHash;
-      }
+      const { plugHashes, sourceKey } = await resolveSocketPlugPool(entry);
       if (!plugHashes.length) return null;
 
-      // Only a genuine multi-option swappable pool under a mod/cosmetic
-      // category is the universal noise this filters out. A socket with
-      // just ONE possible plug isn't swappable at all — no matter which
-      // category it's filed under, a fixed single option is far more
-      // likely to be real hash-level info (an armor archetype trait, an
-      // exotic intrinsic perk, an origin trait) than clutter, so it's kept.
-      if (plugHashes.length > 1 && isNoiseSocketCategory(label)) return null;
+      if (isExcludedSocket(categoryHashByIndex[index], label, plugHashes.length)) return null;
 
       const perks = (await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
         const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
