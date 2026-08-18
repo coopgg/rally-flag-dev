@@ -716,12 +716,17 @@
         for (const vHash of Object.keys(vendorsData)){
           let saleItems;
 
-          if (resolvedSalesByVendor.has(vHash)){
-            saleItems = resolvedSalesByVendor.get(vHash);
-          } else if (salesData[vHash]){
-            // Bulk response actually included this vendor's sales.
+          if (salesData[vHash]){
+            // Always read this character's own bulk data directly — the
+            // same vendor hash can carry genuinely different,
+            // class-specific contents per character (confirmed live on
+            // vendors.html: Hunter's and Titan's exclusive ornaments were
+            // getting silently dropped because an earlier character's
+            // cached result for that same hash was being reused instead
+            // of checking this character's actual bulk response).
             saleItems = Object.values(salesData[vHash].saleItems || {});
-            resolvedSalesByVendor.set(vHash, saleItems);
+          } else if (resolvedSalesByVendor.has(vHash)){
+            saleItems = resolvedSalesByVendor.get(vHash);
           } else {
             // Confirmed live: the bulk Vendors/ call lists every vendor
             // (including the one-item Bright Dust stubs) in vendors.data,
