@@ -789,7 +789,11 @@
         // Filters out vestigial definition stats (armor's "Power"/"Defense",
         // always 0/0) that carry a name but no actual range — a real stat
         // (weapon base stats, or an armor stat with an investment value)
-        // has a nonzero value or maximum.
+        // has a nonzero value or maximum. Armor's real 6-stat total isn't a
+        // definitional stat at all — it's locked to the specific drop
+        // (itemInstanceId) at pickup time, same reason two copies of the
+        // same weapon hash can carry completely different perks; that's
+        // instance data, unreachable from a bare hash lookup.
         if (!statName || (!stat.value && !stat.maximum)) return null;
         const pct = Math.max(0, Math.min(100, stat.value));
         return (
@@ -802,7 +806,7 @@
 
       html += '<div class="section-label">Stats</div>';
       html += statRows.length ? statRows.join("") :
-        '<div class="empty">No definitional stat roll on this item — armor\'s actual stat totals are computed per-character instance, not on the item definition itself, so a bare hash lookup can\'t show them. Sign in above and use Vendor Hash Lookup / Live Vendor Rolls to see real rolled stats.</div>';
+        '<div class="empty">No definitional stat roll on this item — armor\'s actual stat total is locked in per-drop (its own itemInstanceId), not shared across every copy of this item the way its name/icon/perk pool are, so a bare hash lookup can\'t show one specific copy\'s numbers. Sign in above and use Vendor Hash Lookup / Live Vendor Rolls to see a real instance\'s rolled stats.</div>';
     }
 
     const socketGroups = await resolveItemSocketGroups(itemDef);
