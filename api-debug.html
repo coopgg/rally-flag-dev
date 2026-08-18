@@ -52,6 +52,7 @@
   .perk-grid-col{ display:flex; flex-direction:column; gap:5px; }
   .perk-icon{ width:32px; height:32px; object-fit:cover; border-radius:4px; background:#000; border:1px solid #2c2c33; display:block; }
   .perk-icon-empty{ background:#1a1a1f; }
+  .perk-icon.equipped{ border-color:#7fbfff; box-shadow:0 0 0 1px #7fbfff; }
 </style>
 </head>
 <body>
@@ -437,10 +438,11 @@
   // native title tooltip (shows the perk name on hover). Used for perk/mod
   // grids specifically — chipHtml above (name always visible) stays as-is
   // for everywhere else on this page (vendor lists, milestone chips, etc.).
-  function perkIconHtml(name, icon){
+  function perkIconHtml(name, icon, equipped){
     const safeName = name.replace(/"/g, "&quot;");
-    if (icon) return '<img class="perk-icon" src="' + icon + '" alt="' + safeName + '" title="' + safeName + '">';
-    return '<div class="perk-icon perk-icon-empty" title="' + safeName + '"></div>';
+    const cls = "perk-icon" + (equipped ? " equipped" : "");
+    if (icon) return '<img class="' + cls + '" src="' + icon + '" alt="' + safeName + '" title="' + safeName + '">';
+    return '<div class="' + cls + ' perk-icon-empty" title="' + safeName + '"></div>';
   }
 
   function chipHtml(name, sub, icon){
@@ -912,7 +914,7 @@
     });
     const defSocketEntries = (itemDef.sockets && itemDef.sockets.socketEntries) || [];
 
-    const [resolvedStats, resolvedPerks] = await Promise.all([
+    const [resolvedStats, resolvedSockets] = await Promise.all([
       mapWithConcurrency(stats, 5, async (stat) => {
         const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
         const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
@@ -921,39 +923,60 @@
       }).then(rows => rows.filter(Boolean)),
       mapWithConcurrency(visibleSockets, 5, async ({ socket, index }) => {
         const categoryHash = categoryHashByIndex[index];
-        // A live roll only ever carries ONE resolved plug per socket (not
-        // the full pool), so the pool-size-based exclusion rule only
-        // means anything for the one mixed category (Origin Trait vs.
-        // Ornament) — computed from the item's definition-level pool at
-        // this same socket index, not from anything on the live roll.
-        // Any category with no confirmed evidence yet defaults to kept
-        // (a single stray icon here is low-risk, unlike showing an
-        // entire unfiltered pool on the Item Hash Lookup side).
-        let poolSize = 1;
-        if (categoryHash === WEAPON_COSMETICS_MIXED_CATEGORY_HASH && defSocketEntries[index]){
-          poolSize = (await resolveSocketPlugPool(defSocketEntries[index])).plugHashes.length || 1;
+        if (isArchetypeCategory(categoryHash)){
+          const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
+          const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
+          if (!plugName || isJunkSocketPlug(plugName)) return null;
+          return { index, isArchetype: true, name: plugName, icon: plugDef ? iconUrl(plugDef.displayProperties) : null };
         }
-        if (isExcludedSocket(categoryHash, null, poolSize)) return null;
 
-        const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
-        const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
-        if (!plugName || isJunkSocketPlug(plugName)) return null;
-        const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
-        return { isArchetype: isArchetypeCategory(categoryHash), name: plugName, icon: plugIcon };
+        // A live roll only ever carries ONE resolved plug per socket, but
+        // the weapon-perk/origin-trait columns (DIM's 5-column grid:
+        // barrel, magazine, perk 1, perk 2, origin trait) are meant to
+        // show the whole swappable pool with the actual pick highlighted
+        // — so for those specifically, pull the full pool off the item's
+        // definition (same source Item Hash Lookup uses) instead of just
+        // the one resolved plug.
+        const isPerkColumn = categoryHash === WEAPON_PERKS_CATEGORY_HASH || categoryHash === WEAPON_COSMETICS_MIXED_CATEGORY_HASH;
+        const defEntry = defSocketEntries[index];
+        const plugHashes = (isPerkColumn && defEntry)
+          ? (await resolveSocketPlugPool(defEntry)).plugHashes
+          : (socket.plugHash ? [socket.plugHash] : []);
+        if (!plugHashes.length) return null;
+        if (isExcludedSocket(categoryHash, null, plugHashes.length)) return null;
+
+        const perks = (await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
+          const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
+          const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
+          if (!plugName || isJunkSocketPlug(plugName)) return null;
+          return { name: plugName, icon: plugDef ? iconUrl(plugDef.displayProperties) : null, equipped: plugHash === socket.plugHash };
+        })).filter(Boolean);
+        if (!perks.length) return null;
+
+        return { index, isArchetype: false, isPerkColumn, perks };
       }).then(rows => rows.filter(Boolean))
     ]);
 
-    const archetype = resolvedPerks.find(p => p.isArchetype);
-    const otherPerkTiles = resolvedPerks.filter(p => !p.isArchetype).map(p => perkIconHtml(p.name, p.icon));
+    const archetype = resolvedSockets.find(s => s.isArchetype);
+    // Sorted by socket index so the columns land in the game's own order:
+    // barrel/launch/blade type, magazine/arrow/grenade type, perk 1,
+    // perk 2, origin trait.
+    const perkColumns = resolvedSockets.filter(s => !s.isArchetype && s.isPerkColumn)
+      .sort((a, b) => a.index - b.index).map(s => s.perks);
+    const looseIcons = resolvedSockets.filter(s => !s.isArchetype && !s.isPerkColumn)
+      .flatMap(s => s.perks.map(p => perkIconHtml(p.name, p.icon)));
     const statsHtml = itemDef.itemType === 3
       ? weaponStatBarsHtml(resolvedStats, weaponStatLayoutFor(itemDef.itemTypeDisplayName))
       : statBarsHtml(sortStatsToGameOrder(resolvedStats));
-    if (!archetype && !statsHtml && !otherPerkTiles.length) return "";
+    if (!archetype && !statsHtml && !perkColumns.length && !looseIcons.length) return "";
 
     let html = "";
     if (archetype) html += '<div class="chip" style="margin-bottom:8px;">' + (archetype.icon ? '<img src="' + archetype.icon + '" alt="">' : '') + '<div class="chip-name">' + archetype.name + '</div></div>';
     if (statsHtml) html += statsHtml;
-    if (otherPerkTiles.length) html += '<div class="perk-grid">' + otherPerkTiles.join("") + '</div>';
+    if (perkColumns.length) html += '<div class="perk-grid">' + perkColumns.map(column =>
+      '<div class="perk-grid-col">' + column.map(p => perkIconHtml(p.name, p.icon, p.equipped)).join("") + '</div>'
+    ).join("") + '</div>';
+    if (looseIcons.length) html += '<div class="perk-grid">' + looseIcons.join("") + '</div>';
     return html;
   }
 
@@ -1211,7 +1234,18 @@
 
     const socketGroups = await resolveItemSocketGroups(itemDef);
     const archetypeGroups = socketGroups.filter(g => isArchetypeCategory(g.categoryHash));
-    const otherGroups = socketGroups.filter(g => !isArchetypeCategory(g.categoryHash));
+    // Weapons: barrel/launch/blade type, magazine/arrow/grenade type,
+    // perk 1, perk 2, and origin trait all render together as one
+    // DIM-style 5-column grid, not as separate per-category sections —
+    // WEAPON_PERKS_CATEGORY_HASH supplies the first four (already in
+    // socket order), WEAPON_COSMETICS_MIXED_CATEGORY_HASH the origin
+    // trait, and group order here already follows ascending socket index
+    // (resolveItemSocketGroups groups by first-seen order), so
+    // concatenating them lands the columns in the game's own order.
+    const perkColumnGroups = itemDef.itemType === 3
+      ? socketGroups.filter(g => g.categoryHash === WEAPON_PERKS_CATEGORY_HASH || g.categoryHash === WEAPON_COSMETICS_MIXED_CATEGORY_HASH)
+      : [];
+    const otherGroups = socketGroups.filter(g => !isArchetypeCategory(g.categoryHash) && !perkColumnGroups.includes(g));
 
     // Archetype (armor) / Frame (weapon) rendered above the perk pool with
     // visible names, not just an icon among the rest — the one trait that
@@ -1222,6 +1256,13 @@
       for (const group of archetypeGroups){
         html += '<div class="chip-row">' + group.columns.flat().map(p => chipHtml(p.name, null, p.icon)).join("") + '</div>';
       }
+    }
+
+    if (perkColumnGroups.length){
+      html += '<div class="section-label">Weapon Perks</div>';
+      html += '<div class="perk-grid">' + perkColumnGroups.flatMap(g => g.columns).map(column =>
+        '<div class="perk-grid-col">' + column.map(p => perkIconHtml(p.name, p.icon)).join("") + '</div>'
+      ).join("") + '</div>';
     }
 
     if (otherGroups.length){
