@@ -41,6 +41,11 @@
   .badge.available{ background:#1a3a2a; color:#7fd9a0; }
   .badge.unavailable{ background:#3a1a1a; color:#ff8080; }
   .vendor-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px; }
+  .stat-bar-row{ margin-bottom:6px; }
+  .stat-bar-head{ display:flex; justify-content:space-between; font-size:10.5px; color:#999; margin-bottom:2px; }
+  .stat-bar-head .val{ color:#e4e4e8; }
+  .stat-bar-track{ height:4px; border-radius:2px; background:#1a1a1f; overflow:hidden; }
+  .stat-bar-fill{ height:100%; background:#7fbfff; border-radius:2px; }
 </style>
 </head>
 <body>
@@ -153,6 +158,34 @@
 
   function iconUrl(displayProperties){
     return (displayProperties && displayProperties.icon) ? BUNGIE_ROOT + displayProperties.icon : null;
+  }
+
+  // Bounded-concurrency map — same pattern vendors.html uses for its
+  // stat/perk resolution: a small fixed concurrency (5) is safe against
+  // Bungie's API, unlike firing every lookup at once which reliably 500s it.
+  async function mapWithConcurrency(items, limit, fn){
+    const results = new Array(items.length);
+    let next = 0;
+    async function worker(){
+      while (next < items.length){
+        const i = next++;
+        results[i] = await fn(items[i], i);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return results;
+  }
+
+  // Universal placeholder plugs that sit in every item's sockets regardless
+  // of roll — an empty mod/tuning slot, the default (unselected)
+  // shader/ornament, etc. None of these say anything about this specific
+  // item. Same filter vendors.html uses for live vendor rolls.
+  function isJunkSocketPlug(name){
+    if (/^empty .*socket$/i.test(name)) return true;
+    if (/^(default shader|upgrade armor|default ornament)$/i.test(name)) return true;
+    if (/^kill tracker$/i.test(name)) return true;
+    if (/^tier \d+:/i.test(name)) return true;
+    return false;
   }
 
   function chipHtml(name, sub, icon){
@@ -670,6 +703,86 @@
   // DestinyInventoryItemDefinition manifest endpoint directly — same as
   // Weekly Milestones up top — so it works with just the API key, no
   // sign-in required.
+
+  // Definition-level stats/sockets, not a live rolled instance (there's no
+  // character context here) — stats come from the item's base investment
+  // stats, and perks are every possible plug a socket can carry (its full
+  // plug-set pool via DestinyPlugSetDefinition), grouped under whatever
+  // DestinySocketCategoryDefinition name that socket belongs to.
+  async function resolveItemSocketGroups(itemDef){
+    const socketEntries = (itemDef.sockets && itemDef.sockets.socketEntries) || [];
+    if (!socketEntries.length) return [];
+
+    const categories = (itemDef.sockets && itemDef.sockets.socketCategories) || [];
+    const categoryNameByIndex = {};
+    await mapWithConcurrency(categories, 5, async (cat) => {
+      const catDef = await fetchDef("DestinySocketCategoryDefinition", cat.socketCategoryHash);
+      const catName = (catDef && catDef.displayProperties && catDef.displayProperties.name) || null;
+      (cat.socketIndexes || []).forEach(idx => { categoryNameByIndex[idx] = catName; });
+    });
+
+    const groups = await mapWithConcurrency(socketEntries, 5, async (entry, index) => {
+      let plugHashes = [];
+      if (entry.reusablePlugSetHash){
+        const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.reusablePlugSetHash);
+        plugHashes = ((plugSet && plugSet.reusablePlugItems) || []).map(p => p.plugItemHash);
+      } else if (entry.randomizedPlugSetHash){
+        const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.randomizedPlugSetHash);
+        plugHashes = ((plugSet && plugSet.reusablePlugItems) || []).map(p => p.plugItemHash);
+      } else if (entry.reusablePlugItems && entry.reusablePlugItems.length){
+        plugHashes = entry.reusablePlugItems.map(p => p.plugItemHash);
+      } else if (entry.singleInitialItemHash){
+        plugHashes = [entry.singleInitialItemHash];
+      }
+      if (!plugHashes.length) return null;
+
+      const chips = (await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
+        const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
+        const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
+        if (!plugName || isJunkSocketPlug(plugName)) return null;
+        const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
+        return chipHtml(plugName, null, plugIcon);
+      })).filter(Boolean);
+      if (!chips.length) return null;
+
+      return { label: categoryNameByIndex[index] || ("Socket " + index), html: chips.join("") };
+    });
+
+    return groups.filter(Boolean);
+  }
+
+  async function itemStatsAndPerksHtml(itemDef){
+    let html = "";
+
+    const stats = (itemDef.stats && itemDef.stats.stats) ? Object.values(itemDef.stats.stats) : [];
+    if (stats.length){
+      const statRows = (await mapWithConcurrency(stats, 5, async (stat) => {
+        const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
+        const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
+        if (!statName) return null;
+        const pct = Math.max(0, Math.min(100, stat.value));
+        return (
+          '<div class="stat-bar-row">' +
+            '<div class="stat-bar-head"><span>' + statName + '</span><span class="val">' + stat.value + '</span></div>' +
+            '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%"></div></div>' +
+          '</div>'
+        );
+      })).filter(Boolean);
+      if (statRows.length) html += '<div class="section-label">Stats</div>' + statRows.join("");
+    }
+
+    const socketGroups = await resolveItemSocketGroups(itemDef);
+    if (socketGroups.length){
+      html += '<div class="section-label">Perks &amp; Sockets</div>';
+      for (const group of socketGroups){
+        html += '<div class="chip-sub" style="margin:6px 0 3px;">' + group.label + '</div>';
+        html += '<div class="chip-row">' + group.html + '</div>';
+      }
+    }
+
+    return html;
+  }
+
   async function runItemLookup(hash){
     const statusEl = document.getElementById("item-lookup-status");
     const outputEl = document.getElementById("item-lookup-output");
@@ -724,6 +837,15 @@
 
       card.innerHTML = html;
       outputEl.appendChild(card);
+
+      statusEl.textContent = "Resolving stats/perks for " + name + "…";
+      const statsPerksHtml = await itemStatsAndPerksHtml(itemDef);
+      if (statsPerksHtml){
+        const rawToggleEl = card.querySelector(".raw-toggle");
+        rawToggleEl.insertAdjacentHTML("beforebegin", statsPerksHtml);
+      }
+      statusEl.className = "status ok";
+      statusEl.textContent = "OK: " + name;
 
       const rawEl = document.getElementById(rawId);
       rawEl.textContent = JSON.stringify(itemDef, null, 2);
