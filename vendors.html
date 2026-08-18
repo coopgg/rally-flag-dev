@@ -263,6 +263,17 @@
     );
   }
 
+  // Universal placeholder plugs that sit in every piece of armor's sockets
+  // regardless of roll — an empty mod/tuning slot, the default (unselected)
+  // shader/ornament, and the "insert to upgrade" prompt. None of these say
+  // anything about this specific item, unlike an actual archetype perk
+  // (Grenadier, Specialist, Bulwark, etc.) or a socketed mod.
+  function isJunkSocketPlug(name){
+    if (/^empty .*socket$/i.test(name)) return true;
+    if (/^(default shader|upgrade armor|default ornament)$/i.test(name)) return true;
+    return false;
+  }
+
   // Compact stat-roll + socketed-perk markup for a vendor sale item,
   // built from the same itemComponents.stats/sockets shape xur-debug.html's
   // Live Roll Detail already proved out — empty when Bungie doesn't expose
@@ -285,14 +296,15 @@
     // plugHash but no display name and would otherwise render as junk.
     const allSockets = (socketEntry && socketEntry.sockets) || [];
     const visibleSockets = allSockets.filter(s => s.isVisible !== false && s.plugHash);
-    if (visibleSockets.length){
-      const chips = [];
-      for (const socket of visibleSockets){
-        const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
-        const plugName = (plugDef && plugDef.displayProperties && plugDef.displayProperties.name) || ("Plug " + socket.plugHash);
-        const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
-        chips.push('<span class="vend-perk-chip">' + (plugIcon ? '<img src="' + plugIcon + '" alt="">' : '') + plugName + '</span>');
-      }
+    const chips = [];
+    for (const socket of visibleSockets){
+      const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
+      const plugName = (plugDef && plugDef.displayProperties && plugDef.displayProperties.name) || ("Plug " + socket.plugHash);
+      if (isJunkSocketPlug(plugName)) continue;
+      const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
+      chips.push('<span class="vend-perk-chip">' + (plugIcon ? '<img src="' + plugIcon + '" alt="">' : '') + plugName + '</span>');
+    }
+    if (chips.length){
       html += '<div class="vend-perks-row">' + chips.join("") + '</div>';
     }
     return html;
@@ -396,11 +408,13 @@
   const ZAVALA_ARSENAL_HASH = "153857624"; // "Weekly: Vanguard Arms Rewards" — confirmed live, see api-debug.html
 
   // Both his own hash and the Arsenal hash mix in blank portal-tile
-  // stubs and non-gear filler (materials, reputation reset, emblems) —
+  // stubs and non-gear filler (materials, reputation reset, emblems,
+  // generic reward engrams/shaders, and a couple of zero-cost, icon-less
+  // "Armor Set" collection tiles that aren't a real equippable piece) —
   // filtered out by name/type rather than guessed, based on what's
   // actually been seen live.
-  const VANGUARD_SKIP_NAMES = new Set(["Legacy Gear", "Vanguard Ops", "Armor", "Weapons", "Weekly: Vanguard Arms Rewards", "Reset Rank"]);
-  const VANGUARD_SKIP_TYPES = new Set(["", "Material", "Emblem", "Faction Reward"]);
+  const VANGUARD_SKIP_NAMES = new Set(["Legacy Gear", "Vanguard Ops", "Armor", "Weapons", "Weekly: Vanguard Arms Rewards", "Reset Rank", "Vanguard Tactician Armor", "Vanguard Tactician Arsenal", "Vanguard Engram"]);
+  const VANGUARD_SKIP_TYPES = new Set(["", "Material", "Emblem", "Faction Reward", "Engram", "Shader"]);
 
   const VANGUARD_CLASS_LABELS = { 0: "Titan", 1: "Hunter", 2: "Warlock", 3: "Any Class" };
 
@@ -432,14 +446,19 @@
             saleItems = [];
           }
           for (const sale of saleItems){
-            const key = sale.itemHash + "|" + costSignature(sale.costs);
+            const statEntry = statsByIndex[sale.vendorItemIndex];
+            const socketEntry = socketsByIndex[sale.vendorItemIndex];
+            // Zavala can sell the same weapon at the same price with
+            // genuinely different rolls at once (different perks in the
+            // same sockets) — keyed on itemHash + cost alone, those would
+            // wrongly collapse into a single card. Folding each socket's
+            // plugHash into the key keeps distinct rolls as separate
+            // cards, only merging true duplicates (same roll seen again
+            // on another character).
+            const rollSignature = (socketEntry && socketEntry.sockets) ? socketEntry.sockets.map(s => s.plugHash || 0).join(",") : "";
+            const key = sale.itemHash + "|" + costSignature(sale.costs) + "|" + rollSignature;
             if (!itemsByKey.has(key)){
-              itemsByKey.set(key, {
-                sale,
-                statEntry: statsByIndex[sale.vendorItemIndex],
-                socketEntry: socketsByIndex[sale.vendorItemIndex],
-                seenOn: new Set()
-              });
+              itemsByKey.set(key, { sale, statEntry, socketEntry, seenOn: new Set() });
             }
             itemsByKey.get(key).seenOn.add(classLabel);
           }
@@ -452,7 +471,8 @@
         return;
       }
 
-      const byClass = new Map(); // classType -> card html[]
+      const weapons = [];
+      const armorByClass = new Map(); // classType -> card html[]
       let cardCount = 0;
       for (const { sale, statEntry, socketEntry } of itemsByKey.values()){
         const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
@@ -463,11 +483,16 @@
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const costText = await costChipsHtml(sale.costs);
         const extraHtml = await rollDetailHtml(statEntry, socketEntry);
-        const classType = (itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3;
-
-        if (!byClass.has(classType)) byClass.set(classType, []);
-        byClass.get(classType).push(itemCardHtml(name, icon, typeName, costText, null, extraHtml));
+        const card = itemCardHtml(name, icon, typeName, costText, null, extraHtml);
         cardCount++;
+
+        if (XUR_ARMOR_TYPES.has(typeName)){
+          const classType = (itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3;
+          if (!armorByClass.has(classType)) armorByClass.set(classType, []);
+          armorByClass.get(classType).push(card);
+        } else {
+          weapons.push(card);
+        }
       }
 
       if (!cardCount){
@@ -480,13 +505,23 @@
       statusEl.className = "tw-status";
       statusEl.textContent = "OK: " + cardCount + " offer(s) across " + characters.length + " character(s)";
 
-      const classOrder = [0, 1, 2, 3];
-      for (const classType of classOrder){
-        if (!byClass.has(classType)) continue;
-        const items = byClass.get(classType);
+      if (weapons.length){
         const labelEl = document.createElement("div");
         labelEl.className = "vend-category-label";
-        labelEl.textContent = VANGUARD_CLASS_LABELS[classType] + " (" + items.length + ")";
+        labelEl.textContent = "Weapons (" + weapons.length + ")";
+        outputEl.appendChild(labelEl);
+        const grid = document.createElement("div");
+        grid.className = "vend-grid";
+        grid.innerHTML = weapons.join("");
+        outputEl.appendChild(grid);
+      }
+
+      for (const classType of [0, 1, 2, 3]){
+        if (!armorByClass.has(classType)) continue;
+        const items = armorByClass.get(classType);
+        const labelEl = document.createElement("div");
+        labelEl.className = "vend-category-label";
+        labelEl.textContent = VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")";
         outputEl.appendChild(labelEl);
         const grid = document.createElement("div");
         grid.className = "vend-grid";
@@ -740,18 +775,33 @@
         const { characterId, classLabel } = characters[i];
         statusEl.textContent = "Checking Xûr for " + classLabel + " character (" + (i + 1) + "/" + characters.length + ")…";
         for (const vHash of [XUR_HASH, ...XUR_SUB_HASHES]){
-          let saleItems;
+          let saleItems = [], statsByIndex = {}, socketsByIndex = {};
           try {
             const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
-              "/Character/" + characterId + "/Vendors/" + vHash + "/?components=402";
+              "/Character/" + characterId + "/Vendors/" + vHash + "/?components=402,300,302,304,305";
             const resp = await authedApiGet(path);
             saleItems = Object.values((resp.sales && resp.sales.data) || {});
+            const itemComponents = resp.itemComponents || {};
+            statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
+            socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
           } catch (e){
             saleItems = [];
           }
           for (const sale of saleItems){
-            const key = sale.itemHash + "|" + costSignature(sale.costs);
-            if (!itemsByKey.has(key)) itemsByKey.set(key, { sale, seenOn: new Set() });
+            const socketEntry = socketsByIndex[sale.vendorItemIndex];
+            // Same reasoning as Zavala below: fold each socket's plugHash
+            // into the key so genuinely different rolls of the same item
+            // stay as separate cards instead of collapsing into one.
+            const rollSignature = (socketEntry && socketEntry.sockets) ? socketEntry.sockets.map(s => s.plugHash || 0).join(",") : "";
+            const key = sale.itemHash + "|" + costSignature(sale.costs) + "|" + rollSignature;
+            if (!itemsByKey.has(key)){
+              itemsByKey.set(key, {
+                sale,
+                statEntry: statsByIndex[sale.vendorItemIndex],
+                socketEntry,
+                seenOn: new Set()
+              });
+            }
             itemsByKey.get(key).seenOn.add(classLabel);
           }
         }
@@ -763,41 +813,36 @@
         return;
       }
 
-      const exotics = [];
-      const legendaryWeapons = [];
-      const legendaryArmor = [];
-      let skipped = 0;
+      const weapons = [];
+      const armorByClass = new Map(); // classType -> card html[]
+      let itemCount = 0;
 
-      for (const { sale } of itemsByKey.values()){
+      for (const { sale, statEntry, socketEntry } of itemsByKey.values()){
         const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
         const name = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
         const typeName = (itemDef && itemDef.itemTypeDisplayName) || "";
         const tier = itemDef && itemDef.inventory ? itemDef.inventory.tierTypeName : null;
         const isCatalyst = /catalyst/i.test(name);
 
-        if (!isCatalyst && XUR_SKIP_TYPES.has(typeName)){ skipped++; continue; }
+        if (!isCatalyst && XUR_SKIP_TYPES.has(typeName)) continue;
 
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const costText = await costChipsHtml(sale.costs);
-        const tag = isCatalyst ? "Catalyst" : null;
-        const card = itemCardHtml(name, icon, typeName || (isCatalyst ? "Catalyst" : ""), costText, tag);
+        const tag = isCatalyst ? "Catalyst" : (tier === "Exotic" ? "Exotic" : null);
+        const extraHtml = await rollDetailHtml(statEntry, socketEntry);
+        const card = itemCardHtml(name, icon, typeName || (isCatalyst ? "Catalyst" : ""), costText, tag, extraHtml);
+        itemCount++;
 
-        if (tier === "Exotic"){
-          exotics.push(card);
-        } else if (XUR_ARMOR_TYPES.has(typeName)){
-          legendaryArmor.push(card);
+        if (XUR_ARMOR_TYPES.has(typeName)){
+          const classType = (itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3;
+          if (!armorByClass.has(classType)) armorByClass.set(classType, []);
+          armorByClass.get(classType).push(card);
         } else {
-          legendaryWeapons.push(card);
+          weapons.push(card);
         }
       }
 
-      const groups = [
-        ["Exotic Gear", exotics],
-        ["Legendary Weapons", legendaryWeapons],
-        ["Legendary Armor", legendaryArmor]
-      ].filter(([, items]) => items.length);
-
-      if (!groups.length){
+      if (!itemCount){
         outputEl.insertAdjacentHTML("beforeend", '<div class="tw-status">Nothing worth showing came back this pull.</div>');
         statusEl.className = "tw-status";
         statusEl.textContent = "OK: checked " + characters.length + " character(s), nothing to show";
@@ -805,12 +850,25 @@
       }
 
       statusEl.className = "tw-status";
-      statusEl.textContent = "OK: " + (exotics.length + legendaryWeapons.length + legendaryArmor.length) + " item(s) across " + characters.length + " character(s)";
+      statusEl.textContent = "OK: " + itemCount + " item(s) across " + characters.length + " character(s)";
 
-      for (const [label, items] of groups){
+      if (weapons.length){
         const labelEl = document.createElement("div");
         labelEl.className = "vend-category-label";
-        labelEl.textContent = label + " (" + items.length + ")";
+        labelEl.textContent = "Weapons (" + weapons.length + ")";
+        outputEl.appendChild(labelEl);
+        const grid = document.createElement("div");
+        grid.className = "vend-grid";
+        grid.innerHTML = weapons.join("");
+        outputEl.appendChild(grid);
+      }
+
+      for (const classType of [0, 1, 2, 3]){
+        if (!armorByClass.has(classType)) continue;
+        const items = armorByClass.get(classType);
+        const labelEl = document.createElement("div");
+        labelEl.className = "vend-category-label";
+        labelEl.textContent = VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")";
         outputEl.appendChild(labelEl);
         const grid = document.createElement("div");
         grid.className = "vend-grid";
