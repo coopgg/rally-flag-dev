@@ -598,6 +598,13 @@
           return { isArchetype: true, name: plugName, icon: plugDef ? iconUrl(plugDef.displayProperties) : null };
         }
 
+        // Armor has no equivalent perk-grid concept here (no 2pc/4pc set
+        // bonus data to show, and its other sockets are mostly cosmetic)
+        // — just the archetype chip + stats, no Perks tab at all. Skip
+        // resolving anything else for it rather than fetching plugs that
+        // will never render.
+        if (!isWeapon) return null;
+
         // A live roll only ever carries ONE resolved plug per socket, but
         // the weapon-perk columns are meant to show the whole swappable
         // pool with the actual pick highlighted. Component 310
@@ -625,14 +632,27 @@
     ]);
 
     const archetype = resolvedSockets.find(s => s.isArchetype);
-    const perkColumns = resolvedSockets.filter(s => !s.isArchetype && s.isPerkColumn)
-      .sort((a, b) => a.index - b.index).map(s => s.perks);
-    const flatPerks = resolvedSockets.filter(s => !s.isArchetype && !s.isPerkColumn)
-      .flatMap(s => s.perks.map(p => perkIconHtml(p.name, p.icon)));
 
     const statsHtml = isWeapon
       ? weaponStatBarsHtml(resolvedStats, weaponStatLayoutFor(itemDef.itemTypeDisplayName))
       : statBarsHtml(sortStatsToGameOrder(resolvedStats));
+
+    let html = "";
+    if (archetype) html += '<div class="vend-archetype-chip">' + (archetype.icon ? '<img src="' + archetype.icon + '" alt="">' : '') + '<span class="name">' + archetype.name + '</span></div>';
+
+    // Armor: stats only, no tabs — there's no perk-grid content for it
+    // (no 2pc/4pc set bonus data available to show), so a Perks tab
+    // would just be permanently empty.
+    if (!isWeapon){
+      if (!archetype && !statsHtml) return "";
+      html += statsHtml || '<div class="vend-empty-note">no stat roll on this item</div>';
+      return html;
+    }
+
+    const perkColumns = resolvedSockets.filter(s => !s.isArchetype && s.isPerkColumn)
+      .sort((a, b) => a.index - b.index).map(s => s.perks);
+    const flatPerks = resolvedSockets.filter(s => !s.isArchetype && !s.isPerkColumn)
+      .flatMap(s => s.perks.map(p => perkIconHtml(p.name, p.icon)));
 
     let perksHtml = "";
     if (perkColumns.length) perksHtml += '<div class="vend-perk-grid">' + perkColumns.map(column =>
@@ -643,8 +663,6 @@
     if (!archetype && !statsHtml && !perksHtml) return "";
 
     const id = "roll-" + (rollCardIdCounter++);
-    let html = "";
-    if (archetype) html += '<div class="vend-archetype-chip">' + (archetype.icon ? '<img src="' + archetype.icon + '" alt="">' : '') + '<span class="name">' + archetype.name + '</span></div>';
     html +=
       '<div class="vend-roll-tabs">' +
         '<button type="button" class="vend-roll-tab active" data-tab="' + id + '-stats">Stats</button>' +
