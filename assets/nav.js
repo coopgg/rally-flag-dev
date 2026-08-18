@@ -224,14 +224,22 @@
     const container = document.getElementById("site-nav");
     if (!container) return;
 
-    const linksHtml = NAV_SECTIONS.map(section =>
-      '<div class="nav-menu-section">' +
-        '<div class="nav-menu-section-label">' + section.label + '</div>' +
-        section.items.map(item =>
-          '<a href="' + item.href + '"' + (item.group === activeGroup ? ' class="active"' : '') + '>' + item.label + '</a>'
-        ).join("") +
-      '</div>'
-    ).join("");
+    // Each section is a <details>, all sharing one `name` — browsers
+    // auto-collapse the others whenever one opens, so the menu can't
+    // stack up into a long scroll of every link at once. The section
+    // holding the current page starts open; everything else starts
+    // collapsed to just its label.
+    const linksHtml = NAV_SECTIONS.map(section => {
+      const hasActive = section.items.some(item => item.group === activeGroup);
+      return (
+        '<details class="nav-menu-section" name="nav-links-accordion"' + (hasActive ? " open" : "") + '>' +
+          '<summary class="nav-menu-section-label">' + section.label + '</summary>' +
+          section.items.map(item =>
+            '<a href="' + item.href + '"' + (item.group === activeGroup ? ' class="active"' : '') + '>' + item.label + '</a>'
+          ).join("") +
+        '</details>'
+      );
+    }).join("");
 
     container.innerHTML =
       '<nav class="site-nav">' +
