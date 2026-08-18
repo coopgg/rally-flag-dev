@@ -46,6 +46,10 @@
   .stat-bar-head .val{ color:#e4e4e8; }
   .stat-bar-track{ height:4px; border-radius:2px; background:#1a1a1f; overflow:hidden; }
   .stat-bar-fill{ height:100%; background:#7fbfff; border-radius:2px; }
+  .perk-grid{ display:flex; flex-wrap:wrap; gap:10px; margin-top:6px; }
+  .perk-grid-col{ display:flex; flex-direction:column; gap:5px; }
+  .perk-icon{ width:32px; height:32px; object-fit:cover; border-radius:4px; background:#000; border:1px solid #2c2c33; display:block; }
+  .perk-icon-empty{ background:#1a1a1f; }
 </style>
 </head>
 <body>
@@ -224,6 +228,16 @@
       html += '<div class="stat-bar-row"><div class="stat-bar-head"><span>Total</span><span class="val">' + total + '</span></div></div>';
     }
     return html;
+  }
+
+  // DIM-style icon-only perk tile: no visible label, just the icon with a
+  // native title tooltip (shows the perk name on hover). Used for perk/mod
+  // grids specifically — chipHtml above (name always visible) stays as-is
+  // for everywhere else on this page (vendor lists, milestone chips, etc.).
+  function perkIconHtml(name, icon){
+    const safeName = name.replace(/"/g, "&quot;");
+    if (icon) return '<img class="perk-icon" src="' + icon + '" alt="' + safeName + '" title="' + safeName + '">';
+    return '<div class="perk-icon perk-icon-empty" title="' + safeName + '"></div>';
   }
 
   function chipHtml(name, sub, icon){
@@ -683,8 +697,8 @@
         const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
         if (!plugName || isJunkSocketPlug(plugName)) return null;
         const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
-        return chipHtml(plugName, null, plugIcon);
-      }).then(chips => chips.filter(Boolean))
+        return perkIconHtml(plugName, plugIcon);
+      }).then(tiles => tiles.filter(Boolean))
     ]);
 
     const statsHtml = statBarsHtml(resolvedStats);
@@ -692,7 +706,7 @@
 
     let html = "";
     if (statsHtml) html += '<div class="section-label">Current Roll — Stats</div>' + statsHtml;
-    if (perkChips.length) html += '<div class="section-label">Current Roll — Perks</div><div class="chip-row">' + perkChips.join("") + '</div>';
+    if (perkChips.length) html += '<div class="section-label">Current Roll — Perks</div><div class="perk-grid">' + perkChips.join("") + '</div>';
     return html;
   }
 
@@ -808,9 +822,11 @@
   // stats, and perks are every possible plug a non-noise socket can carry
   // (its full plug-set pool via DestinyPlugSetDefinition), grouped under
   // whatever DestinySocketCategoryDefinition name that socket belongs to.
-  // Sockets sharing the same category label (e.g. three separate "Weapon
-  // Mods" slots) are merged into one group with plug names deduped, rather
-  // than repeating the same pool three times.
+  // Each socket becomes its own column (DIM's perk-grid layout — barrel
+  // options, magazine options, trait columns, etc. all differ from each
+  // other even when they share a category), except sockets that are exact
+  // duplicates of one another (same underlying plug source — armor's three
+  // identical universal mod slots, for example), which collapse to one.
   async function resolveItemSocketGroups(itemDef){
     const socketEntries = (itemDef.sockets && itemDef.sockets.socketEntries) || [];
     if (!socketEntries.length) return [];
@@ -827,16 +843,21 @@
       const label = categoryNameByIndex[index] || ("Socket " + index);
 
       let plugHashes = [];
+      let sourceKey;
       if (entry.reusablePlugSetHash){
         const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.reusablePlugSetHash);
         plugHashes = ((plugSet && plugSet.reusablePlugItems) || []).map(p => p.plugItemHash);
+        sourceKey = "rps:" + entry.reusablePlugSetHash;
       } else if (entry.randomizedPlugSetHash){
         const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.randomizedPlugSetHash);
         plugHashes = ((plugSet && plugSet.reusablePlugItems) || []).map(p => p.plugItemHash);
+        sourceKey = "rnd:" + entry.randomizedPlugSetHash;
       } else if (entry.reusablePlugItems && entry.reusablePlugItems.length){
         plugHashes = entry.reusablePlugItems.map(p => p.plugItemHash);
+        sourceKey = "inline:" + plugHashes.slice().sort().join(",");
       } else if (entry.singleInitialItemHash){
         plugHashes = [entry.singleInitialItemHash];
+        sourceKey = "single:" + entry.singleInitialItemHash;
       }
       if (!plugHashes.length) return null;
 
@@ -852,27 +873,26 @@
         const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
         const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
         if (!plugName || isJunkSocketPlug(plugName)) return null;
-        const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
-        return { name: plugName, html: chipHtml(plugName, null, plugIcon) };
+        return { name: plugName, icon: plugDef ? iconUrl(plugDef.displayProperties) : null };
       })).filter(Boolean);
       if (!perks.length) return null;
 
-      return { label, perks };
+      return { label, sourceKey, perks };
     });
 
-    const merged = new Map();
-    for (const group of perSocket){
-      if (!group) continue;
-      if (!merged.has(group.label)) merged.set(group.label, new Map());
-      const seen = merged.get(group.label);
-      for (const perk of group.perks){
-        if (!seen.has(perk.name)) seen.set(perk.name, perk.html);
-      }
+    const columnsByLabel = new Map();
+    const seenSources = new Set();
+    for (const socket of perSocket){
+      if (!socket) continue;
+      const dupeKey = socket.label + "|" + socket.sourceKey;
+      if (seenSources.has(dupeKey)) continue;
+      seenSources.add(dupeKey);
+
+      if (!columnsByLabel.has(socket.label)) columnsByLabel.set(socket.label, []);
+      columnsByLabel.get(socket.label).push(socket.perks);
     }
 
-    return Array.from(merged.entries()).map(([label, seen]) => ({
-      label, html: Array.from(seen.values()).join("")
-    }));
+    return Array.from(columnsByLabel.entries()).map(([label, columns]) => ({ label, columns }));
   }
 
   async function itemStatsAndPerksHtml(itemDef){
@@ -904,7 +924,9 @@
       html += '<div class="section-label">Perks &amp; Sockets</div>';
       for (const group of socketGroups){
         html += '<div class="chip-sub" style="margin:6px 0 3px;">' + group.label + '</div>';
-        html += '<div class="chip-row">' + group.html + '</div>';
+        html += '<div class="perk-grid">' + group.columns.map(column =>
+          '<div class="perk-grid-col">' + column.map(p => perkIconHtml(p.name, p.icon)).join("") + '</div>'
+        ).join("") + '</div>';
       }
     }
 
