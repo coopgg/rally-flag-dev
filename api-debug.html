@@ -314,13 +314,24 @@
     return WEAPON_STAT_LAYOUT[itemTypeDisplayName] || DEFAULT_GUN_STAT_LAYOUT;
   }
 
-  // Renders resolved {name, value} weapon stats using a per-type layout:
-  // the top rate-stat and bottom capacity-stat as bare numbers (no bar,
-  // matching how DIM/in-game shows them), everything else as ordered
-  // bars. Recoil Direction is included as a plain bar/number for now —
-  // DIM renders it as a computed compass angle, but the exact value-to-
-  // angle formula isn't confirmed, and a wrong compass would actively
-  // misinform rather than just being less polished.
+  // The in-game/companion stat card abbreviates a handful of Bungie's
+  // verbose displayProperties.name stat names for the on-screen label —
+  // confirmed via a real in-game screenshot of Inbound Surveillance next
+  // to this page's own (unabbreviated) API output for the same weapon.
+  // Matching/ordering still needs the real API names (below), this is
+  // display-text only.
+  const STAT_DISPLAY_NAME = {
+    "Rounds Per Minute": "RPM",
+    "Airborne Effectiveness": "Airborne",
+    "Ammo Generation": "Ammo Gen"
+  };
+
+  // Renders resolved {name, value} weapon stats using a per-type layout.
+  // Confirmed via the same in-game screenshot: the rate stat (top) and
+  // capacity stat (bottom) are NOT special bare numbers — they render as
+  // an ordinary bar, same as everything else, just first/last in
+  // sequence. Recoil Direction is the only stat that gets special
+  // (non-bar) treatment, rendered as a compass angle.
   // Reverse-engineered EXACT formula (not a guess, not interpolation)
   // from 58 real DIM-rendered SVG samples spanning value 25-100 that the
   // user pulled directly from their vault. Verified to within 1e-13° —
@@ -379,25 +390,22 @@
 
   function weaponStatBarsHtml(resolvedStats, layout){
     if (!resolvedStats.length) return "";
-    const top = layout.top ? resolvedStats.find(s => s.name === layout.top) : null;
-    const bottom = layout.bottom ? resolvedStats.find(s => s.name === layout.bottom) : null;
+    const fullOrder = (layout.top ? [layout.top] : []).concat(layout.order, layout.bottom ? [layout.bottom] : []);
 
-    const barStats = resolvedStats.filter(s => s !== top && s !== bottom);
-    barStats.sort((a, b) => {
-      const ai = layout.order.indexOf(a.name), bi = layout.order.indexOf(b.name);
+    const sorted = resolvedStats.slice().sort((a, b) => {
+      const ai = fullOrder.indexOf(a.name), bi = fullOrder.indexOf(b.name);
       if (ai === -1 && bi === -1) return 0;
       if (ai === -1) return 1;
       if (bi === -1) return -1;
       return ai - bi;
     });
 
-    let html = "";
-    if (top) html += '<div class="stat-bar-row"><div class="stat-bar-head"><span>' + top.name + '</span><span class="val">' + top.value + '</span></div></div>';
-    html += barStats.map(s => {
+    let html = sorted.map(s => {
+      const label = STAT_DISPLAY_NAME[s.name] || s.name;
       if (s.name === "Recoil Direction"){
         return (
           '<div class="stat-bar-row">' +
-            '<div class="stat-bar-head"><span>' + s.name + '</span><span class="val">' + s.value + '</span></div>' +
+            '<div class="stat-bar-head"><span>' + label + '</span><span class="val">' + s.value + '</span></div>' +
             '<div class="recoil-compass-wrap">' + recoilCompassHtml(s.value) + '</div>' +
           '</div>'
         );
@@ -405,12 +413,11 @@
       const pct = Math.max(0, Math.min(100, s.value));
       return (
         '<div class="stat-bar-row">' +
-          '<div class="stat-bar-head"><span>' + s.name + '</span><span class="val">' + s.value + '</span></div>' +
+          '<div class="stat-bar-head"><span>' + label + '</span><span class="val">' + s.value + '</span></div>' +
           '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%"></div></div>' +
         '</div>'
       );
     }).join("");
-    if (bottom) html += '<div class="stat-bar-row"><div class="stat-bar-head"><span>' + bottom.name + '</span><span class="val">' + bottom.value + '</span></div></div>';
 
     return html;
   }
