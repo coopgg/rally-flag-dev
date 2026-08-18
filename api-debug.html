@@ -188,6 +188,44 @@
     return false;
   }
 
+  // Always rendered in this order regardless of what order the API
+  // returns them in, matching the in-game armor stat card. Anything
+  // outside this set (weapon stats — Range, Stability, etc.) keeps its
+  // original relative order, appended after.
+  const STAT_ORDER = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"];
+  function sortStatsToGameOrder(resolvedStats){
+    resolvedStats.sort((a, b) => {
+      const ai = STAT_ORDER.indexOf(a.name), bi = STAT_ORDER.indexOf(b.name);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+    return resolvedStats;
+  }
+
+  // Renders resolved {name, value} stat bars plus a Total row (plain
+  // number, no bar) — but only when every stat present is one of the six
+  // named armor stats above; summing weapon stats (Range + Stability + …)
+  // isn't a meaningful number the way an armor stat total is.
+  function statBarsHtml(resolvedStats){
+    if (!resolvedStats.length) return "";
+    let html = resolvedStats.map(s => {
+      const pct = Math.max(0, Math.min(100, s.value));
+      return (
+        '<div class="stat-bar-row">' +
+          '<div class="stat-bar-head"><span>' + s.name + '</span><span class="val">' + s.value + '</span></div>' +
+          '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%"></div></div>' +
+        '</div>'
+      );
+    }).join("");
+    if (resolvedStats.every(s => STAT_ORDER.includes(s.name))){
+      const total = resolvedStats.reduce((sum, s) => sum + s.value, 0);
+      html += '<div class="stat-bar-row"><div class="stat-bar-head"><span>Total</span><span class="val">' + total + '</span></div></div>';
+    }
+    return html;
+  }
+
   function chipHtml(name, sub, icon){
     return '<div class="chip">' +
       (icon ? '<img src="' + icon + '" alt="">' : '') +
@@ -623,22 +661,23 @@
   // components (304/305) without needing to already own the item.
   async function vendorSaleRollHtml(statEntry, socketEntry){
     const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
+    // No isVisible filter here — an armor piece's archetype (Powerhouse,
+    // Paragon, Grenadier, etc.) lives in sockets Bungie flags
+    // isVisible:false/defaultVisible:false at the definition level (they're
+    // hidden, non-swappable, rolled-at-drop sockets, not meant for the
+    // normal mod-picker UI), so filtering on visibility was silently
+    // dropping exactly the trait this is meant to surface. isJunkSocketPlug
+    // below still catches genuinely empty/placeholder plugs.
     const allSockets = (socketEntry && socketEntry.sockets) || [];
-    const visibleSockets = allSockets.filter(s => s.isVisible !== false && s.plugHash);
+    const visibleSockets = allSockets.filter(s => s.plugHash);
 
-    const [statRows, perkChips] = await Promise.all([
+    const [resolvedStats, perkChips] = await Promise.all([
       mapWithConcurrency(stats, 5, async (stat) => {
         const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
         const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
         if (!statName) return null;
-        const pct = Math.max(0, Math.min(100, stat.value));
-        return (
-          '<div class="stat-bar-row">' +
-            '<div class="stat-bar-head"><span>' + statName + '</span><span class="val">' + stat.value + '</span></div>' +
-            '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%"></div></div>' +
-          '</div>'
-        );
-      }).then(rows => rows.filter(Boolean)),
+        return { name: statName, value: stat.value };
+      }).then(rows => sortStatsToGameOrder(rows.filter(Boolean))),
       mapWithConcurrency(visibleSockets, 5, async (socket) => {
         const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
         const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
@@ -648,10 +687,11 @@
       }).then(chips => chips.filter(Boolean))
     ]);
 
-    if (!statRows.length && !perkChips.length) return "";
+    const statsHtml = statBarsHtml(resolvedStats);
+    if (!statsHtml && !perkChips.length) return "";
 
     let html = "";
-    if (statRows.length) html += '<div class="section-label">Current Roll — Stats</div>' + statRows.join("");
+    if (statsHtml) html += '<div class="section-label">Current Roll — Stats</div>' + statsHtml;
     if (perkChips.length) html += '<div class="section-label">Current Roll — Perks</div><div class="chip-row">' + perkChips.join("") + '</div>';
     return html;
   }
@@ -840,56 +880,23 @@
 
     const stats = (itemDef.stats && itemDef.stats.stats) ? Object.values(itemDef.stats.stats) : [];
     if (stats.length){
-      const resolvedStats = (await mapWithConcurrency(stats, 5, async (stat) => {
+      // Confirmed live on a Legendary gauntlet's raw definition: every
+      // entry here sits at value:0/minimum:0/maximum:0 (only
+      // displayMaximum is nonzero) with hasDisplayableStats:false —
+      // Bungie's own flag that this block isn't meant to be shown. The
+      // real per-copy stat total lives on the rolled instance instead
+      // (itemInstanceId, or a vendor sale's stats component), same as
+      // weapon perks — that's why this reliably comes up empty for armor.
+      const resolvedStats = sortStatsToGameOrder((await mapWithConcurrency(stats, 5, async (stat) => {
         const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
         const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
-        // Filters out vestigial definition stats (armor's "Power"/"Defense",
-        // always 0/0) that carry a name but no actual range — a real stat
-        // (weapon base stats, or an armor stat with an investment value)
-        // has a nonzero value or maximum. Armor's real 6-stat total isn't a
-        // definitional stat at all — it's locked to the specific drop
-        // (itemInstanceId) at pickup time, same reason two copies of the
-        // same weapon hash can carry completely different perks; that's
-        // instance data, unreachable from a bare hash lookup.
         if (!statName || (!stat.value && !stat.maximum)) return null;
         return { name: statName, value: stat.value };
-      })).filter(Boolean);
-
-      // Always shown in this order regardless of the order the API
-      // returns them in, matching the in-game armor stat card. Anything
-      // outside this set (weapon stats — Range, Stability, etc.) keeps
-      // its original relative order, appended after.
-      const STAT_ORDER = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"];
-      resolvedStats.sort((a, b) => {
-        const ai = STAT_ORDER.indexOf(a.name), bi = STAT_ORDER.indexOf(b.name);
-        if (ai === -1 && bi === -1) return 0;
-        if (ai === -1) return 1;
-        if (bi === -1) return -1;
-        return ai - bi;
-      });
+      })).filter(Boolean));
 
       html += '<div class="section-label">Stats</div>';
-      if (resolvedStats.length){
-        html += resolvedStats.map(s => {
-          const pct = Math.max(0, Math.min(100, s.value));
-          return (
-            '<div class="stat-bar-row">' +
-              '<div class="stat-bar-head"><span>' + s.name + '</span><span class="val">' + s.value + '</span></div>' +
-              '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%"></div></div>' +
-            '</div>'
-          );
-        }).join("");
-
-        // Only tallied when every resolved stat is one of the six named
-        // armor stats above — summing weapon stats (Range + Stability + …)
-        // isn't a meaningful number the way an armor stat total is.
-        if (resolvedStats.every(s => STAT_ORDER.includes(s.name))){
-          const total = resolvedStats.reduce((sum, s) => sum + s.value, 0);
-          html += '<div class="stat-bar-row"><div class="stat-bar-head"><span>Total</span><span class="val">' + total + '</span></div></div>';
-        }
-      } else {
-        html += '<div class="empty">No definitional stat roll on this item — armor\'s actual stat total is locked in per-drop (its own itemInstanceId), not shared across every copy of this item the way its name/icon/perk pool are, so a bare hash lookup can\'t show one specific copy\'s numbers. Sign in above and use Vendor Hash Lookup / Live Vendor Rolls to see a real instance\'s rolled stats.</div>';
-      }
+      html += statBarsHtml(resolvedStats) ||
+        '<div class="empty">No definitional stat roll on this item — armor\'s actual stat total is locked in per-drop (its own itemInstanceId), not shared across every copy of this item the way its name/icon/perk pool are, so a bare hash lookup can\'t show one specific copy\'s numbers. Sign in above and use Vendor Hash Lookup to see a real current roll\'s stats.</div>';
     }
 
     const socketGroups = await resolveItemSocketGroups(itemDef);
