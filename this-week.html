@@ -35,6 +35,18 @@
     font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dimmer);
   }
 
+  .tw-collapsible{ margin:44px 0 0; }
+  .tw-collapsible summary{
+    display:flex; align-items:baseline; justify-content:flex-start; gap:8px;
+    margin:0 0 16px; cursor:pointer; list-style:none;
+  }
+  .tw-collapsible summary::-webkit-details-marker{ display:none; }
+  .tw-collapse-chevron{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer);
+    transition:transform 0.15s ease;
+  }
+  .tw-collapsible[open] .tw-collapse-chevron{ transform:rotate(90deg); }
+
   .tw-status{
     text-align:center; padding:30px 20px; color:var(--text-dimmer);
     font-family:'JetBrains Mono', monospace; font-size:13px;
@@ -183,14 +195,16 @@
   <div class="tw-subsection-label">Dungeons</div>
   <div id="featured-dungeons-content"></div>
 
-  <div class="tw-section-head">
-    <div class="tw-section-title">Next Week<span class="tw-predicted-badge">Predicted</span></div>
-    <div class="tw-refresh-note">Same rotation, one reset ahead</div>
-  </div>
-  <div class="tw-subsection-label">Raids</div>
-  <div id="next-week-raids-content"></div>
-  <div class="tw-subsection-label">Dungeons</div>
-  <div id="next-week-dungeons-content"></div>
+  <details class="tw-collapsible">
+    <summary>
+      <span class="tw-section-title">Next Week<span class="tw-predicted-badge">Predicted</span></span>
+      <span class="tw-collapse-chevron">&#9656;</span>
+    </summary>
+    <div class="tw-subsection-label">Raids</div>
+    <div id="next-week-raids-content"></div>
+    <div class="tw-subsection-label">Dungeons</div>
+    <div id="next-week-dungeons-content"></div>
+  </details>
 
   <div class="tw-section-head">
     <div class="tw-section-title">Xûr at the Tower</div>
