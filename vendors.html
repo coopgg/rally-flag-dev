@@ -501,6 +501,11 @@
         if (/decryption$/i.test(name)) continue;
 
         const typeName = (itemDef && itemDef.itemTypeDisplayName) || "Other";
+        // "Package" is Bungie's own type for the Warlock/Hunter/Titan Set
+        // and Pack bundles — a grab-bag of several ornament pieces sold
+        // as one unit, not a single specific cosmetic — excluded per
+        // request same as the Decryption engrams above.
+        if (typeName === "Package") continue;
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const costText = await costChipsHtml(sale.costs);
         if (!groups.has(typeName)) groups.set(typeName, []);
