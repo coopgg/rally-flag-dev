@@ -259,8 +259,12 @@
   // renders as a normal bar instead of being pulled out specially, never
   // a fabricated number.
   const WEAPON_STAT_LAYOUT = {
+    // Swing Speed is the one rate-ish "top" stat that keeps its bar
+    // (topIsBar) — every other weapon type's top stat (RPM, Charge Time,
+    // Draw Time) renders as a plain number instead.
     "Sword": {
       top: "Swing Speed",
+      topIsBar: true,
       order: ["Impact", "Guard Resistance", "Charge Rate", "Guard Endurance"],
       bottom: "Ammo Capacity"
     },
@@ -402,11 +406,11 @@
 
     let html = sorted.map(s => {
       const label = STAT_DISPLAY_NAME[s.name] || s.name;
-      if (s.name === layout.top){
-        // DIM convention: the rate stat (RPM/Charge Time/Draw Time/Swing
-        // Speed) is a plain number, not a bar — unlike every other stat
-        // here (including the bottom capacity stat), it isn't on a 0-100
-        // scale, so a bar for it would be meaningless.
+      if (s.name === layout.top && !layout.topIsBar){
+        // DIM convention: the rate stat (RPM/Charge Time/Draw Time) is a
+        // plain number, not a bar — it isn't on a 0-100 scale, so a bar
+        // for it would be meaningless. Swing Speed (Sword) is the one
+        // exception that keeps its bar, via layout.topIsBar.
         return '<div class="stat-bar-row"><div class="stat-bar-head"><span>' + label + '</span><span class="val">' + s.value + '</span></div></div>';
       }
       if (s.name === "Recoil Direction"){
