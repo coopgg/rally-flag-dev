@@ -275,48 +275,38 @@
   // DIM renders it as a computed compass angle, but the exact value-to-
   // angle formula isn't confirmed, and a wrong compass would actively
   // misinform rather than just being less polished.
-  // Reverse-engineered from real DIM-rendered SVG markup across 24
-  // exact (value, center-angle) samples the user pulled from two
-  // independent rounds: the wedge's half-width in degrees is exactly
-  // 0.9 * (100 - value) — confirmed to floating-point precision on
-  // every sample, so this is real, not guessed. That's the meaningful
-  // half of the visual: 100 = a perfectly vertical line (fully
-  // predictable recoil), lower values fan out wider.
+  // Reverse-engineered EXACT formula (not a guess, not interpolation)
+  // from 58 real DIM-rendered SVG samples spanning value 25-100 that the
+  // user pulled directly from their vault. Verified to within 1e-13° —
+  // floating-point noise — on every single sample:
   //
-  // The wedge's left/right LEAN turned out to be a deterministic
-  // function of the raw value alone, not a per-item or per-roll random
-  // seed as first assumed (an earlier version of this seeded it off the
-  // item hash, then off the full roll, both wrong) — proven when value
-  // 84 and value 85 each showed up on two completely different weapons
-  // across two independent sample batches and produced the *identical*
-  // center angle both times (3.955° and 0.000° respectively, to 3
-  // decimal places). That's not possible if there were any per-item
-  // randomness in play. But the function isn't a simple smooth curve
-  // across the full 0-100 range either — it's smooth within the 80-89
-  // decade, but swings from 0° at value 55 to +32° at value 60 just 5
-  // units later — so rather than guess a closed-form formula from
-  // limited samples, this interpolates between the real measured
-  // points: exact wherever a value has actually been measured, linear
-  // best-effort (unverified) between them.
-  const RECOIL_LEAN_TABLE = [
-    [25, 0], [47, -24.922], [54, -11.372], [55, 0], [60, 32.000], [61, 29.673],
-    [62, 24.594], [69, -23.586], [72, -18.122], [75, 0], [76, 5.933],
-    [80, 16.000], [81, 14.456], [82, 11.650], [83, 7.994], [84, 3.955],
-    [85, 0], [86, -3.461], [87, -6.113], [88, -7.767], [89, -8.369],
-    [92, -5.178], [99, 0.76], [100, 0]
+  //  - half-width in degrees = 0.9 * (100 - value): 100 = a perfectly
+  //    vertical line (fully predictable recoil), lower values fan out
+  //    wider. Confirmed independently on an earlier, smaller batch too.
+  //
+  //  - lean = sign * RATIO[value % 10] * half, where sign is -1 when
+  //    floor(value/10) is even and +1 when odd. The user found this
+  //    parity rule by manually tracking dozens of weapons by hand
+  //    ("odd tens sweep left-to-right as the ones digit rises, even
+  //    tens sweep right-to-left") — it held with zero deviation across
+  //    every one of 6 fully-sampled decades once checked against the
+  //    real coordinates. RATIO[0] is exactly 8/9; the rest were fit
+  //    from the data and are consistent (mirrored) across every decade
+  //    to at least 10 significant figures, so this is the real
+  //    algorithm (or exactly equivalent to it), not an approximation.
+  //  - Not derivable from the value alone: which weapon rolled which
+  //    value in the first place. This only reproduces DIM's cosmetic
+  //    lean for a given value — same as everything else in this file.
+  const RECOIL_LEAN_RATIO = [
+    -8 / 9, -0.8453835700401364, -0.7191262172221752, -0.5224757798155321,
+    -0.2746817727777316, 0,
+    0.2746817727777319, 0.5224757798155313, 0.7191262172221743, 0.8453835700401364
   ];
   function leanDegForValue(value){
-    const table = RECOIL_LEAN_TABLE;
-    if (value <= table[0][0]) return table[0][1];
-    if (value >= table[table.length - 1][0]) return table[table.length - 1][1];
-    for (let i = 0; i < table.length - 1; i++){
-      const [v0, c0] = table[i], [v1, c1] = table[i + 1];
-      if (value >= v0 && value <= v1){
-        if (v1 === v0) return c0;
-        return c0 + ((value - v0) / (v1 - v0)) * (c1 - c0);
-      }
-    }
-    return 0;
+    if (value >= 100) return 0;
+    const half = 0.9 * (100 - value);
+    const sign = Math.floor(value / 10) % 2 === 0 ? -1 : 1;
+    return sign * RECOIL_LEAN_RATIO[value % 10] * half;
   }
 
   function recoilCompassHtml(value){
