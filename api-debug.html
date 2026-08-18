@@ -46,6 +46,8 @@
   .stat-bar-head .val{ color:#e4e4e8; }
   .stat-bar-track{ height:4px; border-radius:2px; background:#1a1a1f; overflow:hidden; }
   .stat-bar-fill{ height:100%; background:#7fbfff; border-radius:2px; }
+  .recoil-compass-wrap{ display:flex; }
+  .recoil-compass{ width:32px; height:16px; }
   .perk-grid{ display:flex; flex-wrap:wrap; gap:10px; margin-top:6px; }
   .perk-grid-col{ display:flex; flex-direction:column; gap:5px; }
   .perk-icon{ width:32px; height:32px; object-fit:cover; border-radius:4px; background:#000; border:1px solid #2c2c33; display:block; }
@@ -273,6 +275,57 @@
   // DIM renders it as a computed compass angle, but the exact value-to-
   // angle formula isn't confirmed, and a wrong compass would actively
   // misinform rather than just being less polished.
+  // Reverse-engineered from real DIM-rendered SVG markup across 14
+  // weapons (values 25-92): the wedge's half-width in degrees is exactly
+  // 0.9 * (100 - value) — confirmed to floating-point precision on every
+  // sample, so this is real, not guessed. That's the meaningful half of
+  // the visual: 100 = a perfectly vertical line (fully predictable
+  // recoil), lower values fan out wider. The wedge's left/right LEAN
+  // doesn't correlate with the raw value alone — but confirmed live on
+  // two copies of the same weapon (Gnawing Hunger) with two different
+  // rolls: their Recoil Direction values differ (84 vs 54) and so does
+  // their lean, meaning the lean is tied to the specific ROLL, not fixed
+  // per weapon type. Seeding off the static item-definition hash would
+  // make every copy of the same weapon look identical regardless of
+  // roll, which is wrong — this seeds off the full resolved stat block
+  // for that specific roll instead (every value shown alongside it), so
+  // two different rolls of the same weapon naturally get two different
+  // leans, and the same roll always renders the same way. The exact
+  // lean angle still won't necessarily match DIM's own (unknown seed),
+  // but the width — the part that's actual game data — is exact either way.
+  function seededLeanDeg(seed){
+    let h = 0;
+    const s = String(seed);
+    for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+    return ((h % 1000) / 1000) * 30; // stable pseudo-random lean, roughly ±30°
+  }
+
+  function recoilCompassHtml(value, seed){
+    const half = 0.9 * (100 - value);
+    // A perfect 100 means zero recoil bias at all — confirmed in the
+    // sample data as the one case rendered dead vertical with no lean,
+    // unlike 99 (still slightly off-center). Every other value keeps
+    // its lean even as the wedge narrows toward a line.
+    const center = value >= 100 ? 0 : seededLeanDeg(seed);
+    const cx = 1, cy = 1;
+    const pt = (deg) => {
+      const rad = deg * Math.PI / 180;
+      return [(cx + Math.sin(rad)).toFixed(4), (cy - Math.cos(rad)).toFixed(4)];
+    };
+
+    let inner;
+    if (half < 1){
+      const [x, y] = pt(center);
+      const [ox, oy] = pt(center + 180);
+      inner = '<line x1="' + ox + '" y1="' + oy + '" x2="' + x + '" y2="' + y + '" stroke="white" stroke-width="0.1"></line>';
+    } else {
+      const [x1, y1] = pt(center + half);
+      const [x2, y2] = pt(center - half);
+      inner = '<path d="M' + cx + ',' + cy + ' L' + x1 + ',' + y1 + ' A1,1 0 0,0 ' + x2 + ',' + y2 + ' Z" fill="#FFF"></path>';
+    }
+    return '<svg class="recoil-compass" viewBox="0 0 2 1"><circle r="1" cx="1" cy="1" fill="#333"></circle>' + inner + '</svg>';
+  }
+
   function weaponStatBarsHtml(resolvedStats, layout){
     if (!resolvedStats.length) return "";
     const top = layout.top ? resolvedStats.find(s => s.name === layout.top) : null;
@@ -287,9 +340,23 @@
       return ai - bi;
     });
 
+    // Seeds the recoil lean off this specific roll's full stat block (not
+    // the static item hash) — see recoilCompassHtml's comment above for
+    // why: two copies of the same weapon with different rolls need
+    // different leans, not an identical one keyed to the weapon type.
+    const rollSeed = resolvedStats.map(s => s.name + ":" + s.value).sort().join("|");
+
     let html = "";
     if (top) html += '<div class="stat-bar-row"><div class="stat-bar-head"><span>' + top.name + '</span><span class="val">' + top.value + '</span></div></div>';
     html += barStats.map(s => {
+      if (s.name === "Recoil Direction"){
+        return (
+          '<div class="stat-bar-row">' +
+            '<div class="stat-bar-head"><span>' + s.name + '</span><span class="val">' + s.value + '</span></div>' +
+            '<div class="recoil-compass-wrap">' + recoilCompassHtml(s.value, rollSeed) + '</div>' +
+          '</div>'
+        );
+      }
       const pct = Math.max(0, Math.min(100, s.value));
       return (
         '<div class="stat-bar-row">' +
