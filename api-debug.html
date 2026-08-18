@@ -11,7 +11,7 @@
   .status{ padding:6px 10px; border-radius:3px; display:inline-block; margin-bottom:14px; font-size:11px; }
   .status.ok{ background:#1a2a3a; color:#7fbfff; }
   .status.err{ background:#3a1a1a; color:#ff8080; }
-  .card{ margin-bottom:18px; border:1px solid #2c2c33; border-radius:4px; padding:16px; background:#111114; }
+  .card{ margin-bottom:18px; max-width:820px; border:1px solid #2c2c33; border-radius:4px; padding:16px; background:#111114; }
   .card-head{ display:flex; gap:12px; align-items:flex-start; margin-bottom:10px; }
   .card-head img{ width:44px; height:44px; object-fit:cover; border-radius:3px; flex-shrink:0; background:#000; }
   .card-name{ font-size:14px; color:#e4e4e8; font-weight:bold; }
@@ -704,11 +704,23 @@
   // Weekly Milestones up top — so it works with just the API key, no
   // sign-in required.
 
+  // Universal armor/weapon mod slots and cosmetic sockets (shaders,
+  // ornaments, trackers) are the same giant plug pool on literally every
+  // item of that type in the game — they don't say anything about *this*
+  // item, they're just noise for a "what's actually on it" lookup.
+  function isNoiseSocketCategory(name){
+    if (!name) return false;
+    return /mods?\b|cosmetics?|shaders?|ornaments?|trackers?/i.test(name);
+  }
+
   // Definition-level stats/sockets, not a live rolled instance (there's no
   // character context here) — stats come from the item's base investment
-  // stats, and perks are every possible plug a socket can carry (its full
-  // plug-set pool via DestinyPlugSetDefinition), grouped under whatever
-  // DestinySocketCategoryDefinition name that socket belongs to.
+  // stats, and perks are every possible plug a non-noise socket can carry
+  // (its full plug-set pool via DestinyPlugSetDefinition), grouped under
+  // whatever DestinySocketCategoryDefinition name that socket belongs to.
+  // Sockets sharing the same category label (e.g. three separate "Weapon
+  // Mods" slots) are merged into one group with plug names deduped, rather
+  // than repeating the same pool three times.
   async function resolveItemSocketGroups(itemDef){
     const socketEntries = (itemDef.sockets && itemDef.sockets.socketEntries) || [];
     if (!socketEntries.length) return [];
@@ -721,7 +733,10 @@
       (cat.socketIndexes || []).forEach(idx => { categoryNameByIndex[idx] = catName; });
     });
 
-    const groups = await mapWithConcurrency(socketEntries, 5, async (entry, index) => {
+    const perSocket = await mapWithConcurrency(socketEntries, 5, async (entry, index) => {
+      const label = categoryNameByIndex[index] || ("Socket " + index);
+      if (isNoiseSocketCategory(label)) return null;
+
       let plugHashes = [];
       if (entry.reusablePlugSetHash){
         const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.reusablePlugSetHash);
@@ -736,19 +751,31 @@
       }
       if (!plugHashes.length) return null;
 
-      const chips = (await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
+      const perks = (await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
         const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
         const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
         if (!plugName || isJunkSocketPlug(plugName)) return null;
         const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
-        return chipHtml(plugName, null, plugIcon);
+        return { name: plugName, html: chipHtml(plugName, null, plugIcon) };
       })).filter(Boolean);
-      if (!chips.length) return null;
+      if (!perks.length) return null;
 
-      return { label: categoryNameByIndex[index] || ("Socket " + index), html: chips.join("") };
+      return { label, perks };
     });
 
-    return groups.filter(Boolean);
+    const merged = new Map();
+    for (const group of perSocket){
+      if (!group) continue;
+      if (!merged.has(group.label)) merged.set(group.label, new Map());
+      const seen = merged.get(group.label);
+      for (const perk of group.perks){
+        if (!seen.has(perk.name)) seen.set(perk.name, perk.html);
+      }
+    }
+
+    return Array.from(merged.entries()).map(([label, seen]) => ({
+      label, html: Array.from(seen.values()).join("")
+    }));
   }
 
   async function itemStatsAndPerksHtml(itemDef){
@@ -759,7 +786,11 @@
       const statRows = (await mapWithConcurrency(stats, 5, async (stat) => {
         const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
         const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
-        if (!statName) return null;
+        // Filters out vestigial definition stats (armor's "Power"/"Defense",
+        // always 0/0) that carry a name but no actual range — a real stat
+        // (weapon base stats, or an armor stat with an investment value)
+        // has a nonzero value or maximum.
+        if (!statName || (!stat.value && !stat.maximum)) return null;
         const pct = Math.max(0, Math.min(100, stat.value));
         return (
           '<div class="stat-bar-row">' +
@@ -768,7 +799,10 @@
           '</div>'
         );
       })).filter(Boolean);
-      if (statRows.length) html += '<div class="section-label">Stats</div>' + statRows.join("");
+
+      html += '<div class="section-label">Stats</div>';
+      html += statRows.length ? statRows.join("") :
+        '<div class="empty">No definitional stat roll on this item — armor\'s actual stat totals are computed per-character instance, not on the item definition itself, so a bare hash lookup can\'t show them. Sign in above and use Vendor Hash Lookup / Live Vendor Rolls to see real rolled stats.</div>';
     }
 
     const socketGroups = await resolveItemSocketGroups(itemDef);
