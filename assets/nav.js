@@ -46,16 +46,20 @@
         { label: "Puzzle Helper", href: "puzzle-helper.html", group: "puzzlehelper" },
         { label: "Codes", href: "codes.html", group: "codes" }
       ]
-    },
-    // Dev-branch only — links to throwaway/noindexed API test pages.
-    // Remove this section before merging toward the production branch/site.
-    {
+    }
+  ];
+  // Debug tools (debug.html and the throwaway/noindexed API test pages
+  // it links to) only exist on the dev site. Hidden by hostname rather
+  // than deleted so this exact file can ship to prod unmodified — no
+  // manual "strip the Debug section" step at promotion time.
+  if (window.location.hostname !== "rallyflag.gg"){
+    NAV_SECTIONS.push({
       label: "Debug",
       items: [
         { label: "🐞 Debug", href: "debug.html", group: "debug" }
       ]
-    }
-  ];
+    });
+  }
   const NAV_ITEMS = NAV_SECTIONS.flatMap(section => section.items);
 
   const BUNGIE_ROOT = "https://www.bungie.net";
