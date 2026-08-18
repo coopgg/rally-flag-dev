@@ -15,13 +15,6 @@
   .callback-status{ font-family:'JetBrains Mono', monospace; font-size:14px; color:var(--text-dim); }
   .callback-error{ color:#ff8080; max-width:480px; }
   .callback-link{ color:var(--accent-bright); text-decoration:none; margin-top:16px; }
-  .callback-summary{
-    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dim);
-    text-align:left; background:var(--panel); border:1px solid var(--panel-border);
-    border-radius:8px; padding:16px 18px; margin-top:6px; max-width:420px; line-height:1.7;
-  }
-  .callback-summary .ok{ color:#7fd9a0; }
-  .callback-summary .bad{ color:#ff8080; }
 </style>
 </head>
 <body data-nav-group="">
@@ -40,24 +33,20 @@
   const statusEl = document.getElementById("callback-status");
   const wrap = document.querySelector(".callback-wrap");
 
-  // Shows exactly what the token exchange produced instead of silently
-  // bouncing straight back — a mismatched field name from Bungie's
-  // response would otherwise look identical to "still signed out" with
-  // zero indication of why.
   RallyFlagAuth.completeCallback()
     .then((result) => {
-      statusEl.textContent = result.isSignedIn ? "Signed in as " + (result.displayName || "Bungie.net user") : "Token exchange completed, but sign-in state didn't stick — see details below.";
-      const cls = (ok) => ok ? "ok" : "bad";
-      wrap.insertAdjacentHTML("beforeend",
-        '<div class="callback-summary">' +
-          'response fields: ' + result.responseKeys.join(", ") + '<br>' +
-          'access_token: <span class="' + cls(result.hasAccessToken) + '">' + (result.hasAccessToken ? "present" : "missing") + '</span><br>' +
-          'refresh_token: <span class="' + cls(result.hasRefreshToken) + '">' + (result.hasRefreshToken ? "present" : "missing") + '</span><br>' +
-          'expires_in: ' + result.accessExpiresInSec + 's · refresh_expires_in: ' + result.refreshExpiresInSec + 's<br>' +
-          'isSignedIn(): <span class="' + cls(result.isSignedIn) + '">' + result.isSignedIn + '</span>' +
-        '</div>' +
-        '<a class="callback-link" href="' + result.returnTo + '">Continue →</a>'
-      );
+      if (result.isSignedIn){
+        // replace(), not href — the callback URL (with its one-time
+        // ?code=&state=) shouldn't linger in history to be revisited.
+        window.location.replace(result.returnTo);
+        return;
+      }
+      // Token exchange succeeded but didn't leave a usable session —
+      // shouldn't happen, but redirecting silently here would look
+      // exactly like sign-in did nothing, with zero explanation.
+      statusEl.className = "callback-status callback-error";
+      statusEl.textContent = "Sign-in completed, but the session didn't stick.";
+      wrap.insertAdjacentHTML("beforeend", '<a class="callback-link" href="' + result.returnTo + '">Back to Rally Flag →</a>');
     })
     .catch((err) => {
       statusEl.className = "callback-status callback-error";
