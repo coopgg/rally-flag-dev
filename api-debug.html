@@ -76,6 +76,15 @@
 <div id="lookup-status" class="status">Sign in above to load this.</div>
 <div id="lookup-output"></div>
 
+<h2>Item Hash Lookup</h2>
+<p class="note">Ad-hoc tool for checking any specific item hash directly against <code>DestinyInventoryItemDefinition</code> — the same public manifest endpoint the Weekly Milestones section up top uses, no sign-in required. Useful for pasting in an <code>itemHash</code> spotted in a raw json dump elsewhere on this page (a sale item, a cost, a quest's <code>questItemHash</code>, etc.) to see its name/icon/description without hunting through the JSON by hand.</p>
+<div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
+  <input type="text" id="item-lookup-hash-input" placeholder="e.g. 1234567890" style="background:#1a1a1f; border:1px solid #2c2c33; color:#e4e4e8; padding:6px 10px; border-radius:3px; font-family:'JetBrains Mono', monospace; font-size:12px; width:160px;">
+  <button id="item-lookup-hash-btn" style="background:#1a2a3a; color:#7fbfff; border:1px solid #2c2c33; padding:6px 14px; border-radius:3px; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:12px;">Look up</button>
+</div>
+<div id="item-lookup-status" class="status">Enter an item hash above and click Look up.</div>
+<div id="item-lookup-output"></div>
+
 <h2>Eververse (Tess Everis)</h2>
 <p class="note">Prod already chased this down once, before this site had OAuth: Bungie's <em>public/anonymous</em> Vendors endpoint drops Tess entirely, confirmed via a 3-way diagnostic (full request, bare Vendors-only request, and her own definition fetched directly — she came back <code>enabled:true</code>, genuinely active, the endpoint just can't serve her). Matches Bungie's documented rule that a vendor gets dropped wholesale from the public endpoint if any part of it can't be computed identically for everyone. Prod ended up sourcing her from a third-party feed, <a href="https://eververse.report/" target="_blank" rel="noopener">eververse.report</a>, instead — noted then as a stopgap "until this site has its own OAuth login."</p>
 <p class="note">That's now. This calls the <em>authenticated, character-scoped</em> <code>Character/{id}/Vendors/?components=400,402</code> — untested territory, since it wasn't an option before. Confirmed working, and confirmed via live testing to be structured very differently than expected: Bright Dust offers aren't nested as sale items under a single Tess Everis vendor hash at all. Each Bright Dust item is its own separate one-item vendor stub — dozens of them, most with no display name of their own (shown as "Unknown (hash)" in the discovered-vendors list below), sitting alongside the handful of real, named NPC vendors. So this pulls sale items from <em>every</em> discovered vendor, not just whichever one happens to be named "Tess Everis"/"Eververse" — that name match now only stars the likely-Eververse entries in the list, it doesn't gate what gets collected. If nothing turns up this way, eververse.report is the proven fallback.</p>
@@ -654,6 +663,85 @@
 
   document.getElementById("lookup-hash-btn").addEventListener("click", () => {
     runVendorLookup(document.getElementById("lookup-hash-input").value.trim());
+  });
+
+  // ---------------- Ad-hoc item hash lookup ----------------
+  // Unlike Vendor Hash Lookup above, this hits the public
+  // DestinyInventoryItemDefinition manifest endpoint directly — same as
+  // Weekly Milestones up top — so it works with just the API key, no
+  // sign-in required.
+  async function runItemLookup(hash){
+    const statusEl = document.getElementById("item-lookup-status");
+    const outputEl = document.getElementById("item-lookup-output");
+    statusEl.className = "status";
+    outputEl.innerHTML = "";
+
+    if (!hash){
+      statusEl.className = "status err";
+      statusEl.textContent = "Enter an item hash first.";
+      return;
+    }
+
+    statusEl.textContent = "Looking up item " + hash + "…";
+    try {
+      const itemDef = await fetchDef("DestinyInventoryItemDefinition", hash);
+      if (!itemDef){
+        statusEl.className = "status err";
+        statusEl.textContent = "No item found for hash " + hash + ".";
+        return;
+      }
+
+      const displayProps = itemDef.displayProperties || {};
+      const name = displayProps.name || ("Unknown (" + hash + ")");
+      const icon = iconUrl(displayProps);
+      const description = displayProps.description || "";
+      const flavorText = itemDef.flavorText || "";
+      const typeName = itemDef.itemTypeDisplayName || "";
+      const tierName = (itemDef.inventory && itemDef.inventory.tierTypeName) || "";
+
+      statusEl.className = "status ok";
+      statusEl.textContent = "OK: " + name;
+
+      const card = document.createElement("div");
+      card.className = "card";
+      let html =
+        '<div class="card-head">' +
+          (icon ? '<img src="' + icon + '" alt="">' : '') +
+          '<div>' +
+            '<div class="card-name">' + name + '</div>' +
+            '<div class="card-hash">hash: ' + hash + '</div>' +
+            (typeName ? '<span class="badge unknown">' + typeName + '</span>' : '') +
+            (tierName ? '<span class="badge unknown">' + tierName + '</span>' : '') +
+          '</div>' +
+        '</div>';
+
+      if (description) html += '<div class="desc">' + description + '</div>';
+      if (flavorText && flavorText !== description) html += '<div class="about">' + flavorText + '</div>';
+
+      const rawId = "item-raw-" + (rawIdCounter++);
+      html += '<span class="raw-toggle" data-target="' + rawId + '">▸ raw json</span>';
+      html += '<pre class="raw" id="' + rawId + '"></pre>';
+
+      card.innerHTML = html;
+      outputEl.appendChild(card);
+
+      const rawEl = document.getElementById(rawId);
+      rawEl.textContent = JSON.stringify(itemDef, null, 2);
+      card.querySelector(".raw-toggle").addEventListener("click", (e) => {
+        rawEl.classList.toggle("open");
+        e.target.textContent = (e.target.textContent[0] === "▸" ? "▾" : "▸") + " raw json";
+      });
+    } catch (err){
+      statusEl.className = "status err";
+      statusEl.textContent = "Error: " + err.message;
+    }
+  }
+
+  document.getElementById("item-lookup-hash-btn").addEventListener("click", () => {
+    runItemLookup(document.getElementById("item-lookup-hash-input").value.trim());
+  });
+  document.getElementById("item-lookup-hash-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runItemLookup(document.getElementById("item-lookup-hash-input").value.trim());
   });
 
   // ---------------- Eververse (Tess Everis) discovery ----------------
