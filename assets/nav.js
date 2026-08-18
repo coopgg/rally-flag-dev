@@ -16,22 +16,47 @@
   const STORAGE_THEME_KEY = "rallyflag_theme";
   const STORAGE_MODE_KEY = "rallyflag_mode";
 
-  const NAV_ITEMS = [
-    { label: "This Week", href: "this-week.html", group: "thisweek" },
-    { label: "Guides", href: "guides.html", group: "guides" },
-    { label: "Puzzle Helper", href: "puzzle-helper.html", group: "puzzlehelper" },
-    { label: "Tracker", href: "tracker.html", group: "tracker" },
-    { label: "Vendors", href: "vendors.html", group: "vendors" },
-    { label: "Distortions", href: "distortions.html", group: "distortions" },
-    { label: "Builds", href: "builds.html", group: "builds" },
-    { label: "God Rolls", href: "god-rolls.html", group: "godrolls" },
-    { label: "Armor Sets", href: "armor-set-bonuses.html", group: "setbonuses" },
-    { label: "Artifacts", href: "artifacts.html", group: "artifacts" },
-    { label: "Codes", href: "codes.html", group: "codes" },
+  // Grouped (rather than one flat list) once the link count grew past
+  // ~10 — same labeled-section treatment the Appearance panel already
+  // uses (.nav-menu-section/.nav-menu-section-label), reused here for
+  // visual consistency between the two dropdown panels.
+  const NAV_SECTIONS = [
+    {
+      label: "Live",
+      items: [
+        { label: "This Week", href: "this-week.html", group: "thisweek" },
+        { label: "Tracker", href: "tracker.html", group: "tracker" },
+        { label: "Vendors", href: "vendors.html", group: "vendors" },
+        { label: "Distortions", href: "distortions.html", group: "distortions" }
+      ]
+    },
+    {
+      label: "Loadouts",
+      items: [
+        { label: "Builds", href: "builds.html", group: "builds" },
+        { label: "God Rolls", href: "god-rolls.html", group: "godrolls" },
+        { label: "Armor Sets", href: "armor-set-bonuses.html", group: "setbonuses" },
+        { label: "Artifacts", href: "artifacts.html", group: "artifacts" }
+      ]
+    },
+    {
+      label: "Reference",
+      items: [
+        { label: "Guides", href: "guides.html", group: "guides" },
+        { label: "Puzzle Helper", href: "puzzle-helper.html", group: "puzzlehelper" },
+        { label: "Codes", href: "codes.html", group: "codes" }
+      ]
+    },
     // Dev-branch only — links to throwaway/noindexed API test pages.
-    // Remove this entry before merging toward the production branch/site.
-    { label: "🐞 Debug", href: "debug.html", group: "debug" }
+    // Remove this section before merging toward the production branch/site.
+    {
+      label: "Debug",
+      items: [
+        { label: "🐞 Debug", href: "debug.html", group: "debug" }
+      ]
+    }
   ];
+  const NAV_ITEMS = NAV_SECTIONS.flatMap(section => section.items);
 
   const BUNGIE_ROOT = "https://www.bungie.net";
 
@@ -199,8 +224,13 @@
     const container = document.getElementById("site-nav");
     if (!container) return;
 
-    const linksHtml = NAV_ITEMS.map(item =>
-      '<a href="' + item.href + '"' + (item.group === activeGroup ? ' class="active"' : '') + '>' + item.label + '</a>'
+    const linksHtml = NAV_SECTIONS.map(section =>
+      '<div class="nav-menu-section">' +
+        '<div class="nav-menu-section-label">' + section.label + '</div>' +
+        section.items.map(item =>
+          '<a href="' + item.href + '"' + (item.group === activeGroup ? ' class="active"' : '') + '>' + item.label + '</a>'
+        ).join("") +
+      '</div>'
     ).join("");
 
     container.innerHTML =
