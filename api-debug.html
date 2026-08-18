@@ -785,7 +785,6 @@
 
     const perSocket = await mapWithConcurrency(socketEntries, 5, async (entry, index) => {
       const label = categoryNameByIndex[index] || ("Socket " + index);
-      if (isNoiseSocketCategory(label)) return null;
 
       let plugHashes = [];
       if (entry.reusablePlugSetHash){
@@ -800,6 +799,14 @@
         plugHashes = [entry.singleInitialItemHash];
       }
       if (!plugHashes.length) return null;
+
+      // Only a genuine multi-option swappable pool under a mod/cosmetic
+      // category is the universal noise this filters out. A socket with
+      // just ONE possible plug isn't swappable at all — no matter which
+      // category it's filed under, a fixed single option is far more
+      // likely to be real hash-level info (an armor archetype trait, an
+      // exotic intrinsic perk, an origin trait) than clutter, so it's kept.
+      if (plugHashes.length > 1 && isNoiseSocketCategory(label)) return null;
 
       const perks = (await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
         const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
@@ -833,7 +840,7 @@
 
     const stats = (itemDef.stats && itemDef.stats.stats) ? Object.values(itemDef.stats.stats) : [];
     if (stats.length){
-      const statRows = (await mapWithConcurrency(stats, 5, async (stat) => {
+      const resolvedStats = (await mapWithConcurrency(stats, 5, async (stat) => {
         const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
         const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
         // Filters out vestigial definition stats (armor's "Power"/"Defense",
@@ -845,18 +852,44 @@
         // same weapon hash can carry completely different perks; that's
         // instance data, unreachable from a bare hash lookup.
         if (!statName || (!stat.value && !stat.maximum)) return null;
-        const pct = Math.max(0, Math.min(100, stat.value));
-        return (
-          '<div class="stat-bar-row">' +
-            '<div class="stat-bar-head"><span>' + statName + '</span><span class="val">' + stat.value + '</span></div>' +
-            '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%"></div></div>' +
-          '</div>'
-        );
+        return { name: statName, value: stat.value };
       })).filter(Boolean);
 
+      // Always shown in this order regardless of the order the API
+      // returns them in, matching the in-game armor stat card. Anything
+      // outside this set (weapon stats — Range, Stability, etc.) keeps
+      // its original relative order, appended after.
+      const STAT_ORDER = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"];
+      resolvedStats.sort((a, b) => {
+        const ai = STAT_ORDER.indexOf(a.name), bi = STAT_ORDER.indexOf(b.name);
+        if (ai === -1 && bi === -1) return 0;
+        if (ai === -1) return 1;
+        if (bi === -1) return -1;
+        return ai - bi;
+      });
+
       html += '<div class="section-label">Stats</div>';
-      html += statRows.length ? statRows.join("") :
-        '<div class="empty">No definitional stat roll on this item — armor\'s actual stat total is locked in per-drop (its own itemInstanceId), not shared across every copy of this item the way its name/icon/perk pool are, so a bare hash lookup can\'t show one specific copy\'s numbers. Sign in above and use Vendor Hash Lookup / Live Vendor Rolls to see a real instance\'s rolled stats.</div>';
+      if (resolvedStats.length){
+        html += resolvedStats.map(s => {
+          const pct = Math.max(0, Math.min(100, s.value));
+          return (
+            '<div class="stat-bar-row">' +
+              '<div class="stat-bar-head"><span>' + s.name + '</span><span class="val">' + s.value + '</span></div>' +
+              '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%"></div></div>' +
+            '</div>'
+          );
+        }).join("");
+
+        // Only tallied when every resolved stat is one of the six named
+        // armor stats above — summing weapon stats (Range + Stability + …)
+        // isn't a meaningful number the way an armor stat total is.
+        if (resolvedStats.every(s => STAT_ORDER.includes(s.name))){
+          const total = resolvedStats.reduce((sum, s) => sum + s.value, 0);
+          html += '<div class="stat-bar-row"><div class="stat-bar-head"><span>Total</span><span class="val">' + total + '</span></div></div>';
+        }
+      } else {
+        html += '<div class="empty">No definitional stat roll on this item — armor\'s actual stat total is locked in per-drop (its own itemInstanceId), not shared across every copy of this item the way its name/icon/perk pool are, so a bare hash lookup can\'t show one specific copy\'s numbers. Sign in above and use Vendor Hash Lookup / Live Vendor Rolls to see a real instance\'s rolled stats.</div>';
+      }
     }
 
     const socketGroups = await resolveItemSocketGroups(itemDef);
