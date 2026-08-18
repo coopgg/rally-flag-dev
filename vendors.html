@@ -87,6 +87,28 @@
   }
   .vend-perk-chip img{ width:14px; height:14px; border-radius:2px; }
 
+  /* Weapon cards: Stats / Perks pill-tabs, DIM-style stat bars */
+  .vend-weapon-tabs{ display:flex; gap:6px; margin-top:10px; }
+  .vend-weapon-tab{
+    font-family:'JetBrains Mono', monospace; font-size:9.5px; text-transform:uppercase;
+    letter-spacing:0.04em; color:var(--text-dim); background:rgba(255,255,255,0.05);
+    border:1px solid var(--panel-border); border-radius:999px; padding:3px 10px;
+    cursor:pointer; transition: all 0.15s ease;
+  }
+  .vend-weapon-tab:hover{ color:var(--text); }
+  .vend-weapon-tab.active{ color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright); font-weight:700; }
+  .vend-weapon-tab-panel{ display:none; margin-top:10px; }
+  .vend-weapon-tab-panel.active{ display:block; }
+  .vend-stat-bar-row{ margin-bottom:6px; }
+  .vend-stat-bar-head{
+    display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace;
+    font-size:10px; color:var(--text-dim); margin-bottom:2px;
+  }
+  .vend-stat-bar-head .val{ color:var(--text); }
+  .vend-stat-bar-track{ height:4px; border-radius:2px; background:rgba(255,255,255,0.08); overflow:hidden; }
+  .vend-stat-bar-fill{ height:100%; background:var(--text-dim); border-radius:2px; }
+  .vend-empty-note{ font-size:10.5px; color:var(--text-dimmer); font-style:italic; }
+
   .tw-status{
     text-align:center; padding:30px 20px; color:var(--text-dimmer);
     font-family:'JetBrains Mono', monospace; font-size:13px;
@@ -271,6 +293,8 @@
   function isJunkSocketPlug(name){
     if (/^empty .*socket$/i.test(name)) return true;
     if (/^(default shader|upgrade armor|default ornament)$/i.test(name)) return true;
+    if (/^kill tracker$/i.test(name)) return true;
+    if (/^tier \d+:/i.test(name)) return true;
     return false;
   }
 
@@ -309,6 +333,68 @@
     }
     return html;
   }
+
+  let weaponCardIdCounter = 0;
+
+  // Stats/Perks pill-tabs for weapon cards specifically (DIM-style stat
+  // bars under one tab, the full perk list under the other) — armor keeps
+  // the flatter always-visible rollDetailHtml view above. Bar width is
+  // just the raw stat value clamped to 100 — Bungie's weapon stats are
+  // already on that scale except RPM, which just visually caps at a full
+  // bar rather than being individually rescaled against its own archetype
+  // range.
+  async function weaponRollHtml(statEntry, socketEntry){
+    const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
+    const allSockets = (socketEntry && socketEntry.sockets) || [];
+    const visibleSockets = allSockets.filter(s => s.isVisible !== false && s.plugHash);
+
+    const perkChips = [];
+    for (const socket of visibleSockets){
+      const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
+      const plugName = (plugDef && plugDef.displayProperties && plugDef.displayProperties.name) || ("Plug " + socket.plugHash);
+      if (isJunkSocketPlug(plugName)) continue;
+      const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
+      perkChips.push('<span class="vend-perk-chip">' + (plugIcon ? '<img src="' + plugIcon + '" alt="">' : '') + plugName + '</span>');
+    }
+
+    if (!stats.length && !perkChips.length) return "";
+
+    const statRows = [];
+    for (const stat of stats){
+      const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
+      const statName = (statDef && statDef.displayProperties && statDef.displayProperties.name) || ("Stat " + stat.statHash);
+      const pct = Math.max(0, Math.min(100, stat.value));
+      statRows.push(
+        '<div class="vend-stat-bar-row">' +
+          '<div class="vend-stat-bar-head"><span>' + statName + '</span><span class="val">' + stat.value + '</span></div>' +
+          '<div class="vend-stat-bar-track"><div class="vend-stat-bar-fill" style="width:' + pct + '%"></div></div>' +
+        '</div>'
+      );
+    }
+
+    const id = "wpn-" + (weaponCardIdCounter++);
+    return (
+      '<div class="vend-weapon-tabs">' +
+        '<button type="button" class="vend-weapon-tab active" data-tab="' + id + '-stats">Stats</button>' +
+        '<button type="button" class="vend-weapon-tab" data-tab="' + id + '-perks">Perks</button>' +
+      '</div>' +
+      '<div class="vend-weapon-tab-panel active" id="' + id + '-stats">' +
+        (statRows.length ? statRows.join("") : '<div class="vend-empty-note">no stat roll on this item</div>') +
+      '</div>' +
+      '<div class="vend-weapon-tab-panel" id="' + id + '-perks">' +
+        (perkChips.length ? '<div class="vend-perks-row">' + perkChips.join("") + '</div>' : '<div class="vend-empty-note">no perk data on this item</div>') +
+      '</div>'
+    );
+  }
+
+  document.addEventListener("click", (e) => {
+    const tab = e.target.closest(".vend-weapon-tab");
+    if (!tab) return;
+    const panel = document.getElementById(tab.dataset.tab);
+    if (!panel) return;
+    tab.closest(".vend-weapon-tabs").querySelectorAll(".vend-weapon-tab").forEach(t => t.classList.toggle("active", t === tab));
+    panel.parentElement.querySelectorAll(".vend-weapon-tab-panel").forEach(p => p.classList.toggle("active", p === panel));
+  });
 
   function formatDate(iso){
     if (!iso) return "";
@@ -482,11 +568,12 @@
 
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const costText = await costChipsHtml(sale.costs);
-        const extraHtml = await rollDetailHtml(statEntry, socketEntry);
+        const isArmor = XUR_ARMOR_TYPES.has(typeName);
+        const extraHtml = isArmor ? await rollDetailHtml(statEntry, socketEntry) : await weaponRollHtml(statEntry, socketEntry);
         const card = itemCardHtml(name, icon, typeName, costText, null, extraHtml);
         cardCount++;
 
-        if (XUR_ARMOR_TYPES.has(typeName)){
+        if (isArmor){
           const classType = (itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3;
           if (!armorByClass.has(classType)) armorByClass.set(classType, []);
           armorByClass.get(classType).push(card);
@@ -829,11 +916,12 @@
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const costText = await costChipsHtml(sale.costs);
         const tag = isCatalyst ? "Catalyst" : (tier === "Exotic" ? "Exotic" : null);
-        const extraHtml = await rollDetailHtml(statEntry, socketEntry);
+        const isArmor = XUR_ARMOR_TYPES.has(typeName);
+        const extraHtml = isArmor ? await rollDetailHtml(statEntry, socketEntry) : await weaponRollHtml(statEntry, socketEntry);
         const card = itemCardHtml(name, icon, typeName || (isCatalyst ? "Catalyst" : ""), costText, tag, extraHtml);
         itemCount++;
 
-        if (XUR_ARMOR_TYPES.has(typeName)){
+        if (isArmor){
           const classType = (itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3;
           if (!armorByClass.has(classType)) armorByClass.set(classType, []);
           armorByClass.get(classType).push(card);
