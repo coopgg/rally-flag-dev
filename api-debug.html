@@ -268,6 +268,9 @@
     // Confirmed via Festival Flight, Truthteller, Deafening Whisper,
     // Salvager's Salvo — same shape as the default gun layout, but the
     // second/third bars are Blast Radius/Velocity instead of Impact/Range.
+    // Also confirmed identical on Rocket Launcher (Apex Predator,
+    // Dragon's Breath, Hezen Vengeance) — top stat is still literally
+    // "RPM" even at values like 15-25, not renamed to anything else.
     "Grenade Launcher": {
       top: "RPM",
       order: ["Blast Radius", "Velocity", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne", "Zoom", "Ammo Gen", "Recoil Direction"],
@@ -282,6 +285,7 @@
       bottom: "Magazine"
     }
   };
+  WEAPON_STAT_LAYOUT["Rocket Launcher"] = WEAPON_STAT_LAYOUT["Grenade Launcher"];
   // Confirmed via Scatter Signal (Fusion Rifle) and Arbalest (Linear
   // Fusion Rifle) — identical to the RPM default except the top stat is
   // Charge Time (in ms) instead of RPM.
