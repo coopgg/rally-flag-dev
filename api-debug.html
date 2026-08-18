@@ -402,6 +402,13 @@
 
     let html = sorted.map(s => {
       const label = STAT_DISPLAY_NAME[s.name] || s.name;
+      if (s.name === layout.top){
+        // DIM convention: the rate stat (RPM/Charge Time/Draw Time/Swing
+        // Speed) is a plain number, not a bar — unlike every other stat
+        // here (including the bottom capacity stat), it isn't on a 0-100
+        // scale, so a bar for it would be meaningless.
+        return '<div class="stat-bar-row"><div class="stat-bar-head"><span>' + label + '</span><span class="val">' + s.value + '</span></div></div>';
+      }
       if (s.name === "Recoil Direction"){
         return (
           '<div class="stat-bar-row">' +
