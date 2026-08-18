@@ -127,7 +127,6 @@
 
 <div id="view-eververse" class="vend-view">
   <section class="vend-section">
-    <div class="vend-category-label">Bright Dust (daily rotation)</div>
     <div id="eververse-status" class="tw-status">Loading…</div>
     <div id="eververse-output"></div>
   </section>
@@ -482,7 +481,12 @@
         return;
       }
 
-      const cards = [];
+      // Grouped by real item type instead of one flat grid, and package/
+      // engram-style "X Decryption" items excluded — those decrypt into
+      // something random rather than being the specific cosmetic itself,
+      // per request.
+      const groups = new Map(); // typeName -> card html[]
+      let totalCount = 0;
       for (const { sale } of itemsByKey.values()){
         let brightDust = false;
         for (const cost of (sale.costs || [])){
@@ -494,13 +498,17 @@
 
         const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
         const name = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
-        const typeName = (itemDef && itemDef.itemTypeDisplayName) || "";
+        if (/decryption$/i.test(name)) continue;
+
+        const typeName = (itemDef && itemDef.itemTypeDisplayName) || "Other";
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const costText = await costChipsHtml(sale.costs);
-        cards.push(itemCardHtml(name, icon, typeName, costText, null));
+        if (!groups.has(typeName)) groups.set(typeName, []);
+        groups.get(typeName).push(itemCardHtml(name, icon, null, costText, null));
+        totalCount++;
       }
 
-      if (!cards.length){
+      if (!totalCount){
         outputEl.innerHTML = '<div class="tw-status">No Bright Dust offers came back this pull.</div>';
         statusEl.className = "tw-status";
         statusEl.textContent = "OK: checked " + characters.length + " character(s), no Bright Dust items this pull";
@@ -508,11 +516,20 @@
       }
 
       statusEl.className = "tw-status";
-      statusEl.textContent = "OK: " + cards.length + " Bright Dust item(s) across " + characters.length + " character(s) — refreshes at daily reset";
-      const grid = document.createElement("div");
-      grid.className = "vend-grid";
-      grid.innerHTML = cards.join("");
-      outputEl.appendChild(grid);
+      statusEl.textContent = "OK: " + totalCount + " Bright Dust item(s) across " + characters.length + " character(s) — refreshes at daily reset";
+
+      const sortedTypes = Array.from(groups.keys()).sort((a, b) => a.localeCompare(b));
+      for (const typeName of sortedTypes){
+        const items = groups.get(typeName);
+        const labelEl = document.createElement("div");
+        labelEl.className = "vend-category-label";
+        labelEl.textContent = typeName + " (" + items.length + ")";
+        outputEl.appendChild(labelEl);
+        const grid = document.createElement("div");
+        grid.className = "vend-grid";
+        grid.innerHTML = items.join("");
+        outputEl.appendChild(grid);
+      }
     } catch (err){
       statusEl.className = "tw-status tw-error";
       statusEl.textContent = "Error: " + err.message;
