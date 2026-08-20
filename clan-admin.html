@@ -62,10 +62,24 @@
     return d.innerHTML;
   }
 
+  // Parses as JSON, but on failure surfaces the actual raw body (truncated)
+  // instead of a bare "Unexpected token" — Bungie's edge/WAF returns XML or
+  // HTML error pages for some failures, and that raw text is the only way
+  // to tell a gateway/WAF block apart from a real Bungie API error.
+  async function readJson(res){
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      throw new Error("HTTP " + res.status + " " + res.statusText + " — non-JSON response: " + text.slice(0, 300));
+    }
+  }
+
   async function authedApiGet(path){
     const res = await RallyFlagAuth.authedFetch(path);
-    const data = await res.json();
-    if (!res.ok || data.ErrorCode !== 1) throw new Error((data && data.Message) || ("HTTP " + res.status));
+    let data;
+    try { data = await readJson(res); } catch (e) { throw new Error(path + " — " + e.message); }
+    if (!res.ok || data.ErrorCode !== 1) throw new Error(path + " — " + ((data && data.Message) || ("HTTP " + res.status)));
     return data.Response;
   }
 
@@ -75,8 +89,9 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body)
     });
-    const data = await res.json();
-    if (!res.ok || data.ErrorCode !== 1) throw new Error((data && data.Message) || ("HTTP " + res.status));
+    let data;
+    try { data = await readJson(res); } catch (e) { throw new Error(path + " — " + e.message); }
+    if (!res.ok || data.ErrorCode !== 1) throw new Error(path + " — " + ((data && data.Message) || ("HTTP " + res.status)));
     return data.Response;
   }
 
