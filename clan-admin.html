@@ -211,7 +211,10 @@
     if (name && name !== g.name) diff.name = name;
     if (motto !== (g.motto || "")) diff.motto = motto;
     if (about !== (g.about || "")) diff.about = about;
-    if (callsign !== origCallsign) diff.clanInfo = { clanCallsign: callsign };
+    // GroupEditAction (the write schema) takes a flat "callsign" field —
+    // the read model nests it under clanInfo.clanCallsign, but that
+    // nested shape isn't what EditGroup accepts.
+    if (callsign !== origCallsign) diff.callsign = callsign;
 
     const diffWrap = document.getElementById("diff-wrap");
     if (!Object.keys(diff).length){
