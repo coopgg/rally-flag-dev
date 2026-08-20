@@ -111,35 +111,43 @@
     }
   }
 
+  // Auto-discovery (GroupV2/User/254/.../0/1/) has turned out unreliable —
+  // it returned a single, wrong clan for a founder account that's actually
+  // in "The Rally Flag" (6807500). Rather than chase that endpoint, just
+  // take the clan ID directly: it's shown right on the clan's own Bungie.net
+  // page, so there's no ambiguity about which clan gets edited.
+  function renderClanIdInput(prefill){
+    clanSelectWrap.innerHTML =
+      '<div class="field"><label>Clan ID</label><input id="clan-id-input" type="text" inputmode="numeric" value="' + esc(prefill || "") + '" placeholder="e.g. 6807500"></div>' +
+      '<button id="load-clan-btn" class="btn" type="button">Load Clan</button>' +
+      '<div id="clan-load-status"></div>';
+    document.getElementById("load-clan-btn").addEventListener("click", () => {
+      const id = document.getElementById("clan-id-input").value.trim();
+      if (!/^\d+$/.test(id)){
+        document.getElementById("clan-load-status").innerHTML = '<div class="status err">Clan ID must be numeric.</div>';
+        return;
+      }
+      selectGroup(id);
+    });
+  }
+
   async function loadClans(){
-    clanSelectWrap.innerHTML = '<div class="status">Loading your clans…</div>';
     formWrap.innerHTML = "";
+    renderClanIdInput("");
+    // Best-effort auto-discovery just to prefill the field — failures here
+    // are non-fatal, the manual Load button always works regardless.
     try {
       const memberships = await authedApiGet("/Platform/User/GetMembershipsForCurrentUser/");
       const bnetId = memberships.bungieNetUser.membershipId;
-      // membershipType 254 = BungieNext, filter 0 = All, groupType 1 = Clan
       const groupsResp = await authedApiGet("/Platform/GroupV2/User/254/" + bnetId + "/0/1/");
       groups = (groupsResp.results || []).map(r => r.group).filter(Boolean);
-      if (!groups.length){
-        clanSelectWrap.innerHTML = '<div class="status err">No clans found for this account.</div>';
-        return;
-      }
-      if (groups.length === 1){
-        clanSelectWrap.innerHTML = '<div class="status ok">Clan: ' + esc(groups[0].name) + '</div>';
-        selectGroup(groups[0].groupId);
-      } else {
-        clanSelectWrap.innerHTML = '<div class="field"><label>Clan</label><select id="clan-picker"></select></div>';
-        const sel = document.getElementById("clan-picker");
-        groups.forEach(g => {
-          const opt = document.createElement("option");
-          opt.value = g.groupId; opt.textContent = g.name;
-          sel.appendChild(opt);
-        });
-        sel.addEventListener("change", () => selectGroup(sel.value));
-        selectGroup(groups[0].groupId);
+      if (groups.length){
+        renderClanIdInput(groups[0].groupId);
+        document.getElementById("clan-load-status").innerHTML =
+          '<div class="note">Auto-discovered: ' + groups.map(g => esc(g.name) + ' (' + g.groupId + ')').join(", ") + ' — verify this matches before loading, or type the ID directly.</div>';
       }
     } catch (err){
-      clanSelectWrap.innerHTML = '<div class="status err">Error loading clans: ' + esc(err.message) + '</div>';
+      // Silent — manual entry still works.
     }
   }
 
@@ -158,6 +166,7 @@
     const g = currentGroup;
     const callsign = (g.clanInfo && g.clanInfo.clanCallsign) || "";
     formWrap.innerHTML =
+      '<div class="status ok">Editing: ' + esc(g.name) + ' (ID ' + esc(g.groupId) + ')</div>' +
       '<div class="field"><label>Name</label><input id="f-name" type="text" value="' + esc(g.name) + '"></div>' +
       '<div class="field"><label>Motto</label><input id="f-motto" type="text" value="' + esc(g.motto) + '"></div>' +
       '<div class="field"><label>Callsign / Tag</label><input id="f-callsign" type="text" maxlength="4" value="' + esc(callsign) + '"></div>' +
