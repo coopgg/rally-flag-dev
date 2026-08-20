@@ -36,7 +36,7 @@
 
 <h1>Clan Admin (throwaway)</h1>
 <div class="note">
-  Edits the real Rally Flag clan on Bungie.net via <code>POST GroupV2/{groupId}/EditGroup/</code>. You must be signed in as a clan Founder or Admin.
+  Edits the real Rally Flag clan on Bungie.net via <code>POST GroupV2/{groupId}/Edit/</code> (operation name GroupV2.EditGroup, but the actual route is just "Edit"). You must be signed in as a clan Founder or Admin.
   Not linked from anywhere in the site nav, noindexed, and not meant to survive to production — this is a one-off tool for making clan changes without hand-building the API call each time.
 </div>
 <div class="warn">This talks to the live Bungie.net clan, not a sandbox. Every "Confirm &amp; Submit" below is a real, immediate edit to the clan everyone sees. If the app's OAuth scopes don't include admin group access (bungie.net → your app → edit → scopes), the submit will fail with a permission error.</div>
@@ -231,7 +231,7 @@
     submitStatus.className = "status";
     submitStatus.textContent = "Submitting…";
     try {
-      const resp = await authedApiPost("/Platform/GroupV2/" + currentGroup.groupId + "/EditGroup/", diff);
+      const resp = await authedApiPost("/Platform/GroupV2/" + currentGroup.groupId + "/Edit/", diff);
       submitStatus.className = "status ok";
       submitStatus.textContent = "Saved.";
       await selectGroup(currentGroup.groupId);
