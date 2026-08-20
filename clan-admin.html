@@ -120,7 +120,10 @@
     clanSelectWrap.innerHTML =
       '<div class="field"><label>Clan ID</label><input id="clan-id-input" type="text" inputmode="numeric" value="' + esc(prefill || "") + '" placeholder="e.g. 6807500"></div>' +
       '<button id="load-clan-btn" class="btn" type="button">Load Clan</button>' +
-      '<div id="clan-load-status"></div>';
+      '<div id="clan-load-status"></div>' +
+      '<div class="field" style="margin-top:18px;"><label>Or find by exact clan name</label><input id="clan-name-input" type="text" value="The Rally Flag" placeholder="e.g. The Rally Flag"></div>' +
+      '<button id="find-clan-btn" class="btn" type="button">Find by Name</button>' +
+      '<div id="clan-find-status"></div>';
     document.getElementById("load-clan-btn").addEventListener("click", () => {
       const id = document.getElementById("clan-id-input").value.trim();
       if (!/^\d+$/.test(id)){
@@ -128,6 +131,26 @@
         return;
       }
       selectGroup(id);
+    });
+    document.getElementById("find-clan-btn").addEventListener("click", async () => {
+      const name = document.getElementById("clan-name-input").value.trim();
+      const findStatus = document.getElementById("clan-find-status");
+      if (!name){
+        findStatus.innerHTML = '<div class="status err">Enter a clan name.</div>';
+        return;
+      }
+      findStatus.innerHTML = '<div class="status">Searching…</div>';
+      try {
+        // groupType 1 = Clan. This is Bungie's own exact-name lookup, so
+        // whatever groupId it returns is authoritative — no risk of a
+        // mistyped or stale ID from anywhere else.
+        const result = await authedApiGet("/Platform/GroupV2/Name/" + encodeURIComponent(name) + "/1/");
+        const g = result.detail;
+        findStatus.innerHTML = '<div class="status ok">Found: ' + esc(g.name) + ' — ID ' + esc(g.groupId) + '</div>';
+        document.getElementById("clan-id-input").value = g.groupId;
+      } catch (err){
+        findStatus.innerHTML = '<div class="status err">' + esc(err.message) + '</div>';
+      }
     });
   }
 
