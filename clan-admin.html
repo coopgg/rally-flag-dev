@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<title>Clan Admin - Rally Flag (throwaway, not linked in nav)</title>
+<style>
+  body{ background:#0a0a0c; color:#e4e4e8; font-family:'JetBrains Mono', monospace; font-size:12px; padding:24px; }
+  h1{ font-size:16px; color:#8fc9ff; }
+  .note{ color:#999; margin-bottom:20px; max-width:640px; line-height:1.6; }
+  .warn{ color:#ffb380; margin-bottom:20px; max-width:640px; line-height:1.6; padding:10px 12px; background:#2a1f10; border:1px solid #4a3520; border-radius:4px; }
+  .status{ padding:6px 10px; border-radius:3px; display:inline-block; margin-bottom:14px; font-size:11px; }
+  .status.ok{ background:#1a2a3a; color:#7fbfff; }
+  .status.err{ background:#3a1a1a; color:#ff8080; }
+  .field{ max-width:520px; margin-bottom:14px; }
+  .field label{ display:block; color:#8fc9ff; font-size:10.5px; text-transform:uppercase; letter-spacing:0.06em; margin-bottom:5px; }
+  .field input, .field textarea{
+    width:100%; background:#111114; border:1px solid #2c2c33; border-radius:4px;
+    color:#e4e4e8; font-family:inherit; font-size:12.5px; padding:8px 10px; box-sizing:border-box;
+  }
+  .field textarea{ resize:vertical; }
+  .btn{
+    font-family:inherit; font-size:11.5px; color:#8fc9ff; background:#16202c;
+    border:1px solid #2c3c4c; border-radius:4px; padding:9px 16px; cursor:pointer; margin-top:4px;
+  }
+  .btn:hover{ border-color:#4a6c8c; }
+  .btn-danger{ color:#ff8080; background:#2a1414; border-color:#4c2424; }
+  .btn-danger:hover{ border-color:#7c3838; }
+  .diff-pre{
+    max-width:520px; background:#111114; border:1px solid #2c2c33; border-radius:4px;
+    padding:12px; color:#c9c9d0; font-size:11.5px; line-height:1.5; overflow-x:auto;
+  }
+</style>
+</head>
+<body>
+
+<h1>Clan Admin (throwaway)</h1>
+<div class="note">
+  Edits the real Rally Flag clan on Bungie.net via <code>POST GroupV2/{groupId}/EditGroup/</code>. You must be signed in as a clan Founder or Admin.
+  Not linked from anywhere in the site nav, noindexed, and not meant to survive to production — this is a one-off tool for making clan changes without hand-building the API call each time.
+</div>
+<div class="warn">This talks to the live Bungie.net clan, not a sandbox. Every "Confirm &amp; Submit" below is a real, immediate edit to the clan everyone sees. If the app's OAuth scopes don't include admin group access (bungie.net → your app → edit → scopes), the submit will fail with a permission error.</div>
+
+<div id="auth-box" class="status">Loading…</div>
+<div id="clan-select-wrap"></div>
+<div id="form-wrap"></div>
+
+<script src="assets/api-keys.js"></script>
+<script src="assets/oauth.js"></script>
+<script>
+(function(){
+  const authBox = document.getElementById("auth-box");
+  const clanSelectWrap = document.getElementById("clan-select-wrap");
+  const formWrap = document.getElementById("form-wrap");
+
+  let currentGroup = null;
+  let groups = [];
+
+  function esc(s){
+    const d = document.createElement("div");
+    d.textContent = s == null ? "" : s;
+    return d.innerHTML;
+  }
+
+  async function authedApiGet(path){
+    const res = await RallyFlagAuth.authedFetch(path);
+    const data = await res.json();
+    if (!res.ok || data.ErrorCode !== 1) throw new Error((data && data.Message) || ("HTTP " + res.status));
+    return data.Response;
+  }
+
+  async function authedApiPost(path, body){
+    const res = await RallyFlagAuth.authedFetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok || data.ErrorCode !== 1) throw new Error((data && data.Message) || ("HTTP " + res.status));
+    return data.Response;
+  }
+
+  function renderAuthBox(){
+    if (RallyFlagAuth.isSignedIn()){
+      authBox.className = "status ok";
+      authBox.innerHTML = 'Signed in as ' + esc(RallyFlagAuth.getDisplayName() || "Bungie.net user") +
+        ' — <a href="#" id="auth-signout" style="color:inherit;">sign out</a>';
+      document.getElementById("auth-signout").addEventListener("click", (e) => { e.preventDefault(); RallyFlagAuth.signOut(); });
+      loadClans();
+    } else {
+      authBox.className = "status";
+      authBox.innerHTML = '<a href="#" id="auth-signin" style="color:inherit;">Sign in with Bungie.net</a> — you must be a Founder or Admin of the clan to edit it.';
+      document.getElementById("auth-signin").addEventListener("click", (e) => { e.preventDefault(); RallyFlagAuth.signIn(); });
+      clanSelectWrap.innerHTML = "";
+      formWrap.innerHTML = "";
+    }
+  }
+
+  async function loadClans(){
+    clanSelectWrap.innerHTML = '<div class="status">Loading your clans…</div>';
+    formWrap.innerHTML = "";
+    try {
+      const memberships = await authedApiGet("/Platform/User/GetMembershipsForCurrentUser/");
+      const bnetId = memberships.bungieNetUser.membershipId;
+      // membershipType 254 = BungieNext, filter 0 = All, groupType 1 = Clan
+      const groupsResp = await authedApiGet("/Platform/GroupV2/User/254/" + bnetId + "/0/1/");
+      groups = (groupsResp.results || []).map(r => r.group).filter(Boolean);
+      if (!groups.length){
+        clanSelectWrap.innerHTML = '<div class="status err">No clans found for this account.</div>';
+        return;
+      }
+      if (groups.length === 1){
+        clanSelectWrap.innerHTML = '<div class="status ok">Clan: ' + esc(groups[0].name) + '</div>';
+        selectGroup(groups[0].groupId);
+      } else {
+        clanSelectWrap.innerHTML = '<div class="field"><label>Clan</label><select id="clan-picker"></select></div>';
+        const sel = document.getElementById("clan-picker");
+        groups.forEach(g => {
+          const opt = document.createElement("option");
+          opt.value = g.groupId; opt.textContent = g.name;
+          sel.appendChild(opt);
+        });
+        sel.addEventListener("change", () => selectGroup(sel.value));
+        selectGroup(groups[0].groupId);
+      }
+    } catch (err){
+      clanSelectWrap.innerHTML = '<div class="status err">Error loading clans: ' + esc(err.message) + '</div>';
+    }
+  }
+
+  async function selectGroup(groupId){
+    formWrap.innerHTML = '<div class="status">Loading clan details…</div>';
+    try {
+      const detail = await authedApiGet("/Platform/GroupV2/" + groupId + "/");
+      currentGroup = detail.detail;
+      renderForm();
+    } catch (err){
+      formWrap.innerHTML = '<div class="status err">Error loading clan details: ' + esc(err.message) + '</div>';
+    }
+  }
+
+  function renderForm(){
+    const g = currentGroup;
+    const callsign = (g.clanInfo && g.clanInfo.clanCallsign) || "";
+    formWrap.innerHTML =
+      '<div class="field"><label>Name</label><input id="f-name" type="text" value="' + esc(g.name) + '"></div>' +
+      '<div class="field"><label>Motto</label><input id="f-motto" type="text" value="' + esc(g.motto) + '"></div>' +
+      '<div class="field"><label>Callsign / Tag</label><input id="f-callsign" type="text" maxlength="4" value="' + esc(callsign) + '"></div>' +
+      '<div class="field"><label>About</label><textarea id="f-about" rows="6">' + esc(g.about) + '</textarea></div>' +
+      '<button id="preview-btn" class="btn" type="button">Preview Changes</button>' +
+      '<div id="diff-wrap"></div>';
+    document.getElementById("preview-btn").addEventListener("click", previewChanges);
+  }
+
+  function previewChanges(){
+    const g = currentGroup;
+    const diff = {};
+    const name = document.getElementById("f-name").value.trim();
+    const motto = document.getElementById("f-motto").value;
+    const callsign = document.getElementById("f-callsign").value.trim();
+    const about = document.getElementById("f-about").value;
+    const origCallsign = (g.clanInfo && g.clanInfo.clanCallsign) || "";
+
+    if (name && name !== g.name) diff.name = name;
+    if (motto !== (g.motto || "")) diff.motto = motto;
+    if (about !== (g.about || "")) diff.about = about;
+    if (callsign !== origCallsign) diff.clanInfo = { clanCallsign: callsign };
+
+    const diffWrap = document.getElementById("diff-wrap");
+    if (!Object.keys(diff).length){
+      diffWrap.innerHTML = '<div class="status">No changes to submit.</div>';
+      return;
+    }
+    diffWrap.innerHTML =
+      '<div class="warn">This submits to the live clan right now. Review the diff below, then confirm.</div>' +
+      '<pre class="diff-pre">' + esc(JSON.stringify(diff, null, 2)) + '</pre>' +
+      '<button id="confirm-btn" class="btn btn-danger" type="button">Confirm &amp; Submit</button>' +
+      '<div id="submit-status"></div>';
+    document.getElementById("confirm-btn").addEventListener("click", () => submitChanges(diff));
+  }
+
+  async function submitChanges(diff){
+    const submitStatus = document.getElementById("submit-status");
+    submitStatus.className = "status";
+    submitStatus.textContent = "Submitting…";
+    try {
+      const resp = await authedApiPost("/Platform/GroupV2/" + currentGroup.groupId + "/EditGroup/", diff);
+      submitStatus.className = "status ok";
+      submitStatus.textContent = "Saved.";
+      await selectGroup(currentGroup.groupId);
+    } catch (err){
+      submitStatus.className = "status err";
+      const hint = /permiss|scope|forbidden|unauthor/i.test(err.message)
+        ? " — check that this app's OAuth scopes (bungie.net/en/Application → edit) include admin/group management access."
+        : "";
+      submitStatus.textContent = "Error: " + err.message + hint;
+    }
+  }
+
+  RallyFlagAuth.onChange(renderAuthBox);
+  renderAuthBox();
+})();
+</script>
+</body>
+</html>
