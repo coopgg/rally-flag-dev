@@ -13,8 +13,6 @@ function getDistortionUpdate(now = new Date()){
     const hourStart = currentHourStart + i * HOUR_MS;
     upcoming.push({
       hourStart,
-      time: DistortionData.fmtTime(hourStart),
-      day: DistortionData.fmtDay(hourStart),
       ...DistortionData.destinationAt(hourStart)
     });
   }
@@ -22,19 +20,29 @@ function getDistortionUpdate(now = new Date()){
   return {
     hourIndex: Math.floor(currentHourStart / HOUR_MS), // stable, ever-increasing marker for state.json
     hourStart: currentHourStart,
+    nextShiftAt: currentHourStart + HOUR_MS,
     current,
     upcoming
   };
 }
 
-function formatDistortionMessage({ current, upcoming }){
+// Discord renders <t:SECONDS:STYLE> in each viewer's own local time/locale
+// client-side — computing a formatted string server-side (like the website
+// does with toLocaleTimeString in the visitor's own browser) would instead
+// bake in the Pi's timezone for every viewer, which is the bug this replaces.
+function discordTimestamp(ms, style){
+  return `<t:${Math.floor(ms / 1000)}:${style}>`;
+}
+
+function formatDistortionMessage({ current, upcoming, nextShiftAt }){
   const lines = [
     `**Distortion — live now:** ${current.name} (${current.loot})`,
+    `Shifts ${discordTimestamp(nextShiftAt, "R")}`,
     "",
     "**Up next:**"
   ];
   upcoming.forEach(u => {
-    lines.push(`• ${u.time} ${u.day} — ${u.name} (${u.loot})`);
+    lines.push(`• ${discordTimestamp(u.hourStart, "f")} — ${u.name} (${u.loot})`);
   });
   return lines.join("\n");
 }
