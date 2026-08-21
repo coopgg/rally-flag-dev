@@ -5,10 +5,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-# Adjust these two paths/user if your setup differs.
-User=pi
-WorkingDirectory=/home/pi/rally-flag/discord-bot
-ExecStart=/usr/bin/node src/index.js
+User=nick
+WorkingDirectory=/home/nick/rally-flag/discord-bot
+ExecStart=/usr/local/bin/node src/index.js
 Restart=on-failure
 RestartSec=10
 

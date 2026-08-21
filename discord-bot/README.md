@@ -44,30 +44,44 @@ In Discord, run `/distortion` and `/thisweek` and check the output against
 what [distortions.html](../distortions.html) / [this-week.html](../this-week.html)
 show right now. Ctrl+C to stop once it looks right.
 
-## 4. Deploy to the Raspberry Pi 2
+## 4. Deploy to the Raspberry Pi
+
+The bot currently runs on a first-generation **Raspberry Pi Model B Rev 2**
+(2012 hardware — single-core ARM1176 @ 700MHz, ARMv6, 512MB RAM), not the
+Pi 2 originally assumed. `uname -m` reports `armv6l`. That matters because
+official Node.js dropped ARMv6 builds years ago, and this hardware is
+noticeably slower than any Pi 2/3/4 — expect `npm install` to take several
+minutes and every SSH command to feel sluggish.
 
 ### Install Node.js
 
-The Pi 2 is ARMv7 (32-bit/armhf) — an old architecture, so don't assume the
-latest Node.js LTS has a build for it. On the Pi, check what's actually
-available first:
+Official Node has no ARMv6 build, but the community-maintained
+[unofficial-builds.nodejs.org](https://unofficial-builds.nodejs.org/download/release/)
+project still publishes current LTS `linux-armv6l` tarballs. This is what's
+installed on the Pi right now (Node v22.23.2):
 
 ```bash
-uname -m                     # expect armv7l
-apt-cache policy nodejs      # see what Raspberry Pi OS's own repo offers
+cd /tmp
+curl -fsSL -o node.tar.xz https://unofficial-builds.nodejs.org/download/release/v22.23.2/node-v22.23.2-linux-armv6l.tar.xz
+sudo mkdir -p /opt/nodejs
+sudo tar -xJf node.tar.xz -C /opt/nodejs --strip-components=1
+sudo ln -sf /opt/nodejs/bin/node /usr/local/bin/node
+sudo ln -sf /opt/nodejs/bin/npm /usr/local/bin/npm
+sudo ln -sf /opt/nodejs/bin/npx /usr/local/bin/npx
+rm node.tar.xz
+node -v && npm -v
 ```
 
-If that's too old (Discord.js v14 needs Node 18+), use
-[NodeSource's setup script](https://github.com/nodesource/distributions) or
-[nvm](https://github.com/nvm-sh/nvm) instead of the OS package — but check
-NodeSource's current release notes for armv7l support before picking a
-version; if the newest LTS doesn't publish an armv7l build, install the
-newest one that does. Tell me what `uname -m` and `node -v` (once installed)
-report and I can help troubleshoot from there.
+Check that page for a newer LTS release before reusing this on a fresh
+setup — just confirm the version you pick has a `linux-armv6l` tarball
+before downloading.
 
 ### Get the code onto the Pi and configure it
 
+Git isn't preinstalled on a fresh Raspberry Pi OS image either:
+
 ```bash
+sudo apt-get update && sudo apt-get install -y git
 git clone <your repo URL> ~/rally-flag        # or `git pull` if it's already there
 cd ~/rally-flag/discord-bot
 npm install
@@ -76,12 +90,19 @@ nano .env                                     # fill in the same values as step 
 npm run deploy-commands                       # only needed once, or after changing commands
 ```
 
+The bot also needs to actually be invited to your server (Developer Portal
+→ OAuth2 → URL Generator → open the generated link) — creating the
+application and having a valid token is not the same as the bot being a
+guild member. If slash commands or scheduled posts fail with a Discord
+`50001 Missing Access` error, that's the first thing to check: confirm the
+bot shows up in your server's member list, not just that an invite dialog
+said "Success."
+
 ### Run it as a systemd service (survives reboots/crashes)
 
-[rallybot.service](rallybot.service) is a template — edit `User=` and
-`WorkingDirectory=` if your Pi's username or clone path differ from
-`pi` / `/home/pi/rally-flag/discord-bot`, and check `ExecStart`'s node path
-matches `which node`. Then:
+[rallybot.service](rallybot.service) is already filled in for this Pi
+(`User=nick`, `/home/nick/rally-flag/discord-bot`, `/usr/local/bin/node`) —
+edit those three if you're setting this up somewhere else. Then:
 
 ```bash
 sudo cp rallybot.service /etc/systemd/system/rallybot.service

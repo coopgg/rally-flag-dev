@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy - Rally Flag</title>
+<meta name="description" content="Privacy Policy for Rally Flag and RallyBot.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rally Flag">
+<meta property="og:title" content="Privacy Policy">
+<meta property="og:description" content="Privacy Policy for Rally Flag and RallyBot.">
+<meta property="og:url" content="https://rallyflag.gg/privacy.html">
+<meta property="og:image" content="https://rallyflag.gg/assets/icon-512.png">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Privacy Policy">
+<meta name="twitter:description" content="Privacy Policy for Rally Flag and RallyBot.">
+<meta name="twitter:image" content="https://rallyflag.gg/assets/icon-512.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  section.legal{ max-width:760px; margin:0 auto; padding:32px 24px 90px; }
+  .legal-updated{
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.06em;
+    color:var(--text-dimmer); text-transform:uppercase; margin-bottom:36px;
+  }
+  .legal h2{
+    font-family:'Oswald', sans-serif; font-weight:600; font-size:18px; color:var(--text);
+    margin:36px 0 12px;
+  }
+  .legal h2:first-of-type{ margin-top:0; }
+  .legal p, .legal li{ font-size:14px; line-height:1.7; color:var(--text-dim); }
+  .legal ul{ margin:0 0 12px; padding-left:20px; }
+  .legal li{ margin-bottom:6px; }
+  .legal a{ color:var(--accent-bright); text-decoration:none; }
+  .legal a:hover{ text-decoration:underline; }
+</style>
+</head>
+<body>
+
+<div id="site-nav"></div>
+
+<div class="hero">
+  <div class="eyebrow">Rally Flag</div>
+  <h1 class="title">Privacy Policy</h1>
+  <p class="subtitle">For the Rally Flag website and the RallyBot Discord bot.</p>
+</div>
+
+<section class="legal">
+  <div class="legal-updated">Last updated: August 2026</div>
+
+  <h2>RallyBot (Discord)</h2>
+  <p>RallyBot posts Destiny 2 rotation info (the Distortion tracker and featured weekly raid/dungeon) to Discord, either when you run a slash command or on a fixed schedule. It's intentionally minimal:</p>
+  <ul>
+    <li><strong>No message content access.</strong> RallyBot doesn't request Discord's message content intent — it can't read the messages you send.</li>
+    <li><strong>No stored user data.</strong> When you run <code>/distortion</code> or <code>/thisweek</code>, Discord's own API tells the bot who ran it and where, same as any bot — but RallyBot doesn't log, store, or reuse that. It computes an answer and replies. Nothing about you is written anywhere.</li>
+    <li><strong>The only thing it stores</strong> is which rotation hour/week it last posted about, so it doesn't double-post after a restart — no personal or server data, just two numbers.</li>
+    <li><strong>No third-party sharing.</strong> RallyBot doesn't send any data anywhere except Discord's own API, and it doesn't call Bungie's API either — its rotation data is computed locally from a fixed pattern.</li>
+  </ul>
+  <p>To remove RallyBot's access entirely, remove it from your server via Server Settings → Integrations at any time.</p>
+
+  <h2>rallyflag.gg (the website)</h2>
+  <ul>
+    <li>The site itself doesn't have a server or database — it's static pages plus client-side JavaScript.</li>
+    <li>Pages that show Destiny data (raids, dungeons, builds, etc.) call Bungie's public API directly from your browser using a shared, non-personal API key. No account or personal info is required to use them.</li>
+    <li>The optional "sign in with Bungie.net" feature on <a href="vendors.html">Vendors</a> uses Bungie's own OAuth login to show your loadouts. The resulting access token is kept in your browser's <code>sessionStorage</code> only — it's never sent to us, because there's no "us" to send it to. It's cleared automatically when you close the tab.</li>
+    <li>We don't run analytics, tracking pixels, or advertising on the site.</li>
+  </ul>
+
+  <h2>Changes</h2>
+  <p>This policy may be updated as the site and bot evolve. Continued use after a change means you accept the update.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy? Reach out through the server where RallyBot is running.</p>
+</section>
+
+<footer>
+  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
+  <p><a href="terms.html">Terms of Service</a> · <a href="privacy.html">Privacy Policy</a></p>
+</footer>
+
+<script src="assets/nav.js"></script>
+</body>
+</html>
