@@ -209,79 +209,26 @@
 <script src="assets/dungeons-data.js"></script>
 <script src="assets/sets-data.js"></script>
 <script src="assets/builds-data.js"></script>
+<script src="assets/featured-rotation-data.js"></script>
 <script src="assets/api-keys.js"></script>
 <script>
 (function(){
-  // ---------------------------------------------------------------
-  // Bungie's public API doesn't give a clean "these 2 are featured"
-  // signal — checked GetPublicMilestones directly and every raid gets
-  // an identically-shaped weekly challenge simultaneously (King's Fall,
-  // Crota's End, etc. all live at once, same date range, no distinguishing
-  // field), and dungeons don't appear in Milestones at all.
-  //
-  // Reverse-engineered instead from D2RAD's rotation-history tracking
-  // (d2rad.com/rotation-history — ~10 weeks of Bungie API-verified
-  // history). Real mechanism: two independent slots per category, each
-  // stepping forward exactly one position through the SAME canonical
-  // sequence every reset, permanently offset from each other. Anchored
-  // to the confirmed week of Aug 11, 2026: raid slots on Last Wish
-  // (position 1) + Vow of the Disciple (position 5); dungeon slots on
-  // Grasp of Avarice (position 4) + Sundered Doctrine (position 10) —
-  // this exactly matched what was previously hand-maintained here too.
-  // The Desert Perpetual and Equilibrium (the two newest raid/dungeon)
-  // aren't in D2RAD's tracked cycle at all — not because they're missing
-  // data, but because Bungie always features the newest raid/dungeon of
-  // the season permanently, on top of the 2 rotating slots. Since this is
-  // the final content update, that pair is never going to change, so
-  // they're added back in below as permanently-featured entries rather
-  // than rotation candidates.
-  // ---------------------------------------------------------------
-  const ALWAYS_FEATURED_RAID_SLUG = "the-desert-perpetual";
-  const ALWAYS_FEATURED_DUNGEON_SLUG = "equilibrium";
-  const RAID_ROTATION_SLUGS = [
-    "last-wish", "garden-of-salvation", "deep-stone-crypt", "vault-of-glass",
-    "vow-of-the-disciple", "kings-fall", "root-of-nightmares", "crotas-end",
-    "salvations-edge"
-  ];
-  const DUNGEON_ROTATION_SLUGS = [
-    "shattered-throne", "pit-of-heresy", "prophecy", "grasp-of-avarice",
-    "duality", "spire-of-the-watcher", "ghosts-of-the-deep", "warlords-ruin",
-    "vespers-host", "sundered-doctrine"
-  ];
-  const RAID_SLOT_OFFSETS = [0, 4];    // Last Wish, Vow of the Disciple @ anchor week
-  const DUNGEON_SLOT_OFFSETS = [3, 9]; // Grasp of Avarice, Sundered Doctrine @ anchor week
-  const RESET_EPOCH_UTC = Date.UTC(2026, 7, 11, 17, 0, 0); // confirmed reset week — this is week 0
-  const MS_PER_WEEK = 7 * 24 * 60 * 60 * 1000;
+  // Featured raid/dungeon rotation math now lives in
+  // assets/featured-rotation-data.js (window.FeaturedRotationData) —
+  // shared with the RallyBot Discord bot so both stay in sync off a
+  // single recalibration point. See that file for the full rationale.
+  const ALWAYS_FEATURED_RAID_SLUG = window.FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG;
+  const ALWAYS_FEATURED_DUNGEON_SLUG = window.FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG;
 
-  function currentWeekIndex(){
-    return Math.floor((Date.now() - RESET_EPOCH_UTC) / MS_PER_WEEK);
-  }
-
-  function mod(n, m){
-    return ((n % m) + m) % m;
-  }
-
-  function slotRotationPick(slugs, slotOffsets, week){
-    return slotOffsets.map(offset => slugs[mod(offset + week, slugs.length)]);
-  }
-
-  const FEATURED_THIS_WEEK = {
-    raids: [ALWAYS_FEATURED_RAID_SLUG, ...slotRotationPick(RAID_ROTATION_SLUGS, RAID_SLOT_OFFSETS, currentWeekIndex())],
-    dungeons: [ALWAYS_FEATURED_DUNGEON_SLUG, ...slotRotationPick(DUNGEON_ROTATION_SLUGS, DUNGEON_SLOT_OFFSETS, currentWeekIndex())]
-  };
+  const FEATURED_THIS_WEEK = window.FeaturedRotationData.featuredForWeek(window.FeaturedRotationData.currentWeekIndex());
   // Same rotation math, one week ahead — since the pattern is a fixed
   // deterministic cycle (not read from Bungie), next week's picks are
   // exactly as knowable as this week's. Still labeled "Predicted" in the
   // UI since it rests on D2RAD's reverse-engineered pattern holding.
-  const FEATURED_NEXT_WEEK = {
-    raids: [ALWAYS_FEATURED_RAID_SLUG, ...slotRotationPick(RAID_ROTATION_SLUGS, RAID_SLOT_OFFSETS, currentWeekIndex() + 1)],
-    dungeons: [ALWAYS_FEATURED_DUNGEON_SLUG, ...slotRotationPick(DUNGEON_ROTATION_SLUGS, DUNGEON_SLOT_OFFSETS, currentWeekIndex() + 1)]
-  };
+  const FEATURED_NEXT_WEEK = window.FeaturedRotationData.featuredForWeek(window.FeaturedRotationData.currentWeekIndex() + 1);
 
   function msUntilNextReset(){
-    const now = Date.now();
-    const currentWeekStart = RESET_EPOCH_UTC + Math.floor((now - RESET_EPOCH_UTC) / MS_PER_WEEK) * MS_PER_WEEK;
-    return (currentWeekStart + MS_PER_WEEK) - now;
+    return window.FeaturedRotationData.msUntilNextReset();
   }
 
   function formatCountdown(ms){

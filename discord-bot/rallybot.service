@@ -1,0 +1,16 @@
+[Unit]
+Description=RallyBot Discord bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Adjust these two paths/user if your setup differs.
+User=pi
+WorkingDirectory=/home/pi/rally-flag/discord-bot
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

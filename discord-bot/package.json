@@ -1,0 +1,17 @@
+{
+  "name": "rallybot",
+  "version": "1.0.0",
+  "description": "Discord bot for Rally Flag — Distortion tracker and This Week updates.",
+  "private": true,
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "deploy-commands": "node deploy-commands.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5",
+    "node-cron": "^3.0.3"
+  }
+}
