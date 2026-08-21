@@ -5,6 +5,9 @@
   "private": true,
   "main": "src/index.js",
   "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/index.js",
     "deploy-commands": "node deploy-commands.js"
@@ -12,6 +15,6 @@
   "dependencies": {
     "discord.js": "^14.15.3",
     "dotenv": "^16.4.5",
-    "node-cron": "^3.0.3"
+    "node-cron": "^4.6.0"
   }
 }
