@@ -92,7 +92,7 @@ async function catchUpMissedPosts(){
   }
 }
 
-client.once("ready", async () => {
+client.once("clientReady", async () => {
   console.log(`RallyBot online as ${client.user.tag}.`);
 
   await catchUpMissedPosts().catch(err => console.error("Catch-up post failed:", err));
