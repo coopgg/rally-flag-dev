@@ -87,6 +87,7 @@
     <a href="raids.html">Raids</a>
     <a href="dungeons.html" class="active">Dungeons</a>
   </div>
+  <div class="subnav" id="encounter-subnav"></div>
 </div>
 
 <section id="content"></section>
@@ -131,6 +132,31 @@
   setMeta('meta[name="twitter:title"]', "content", dungeon.name);
   setMeta('meta[name="twitter:description"]', "content", dungeonDesc);
 
+  function slugify(name){
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+  function encounterAnchorId(e, i){
+    return "encounter-" + (e.name ? slugify(e.name) : (i + 1));
+  }
+
+  const encounterSubnavEl = document.getElementById("encounter-subnav");
+  if (dungeon.encounters.length){
+    encounterSubnavEl.innerHTML = dungeon.encounters.map((e, i) =>
+      '<a href="#' + encounterAnchorId(e, i) + '">' + e.name + '</a>'
+    ).join("");
+    encounterSubnavEl.addEventListener("click", (ev) => {
+      const link = ev.target.closest("a");
+      if (!link) return;
+      const target = document.querySelector(link.getAttribute("href"));
+      if (!target) return;
+      ev.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      history.replaceState(null, "", link.getAttribute("href"));
+    });
+  } else {
+    encounterSubnavEl.style.display = "none";
+  }
+
   const setsBySlug = {};
   window.ArmorSetsData.SETS.forEach(s => setsBySlug[s.slug] = s);
 
@@ -145,7 +171,7 @@
         if (e.objective || e.steps){
           const hl = window.GameTerms.highlight;
           const stepsHtml = (e.steps || []).map(s => '<li>' + hl(s) + '</li>').join("");
-          return '<div class="encounter-block">' +
+          return '<div class="encounter-block" id="' + encounterAnchorId(e, i) + '">' +
             '<div class="encounter-head"><div class="encounter-num">' + (i + 1) + '</div><div class="encounter-title">' + e.name + '</div></div>' +
             (e.objective ? '<div class="encounter-field"><span class="encounter-field-label">Objective</span>' + hl(e.objective) + '</div>' : '') +
             (e.roles ? '<div class="encounter-field"><span class="encounter-field-label">Roles</span>' + hl(e.roles) + '</div>' : '') +
@@ -154,7 +180,7 @@
           '</div>';
         }
         // Fallback for older, simpler encounter entries
-        return '<div class="encounter-row"><div class="encounter-num">' + (i + 1) + '</div>' +
+        return '<div class="encounter-row" id="' + encounterAnchorId(e, i) + '"><div class="encounter-num">' + (i + 1) + '</div>' +
           '<div><div class="encounter-name">' + e.name + '</div><div class="encounter-notes">' + (e.notes || "") + '</div></div></div>';
       }).join("")
     : '<div class="block-empty">Encounter notes coming soon.</div>';

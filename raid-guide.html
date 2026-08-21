@@ -129,6 +129,7 @@
     <a href="raids.html" class="active">Raids</a>
     <a href="dungeons.html">Dungeons</a>
   </div>
+  <div class="subnav" id="encounter-subnav"></div>
 </div>
 
 <section id="content"></section>
@@ -172,6 +173,31 @@
   setMeta('meta[property="og:url"]', "content", "https://rallyflag.gg/raid-guide.html?slug=" + raid.slug);
   setMeta('meta[name="twitter:title"]', "content", raid.name);
   setMeta('meta[name="twitter:description"]', "content", raidDesc);
+
+  function slugify(name){
+    return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  }
+  function encounterAnchorId(e, i){
+    return "encounter-" + (e.name ? slugify(e.name) : (i + 1));
+  }
+
+  const encounterSubnavEl = document.getElementById("encounter-subnav");
+  if (raid.encounters.length){
+    encounterSubnavEl.innerHTML = raid.encounters.map((e, i) =>
+      '<a href="#' + encounterAnchorId(e, i) + '">' + e.name + '</a>'
+    ).join("");
+    encounterSubnavEl.addEventListener("click", (ev) => {
+      const link = ev.target.closest("a");
+      if (!link) return;
+      const target = document.querySelector(link.getAttribute("href"));
+      if (!target) return;
+      ev.preventDefault();
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      history.replaceState(null, "", link.getAttribute("href"));
+    });
+  } else {
+    encounterSubnavEl.style.display = "none";
+  }
 
   const setsBySlug = {};
   window.ArmorSetsData.SETS.forEach(s => setsBySlug[s.slug] = s);
@@ -221,7 +247,7 @@
                 '<div class="puzzle-helper-link-arrow">Open tool &rarr;</div>' +
               '</a>'
             : '';
-          return '<div class="encounter-block">' +
+          return '<div class="encounter-block" id="' + encounterAnchorId(e, i) + '">' +
             '<div class="encounter-head"><div class="encounter-num">' + (i + 1) + '</div><div class="encounter-title">' + e.name + '</div></div>' +
             (e.objective ? '<div class="encounter-field"><span class="encounter-field-label">Objective</span>' + hl(e.objective) + '</div>' : '') +
             (e.roles ? '<div class="encounter-field"><span class="encounter-field-label">Roles</span>' + hl(e.roles) + '</div>' : '') +
@@ -235,7 +261,7 @@
           '</div>';
         }
         // Fallback for older, simpler encounter entries
-        return '<div class="encounter-row"><div class="encounter-num">' + (i + 1) + '</div>' +
+        return '<div class="encounter-row" id="' + encounterAnchorId(e, i) + '"><div class="encounter-num">' + (i + 1) + '</div>' +
           '<div><div class="encounter-name">' + e.name + '</div><div class="encounter-notes">' + (e.notes || "") + '</div></div></div>';
       }).join("")
     : '<div class="block-empty">Encounter notes coming soon.</div>';

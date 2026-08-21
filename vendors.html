@@ -50,6 +50,19 @@
   }
   .vend-category-label:first-child{ margin-top:0; }
 
+  /* Per-class armor groups collapse by default — most players only care
+     about their own class, and there can be up to 4 of these stacked
+     under one vendor. Weapons stay always-expanded (a plain label+grid,
+     not one of these), since that group applies to everyone. */
+  .vend-category-collapsible{ margin:0; }
+  .vend-category-collapsible:first-child{ margin-top:0; }
+  .vend-category-collapsible summary.vend-category-label{
+    cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between;
+  }
+  .vend-category-collapsible summary.vend-category-label::-webkit-details-marker{ display:none; }
+  .vend-category-chevron{ font-size:11px; transition:transform 0.15s ease; }
+  .vend-category-collapsible[open] .vend-category-chevron{ transform:rotate(90deg); }
+
   .vend-grid{ display:flex; flex-wrap:wrap; justify-content:center; gap:12px; }
   .vend-card{ flex:0 1 250px; padding:14px; }
   .vend-card-top{ display:flex; gap:12px; align-items:center; }
@@ -73,12 +86,6 @@
     border:1px solid var(--accent); color:var(--accent-bright); margin-top:8px;
   }
 
-  .vend-stats-row{ display:flex; flex-wrap:wrap; gap:5px; margin-top:10px; }
-  .vend-stat-chip{
-    font-family:'JetBrains Mono', monospace; font-size:9.5px; color:var(--text-dim);
-    background:rgba(255,255,255,0.05); border:1px solid var(--panel-border);
-    border-radius:4px; padding:2px 6px;
-  }
   .vend-perks-row{ display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
   .vend-perk-chip{
     display:flex; align-items:center; gap:4px; font-family:'JetBrains Mono', monospace;
@@ -87,18 +94,21 @@
   }
   .vend-perk-chip img{ width:14px; height:14px; border-radius:2px; }
 
-  /* Weapon cards: Stats / Perks pill-tabs, DIM-style stat bars */
-  .vend-weapon-tabs{ display:flex; gap:6px; margin-top:10px; }
-  .vend-weapon-tab{
+  /* Weapon/armor cards: Stats / Perks pill-tabs, DIM-style stat bars +
+     perk grid — same rendering as api-debug.html's Vendor/Item Hash
+     Lookup, just tabbed instead of always-stacked to keep these smaller
+     250px cards clean. */
+  .vend-roll-tabs{ display:flex; gap:6px; margin-top:10px; }
+  .vend-roll-tab{
     font-family:'JetBrains Mono', monospace; font-size:9.5px; text-transform:uppercase;
     letter-spacing:0.04em; color:var(--text-dim); background:rgba(255,255,255,0.05);
     border:1px solid var(--panel-border); border-radius:999px; padding:3px 10px;
     cursor:pointer; transition: all 0.15s ease;
   }
-  .vend-weapon-tab:hover{ color:var(--text); }
-  .vend-weapon-tab.active{ color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright); font-weight:700; }
-  .vend-weapon-tab-panel{ display:none; margin-top:10px; }
-  .vend-weapon-tab-panel.active{ display:block; }
+  .vend-roll-tab:hover{ color:var(--text); }
+  .vend-roll-tab.active{ color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright); font-weight:700; }
+  .vend-roll-tab-panel{ display:none; margin-top:10px; }
+  .vend-roll-tab-panel.active{ display:block; }
   .vend-stat-bar-row{ margin-bottom:6px; }
   .vend-stat-bar-head{
     display:flex; justify-content:space-between; font-family:'JetBrains Mono', monospace;
@@ -108,6 +118,24 @@
   .vend-stat-bar-track{ height:4px; border-radius:2px; background:rgba(255,255,255,0.08); overflow:hidden; }
   .vend-stat-bar-fill{ height:100%; background:var(--text-dim); border-radius:2px; }
   .vend-empty-note{ font-size:10.5px; color:var(--text-dimmer); font-style:italic; }
+
+  .vend-recoil-compass-wrap{ display:flex; }
+  .vend-recoil-compass{ width:32px; height:16px; }
+
+  .vend-perk-grid{ display:flex; flex-wrap:wrap; gap:8px; }
+  .vend-perk-grid-col{ display:flex; flex-direction:column; gap:5px; }
+  .vend-perk-icon{
+    width:28px; height:28px; object-fit:cover; border-radius:4px; background:#000;
+    border:1px solid var(--panel-border); display:block;
+  }
+  .vend-perk-icon-empty{ background:rgba(255,255,255,0.05); }
+  .vend-perk-icon.equipped{ border-color:var(--accent-bright); box-shadow:0 0 0 1px var(--accent-bright); }
+
+  .vend-archetype-chip{ display:flex; align-items:center; gap:6px; margin-top:8px; }
+  .vend-archetype-chip img{ width:20px; height:20px; border-radius:3px; object-fit:cover; background:#000; }
+  .vend-archetype-chip .name{
+    font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:600; color:var(--text);
+  }
 
   .tw-status{
     text-align:center; padding:30px 20px; color:var(--text-dimmer);
@@ -134,6 +162,12 @@
     color:var(--text-dim); margin-bottom:24px;
   }
   .vend-departure-note .clock{ color:var(--accent-bright); font-weight:700; }
+  .vend-build-note{
+    margin-top:10px; padding-top:10px; border-top:1px solid var(--panel-border);
+    font-size:11.5px; color:var(--text-dim);
+  }
+  .vend-build-note a{ color:var(--accent-bright); text-decoration:none; }
+  .vend-build-note a:hover{ text-decoration:underline; }
 </style>
 </head>
 <body data-nav-group="vendors">
@@ -190,6 +224,7 @@
 
 <script src="assets/api-keys.js"></script>
 <script src="assets/oauth.js"></script>
+<script src="assets/builds-data.js"></script>
 <script src="assets/nav.js"></script>
 <script>
 (function(){
@@ -334,6 +369,16 @@
     );
   }
 
+  // Per-class armor group, collapsed by default (see .vend-category-collapsible).
+  function appendCollapsibleCategory(outputEl, label, cardsHtml){
+    const details = document.createElement("details");
+    details.className = "vend-category-collapsible";
+    details.innerHTML =
+      '<summary class="vend-category-label">' + label + '<span class="vend-category-chevron">&#9656;</span></summary>' +
+      '<div class="vend-grid">' + cardsHtml.join("") + '</div>';
+    outputEl.appendChild(details);
+  }
+
   // Universal placeholder plugs that sit in every piece of armor's sockets
   // regardless of roll — an empty mod/tuning slot, the default (unselected)
   // shader/ornament, and the "insert to upgrade" prompt. None of these say
@@ -347,99 +392,323 @@
     return false;
   }
 
-  // Compact stat-roll + socketed-perk markup for a vendor sale item,
-  // built from the same itemComponents.stats/sockets shape xur-debug.html's
-  // Live Roll Detail already proved out — empty when Bungie doesn't expose
-  // roll data for this particular sale item (not every vendor offer does).
-  async function rollDetailHtml(statEntry, socketEntry){
-    const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
-    // Same isVisible filter as xur-debug.html — hides structural/bookkeeping
-    // sockets (catalyst trackers, hidden intrinsic slots) that carry a real
-    // plugHash but no display name and would otherwise render as junk.
-    const allSockets = (socketEntry && socketEntry.sockets) || [];
-    const visibleSockets = allSockets.filter(s => s.isVisible !== false && s.plugHash);
+  // Archetype (armor) / Frame (weapon) socket categories — same evidence
+  // as api-debug.html: a fixed, non-swappable, isVisible:false socket
+  // carrying the one defining trait (Powerhouse, Demolitionist, a
+  // sword's Frame, etc.), confirmed against real raw JSON.
+  const ARCHETYPE_SOCKET_CATEGORY_HASH = 3154740035;
+  const WEAPON_FRAME_CATEGORY_HASH = 3956125808;
+  function isArchetypeCategory(categoryHash){
+    return categoryHash === ARCHETYPE_SOCKET_CATEGORY_HASH || categoryHash === WEAPON_FRAME_CATEGORY_HASH;
+  }
 
-    const [statChips, perkChips] = await Promise.all([
-      mapWithConcurrency(stats, 5, async (stat) => {
-        const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
-        const statName = (statDef && statDef.displayProperties && statDef.displayProperties.name) || ("Stat " + stat.statHash);
-        return '<span class="vend-stat-chip">' + statName + " " + stat.value + "</span>";
-      }),
-      mapWithConcurrency(visibleSockets, 5, async (socket) => {
-        const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
-        const plugName = (plugDef && plugDef.displayProperties && plugDef.displayProperties.name) || ("Plug " + socket.plugHash);
-        if (isJunkSocketPlug(plugName)) return null;
-        const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
-        return '<span class="vend-perk-chip">' + (plugIcon ? '<img src="' + plugIcon + '" alt="">' : '') + plugName + '</span>';
-      }).then(chips => chips.filter(Boolean))
-    ]);
+  // Weapon perk/noise socket categories — same evidence as api-debug.html.
+  const WEAPON_PERKS_CATEGORY_HASH = 4241085061;    // barrel/mag/perk 1/perk 2 — always kept
+  const WEAPON_MOD_TIER_CATEGORY_HASH = 2048875504; // same universal mod pool armor's tier slot uses — always excluded
+  const WEAPON_COSMETICS_MIXED_CATEGORY_HASH = 2685412949; // Origin Trait mixed with Ornaments — dropped entirely, by request
+  function isNoiseSocketCategory(name){
+    if (!name) return false;
+    return /mods?\b|cosmetics?|shaders?|ornaments?|trackers?/i.test(name);
+  }
+  function isExcludedSocket(categoryHash, label, plugCount){
+    if (categoryHash === WEAPON_PERKS_CATEGORY_HASH) return false;
+    if (categoryHash === WEAPON_MOD_TIER_CATEGORY_HASH) return true;
+    if (categoryHash === WEAPON_COSMETICS_MIXED_CATEGORY_HASH) return true;
+    return plugCount > 1 && isNoiseSocketCategory(label);
+  }
 
-    let html = "";
-    if (statChips.length) html += '<div class="vend-stats-row">' + statChips.join("") + '</div>';
-    if (perkChips.length) html += '<div class="vend-perks-row">' + perkChips.join("") + '</div>';
+  // Armor stats always render in this fixed order, matching the in-game
+  // card, with a Total row — same as api-debug.html.
+  const STAT_ORDER = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"];
+  function sortStatsToGameOrder(resolvedStats){
+    resolvedStats.sort((a, b) => {
+      const ai = STAT_ORDER.indexOf(a.name), bi = STAT_ORDER.indexOf(b.name);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+    return resolvedStats;
+  }
+  function statBarsHtml(resolvedStats){
+    if (!resolvedStats.length) return "";
+    let html = resolvedStats.map(s => {
+      const pct = Math.max(0, Math.min(100, s.value));
+      return (
+        '<div class="vend-stat-bar-row">' +
+          '<div class="vend-stat-bar-head"><span>' + s.name + '</span><span class="val">' + s.value + '</span></div>' +
+          '<div class="vend-stat-bar-track"><div class="vend-stat-bar-fill" style="width:' + pct + '%"></div></div>' +
+        '</div>'
+      );
+    }).join("");
+    if (resolvedStats.every(s => STAT_ORDER.includes(s.name))){
+      const total = resolvedStats.reduce((sum, s) => sum + s.value, 0);
+      html += '<div class="vend-stat-bar-row"><div class="vend-stat-bar-head"><span>Total</span><span class="val">' + total + '</span></div></div>';
+    }
     return html;
   }
 
-  let weaponCardIdCounter = 0;
+  // Bungie's real API stat names are verbose ("Rounds Per Minute",
+  // "Airborne Effectiveness", "Ammo Generation") — the game abbreviates
+  // just these three for display. Matching/ordering still needs the
+  // real names below.
+  const STAT_DISPLAY_NAME = {
+    "Rounds Per Minute": "RPM",
+    "Airborne Effectiveness": "Airborne",
+    "Ammo Generation": "Ammo Gen"
+  };
+  // Per-weapon-type stat layout — same evidence as api-debug.html
+  // (confirmed against real screenshots, not guessed). `top` is the rate
+  // stat (a plain number, not a bar — Swing Speed is the one exception,
+  // via topIsBar), `order` is the bar-stat sequence, `bottom` is the
+  // capacity stat (also a bar).
+  const WEAPON_STAT_LAYOUT = {
+    "Sword": {
+      top: "Swing Speed",
+      topIsBar: true,
+      order: ["Impact", "Guard Resistance", "Charge Rate", "Guard Endurance"],
+      bottom: "Ammo Capacity"
+    },
+    "Bow": {
+      top: "Draw Time",
+      order: ["Impact", "Accuracy", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
+      bottom: null
+    },
+    "Grenade Launcher": {
+      top: "Rounds Per Minute",
+      order: ["Blast Radius", "Velocity", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
+      bottom: "Magazine"
+    },
+    "Glaive": {
+      top: "Rounds Per Minute",
+      order: ["Impact", "Range", "Shield Duration", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
+      bottom: "Magazine"
+    }
+  };
+  WEAPON_STAT_LAYOUT["Rocket Launcher"] = WEAPON_STAT_LAYOUT["Grenade Launcher"];
+  const CHARGE_TIME_GUN_STAT_LAYOUT = {
+    top: "Charge Time",
+    order: ["Impact", "Range", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
+    bottom: "Magazine"
+  };
+  WEAPON_STAT_LAYOUT["Fusion Rifle"] = CHARGE_TIME_GUN_STAT_LAYOUT;
+  WEAPON_STAT_LAYOUT["Linear Fusion Rifle"] = CHARGE_TIME_GUN_STAT_LAYOUT;
+  const DEFAULT_GUN_STAT_LAYOUT = {
+    top: "Rounds Per Minute",
+    order: ["Impact", "Range", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
+    bottom: "Magazine"
+  };
+  function weaponStatLayoutFor(itemTypeDisplayName){
+    return WEAPON_STAT_LAYOUT[itemTypeDisplayName] || DEFAULT_GUN_STAT_LAYOUT;
+  }
 
-  // Stats/Perks pill-tabs for weapon cards specifically (DIM-style stat
-  // bars under one tab, the full perk list under the other) — armor keeps
-  // the flatter always-visible rollDetailHtml view above. Bar width is
-  // just the raw stat value clamped to 100 — Bungie's weapon stats are
-  // already on that scale except RPM, which just visually caps at a full
-  // bar rather than being individually rescaled against its own archetype
-  // range.
-  async function weaponRollHtml(statEntry, socketEntry){
-    const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
-    const allSockets = (socketEntry && socketEntry.sockets) || [];
-    const visibleSockets = allSockets.filter(s => s.isVisible !== false && s.plugHash);
+  // Recoil Direction compass — exact reverse-engineered formula, same as
+  // api-debug.html (verified to 1e-13° against 58 real DIM SVG samples).
+  const RECOIL_LEAN_RATIO = [
+    -8 / 9, -0.8453835700401364, -0.7191262172221752, -0.5224757798155321,
+    -0.2746817727777316, 0,
+    0.2746817727777319, 0.5224757798155313, 0.7191262172221743, 0.8453835700401364
+  ];
+  function leanDegForValue(value){
+    if (value >= 100) return 0;
+    const half = 0.9 * (100 - value);
+    const sign = Math.floor(value / 10) % 2 === 0 ? -1 : 1;
+    return sign * RECOIL_LEAN_RATIO[value % 10] * half;
+  }
+  function recoilCompassHtml(value){
+    const half = 0.9 * (100 - value);
+    const center = leanDegForValue(value);
+    const cx = 1, cy = 1;
+    const pt = (deg) => {
+      const rad = deg * Math.PI / 180;
+      return [(cx + Math.sin(rad)).toFixed(4), (cy - Math.cos(rad)).toFixed(4)];
+    };
+    let inner;
+    if (half < 1){
+      const [x, y] = pt(center);
+      const [ox, oy] = pt(center + 180);
+      inner = '<line x1="' + ox + '" y1="' + oy + '" x2="' + x + '" y2="' + y + '" stroke="white" stroke-width="0.1"></line>';
+    } else {
+      const [x1, y1] = pt(center + half);
+      const [x2, y2] = pt(center - half);
+      inner = '<path d="M' + cx + ',' + cy + ' L' + x1 + ',' + y1 + ' A1,1 0 0,0 ' + x2 + ',' + y2 + ' Z" fill="#FFF"></path>';
+    }
+    return '<svg class="vend-recoil-compass" viewBox="0 0 2 1"><circle r="1" cx="1" cy="1" fill="#333"></circle>' + inner + '</svg>';
+  }
 
-    const [statRows, perkChips] = await Promise.all([
-      mapWithConcurrency(stats, 5, async (stat) => {
-        const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
-        const statName = (statDef && statDef.displayProperties && statDef.displayProperties.name) || ("Stat " + stat.statHash);
-        const pct = Math.max(0, Math.min(100, stat.value));
+  function weaponStatBarsHtml(resolvedStats, layout){
+    if (!resolvedStats.length) return "";
+    const fullOrder = (layout.top ? [layout.top] : []).concat(layout.order, layout.bottom ? [layout.bottom] : []);
+    const sorted = resolvedStats.slice().sort((a, b) => {
+      const ai = fullOrder.indexOf(a.name), bi = fullOrder.indexOf(b.name);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+    return sorted.map(s => {
+      const label = STAT_DISPLAY_NAME[s.name] || s.name;
+      if (s.name === layout.top && !layout.topIsBar){
+        return '<div class="vend-stat-bar-row"><div class="vend-stat-bar-head"><span>' + label + '</span><span class="val">' + s.value + '</span></div></div>';
+      }
+      if (s.name === "Recoil Direction"){
         return (
           '<div class="vend-stat-bar-row">' +
-            '<div class="vend-stat-bar-head"><span>' + statName + '</span><span class="val">' + stat.value + '</span></div>' +
-            '<div class="vend-stat-bar-track"><div class="vend-stat-bar-fill" style="width:' + pct + '%"></div></div>' +
+            '<div class="vend-stat-bar-head"><span>' + label + '</span><span class="val">' + s.value + '</span></div>' +
+            '<div class="vend-recoil-compass-wrap">' + recoilCompassHtml(s.value) + '</div>' +
           '</div>'
         );
-      }),
-      mapWithConcurrency(visibleSockets, 5, async (socket) => {
-        const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
-        const plugName = (plugDef && plugDef.displayProperties && plugDef.displayProperties.name) || ("Plug " + socket.plugHash);
-        if (isJunkSocketPlug(plugName)) return null;
-        const plugIcon = plugDef ? iconUrl(plugDef.displayProperties) : null;
-        return '<span class="vend-perk-chip">' + (plugIcon ? '<img src="' + plugIcon + '" alt="">' : '') + plugName + '</span>';
-      }).then(chips => chips.filter(Boolean))
+      }
+      const pct = Math.max(0, Math.min(100, s.value));
+      return (
+        '<div class="vend-stat-bar-row">' +
+          '<div class="vend-stat-bar-head"><span>' + label + '</span><span class="val">' + s.value + '</span></div>' +
+          '<div class="vend-stat-bar-track"><div class="vend-stat-bar-fill" style="width:' + pct + '%"></div></div>' +
+        '</div>'
+      );
+    }).join("");
+  }
+
+  function perkIconHtml(name, icon, equipped){
+    const safeName = name.replace(/"/g, "&quot;");
+    const cls = "vend-perk-icon" + (equipped ? " equipped" : "");
+    if (icon) return '<img class="' + cls + '" src="' + icon + '" alt="' + safeName + '" title="' + safeName + '">';
+    return '<div class="' + cls + ' vend-perk-icon-empty" title="' + safeName + '"></div>';
+  }
+
+  let rollCardIdCounter = 0;
+
+  // Unified stats+perks roll block for a vendor sale item, same
+  // rendering as api-debug.html's Vendor Hash Lookup but tabbed (Stats /
+  // Perks) to keep these smaller 250px cards clean instead of stacking
+  // everything. Weapons get the DIM-style layout (top rate stat as a
+  // plain number, ordered bars, recoil compass, bottom capacity stat as
+  // a bar) plus a 4-column perk grid (barrel/launch/blade type,
+  // magazine/arrow/grenade type, perk 1, perk 2) scoped to what this
+  // sale can actually roll (component 310) with the equipped option
+  // highlighted. Armor gets game-ordered stat bars + a Total, plus a
+  // flat perk-chip list for anything else non-noise. Archetype/Frame —
+  // the one defining trait — renders above the tabs, always visible.
+  async function resolvedRollHtml(itemDef, statEntry, socketEntry, reusablePlugsEntry){
+    const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
+    const reusablePlugsByIndex = (reusablePlugsEntry && reusablePlugsEntry.plugs) || {};
+    // No isVisible filter — an armor archetype (Powerhouse, Paragon, etc.)
+    // lives in a hidden, non-swappable, rolled-at-drop socket; filtering
+    // on visibility silently drops exactly the trait this is meant to show.
+    const allSockets = (socketEntry && socketEntry.sockets) || [];
+    const visibleSockets = allSockets.map((s, i) => ({ socket: s, index: i })).filter(s => s.socket.plugHash);
+
+    const categoryHashByIndex = {};
+    ((itemDef.sockets && itemDef.sockets.socketCategories) || []).forEach(cat => {
+      (cat.socketIndexes || []).forEach(idx => { categoryHashByIndex[idx] = cat.socketCategoryHash; });
+    });
+
+    const isWeapon = itemDef.itemType === 3;
+
+    const [resolvedStats, resolvedSockets] = await Promise.all([
+      mapWithConcurrency(stats, 5, async (stat) => {
+        const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
+        const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
+        if (!statName) return null;
+        return { name: statName, value: stat.value };
+      }).then(rows => rows.filter(Boolean)),
+      mapWithConcurrency(visibleSockets, 5, async ({ socket, index }) => {
+        const categoryHash = categoryHashByIndex[index];
+        if (isArchetypeCategory(categoryHash)){
+          const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
+          const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
+          if (!plugName || isJunkSocketPlug(plugName)) return null;
+          return { isArchetype: true, name: plugName, icon: plugDef ? iconUrl(plugDef.displayProperties) : null };
+        }
+
+        // Armor has no equivalent perk-grid concept here (no 2pc/4pc set
+        // bonus data to show, and its other sockets are mostly cosmetic)
+        // — just the archetype chip + stats, no Perks tab at all. Skip
+        // resolving anything else for it rather than fetching plugs that
+        // will never render.
+        if (!isWeapon) return null;
+
+        // A live roll only ever carries ONE resolved plug per socket, but
+        // the weapon-perk columns are meant to show the whole swappable
+        // pool with the actual pick highlighted. Component 310
+        // (reusablePlugs) is what's scoped to this sale — the real "what
+        // this gun can roll" pool. Falls back to just the one resolved
+        // plug if it's missing for a socket.
+        const isPerkColumn = isWeapon && categoryHash === WEAPON_PERKS_CATEGORY_HASH;
+        const reusablePlugs = reusablePlugsByIndex[index];
+        const plugHashes = (isPerkColumn && reusablePlugs && reusablePlugs.length)
+          ? reusablePlugs.map(p => p.plugItemHash)
+          : (socket.plugHash ? [socket.plugHash] : []);
+        if (!plugHashes.length) return null;
+        if (isExcludedSocket(categoryHash, null, plugHashes.length)) return null;
+
+        const perks = (await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
+          const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
+          const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
+          if (!plugName || isJunkSocketPlug(plugName)) return null;
+          return { name: plugName, icon: plugDef ? iconUrl(plugDef.displayProperties) : null, equipped: plugHash === socket.plugHash };
+        })).filter(Boolean);
+        if (!perks.length) return null;
+
+        return { index, isArchetype: false, isPerkColumn, perks };
+      }).then(rows => rows.filter(Boolean))
     ]);
 
-    if (!statRows.length && !perkChips.length) return "";
+    const archetype = resolvedSockets.find(s => s.isArchetype);
 
-    const id = "wpn-" + (weaponCardIdCounter++);
-    return (
-      '<div class="vend-weapon-tabs">' +
-        '<button type="button" class="vend-weapon-tab active" data-tab="' + id + '-stats">Stats</button>' +
-        '<button type="button" class="vend-weapon-tab" data-tab="' + id + '-perks">Perks</button>' +
+    const statsHtml = isWeapon
+      ? weaponStatBarsHtml(resolvedStats, weaponStatLayoutFor(itemDef.itemTypeDisplayName))
+      : statBarsHtml(sortStatsToGameOrder(resolvedStats));
+
+    let html = "";
+    if (archetype) html += '<div class="vend-archetype-chip">' + (archetype.icon ? '<img src="' + archetype.icon + '" alt="">' : '') + '<span class="name">' + archetype.name + '</span></div>';
+
+    // Armor: stats only, no tabs — there's no perk-grid content for it
+    // (no 2pc/4pc set bonus data available to show), so a Perks tab
+    // would just be permanently empty.
+    if (!isWeapon){
+      if (!archetype && !statsHtml) return "";
+      html += statsHtml || '<div class="vend-empty-note">no stat roll on this item</div>';
+      return html;
+    }
+
+    const perkColumns = resolvedSockets.filter(s => !s.isArchetype && s.isPerkColumn)
+      .sort((a, b) => a.index - b.index).map(s => s.perks);
+    const flatPerks = resolvedSockets.filter(s => !s.isArchetype && !s.isPerkColumn)
+      .flatMap(s => s.perks.map(p => perkIconHtml(p.name, p.icon)));
+
+    let perksHtml = "";
+    if (perkColumns.length) perksHtml += '<div class="vend-perk-grid">' + perkColumns.map(column =>
+      '<div class="vend-perk-grid-col">' + column.map(p => perkIconHtml(p.name, p.icon, p.equipped)).join("") + '</div>'
+    ).join("") + '</div>';
+    if (flatPerks.length) perksHtml += '<div class="vend-perks-row">' + flatPerks.join("") + '</div>';
+
+    if (!archetype && !statsHtml && !perksHtml) return "";
+
+    const id = "roll-" + (rollCardIdCounter++);
+    html +=
+      '<div class="vend-roll-tabs">' +
+        '<button type="button" class="vend-roll-tab active" data-tab="' + id + '-stats">Stats</button>' +
+        '<button type="button" class="vend-roll-tab" data-tab="' + id + '-perks">Perks</button>' +
       '</div>' +
-      '<div class="vend-weapon-tab-panel active" id="' + id + '-stats">' +
-        (statRows.length ? statRows.join("") : '<div class="vend-empty-note">no stat roll on this item</div>') +
+      '<div class="vend-roll-tab-panel active" id="' + id + '-stats">' +
+        (statsHtml || '<div class="vend-empty-note">no stat roll on this item</div>') +
       '</div>' +
-      '<div class="vend-weapon-tab-panel" id="' + id + '-perks">' +
-        (perkChips.length ? '<div class="vend-perks-row">' + perkChips.join("") + '</div>' : '<div class="vend-empty-note">no perk data on this item</div>') +
-      '</div>'
-    );
+      '<div class="vend-roll-tab-panel" id="' + id + '-perks">' +
+        (perksHtml || '<div class="vend-empty-note">no perk data on this item</div>') +
+      '</div>';
+    return html;
   }
 
   document.addEventListener("click", (e) => {
-    const tab = e.target.closest(".vend-weapon-tab");
+    const tab = e.target.closest(".vend-roll-tab");
     if (!tab) return;
     const panel = document.getElementById(tab.dataset.tab);
     if (!panel) return;
-    tab.closest(".vend-weapon-tabs").querySelectorAll(".vend-weapon-tab").forEach(t => t.classList.toggle("active", t === tab));
-    panel.parentElement.querySelectorAll(".vend-weapon-tab-panel").forEach(p => p.classList.toggle("active", p === panel));
+    tab.closest(".vend-roll-tabs").querySelectorAll(".vend-roll-tab").forEach(t => t.classList.toggle("active", t === tab));
+    panel.parentElement.querySelectorAll(".vend-roll-tab-panel").forEach(p => p.classList.toggle("active", p === panel));
   });
+
 
   function formatDate(iso){
     if (!iso) return "";
@@ -570,21 +839,23 @@
       // mutated synchronously (no await between reading and writing it),
       // so concurrent workers can't race each other on it.
       await mapWithConcurrency(pairs, 4, async ({ characterId, classLabel, vHash }) => {
-        let saleItems = [], statsByIndex = {}, socketsByIndex = {};
+        let saleItems = [], statsByIndex = {}, socketsByIndex = {}, reusablePlugsByIndex = {};
         try {
           const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
-            "/Character/" + characterId + "/Vendors/" + vHash + "/?components=402,300,302,304,305";
+            "/Character/" + characterId + "/Vendors/" + vHash + "/?components=402,300,302,304,305,310";
           const resp = await authedApiGet(path);
           saleItems = Object.values((resp.sales && resp.sales.data) || {});
           const itemComponents = resp.itemComponents || {};
           statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
           socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
+          reusablePlugsByIndex = (itemComponents.reusablePlugs && itemComponents.reusablePlugs.data) || {};
         } catch (e){
           saleItems = [];
         }
         for (const sale of saleItems){
           const statEntry = statsByIndex[sale.vendorItemIndex];
           const socketEntry = socketsByIndex[sale.vendorItemIndex];
+          const reusablePlugsEntry = reusablePlugsByIndex[sale.vendorItemIndex];
           // Zavala can sell the same weapon at the same price with
           // genuinely different rolls at once (different perks in the
           // same sockets) — keyed on itemHash + cost alone, those would
@@ -595,7 +866,7 @@
           const rollSignature = (socketEntry && socketEntry.sockets) ? socketEntry.sockets.map(s => s.plugHash || 0).join(",") : "";
           const key = sale.itemHash + "|" + costSignature(sale.costs) + "|" + rollSignature;
           if (!itemsByKey.has(key)){
-            itemsByKey.set(key, { sale, statEntry, socketEntry, seenOn: new Set() });
+            itemsByKey.set(key, { sale, statEntry, socketEntry, reusablePlugsEntry, seenOn: new Set() });
           }
           itemsByKey.get(key).seenOn.add(classLabel);
         }
@@ -608,7 +879,7 @@
       }
 
       statusEl.textContent = "Resolving " + itemsByKey.size + " offer(s)…";
-      const resolved = await mapWithConcurrency(Array.from(itemsByKey.values()), 6, async ({ sale, statEntry, socketEntry }) => {
+      const resolved = await mapWithConcurrency(Array.from(itemsByKey.values()), 6, async ({ sale, statEntry, socketEntry, reusablePlugsEntry }) => {
         const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
         const name = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
         const typeName = (itemDef && itemDef.itemTypeDisplayName) || "";
@@ -618,7 +889,7 @@
         const isArmor = XUR_ARMOR_TYPES.has(typeName);
         const [costText, extraHtml] = await Promise.all([
           costChipsHtml(sale.costs),
-          isArmor ? rollDetailHtml(statEntry, socketEntry) : weaponRollHtml(statEntry, socketEntry)
+          resolvedRollHtml(itemDef, statEntry, socketEntry, reusablePlugsEntry)
         ]);
         const card = itemCardHtml(name, icon, typeName, costText, null, extraHtml);
         const classType = isArmor ? ((itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3) : null;
@@ -663,14 +934,7 @@
       for (const classType of [0, 1, 2, 3]){
         if (!armorByClass.has(classType)) continue;
         const items = armorByClass.get(classType);
-        const labelEl = document.createElement("div");
-        labelEl.className = "vend-category-label";
-        labelEl.textContent = VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")";
-        outputEl.appendChild(labelEl);
-        const grid = document.createElement("div");
-        grid.className = "vend-grid";
-        grid.innerHTML = items.join("");
-        outputEl.appendChild(grid);
+        appendCollapsibleCategory(outputEl, VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")", items);
       }
     } catch (err){
       statusEl.className = "tw-status tw-error";
@@ -906,6 +1170,18 @@
   // name-based check below instead of getting filtered out with the junk.
   const XUR_SKIP_TYPES = new Set(["", "Material", "Engram", "Weapon Engram", "Armor Engram", "Emblem", "Faction Reward", "Quest Step", "Currency", "Container", "Buff", "Consumable"]);
 
+  // Ported from the old this-week.html Xur section: flags an exotic sale
+  // item that a curated build calls for, with a link straight to it.
+  function findBuildMatch(itemHash){
+    const builds = (window.BuildsData && window.BuildsData.BUILDS) || [];
+    for (const b of builds){
+      if ((b.exoticArmor && b.exoticArmor.itemHash === itemHash) || (b.exoticWeapon && b.exoticWeapon.itemHash === itemHash)){
+        return b;
+      }
+    }
+    return null;
+  }
+
   async function runXur(){
     const statusEl = document.getElementById("xur-status");
     const outputEl = document.getElementById("xur-output");
@@ -932,15 +1208,16 @@
         for (const vHash of [XUR_HASH, ...XUR_SUB_HASHES]) pairs.push({ characterId, classLabel, vHash });
       }
       await mapWithConcurrency(pairs, 4, async ({ characterId, classLabel, vHash }) => {
-        let saleItems = [], statsByIndex = {}, socketsByIndex = {};
+        let saleItems = [], statsByIndex = {}, socketsByIndex = {}, reusablePlugsByIndex = {};
         try {
           const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
-            "/Character/" + characterId + "/Vendors/" + vHash + "/?components=402,300,302,304,305";
+            "/Character/" + characterId + "/Vendors/" + vHash + "/?components=402,300,302,304,305,310";
           const resp = await authedApiGet(path);
           saleItems = Object.values((resp.sales && resp.sales.data) || {});
           const itemComponents = resp.itemComponents || {};
           statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
           socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
+          reusablePlugsByIndex = (itemComponents.reusablePlugs && itemComponents.reusablePlugs.data) || {};
         } catch (e){
           saleItems = [];
         }
@@ -956,6 +1233,7 @@
               sale,
               statEntry: statsByIndex[sale.vendorItemIndex],
               socketEntry,
+              reusablePlugsEntry: reusablePlugsByIndex[sale.vendorItemIndex],
               seenOn: new Set()
             });
           }
@@ -970,7 +1248,7 @@
       }
 
       statusEl.textContent = "Resolving " + itemsByKey.size + " item(s)…";
-      const resolved = await mapWithConcurrency(Array.from(itemsByKey.values()), 6, async ({ sale, statEntry, socketEntry }) => {
+      const resolved = await mapWithConcurrency(Array.from(itemsByKey.values()), 6, async ({ sale, statEntry, socketEntry, reusablePlugsEntry }) => {
         const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
         const name = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
         const typeName = (itemDef && itemDef.itemTypeDisplayName) || "";
@@ -982,11 +1260,15 @@
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const tag = isCatalyst ? "Catalyst" : (tier === "Exotic" ? "Exotic" : null);
         const isArmor = XUR_ARMOR_TYPES.has(typeName);
-        const [costText, extraHtml] = await Promise.all([
+        const [costText, rollHtml] = await Promise.all([
           costChipsHtml(sale.costs),
-          isArmor ? rollDetailHtml(statEntry, socketEntry) : weaponRollHtml(statEntry, socketEntry)
+          resolvedRollHtml(itemDef, statEntry, socketEntry, reusablePlugsEntry)
         ]);
-        const card = itemCardHtml(name, icon, typeName || (isCatalyst ? "Catalyst" : ""), costText, tag, extraHtml);
+        const buildMatch = findBuildMatch(sale.itemHash);
+        const buildHtml = buildMatch
+          ? '<div class="vend-build-note">We recommend this in <a href="builds.html#build-' + buildMatch.slug + '">' + buildMatch.title + '</a></div>'
+          : "";
+        const card = itemCardHtml(name, icon, typeName || (isCatalyst ? "Catalyst" : ""), costText, tag, rollHtml + buildHtml);
         const classType = isArmor ? ((itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3) : null;
         return { card, isArmor, classType };
       });
@@ -1029,14 +1311,7 @@
       for (const classType of [0, 1, 2, 3]){
         if (!armorByClass.has(classType)) continue;
         const items = armorByClass.get(classType);
-        const labelEl = document.createElement("div");
-        labelEl.className = "vend-category-label";
-        labelEl.textContent = VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")";
-        outputEl.appendChild(labelEl);
-        const grid = document.createElement("div");
-        grid.className = "vend-grid";
-        grid.innerHTML = items.join("");
-        outputEl.appendChild(grid);
+        appendCollapsibleCategory(outputEl, VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")", items);
       }
     } catch (err){
       statusEl.className = "tw-status tw-error";

@@ -46,16 +46,20 @@
         { label: "Puzzle Helper", href: "puzzle-helper.html", group: "puzzlehelper" },
         { label: "Codes", href: "codes.html", group: "codes" }
       ]
-    },
-    // Dev-branch only — links to throwaway/noindexed API test pages.
-    // Remove this section before merging toward the production branch/site.
-    {
+    }
+  ];
+  // Debug tools (debug.html and the throwaway/noindexed API test pages
+  // it links to) only exist on the dev site. Hidden by hostname rather
+  // than deleted so this exact file can ship to prod unmodified — no
+  // manual "strip the Debug section" step at promotion time.
+  if (window.location.hostname !== "rallyflag.gg"){
+    NAV_SECTIONS.push({
       label: "Debug",
       items: [
         { label: "🐞 Debug", href: "debug.html", group: "debug" }
       ]
-    }
-  ];
+    });
+  }
   const NAV_ITEMS = NAV_SECTIONS.flatMap(section => section.items);
 
   const BUNGIE_ROOT = "https://www.bungie.net";
@@ -224,14 +228,22 @@
     const container = document.getElementById("site-nav");
     if (!container) return;
 
-    const linksHtml = NAV_SECTIONS.map(section =>
-      '<div class="nav-menu-section">' +
-        '<div class="nav-menu-section-label">' + section.label + '</div>' +
-        section.items.map(item =>
-          '<a href="' + item.href + '"' + (item.group === activeGroup ? ' class="active"' : '') + '>' + item.label + '</a>'
-        ).join("") +
-      '</div>'
-    ).join("");
+    // Each section is a <details>, all sharing one `name` — browsers
+    // auto-collapse the others whenever one opens, so the menu can't
+    // stack up into a long scroll of every link at once. The section
+    // holding the current page starts open; everything else starts
+    // collapsed to just its label.
+    const linksHtml = NAV_SECTIONS.map(section => {
+      const hasActive = section.items.some(item => item.group === activeGroup);
+      return (
+        '<details class="nav-menu-section" name="nav-links-accordion"' + (hasActive ? " open" : "") + '>' +
+          '<summary class="nav-menu-section-label">' + section.label + '</summary>' +
+          section.items.map(item =>
+            '<a href="' + item.href + '"' + (item.group === activeGroup ? ' class="active"' : '') + '>' + item.label + '</a>'
+          ).join("") +
+        '</details>'
+      );
+    }).join("");
 
     container.innerHTML =
       '<nav class="site-nav">' +

@@ -7,8 +7,12 @@
    Platform endpoint.
 
    Storage:
-     localStorage "rallyflag_bungie_auth" — tokens + cached identity,
-       persists across visits until sign-out or refresh-token expiry.
+     sessionStorage "rallyflag_bungie_auth" — tokens + cached identity,
+       gone the moment this tab/window closes (by request — no lingering
+       sign-in across browser sessions). Within a still-open tab, Bungie's
+       actual access token still has its own real expiry (see
+       getAccessToken() below for how that's handled without feeling
+       like a hard timeout).
      sessionStorage "rallyflag_oauth_state" — CSRF state for the one
        in-flight authorize round trip.
      sessionStorage "rallyflag_oauth_return" — page to bounce back to
@@ -39,7 +43,7 @@ window.RallyFlagAuth = (function(){
 
   function loadAuth(){
     try {
-      const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+      const raw = sessionStorage.getItem(AUTH_STORAGE_KEY);
       return raw ? JSON.parse(raw) : null;
     } catch (e) {
       return null;
@@ -47,12 +51,12 @@ window.RallyFlagAuth = (function(){
   }
 
   function saveAuth(auth){
-    localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
+    sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
     notifyChange();
   }
 
   function clearAuth(){
-    localStorage.removeItem(AUTH_STORAGE_KEY);
+    sessionStorage.removeItem(AUTH_STORAGE_KEY);
     notifyChange();
   }
 
@@ -195,9 +199,16 @@ window.RallyFlagAuth = (function(){
 
   // Returns a valid access token. If it's expired and a refresh token
   // exists, refreshes first. This app's token responses don't actually
-  // include a refresh token (see tokenResponseToAuth), so in practice an
-  // expired access token just means the session is over — the user has
-  // to sign in again rather than getting a silent renewal.
+  // include a refresh token (see tokenResponseToAuth) — Bungie's public
+  // OAuth clients only ever get an access_token, which is short-lived.
+  // Rather than treating that expiry as "you're logged out, go click
+  // sign in again," this silently re-runs the same authorize round trip
+  // instead: the browser almost always still has an active bungie.net
+  // session, so it completes with no login form and bounces right back
+  // to the current page (signIn()'s RETURN_KEY). Effectively, staying
+  // signed in lasts as long as this tab stays open — it only actually
+  // ends when the tab/window closes (auth lives in sessionStorage now)
+  // or sign-out is explicit.
   async function getAccessToken(){
     let auth = loadAuth();
     if (!auth || !auth.access_token) return null;
@@ -206,17 +217,17 @@ window.RallyFlagAuth = (function(){
       return auth.access_token;
     }
 
-    if (!auth.refresh_token || (auth.refresh_expires_at && Date.now() >= auth.refresh_expires_at)) {
-      clearAuth();
-      return null;
+    if (auth.refresh_token && !(auth.refresh_expires_at && Date.now() >= auth.refresh_expires_at)) {
+      try {
+        auth = await refresh(auth);
+        return auth.access_token;
+      } catch (e) {
+        clearAuth();
+      }
     }
-    try {
-      auth = await refresh(auth);
-      return auth.access_token;
-    } catch (e) {
-      clearAuth();
-      return null;
-    }
+
+    signIn();
+    return null;
   }
 
   // Convenience wrapper for pages that need to hit an OAuth-protected

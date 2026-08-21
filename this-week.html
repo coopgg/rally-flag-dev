@@ -5,16 +5,16 @@
 <link rel="icon" href="favicon.ico">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>This Week - Rally Flag</title>
-<meta name="description" content="This week's featured raid and dungeon, and Xûr's current wares.">
+<meta name="description" content="This week's featured raid and dungeon.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Rally Flag">
 <meta property="og:title" content="This Week">
-<meta property="og:description" content="This week's featured raid and dungeon, and Xûr's current wares.">
+<meta property="og:description" content="This week's featured raid and dungeon.">
 <meta property="og:url" content="https://rallyflag.gg/this-week.html">
 <meta property="og:image" content="https://rallyflag.gg/assets/icon-512.png">
 <meta name="twitter:card" content="summary">
 <meta name="twitter:title" content="This Week">
-<meta name="twitter:description" content="This week's featured raid and dungeon, and Xûr's current wares.">
+<meta name="twitter:description" content="This week's featured raid and dungeon.">
 <meta name="twitter:image" content="https://rallyflag.gg/assets/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -35,65 +35,23 @@
     font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dimmer);
   }
 
+  .tw-collapsible{ margin:44px 0 0; }
+  .tw-collapsible summary{
+    display:flex; align-items:baseline; justify-content:flex-start; gap:8px;
+    margin:0 0 16px; cursor:pointer; list-style:none;
+  }
+  .tw-collapsible summary::-webkit-details-marker{ display:none; }
+  .tw-collapse-chevron{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer);
+    transition:transform 0.15s ease;
+  }
+  .tw-collapsible[open] .tw-collapse-chevron{ transform:rotate(90deg); }
+
   .tw-status{
     text-align:center; padding:30px 20px; color:var(--text-dimmer);
     font-family:'JetBrains Mono', monospace; font-size:13px;
   }
   .tw-status.tw-error{ color:#ff8f8f; }
-
-  /* --- Xur --- */
-  .xur-category{ margin-bottom:26px; }
-  .xur-category-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.1em;
-    color:var(--accent); text-transform:uppercase; margin-bottom:10px;
-  }
-  .xur-class-label{
-    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.12em;
-    color:var(--accent); text-transform:uppercase; margin:20px 0 12px;
-    padding-bottom:8px; border-bottom:1px solid var(--panel-border);
-  }
-  .xur-class-label:first-of-type{ margin-top:2px; }
-  .xur-grid{
-    display:flex; flex-wrap:wrap; justify-content:center; gap:12px;
-  }
-  .xur-card{ flex:0 1 250px; padding:14px; }
-  .xur-card-top{ display:flex; gap:12px; align-items:center; }
-  .xur-icon{
-    width:52px; height:52px; border-radius:4px; overflow:hidden; flex-shrink:0;
-    background:rgba(0,0,0,0.4);
-  }
-  .xur-icon img{ width:100%; height:100%; object-fit:cover; display:block; }
-  .xur-info{ min-width:0; }
-  .xur-name{
-    font-family:'Oswald', sans-serif; font-weight:600; font-size:13.5px; color:var(--text);
-    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  .xur-type{ font-size:11px; color:var(--text-dimmer); margin-top:2px; }
-  .xur-cost{
-    display:flex; align-items:center; gap:5px; margin-top:6px;
-    font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--accent-bright);
-  }
-  .xur-cost img{ width:14px; height:14px; object-fit:contain; }
-
-  .xur-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
-  .xur-tag{
-    font-family:'JetBrains Mono', monospace; font-size:9.5px; letter-spacing:0.04em;
-    text-transform:uppercase; padding:4px 9px; border-radius:999px;
-    border:1px solid var(--panel-border); color:var(--text-dim);
-  }
-  .xur-tag-archetype{ color:var(--accent-bright); border-color:var(--accent); }
-  .xur-tag-affinity-void{ color:#b48cff; border-color:#6b4fa8; }
-  .xur-tag-affinity-solar{ color:#ff9b5c; border-color:#a85f2f; }
-  .xur-tag-affinity-arc{ color:#7fdcff; border-color:#3f8ba8; }
-  .xur-tag-affinity-stasis{ color:#8cc7ff; border-color:#4f76a8; }
-  .xur-tag-affinity-strand{ color:#7fff9b; border-color:#3fa85f; }
-
-  .xur-build-note{
-    margin-top:10px; padding-top:10px; border-top:1px solid var(--panel-border);
-    font-size:11.5px; color:var(--text-dim);
-  }
-  .xur-build-note a{ color:var(--accent-bright); text-decoration:none; }
-  .xur-build-note a:hover{ text-decoration:underline; }
 
   /* --- Featured This Week --- */
   .tw-subsection-label{
@@ -142,25 +100,6 @@
     padding:3px 8px; margin-left:8px; vertical-align:middle;
   }
   #reset-countdown-note{ font-variant-numeric:tabular-nums; }
-
-  .tw-countdown-wrap{
-    text-align:center; padding:30px 20px;
-  }
-  .tw-countdown-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.1em;
-    color:var(--text-dimmer); text-transform:uppercase; margin-bottom:14px;
-  }
-  .tw-countdown-digits{
-    font-family:'JetBrains Mono', monospace; font-weight:700; font-size:34px;
-    color:var(--accent-bright); letter-spacing:0.02em;
-  }
-  .tw-countdown-arrival{
-    font-size:13px; color:var(--text-dim); margin-top:12px;
-  }
-  .tw-countdown-note{
-    font-size:11px; color:var(--text-dimmer); margin-top:6px; max-width:420px;
-    margin-left:auto; margin-right:auto; line-height:1.5;
-  }
 </style>
 </head>
 <body data-nav-group="thisweek">
@@ -168,9 +107,9 @@
 <div id="site-nav"></div>
 
 <div class="hero">
-  <div class="eyebrow">Destiny 2 Database</div>
+  <div class="eyebrow">Destiny 2 · Live Info</div>
   <h1 class="title">This Week</h1>
-  <p class="subtitle">This week's featured raid and dungeon, and Xûr's current wares.</p>
+  <p class="subtitle">This week's featured raid and dungeon.</p>
 </div>
 
 <section>
@@ -183,34 +122,29 @@
   <div class="tw-subsection-label">Dungeons</div>
   <div id="featured-dungeons-content"></div>
 
-  <div class="tw-section-head">
-    <div class="tw-section-title">Next Week<span class="tw-predicted-badge">Predicted</span></div>
-    <div class="tw-refresh-note">Same rotation, one reset ahead</div>
-  </div>
-  <div class="tw-subsection-label">Raids</div>
-  <div id="next-week-raids-content"></div>
-  <div class="tw-subsection-label">Dungeons</div>
-  <div id="next-week-dungeons-content"></div>
+  <details class="tw-collapsible">
+    <summary>
+      <span class="tw-section-title">Next Week<span class="tw-predicted-badge">Predicted</span></span>
+      <span class="tw-collapse-chevron">&#9656;</span>
+    </summary>
+    <div class="tw-subsection-label">Raids</div>
+    <div id="next-week-raids-content"></div>
+    <div class="tw-subsection-label">Dungeons</div>
+    <div id="next-week-dungeons-content"></div>
+  </details>
 
-  <div class="tw-section-head">
-    <div class="tw-section-title">Xûr at the Tower</div>
-    <div class="tw-refresh-note" id="xur-refresh-note"></div>
-  </div>
-  <div id="xur-content"><div class="tw-status">Loading...</div></div>
 </section>
 
 <footer>
   <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
-  <p>Pulled live from Bungie's public API on page load. If something looks off or missing, it's likely a Bungie-side data gap rather than a bug here, so let us know either way.</p>
+  <p>Featured raid/dungeon picks are computed from a reverse-engineered rotation pattern, not pulled live from Bungie. Xûr's current wares live under <a href="vendors.html">Vendors</a> now.</p>
 </footer>
 
 <script src="assets/nav.js"></script>
 <script src="assets/raids-data.js"></script>
 <script src="assets/dungeons-data.js"></script>
 <script src="assets/sets-data.js"></script>
-<script src="assets/builds-data.js"></script>
 <script src="assets/featured-rotation-data.js"></script>
-<script src="assets/api-keys.js"></script>
 <script>
 (function(){
   // Featured raid/dungeon rotation math now lives in
@@ -247,262 +181,6 @@
     el.textContent = "Resets in " + formatCountdown(msUntilNextReset());
   }
 
-  const BUNGIE_API_KEY = window.RallyFlagAPI.BUNGIE_API_KEY;
-  const BUNGIE_ROOT = "https://www.bungie.net";
-  const XUR_VENDOR_HASH = "2190858386";
-
-  async function apiGet(path){
-    const res = await fetch(BUNGIE_ROOT + path, { headers: { "X-API-Key": BUNGIE_API_KEY } });
-    const data = await res.json();
-    if (!res.ok || data.ErrorCode !== 1){
-      const msg = (data && data.Message) || ("HTTP " + res.status);
-      throw new Error(msg);
-    }
-    return data.Response;
-  }
-
-  // Manifest lookups are cached and always sequential (never Promise.all) —
-  // concurrent manifest requests have caused rate-limit errors on this site
-  // before.
-  const itemDefCache = {};
-  async function fetchItemDef(hash){
-    if (itemDefCache[hash] !== undefined) return itemDefCache[hash];
-    try {
-      const def = await apiGet("/Platform/Destiny2/Manifest/DestinyInventoryItemDefinition/" + hash + "/");
-      const result = {
-        name: (def.displayProperties && def.displayProperties.name) || ("Unknown (" + hash + ")"),
-        description: (def.displayProperties && def.displayProperties.description) || "",
-        icon: (def.displayProperties && def.displayProperties.icon) ? BUNGIE_ROOT + def.displayProperties.icon : null,
-        typeName: def.itemTypeDisplayName || "",
-        // 0=Titan, 1=Hunter, 2=Warlock, 3=Any — documented Bungie API field,
-        // used to group Xur's class items instead of guessing from the name.
-        classType: typeof def.classType === "number" ? def.classType : 3,
-        itemCategoryHashes: def.itemCategoryHashes || [],
-        // Raw stat hash->value map. Only armor has the six confirmed
-        // archetype stat hashes populated; weapons have different stats
-        // entirely, which is how we tell them apart without guessing an
-        // itemType enum.
-        stats: (def.stats && def.stats.stats) || {},
-        // Same pattern god-rolls.html already uses for weapon damage type —
-        // resolved via a second manifest lookup by hash, not a hardcoded
-        // enum, so no guessing at Bungie's internal numbering.
-        damageTypeHash: (def.damageTypeHashes && def.damageTypeHashes.length) ? def.damageTypeHashes[0] : null,
-        // First socket's default plug is where an exotic armor's intrinsic
-        // perk usually lives. Unverified against a live pull as of writing —
-        // flagged clearly wherever this gets used.
-        firstSocketPlugHash: (def.sockets && def.sockets.socketEntries && def.sockets.socketEntries.length && def.sockets.socketEntries[0].singleInitialItemHash) || null
-      };
-      itemDefCache[hash] = result;
-      return result;
-    } catch (err){
-      console.warn("Item def fetch failed for hash " + hash + ":", err.message);
-      const fallback = { name: "Unknown (" + hash + ")", description: "", icon: null, typeName: "", classType: 3, itemCategoryHashes: [], stats: {}, damageTypeHash: null, firstSocketPlugHash: null };
-      itemDefCache[hash] = fallback;
-      return fallback;
-    }
-  }
-
-  const damageTypeCache = {};
-  async function fetchDamageType(hash){
-    if (!hash) return null;
-    if (damageTypeCache[hash] !== undefined) return damageTypeCache[hash];
-    try {
-      const def = await apiGet("/Platform/Destiny2/Manifest/DestinyDamageTypeDefinition/" + hash + "/");
-      const result = (def.displayProperties && def.displayProperties.name) || null;
-      damageTypeCache[hash] = result;
-      return result;
-    } catch (err){
-      console.warn("Damage type fetch failed for hash " + hash + ":", err.message);
-      damageTypeCache[hash] = null;
-      return null;
-    }
-  }
-
-  // Confirmed via a Bungie.net forum thread showing the actual raw API
-  // response, cross-checked against a second independent source. These
-  // are the OLD stat hashes — Armor 3.0 renamed the stats in place rather
-  // than creating new ones (Mobility->Weapons, Resilience->Health,
-  // Recovery->Class, Discipline->Grenade, Intellect->Super, Strength->Melee).
-  const STAT_HASHES = {
-    weapons: "2996146975",
-    health: "392767087",
-    class: "1943323491",
-    grenade: "1735777505",
-    super: "144602215",
-    melee: "4244567218"
-  };
-
-  // Confirmed against Bungie's own Update 9.7.0 patch notes (Monument of
-  // Triumph, June 9 2026) — the six new archetypes added there, plus the
-  // original six from the Edge of Fate announcement. 12 total.
-  const ARCHETYPES = [
-    { name: "Paragon", primary: "super", secondary: "melee" },
-    { name: "Grenadier", primary: "grenade", secondary: "super" },
-    { name: "Specialist", primary: "class", secondary: "weapons" },
-    { name: "Brawler", primary: "melee", secondary: "health" },
-    { name: "Bulwark", primary: "health", secondary: "class" },
-    { name: "Gunner", primary: "weapons", secondary: "grenade" },
-    { name: "Siegebreaker", primary: "health", secondary: "grenade" },
-    { name: "Skirmisher", primary: "melee", secondary: "weapons" },
-    { name: "Demolitionist", primary: "grenade", secondary: "class" },
-    { name: "Colossus", primary: "super", secondary: "health" },
-    { name: "Reaver", primary: "class", secondary: "melee" },
-    { name: "Powerhouse", primary: "weapons", secondary: "super" }
-  ];
-
-  function detectArchetype(rawStats){
-    const values = {};
-    let populatedCount = 0;
-    Object.keys(STAT_HASHES).forEach(key => {
-      const entry = rawStats[STAT_HASHES[key]];
-      const v = entry && typeof entry.value === "number" ? entry.value : 0;
-      values[key] = v;
-      if (v > 0) populatedCount++;
-    });
-    if (populatedCount < 2) return null; // not armor, or stats didn't come through
-    const sorted = Object.entries(values).sort((a, b) => b[1] - a[1]);
-    const [primary, secondary] = [sorted[0][0], sorted[1][0]];
-    const match = ARCHETYPES.find(a => a.primary === primary && a.secondary === secondary);
-    return match ? match.name : null;
-  }
-
-  // Armor doesn't have a damage-type field the way weapons do, but exotic
-  // perk text almost always names subclass-specific verbs. Keyword list
-  // cross-checked against a published D2 subclass terminology glossary —
-  // checked top to bottom, first match wins. This is pattern-matching on
-  // known terminology, not a guaranteed API field, so it can occasionally
-  // miss an item whose perk text doesn't use these exact words.
-  const ELEMENT_KEYWORDS = [
-    { name: "Void", pattern: /\b(devour|volatile|nova bomb|weaken(?:ed)?|suppress|invisib|void overshield)\b/i },
-    { name: "Solar", pattern: /\b(scorch(?:ed)?|ignite|radiant|cure|restoration|sunspot|firesprite)\b/i },
-    { name: "Arc", pattern: /\b(jolt(?:ed)?|amplified|ionic trace|blind(?:ed)?|spark)\b/i },
-    { name: "Stasis", pattern: /\b(freeze|freezing|frozen|slow(?:ed)?|shatter|stasis crystal|stasis shard)\b/i },
-    { name: "Strand", pattern: /\b(sever(?:ed)?|suspend(?:ed)?|unravel(?:ed)?|tangle|woven mail)\b/i }
-  ];
-
-  function detectAffinityFromText(text){
-    if (!text) return null;
-    for (const el of ELEMENT_KEYWORDS){
-      if (el.pattern.test(text)) return el.name;
-    }
-    return null;
-  }
-
-  function findBuildMatch(itemHash){
-    const builds = (window.BuildsData && window.BuildsData.BUILDS) || [];
-    for (const b of builds){
-      if ((b.exoticArmor && b.exoticArmor.itemHash === itemHash) || (b.exoticWeapon && b.exoticWeapon.itemHash === itemHash)){
-        return b;
-      }
-    }
-    return null;
-  }
-
-  const vendorDefCache = {};
-  async function fetchVendorDef(hash){
-    if (vendorDefCache[hash] !== undefined) return vendorDefCache[hash];
-    const def = await apiGet("/Platform/Destiny2/Manifest/DestinyVendorDefinition/" + hash + "/");
-    vendorDefCache[hash] = def;
-    return def;
-  }
-
-  function formatDate(iso){
-    if (!iso) return "";
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + " at "
-         + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  }
-
-  // Xur's real schedule, confirmed directly: active from Friday's daily
-  // reset (1 PM Eastern) through Tuesday's weekly reset (1 PM Eastern).
-  // Both are 17:00 UTC in August (EDT, UTC-4) — same hour, different days.
-  // (Earlier version of this code assumed 09:00 UTC arrival based on a
-  // single misread API capture — that was wrong. This is ground truth.)
-  const XUR_RESET_UTC_HOUR = 17;
-
-  function estimateNextXurArrival(){
-    const now = new Date();
-    const target = new Date(now);
-    target.setUTCHours(XUR_RESET_UTC_HOUR, 0, 0, 0);
-    let daysUntilFriday = (5 - target.getUTCDay() + 7) % 7; // 5 = Friday
-    if (daysUntilFriday === 0 && target.getTime() <= now.getTime()) daysUntilFriday = 7;
-    target.setUTCDate(target.getUTCDate() + daysUntilFriday);
-    return target.toISOString();
-  }
-
-  function isWithinXurSchedule(now){
-    now = now || new Date();
-    const day = now.getUTCDay(); // 0=Sun..5=Fri..6=Sat
-    const hour = now.getUTCHours();
-    // Friday from 17:00 UTC onward, all of Sat/Sun/Mon, and Tuesday before 17:00 UTC.
-    if (day === 5) return hour >= XUR_RESET_UTC_HOUR;
-    if (day === 6 || day === 0 || day === 1) return true;
-    if (day === 2) return hour < XUR_RESET_UTC_HOUR;
-    return false;
-  }
-
-  function nextXurDeparture(){
-    const now = new Date();
-    const target = new Date(now);
-    target.setUTCHours(XUR_RESET_UTC_HOUR, 0, 0, 0);
-    let daysUntilTuesday = (2 - target.getUTCDay() + 7) % 7; // 2 = Tuesday
-    if (daysUntilTuesday === 0 && target.getTime() <= now.getTime()) daysUntilTuesday = 7;
-    target.setUTCDate(target.getUTCDate() + daysUntilTuesday);
-    return target;
-  }
-
-  let departureTimer = null;
-  function startDepartureCountdown(el){
-    if (departureTimer) clearInterval(departureTimer);
-    const target = nextXurDeparture();
-    function tick(){
-      const diff = target.getTime() - Date.now();
-      if (diff <= 0){
-        el.textContent = "Leaving now\u2026";
-        clearInterval(departureTimer);
-        return;
-      }
-      const d = Math.floor(diff / 86400000);
-      const h = Math.floor((diff % 86400000) / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      el.textContent = "Departs in " + (d > 0 ? d + "d " : "") + h + "h " + m + "m " + s + "s";
-    }
-    tick();
-    departureTimer = setInterval(tick, 1000);
-  }
-
-  let countdownTimer = null;
-  function renderCountdown(container, arrivalIso, isEstimate){
-    if (countdownTimer) clearInterval(countdownTimer);
-
-    container.innerHTML =
-      '<div class="tw-countdown-wrap">' +
-        '<div class="tw-countdown-label">X\u00fbr has left the Tower. Returns in</div>' +
-        '<div class="tw-countdown-digits" id="xur-countdown-digits">--</div>' +
-        '<div class="tw-countdown-arrival">Arrives ' + formatDate(arrivalIso) + '</div>' +
-        (isEstimate ? '<div class="tw-countdown-note">Bungie didn\u2019t give us a live refresh time this pull, so this is an estimate based on his usual Friday reset, not a guaranteed figure.</div>' : '') +
-      '</div>';
-
-    const digitsEl = document.getElementById("xur-countdown-digits");
-    const target = new Date(arrivalIso).getTime();
-
-    function tick(){
-      const diff = target - Date.now();
-      if (diff <= 0){
-        digitsEl.textContent = "Any moment now";
-        clearInterval(countdownTimer);
-        return;
-      }
-      const d = Math.floor(diff / 86400000);
-      const h = Math.floor((diff % 86400000) / 3600000);
-      const m = Math.floor((diff % 3600000) / 60000);
-      const s = Math.floor((diff % 60000) / 1000);
-      digitsEl.textContent = (d > 0 ? d + "d " : "") + h + "h " + m + "m " + s + "s";
-    }
-    tick();
-    countdownTimer = setInterval(tick, 1000);
-  }
 
   // ---------------- Featured This Week / Next Week (manual data, instant render) ----------------
   // One row per category (raids / dungeons) instead of one mixed grid —
@@ -568,263 +246,9 @@
     renderCategoryCards("next-week-dungeons-content", "Dungeon", toEntries(FEATURED_NEXT_WEEK.dungeons, dungeonList), "dungeon-guide.html?slug=", true, ALWAYS_FEATURED_DUNGEON_SLUG);
   }
 
-  // ---------------- Xur ----------------
-  async function loadXur(){
-    const contentEl = document.getElementById("xur-content");
-    const refreshEl = document.getElementById("xur-refresh-note");
-    try {
-      const vendorsResp = await apiGet("/Platform/Destiny2/Vendors/?components=Vendors,VendorCategories,VendorSales");
-      const vendorEntry = vendorsResp.vendors && vendorsResp.vendors.data && vendorsResp.vendors.data[XUR_VENDOR_HASH];
-
-      // Whether he's actively selling. His real schedule (Fri 17:00 UTC ->
-      // Tue 17:00 UTC, confirmed directly) is the decisive signal here \u2014
-      // NOT any interpretation of nextRefreshDate. An earlier version of
-      // this code tried to cross-check nextRefreshDate for "staleness,"
-      // but that field's behavior turned out to be unreliable/misunderstood
-      // and it produced a false negative (flagged genuinely-live data as
-      // fake). Removed rather than patched again. The API's enabled flag
-      // and populated inventory are still checked as a basic sanity gate,
-      // but the calendar schedule is what actually decides active/inactive.
-      const saleItemsCheck = (vendorsResp.sales && vendorsResp.sales.data && vendorsResp.sales.data[XUR_VENDOR_HASH] && vendorsResp.sales.data[XUR_VENDOR_HASH].saleItems) || {};
-      const apiSaysActive = vendorEntry && vendorEntry.enabled !== false && Object.keys(saleItemsCheck).length > 0;
-      const isActive = apiSaysActive && isWithinXurSchedule();
-
-      if (!isActive){
-        // Same distrust as the active/inactive check above applies here:
-        // vendorEntry.nextRefreshDate has proven unreliable, so the arrival
-        // time is always computed from the confirmed schedule rather than
-        // whatever Bungie's API happens to return for this field.
-        const arrivalIso = estimateNextXurArrival();
-        renderCountdown(contentEl, arrivalIso, false);
-        return;
-      }
-
-      startDepartureCountdown(refreshEl);
-
-      const saleItems = saleItemsCheck;
-      const categoriesRaw = (vendorsResp.categories && vendorsResp.categories.data && vendorsResp.categories.data[XUR_VENDOR_HASH] && vendorsResp.categories.data[XUR_VENDOR_HASH].categories) || [];
-
-      const saleList = Object.values(saleItems);
-      if (!saleList.length){
-        contentEl.innerHTML = '<div class="tw-status">He\u2019s here, but no sale data came back. Try refreshing in a bit.</div>';
-        return;
-      }
-
-      // Real category display names come from the vendor's own definition,
-      // not guessed — indexed the same way the live sale response indexes them.
-      let categoryNames = {};
-      try {
-        const vendorDef = await fetchVendorDef(XUR_VENDOR_HASH);
-        (vendorDef.displayCategories || []).forEach((cat, i) => {
-          categoryNames[i] = (cat.displayProperties && cat.displayProperties.name) || ("Category " + i);
-        });
-      } catch (err){
-        console.warn("Vendor def fetch failed:", err.message);
-      }
-
-      const bySaleIndex = {};
-      saleList.forEach(item => { bySaleIndex[item.vendorItemIndex] = item; });
-
-      // Temporary diagnostic — logs every category this pull actually
-      // contains and how many items are in each, including ones we don't
-      // currently render. Helps confirm whether Hunter/Warlock class items
-      // live under a category we're not showing, vs. something else.
-      console.log("[This Week debug] all categories this pull:",
-        categoriesRaw.map(cat => ({
-          name: categoryNames[cat.displayCategoryIndex] || ("Category " + cat.displayCategoryIndex),
-          itemCount: (cat.itemIndexes || []).length
-        }))
-      );
-
-      const CLASS_LABELS = { 0: "Titan", 1: "Hunter", 2: "Warlock" };
-
-      contentEl.innerHTML = "";
-      for (const cat of categoriesRaw){
-        const catName = categoryNames[cat.displayCategoryIndex] || "";
-        const normalized = catName.trim().toLowerCase();
-        // These two are the categories that actually rotate week to week —
-        // the exotic gear + catalysts and the exotic class item/armor
-        // offers. The rest (rank rewards, engram bundles, the info tile)
-        // are the same every week regardless of what's featured, so skip them.
-        if (normalized !== "multivarious strange offers" && normalized !== "strange gear offers") continue;
-
-        const itemsInCat = (cat.itemIndexes || []).map(i => bySaleIndex[i]).filter(Boolean);
-        if (!itemsInCat.length) continue;
-
-        // Sequential, one item (and its cost currency) at a time. Resolve
-        // definitions first so Multivarious Strange Offers can be grouped
-        // by class (classType is a real, documented API field, not a
-        // guess from the item name).
-        const resolved = [];
-        let lastCostHtml = ""; // reused for the class-item fallback below — every item in this category costs the same 41 Strange Coin, so no need to re-fetch the currency icon separately
-        for (const saleItem of itemsInCat){
-          const itemDef = await fetchItemDef(saleItem.itemHash);
-          // Vehicles (e.g. exotic Sparrows like The Xûrfboard) show up in this
-          // category too but aren't gear — skip by the resolved type name,
-          // not by item name, so any future vehicle offer gets excluded too.
-          if (itemDef.typeName === "Vehicle") continue;
-          let costHtml = "";
-          if (saleItem.costs && saleItem.costs.length){
-            const cost = saleItem.costs[0];
-            const costDef = await fetchItemDef(cost.itemHash);
-            costHtml = '<div class="xur-cost">' +
-              (costDef.icon ? '<img src="' + costDef.icon + '" alt="">' : '') +
-              cost.quantity + ' ' + costDef.name +
-            '</div>';
-            lastCostHtml = costHtml;
-          }
-
-          // Archetype — only resolves to something on armor (weapons don't
-          // have these six stats populated).
-          const archetype = detectArchetype(itemDef.stats);
-
-          // Affinity — weapons get a clean, verified answer via a live
-          // manifest lookup (same pattern god-rolls.html already uses for
-          // damage type, no hardcoded enum). Armor doesn't have a damage
-          // type field at all, so it falls back to scanning the intrinsic
-          // perk's text for subclass keywords (Nova Bomb, Devour, etc.) —
-          // this second path is UNVERIFIED against a live pull as of
-          // writing, since it depends on the socket structure actually
-          // holding the perk where we're guessing it does.
-          let affinity = null;
-          if (itemDef.damageTypeHash){
-            affinity = await fetchDamageType(itemDef.damageTypeHash);
-          } else if (itemDef.firstSocketPlugHash){
-            const perkDef = await fetchItemDef(itemDef.firstSocketPlugHash);
-            affinity = detectAffinityFromText(perkDef.name + " " + perkDef.description);
-            console.log("[This Week debug] armor affinity check \u2014 item:", itemDef.name, "| perk:", perkDef.name, "| perk text:", perkDef.description, "| detected affinity:", affinity);
-          }
-
-          const buildMatch = findBuildMatch(saleItem.itemHash);
-
-          let tagsHtml = "";
-          if (archetype || affinity){
-            tagsHtml = '<div class="xur-tags">' +
-              (archetype ? '<span class="xur-tag xur-tag-archetype">' + archetype + '</span>' : '') +
-              (affinity ? '<span class="xur-tag xur-tag-affinity-' + affinity.toLowerCase() + '">' + affinity + '</span>' : '') +
-            '</div>';
-          }
-
-          const buildHtml = buildMatch
-            ? '<div class="xur-build-note">We recommend this in <a href="builds.html#build-' + buildMatch.slug + '">' + buildMatch.title + '</a></div>'
-            : "";
-
-          const cardHtml =
-            '<div class="xur-card panel-card">' +
-              '<div class="xur-card-top">' +
-                '<div class="xur-icon">' + (itemDef.icon ? '<img src="' + itemDef.icon + '" alt="">' : '') + '</div>' +
-                '<div class="xur-info">' +
-                  '<div class="xur-name">' + itemDef.name + (saleItem.quantity > 1 ? ' \u00d7' + saleItem.quantity : '') + '</div>' +
-                  '<div class="xur-type">' + itemDef.typeName + '</div>' +
-                  costHtml +
-                '</div>' +
-              '</div>' +
-              tagsHtml +
-              buildHtml +
-            '</div>';
-          console.log("[This Week debug] item:", itemDef.name, "| category:", catName, "| classType:", itemDef.classType, "(0=Titan,1=Hunter,2=Warlock,3=Any)");
-          resolved.push({ classType: itemDef.classType, typeName: itemDef.typeName, html: cardHtml });
-        }
-
-        const catWrap = document.createElement("div");
-        catWrap.className = "xur-category";
-        const label = document.createElement("div");
-        label.className = "xur-category-label";
-        label.textContent = catName || ("Category " + cat.displayCategoryIndex);
-        catWrap.appendChild(label);
-
-        if (normalized === "multivarious strange offers"){
-          // Grouped by class — a real API field (classType), not guessed
-          // from the item name. classType 3 = not class-specific (the
-          // vehicle/sparrow-type offers), grouped under "For Everyone."
-          //
-          // Confirmed via a full unfiltered pull (xur-debug.html): the
-          // public API reliably returns regular armor pieces per class,
-          // but only ONE class's actual class-item slot (Titan Mark /
-          // Hunter Cloak / Warlock Bond) per pull, never all three. Rather
-          // than hardcode specific item names (which rotate weekly and
-          // would go stale immediately), each class always gets a
-          // class-item slot shown — real data if the API gave it to us
-          // this pull, otherwise the known, permanently-fixed base item
-          // (there's only ever one class item per class, ever — only the
-          // perk roll on it rotates) with its real icon resolved live,
-          // same manifest pattern as everything else on this page.
-          const CLASS_ITEM_TYPE_NAMES = { 0: "Titan Mark", 1: "Hunter Cloak", 2: "Warlock Bond" };
-          // Titan (Stoicism) stays resolved live via itemHash — that hash
-          // was independently confirmed against a real live pull, matched
-          // exactly. Hunter (Relativism) and Warlock (Solipsism) use
-          // confirmed icon URLs directly instead of a hash lookup, since
-          // those two hashes were only ever a light.gg-derived guess,
-          // never checked against a live pull the way Stoicism's was \u2014
-          // these exact URLs came from a real, current in-game screenshot,
-          // which is stronger ground truth than the guess it replaces.
-          const CLASS_ITEM_HASH_LOOKUP = { 0: 2362430352 };
-          const CLASS_ITEM_HARDCODED = {
-            1: { name: "Relativism", icon: "https://www.bungie.net/common/destiny2_content/icons/58ae63b773059e5bd7a4d43298f73a50.jpg" },
-            2: { name: "Solipsism", icon: "https://www.bungie.net/common/destiny2_content/icons/7b57cd041db1987c3f566b96535daf9f.jpg" }
-          };
-          for (const ct of [0, 1, 2]){
-            const itemsForClass = resolved.filter(r => r.classType === ct);
-            const subLabel = document.createElement("div");
-            subLabel.className = "xur-class-label";
-            subLabel.textContent = CLASS_LABELS[ct];
-            catWrap.appendChild(subLabel);
-            const grid = document.createElement("div");
-            grid.className = "xur-grid";
-            grid.innerHTML = itemsForClass.map(r => r.html).join("");
-            const hasClassItem = itemsForClass.some(r => r.typeName === CLASS_ITEM_TYPE_NAMES[ct]);
-            if (!hasClassItem){
-              const baseDef = CLASS_ITEM_HASH_LOOKUP[ct]
-                ? await fetchItemDef(CLASS_ITEM_HASH_LOOKUP[ct])
-                : CLASS_ITEM_HARDCODED[ct];
-              grid.innerHTML +=
-                '<div class="xur-card panel-card">' +
-                  '<div class="xur-card-top">' +
-                    '<div class="xur-icon">' + (baseDef.icon ? '<img src="' + baseDef.icon + '" alt="">' : '') + '</div>' +
-                    '<div class="xur-info">' +
-                      '<div class="xur-name">' + baseDef.name + '</div>' +
-                      '<div class="xur-type">' + CLASS_ITEM_TYPE_NAMES[ct] + '</div>' +
-                      lastCostHtml +
-                    '</div>' +
-                  '</div>' +
-                '</div>';
-            }
-            catWrap.appendChild(grid);
-          }
-
-          const anyItems = resolved.filter(r => r.classType === 3);
-          if (anyItems.length){
-            const subLabel = document.createElement("div");
-            subLabel.className = "xur-class-label";
-            subLabel.textContent = "For Everyone";
-            catWrap.appendChild(subLabel);
-            const grid = document.createElement("div");
-            grid.className = "xur-grid";
-            grid.innerHTML = anyItems.map(r => r.html).join("");
-            catWrap.appendChild(grid);
-          }
-        } else {
-          const grid = document.createElement("div");
-          grid.className = "xur-grid";
-          grid.innerHTML = resolved.map(r => r.html).join("");
-          catWrap.appendChild(grid);
-        }
-
-        contentEl.appendChild(catWrap);
-      }
-
-      if (!contentEl.children.length){
-        contentEl.innerHTML = '<div class="tw-status">Couldn\u2019t find either strange-offers category this pull. Bungie may have renamed them, or he\u2019s not selling anything in them right now.</div>';
-      }
-    } catch (err){
-      contentEl.innerHTML = '<div class="tw-status tw-error">Couldn\u2019t load Xur\u2019s inventory: ' + err.message + '</div>';
-    }
-  }
-
   renderFeatured();
   tickResetCountdown();
   setInterval(tickResetCountdown, 1000);
-  loadXur();
 })();
 </script>
 

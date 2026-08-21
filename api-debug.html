@@ -11,7 +11,7 @@
   .status{ padding:6px 10px; border-radius:3px; display:inline-block; margin-bottom:14px; font-size:11px; }
   .status.ok{ background:#1a2a3a; color:#7fbfff; }
   .status.err{ background:#3a1a1a; color:#ff8080; }
-  .card{ margin-bottom:18px; border:1px solid #2c2c33; border-radius:4px; padding:16px; background:#111114; }
+  .card{ margin-bottom:18px; max-width:820px; border:1px solid #2c2c33; border-radius:4px; padding:16px; background:#111114; }
   .card-head{ display:flex; gap:12px; align-items:flex-start; margin-bottom:10px; }
   .card-head img{ width:44px; height:44px; object-fit:cover; border-radius:3px; flex-shrink:0; background:#000; }
   .card-name{ font-size:14px; color:#e4e4e8; font-weight:bold; }
@@ -41,6 +41,18 @@
   .badge.available{ background:#1a3a2a; color:#7fd9a0; }
   .badge.unavailable{ background:#3a1a1a; color:#ff8080; }
   .vendor-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:12px; }
+  .stat-bar-row{ margin-bottom:6px; }
+  .stat-bar-head{ display:flex; justify-content:space-between; font-size:10.5px; color:#999; margin-bottom:2px; }
+  .stat-bar-head .val{ color:#e4e4e8; }
+  .stat-bar-track{ height:4px; border-radius:2px; background:#1a1a1f; overflow:hidden; }
+  .stat-bar-fill{ height:100%; background:#7fbfff; border-radius:2px; }
+  .recoil-compass-wrap{ display:flex; }
+  .recoil-compass{ width:32px; height:16px; }
+  .perk-grid{ display:flex; flex-wrap:wrap; gap:10px; margin-top:6px; }
+  .perk-grid-col{ display:flex; flex-direction:column; gap:5px; }
+  .perk-icon{ width:32px; height:32px; object-fit:cover; border-radius:4px; background:#000; border:1px solid #2c2c33; display:block; }
+  .perk-icon-empty{ background:#1a1a1f; }
+  .perk-icon.equipped{ border-color:#7fbfff; box-shadow:0 0 0 1px #7fbfff; }
 </style>
 </head>
 <body>
@@ -75,6 +87,15 @@
 </div>
 <div id="lookup-status" class="status">Sign in above to load this.</div>
 <div id="lookup-output"></div>
+
+<h2>Item Hash Lookup</h2>
+<p class="note">Ad-hoc tool for checking any specific item hash directly against <code>DestinyInventoryItemDefinition</code> — the same public manifest endpoint the Weekly Milestones section up top uses, no sign-in required. Useful for pasting in an <code>itemHash</code> spotted in a raw json dump elsewhere on this page (a sale item, a cost, a quest's <code>questItemHash</code>, etc.) to see its name/icon/description without hunting through the JSON by hand.</p>
+<div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
+  <input type="text" id="item-lookup-hash-input" placeholder="e.g. 1234567890" style="background:#1a1a1f; border:1px solid #2c2c33; color:#e4e4e8; padding:6px 10px; border-radius:3px; font-family:'JetBrains Mono', monospace; font-size:12px; width:160px;">
+  <button id="item-lookup-hash-btn" style="background:#1a2a3a; color:#7fbfff; border:1px solid #2c2c33; padding:6px 14px; border-radius:3px; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:12px;">Look up</button>
+</div>
+<div id="item-lookup-status" class="status">Enter an item hash above and click Look up.</div>
+<div id="item-lookup-output"></div>
 
 <h2>Eververse (Tess Everis)</h2>
 <p class="note">Prod already chased this down once, before this site had OAuth: Bungie's <em>public/anonymous</em> Vendors endpoint drops Tess entirely, confirmed via a 3-way diagnostic (full request, bare Vendors-only request, and her own definition fetched directly — she came back <code>enabled:true</code>, genuinely active, the endpoint just can't serve her). Matches Bungie's documented rule that a vendor gets dropped wholesale from the public endpoint if any part of it can't be computed identically for everyone. Prod ended up sourcing her from a third-party feed, <a href="https://eververse.report/" target="_blank" rel="noopener">eververse.report</a>, instead — noted then as a stopgap "until this site has its own OAuth login."</p>
@@ -144,6 +165,284 @@
 
   function iconUrl(displayProperties){
     return (displayProperties && displayProperties.icon) ? BUNGIE_ROOT + displayProperties.icon : null;
+  }
+
+  // Bounded-concurrency map — same pattern vendors.html uses for its
+  // stat/perk resolution: a small fixed concurrency (5) is safe against
+  // Bungie's API, unlike firing every lookup at once which reliably 500s it.
+  async function mapWithConcurrency(items, limit, fn){
+    const results = new Array(items.length);
+    let next = 0;
+    async function worker(){
+      while (next < items.length){
+        const i = next++;
+        results[i] = await fn(items[i], i);
+      }
+    }
+    await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+    return results;
+  }
+
+  // Universal placeholder plugs that sit in every item's sockets regardless
+  // of roll — an empty mod/tuning slot, the default (unselected)
+  // shader/ornament, etc. None of these say anything about this specific
+  // item. Same filter vendors.html uses for live vendor rolls.
+  function isJunkSocketPlug(name){
+    if (/^empty .*socket$/i.test(name)) return true;
+    if (/^(default shader|upgrade armor|default ornament)$/i.test(name)) return true;
+    if (/^kill tracker$/i.test(name)) return true;
+    if (/^tier \d+:/i.test(name)) return true;
+    return false;
+  }
+
+  // Always rendered in this order regardless of what order the API
+  // returns them in, matching the in-game armor stat card. Anything
+  // outside this set (weapon stats — Range, Stability, etc.) keeps its
+  // original relative order, appended after.
+  const STAT_ORDER = ["Health", "Melee", "Grenade", "Super", "Class", "Weapons"];
+  function sortStatsToGameOrder(resolvedStats){
+    resolvedStats.sort((a, b) => {
+      const ai = STAT_ORDER.indexOf(a.name), bi = STAT_ORDER.indexOf(b.name);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+    return resolvedStats;
+  }
+
+  // Renders resolved {name, value} stat bars plus a Total row (plain
+  // number, no bar) — but only when every stat present is one of the six
+  // named armor stats above; summing weapon stats (Range + Stability + …)
+  // isn't a meaningful number the way an armor stat total is.
+  function statBarsHtml(resolvedStats){
+    if (!resolvedStats.length) return "";
+    let html = resolvedStats.map(s => {
+      const pct = Math.max(0, Math.min(100, s.value));
+      return (
+        '<div class="stat-bar-row">' +
+          '<div class="stat-bar-head"><span>' + s.name + '</span><span class="val">' + s.value + '</span></div>' +
+          '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%"></div></div>' +
+        '</div>'
+      );
+    }).join("");
+    if (resolvedStats.every(s => STAT_ORDER.includes(s.name))){
+      const total = resolvedStats.reduce((sum, s) => sum + s.value, 0);
+      html += '<div class="stat-bar-row"><div class="stat-bar-head"><span>Total</span><span class="val">' + total + '</span></div></div>';
+    }
+    return html;
+  }
+
+  // Per-weapon-type stat layout, keyed by itemTypeDisplayName — Bungie's
+  // own resolved weapon-type string (the same field already shown in this
+  // page's card headers), not a numeric itemSubType enum: a confirmed
+  // Sword reported itemSubType 18, which doesn't match what community
+  // docs list for swords, so name-keying is the safer bet here. `top`
+  // renders as a bare number (no bar) above everything else, `order` is
+  // the bar-stat sequence beneath it (anything present but unlisted keeps
+  // its relative order, appended after — same fallback armor's STAT_ORDER
+  // uses), `bottom` renders as a bare number below the bars.
+  //
+  // Every name below is copied verbatim from real rendered cards. Both
+  // prior guesses at the rate/airborne/ammo-gen stat names were wrong —
+  // "RPM"/"Airborne"/"Ammo Gen" (this file's original guess) AND
+  // "Airborne"/"Ammo Gen" alone (a later "fix" that swapped in more
+  // abbreviations without checking) — Bungie's real displayProperties.name
+  // strings are the full "Rounds Per Minute", "Airborne Effectiveness",
+  // "Ammo Generation", confirmed on Inbound Surveillance screenshots
+  // showing all three landing in "unlisted, appended at the end" instead
+  // of their real positions.
+  //
+  // Sword and Bow confirmed via Eighty-Six and Anamnesis (Adept). Weapon
+  // types not listed here (Shotgun, Machine Gun, Sidearm, Trace Rifle)
+  // fall back to DEFAULT_GUN_STAT_LAYOUT — untested for those
+  // specifically, so worst case an unconfirmed type's "top" stat just
+  // renders as a normal bar instead of being pulled out specially, never
+  // a fabricated number.
+  const WEAPON_STAT_LAYOUT = {
+    // Swing Speed is the one rate-ish "top" stat that keeps its bar
+    // (topIsBar) — every other weapon type's top stat (RPM, Charge Time,
+    // Draw Time) renders as a plain number instead.
+    "Sword": {
+      top: "Swing Speed",
+      topIsBar: true,
+      order: ["Impact", "Guard Resistance", "Charge Rate", "Guard Endurance"],
+      bottom: "Ammo Capacity"
+    },
+    "Bow": {
+      top: "Draw Time",
+      order: ["Impact", "Accuracy", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
+      bottom: null
+    },
+    // Confirmed via Festival Flight, Truthteller, Deafening Whisper,
+    // Salvager's Salvo — same shape as the default gun layout, but the
+    // second/third bars are Blast Radius/Velocity instead of Impact/Range.
+    // Also confirmed identical on Rocket Launcher (Apex Predator,
+    // Dragon's Breath, Hezen Vengeance) — top stat is still the rate
+    // stat, even at values like 15-25, not renamed to anything else.
+    "Grenade Launcher": {
+      top: "Rounds Per Minute",
+      order: ["Blast Radius", "Velocity", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
+      bottom: "Magazine"
+    },
+    // Confirmed via Refusal of the Call — same shape as the RPM default,
+    // but with a Shield Duration stat (the block mechanic) inserted
+    // after Range, and no Stability stat at all.
+    "Glaive": {
+      top: "Rounds Per Minute",
+      order: ["Impact", "Range", "Shield Duration", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
+      bottom: "Magazine"
+    }
+  };
+  WEAPON_STAT_LAYOUT["Rocket Launcher"] = WEAPON_STAT_LAYOUT["Grenade Launcher"];
+  // Confirmed via Scatter Signal (Fusion Rifle) and Arbalest (Linear
+  // Fusion Rifle) — identical to the RPM default except the top stat is
+  // Charge Time (in ms) instead of the rate stat.
+  const CHARGE_TIME_GUN_STAT_LAYOUT = {
+    top: "Charge Time",
+    order: ["Impact", "Range", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
+    bottom: "Magazine"
+  };
+  WEAPON_STAT_LAYOUT["Fusion Rifle"] = CHARGE_TIME_GUN_STAT_LAYOUT;
+  WEAPON_STAT_LAYOUT["Linear Fusion Rifle"] = CHARGE_TIME_GUN_STAT_LAYOUT;
+  // Confirmed via Survivor's Epitaph, Modified B-7 Pistol, Agape (Hand
+  // Cannon), Izanagi's Burden (Sniper Rifle), Sublimation/Taraxippos
+  // (Scout Rifle), Gnawing Hunger/Quicksilver Storm/Inbound Surveillance
+  // (Auto Rifle/Pulse Rifle), Nightshade (Pulse Rifle), Prolonged
+  // Engagement (SMG).
+  const DEFAULT_GUN_STAT_LAYOUT = {
+    top: "Rounds Per Minute",
+    order: ["Impact", "Range", "Stability", "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction"],
+    bottom: "Magazine"
+  };
+  function weaponStatLayoutFor(itemTypeDisplayName){
+    return WEAPON_STAT_LAYOUT[itemTypeDisplayName] || DEFAULT_GUN_STAT_LAYOUT;
+  }
+
+  // The in-game/companion stat card abbreviates a handful of Bungie's
+  // verbose displayProperties.name stat names for the on-screen label —
+  // confirmed via a real in-game screenshot of Inbound Surveillance next
+  // to this page's own (unabbreviated) API output for the same weapon.
+  // Matching/ordering still needs the real API names (below), this is
+  // display-text only.
+  const STAT_DISPLAY_NAME = {
+    "Rounds Per Minute": "RPM",
+    "Airborne Effectiveness": "Airborne",
+    "Ammo Generation": "Ammo Gen"
+  };
+
+  // Renders resolved {name, value} weapon stats using a per-type layout.
+  // Confirmed via the same in-game screenshot: the rate stat (top) and
+  // capacity stat (bottom) are NOT special bare numbers — they render as
+  // an ordinary bar, same as everything else, just first/last in
+  // sequence. Recoil Direction is the only stat that gets special
+  // (non-bar) treatment, rendered as a compass angle.
+  // Reverse-engineered EXACT formula (not a guess, not interpolation)
+  // from 58 real DIM-rendered SVG samples spanning value 25-100 that the
+  // user pulled directly from their vault. Verified to within 1e-13° —
+  // floating-point noise — on every single sample:
+  //
+  //  - half-width in degrees = 0.9 * (100 - value): 100 = a perfectly
+  //    vertical line (fully predictable recoil), lower values fan out
+  //    wider. Confirmed independently on an earlier, smaller batch too.
+  //
+  //  - lean = sign * RATIO[value % 10] * half, where sign is -1 when
+  //    floor(value/10) is even and +1 when odd. The user found this
+  //    parity rule by manually tracking dozens of weapons by hand
+  //    ("odd tens sweep left-to-right as the ones digit rises, even
+  //    tens sweep right-to-left") — it held with zero deviation across
+  //    every one of 6 fully-sampled decades once checked against the
+  //    real coordinates. RATIO[0] is exactly 8/9; the rest were fit
+  //    from the data and are consistent (mirrored) across every decade
+  //    to at least 10 significant figures, so this is the real
+  //    algorithm (or exactly equivalent to it), not an approximation.
+  //  - Not derivable from the value alone: which weapon rolled which
+  //    value in the first place. This only reproduces DIM's cosmetic
+  //    lean for a given value — same as everything else in this file.
+  const RECOIL_LEAN_RATIO = [
+    -8 / 9, -0.8453835700401364, -0.7191262172221752, -0.5224757798155321,
+    -0.2746817727777316, 0,
+    0.2746817727777319, 0.5224757798155313, 0.7191262172221743, 0.8453835700401364
+  ];
+  function leanDegForValue(value){
+    if (value >= 100) return 0;
+    const half = 0.9 * (100 - value);
+    const sign = Math.floor(value / 10) % 2 === 0 ? -1 : 1;
+    return sign * RECOIL_LEAN_RATIO[value % 10] * half;
+  }
+
+  function recoilCompassHtml(value){
+    const half = 0.9 * (100 - value);
+    const center = leanDegForValue(value);
+    const cx = 1, cy = 1;
+    const pt = (deg) => {
+      const rad = deg * Math.PI / 180;
+      return [(cx + Math.sin(rad)).toFixed(4), (cy - Math.cos(rad)).toFixed(4)];
+    };
+
+    let inner;
+    if (half < 1){
+      const [x, y] = pt(center);
+      const [ox, oy] = pt(center + 180);
+      inner = '<line x1="' + ox + '" y1="' + oy + '" x2="' + x + '" y2="' + y + '" stroke="white" stroke-width="0.1"></line>';
+    } else {
+      const [x1, y1] = pt(center + half);
+      const [x2, y2] = pt(center - half);
+      inner = '<path d="M' + cx + ',' + cy + ' L' + x1 + ',' + y1 + ' A1,1 0 0,0 ' + x2 + ',' + y2 + ' Z" fill="#FFF"></path>';
+    }
+    return '<svg class="recoil-compass" viewBox="0 0 2 1"><circle r="1" cx="1" cy="1" fill="#333"></circle>' + inner + '</svg>';
+  }
+
+  function weaponStatBarsHtml(resolvedStats, layout){
+    if (!resolvedStats.length) return "";
+    const fullOrder = (layout.top ? [layout.top] : []).concat(layout.order, layout.bottom ? [layout.bottom] : []);
+
+    const sorted = resolvedStats.slice().sort((a, b) => {
+      const ai = fullOrder.indexOf(a.name), bi = fullOrder.indexOf(b.name);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+
+    let html = sorted.map(s => {
+      const label = STAT_DISPLAY_NAME[s.name] || s.name;
+      if (s.name === layout.top && !layout.topIsBar){
+        // DIM convention: the rate stat (RPM/Charge Time/Draw Time) is a
+        // plain number, not a bar — it isn't on a 0-100 scale, so a bar
+        // for it would be meaningless. Swing Speed (Sword) is the one
+        // exception that keeps its bar, via layout.topIsBar.
+        return '<div class="stat-bar-row"><div class="stat-bar-head"><span>' + label + '</span><span class="val">' + s.value + '</span></div></div>';
+      }
+      if (s.name === "Recoil Direction"){
+        return (
+          '<div class="stat-bar-row">' +
+            '<div class="stat-bar-head"><span>' + label + '</span><span class="val">' + s.value + '</span></div>' +
+            '<div class="recoil-compass-wrap">' + recoilCompassHtml(s.value) + '</div>' +
+          '</div>'
+        );
+      }
+      const pct = Math.max(0, Math.min(100, s.value));
+      return (
+        '<div class="stat-bar-row">' +
+          '<div class="stat-bar-head"><span>' + label + '</span><span class="val">' + s.value + '</span></div>' +
+          '<div class="stat-bar-track"><div class="stat-bar-fill" style="width:' + pct + '%"></div></div>' +
+        '</div>'
+      );
+    }).join("");
+
+    return html;
+  }
+
+  // DIM-style icon-only perk tile: no visible label, just the icon with a
+  // native title tooltip (shows the perk name on hover). Used for perk/mod
+  // grids specifically — chipHtml above (name always visible) stays as-is
+  // for everywhere else on this page (vendor lists, milestone chips, etc.).
+  function perkIconHtml(name, icon, equipped){
+    const safeName = name.replace(/"/g, "&quot;");
+    const cls = "perk-icon" + (equipped ? " equipped" : "");
+    if (icon) return '<img class="' + cls + '" src="' + icon + '" alt="' + safeName + '" title="' + safeName + '">';
+    return '<div class="' + cls + ' perk-icon-empty" title="' + safeName + '"></div>';
   }
 
   function chipHtml(name, sub, icon){
@@ -575,6 +874,117 @@
     }
   }
 
+  // This is the vendor's actual current roll — fixed for the whole
+  // rotation and identical for every player until reset, not a random
+  // per-instance drop — read straight off the sale's stats/sockets
+  // components (304/305) without needing to already own the item.
+  // Confirmed live on a Luminopotent Grips vendor roll: its archetype
+  // trait ("Demolitionist", matching Grenade being its highest stat)
+  // resolved out of socket category 3154740035 — the same category that
+  // item's raw definition showed as four hidden, non-swappable,
+  // roll-at-drop sockets. Only verified against one armor piece (arms);
+  // if a different armor slot (helmet/chest/legs/class item) uses a
+  // different category hash for its archetype socket, this constant will
+  // need updating for that slot.
+  const ARCHETYPE_SOCKET_CATEGORY_HASH = 3154740035;
+  // Confirmed on the Eighty-Six sword's raw definition: a single fixed
+  // (non-swappable, non-randomized) socket at index 0 in its own
+  // dedicated category — a weapon's Frame, the direct equivalent of
+  // armor's archetype for "the one defining trait shown up top."
+  const WEAPON_FRAME_CATEGORY_HASH = 3956125808;
+  function isArchetypeCategory(categoryHash){
+    return categoryHash === ARCHETYPE_SOCKET_CATEGORY_HASH || categoryHash === WEAPON_FRAME_CATEGORY_HASH;
+  }
+
+  async function vendorSaleRollHtml(itemDef, statEntry, socketEntry, reusablePlugsEntry){
+    const stats = statEntry && statEntry.stats ? Object.values(statEntry.stats) : [];
+    const reusablePlugsByIndex = (reusablePlugsEntry && reusablePlugsEntry.plugs) || {};
+    // No isVisible filter here — an armor piece's archetype (Powerhouse,
+    // Paragon, Grenadier, etc.) lives in sockets Bungie flags
+    // isVisible:false/defaultVisible:false at the definition level (they're
+    // hidden, non-swappable, rolled-at-drop sockets, not meant for the
+    // normal mod-picker UI), so filtering on visibility was silently
+    // dropping exactly the trait this is meant to surface. isJunkSocketPlug
+    // below still catches genuinely empty/placeholder plugs.
+    const allSockets = (socketEntry && socketEntry.sockets) || [];
+    const visibleSockets = allSockets.map((s, i) => ({ socket: s, index: i })).filter(s => s.socket.plugHash);
+
+    const categoryHashByIndex = {};
+    ((itemDef.sockets && itemDef.sockets.socketCategories) || []).forEach(cat => {
+      (cat.socketIndexes || []).forEach(idx => { categoryHashByIndex[idx] = cat.socketCategoryHash; });
+    });
+
+    const [resolvedStats, resolvedSockets] = await Promise.all([
+      mapWithConcurrency(stats, 5, async (stat) => {
+        const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
+        const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
+        if (!statName) return null;
+        return { name: statName, value: stat.value };
+      }).then(rows => rows.filter(Boolean)),
+      mapWithConcurrency(visibleSockets, 5, async ({ socket, index }) => {
+        const categoryHash = categoryHashByIndex[index];
+        if (isArchetypeCategory(categoryHash)){
+          const plugDef = await fetchDef("DestinyInventoryItemDefinition", socket.plugHash);
+          const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
+          if (!plugName || isJunkSocketPlug(plugName)) return null;
+          return { index, isArchetype: true, name: plugName, icon: plugDef ? iconUrl(plugDef.displayProperties) : null };
+        }
+
+        if (isExcludedSocket(categoryHash, null, 1)) return null;
+
+        // A live roll only ever carries ONE resolved plug per socket, but
+        // the weapon-perk columns (barrel, magazine, perk 1, perk 2) are
+        // meant to show the whole swappable pool with the actual pick
+        // highlighted. The item DEFINITION's plug pool is wrong for
+        // actually showing that pool — it's universal across every copy
+        // of the weapon type, including options this specific sale/season
+        // doesn't offer. Component 310 (reusablePlugs) is what's scoped
+        // to this sale: the real "what this gun can roll" pool, keyed by
+        // socket index. If it's missing for a socket, fall back to just
+        // the one resolved plug rather than overshooting with the
+        // universal pool.
+        const isPerkColumn = categoryHash === WEAPON_PERKS_CATEGORY_HASH;
+        const reusablePlugs = reusablePlugsByIndex[index];
+        const plugHashes = (isPerkColumn && reusablePlugs && reusablePlugs.length)
+          ? reusablePlugs.map(p => p.plugItemHash)
+          : (socket.plugHash ? [socket.plugHash] : []);
+        if (!plugHashes.length) return null;
+
+        const perks = (await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
+          const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
+          const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
+          if (!plugName || isJunkSocketPlug(plugName)) return null;
+          return { name: plugName, icon: plugDef ? iconUrl(plugDef.displayProperties) : null, equipped: plugHash === socket.plugHash };
+        })).filter(Boolean);
+        if (!perks.length) return null;
+
+        return { index, isArchetype: false, isPerkColumn, perks };
+      }).then(rows => rows.filter(Boolean))
+    ]);
+
+    const archetype = resolvedSockets.find(s => s.isArchetype);
+    // Sorted by socket index so the columns land in the game's own order:
+    // barrel/launch/blade type, magazine/arrow/grenade type, perk 1,
+    // perk 2.
+    const perkColumns = resolvedSockets.filter(s => !s.isArchetype && s.isPerkColumn)
+      .sort((a, b) => a.index - b.index).map(s => s.perks);
+    const looseIcons = resolvedSockets.filter(s => !s.isArchetype && !s.isPerkColumn)
+      .flatMap(s => s.perks.map(p => perkIconHtml(p.name, p.icon)));
+    const statsHtml = itemDef.itemType === 3
+      ? weaponStatBarsHtml(resolvedStats, weaponStatLayoutFor(itemDef.itemTypeDisplayName))
+      : statBarsHtml(sortStatsToGameOrder(resolvedStats));
+    if (!archetype && !statsHtml && !perkColumns.length && !looseIcons.length) return "";
+
+    let html = "";
+    if (archetype) html += '<div class="chip" style="margin-bottom:8px;">' + (archetype.icon ? '<img src="' + archetype.icon + '" alt="">' : '') + '<div class="chip-name">' + archetype.name + '</div></div>';
+    if (statsHtml) html += statsHtml;
+    if (perkColumns.length) html += '<div class="perk-grid">' + perkColumns.map(column =>
+      '<div class="perk-grid-col">' + column.map(p => perkIconHtml(p.name, p.icon, p.equipped)).join("") + '</div>'
+    ).join("") + '</div>';
+    if (looseIcons.length) html += '<div class="perk-grid">' + looseIcons.join("") + '</div>';
+    return html;
+  }
+
   // ---------------- Ad-hoc vendor hash lookup ----------------
   async function runVendorLookup(hash){
     const statusEl = document.getElementById("lookup-status");
@@ -597,10 +1007,23 @@
       const vName = (vDef && vDef.displayProperties && vDef.displayProperties.name) || ("Unknown (" + hash + ")");
       const vIcon = vDef ? iconUrl(vDef.displayProperties) : null;
 
+      // Components 304 (stats) and 305 (sockets) ride along with the sale
+      // itself, keyed by each sale's vendorItemIndex — this is the vendor's
+      // actual current roll (same for every player until reset), not a
+      // random per-instance drop, so it's readable straight off the sale
+      // without needing to already own the item. 310 (reusable plugs) is
+      // what actually scopes the perk-column pools down to what this
+      // specific sale can roll — the item definition's own pool is
+      // universal across every copy of the weapon type and includes
+      // options this particular sale/season doesn't offer.
       const path = "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
-        "/Character/" + characterId + "/Vendors/" + hash + "/?components=402";
+        "/Character/" + characterId + "/Vendors/" + hash + "/?components=402,304,305,310";
       const resp = await authedApiGet(path);
       const saleItems = Object.values((resp.sales && resp.sales.data) || {});
+      const itemComponents = resp.itemComponents || {};
+      const statsByIndex = (itemComponents.stats && itemComponents.stats.data) || {};
+      const socketsByIndex = (itemComponents.sockets && itemComponents.sockets.data) || {};
+      const reusablePlugsByIndex = (itemComponents.reusablePlugs && itemComponents.reusablePlugs.data) || {};
 
       statusEl.className = "status ok";
       statusEl.textContent = "OK: " + vName + " — " + saleItems.length + " item(s) for sale";
@@ -633,6 +1056,8 @@
           costChips.push(cost.quantity + " " + costName);
         }
 
+        const rollHtml = await vendorSaleRollHtml(itemDef, statsByIndex[sale.vendorItemIndex], socketsByIndex[sale.vendorItemIndex], reusablePlugsByIndex[sale.vendorItemIndex]);
+
         const card = document.createElement("div");
         card.className = "card";
         card.innerHTML =
@@ -643,6 +1068,7 @@
               '<div class="card-hash">hash: ' + sale.itemHash + '</div>' +
             '</div>' +
           '</div>' +
+          rollHtml +
           '<div class="desc">' + (costChips.length ? costChips.join(", ") : "Free / no listed cost") + '</div>';
         grid.appendChild(card);
       }
@@ -654,6 +1080,289 @@
 
   document.getElementById("lookup-hash-btn").addEventListener("click", () => {
     runVendorLookup(document.getElementById("lookup-hash-input").value.trim());
+  });
+
+  // ---------------- Ad-hoc item hash lookup ----------------
+  // Unlike Vendor Hash Lookup above, this hits the public
+  // DestinyInventoryItemDefinition manifest endpoint directly — same as
+  // Weekly Milestones up top — so it works with just the API key, no
+  // sign-in required.
+
+  // Universal armor/weapon mod slots and cosmetic sockets (shaders,
+  // ornaments, trackers) are the same giant plug pool on literally every
+  // item of that type in the game — they don't say anything about *this*
+  // item, they're just noise for a "what's actually on it" lookup.
+  function isNoiseSocketCategory(name){
+    if (!name) return false;
+    return /mods?\b|cosmetics?|shaders?|ornaments?|trackers?/i.test(name);
+  }
+
+  // Evidence-based socket-category overrides, confirmed against real raw
+  // JSON (an Eighty-Six sword, cross-checked against a Luminopotent Grips
+  // armor piece) rather than guessed — these take priority over the
+  // generic name-pattern fallback above, because some legitimate
+  // multi-option pools (a sword's Origin Trait, 9 options) sit inside a
+  // category whose resolved name matches the generic "cosmetics" pattern
+  // and would otherwise be wrongly excluded by it.
+  const WEAPON_PERKS_CATEGORY_HASH = 4241085061;    // frame-adjacent trait/perk columns (edge, guard, perk 1, perk 2, etc.) — always kept
+  const WEAPON_MOD_TIER_CATEGORY_HASH = 2048875504; // same universal mod pool armor's tier slot uses — always excluded
+  // Mixes Origin Trait with Ornament/pattern slots under one category —
+  // dropped entirely (not shown on the perk grid at all), by request.
+  const WEAPON_COSMETICS_MIXED_CATEGORY_HASH = 2685412949;
+
+  function isExcludedSocket(categoryHash, label, plugCount){
+    if (categoryHash === WEAPON_PERKS_CATEGORY_HASH) return false;
+    if (categoryHash === WEAPON_MOD_TIER_CATEGORY_HASH) return true;
+    if (categoryHash === WEAPON_COSMETICS_MIXED_CATEGORY_HASH) return true;
+    // Fallback for every category without confirmed evidence yet (armor's
+    // mod/cosmetic categories, other weapon types, etc.): only a genuine
+    // multi-option swappable pool under a mod/cosmetic-named category is
+    // treated as noise. A socket with just one possible plug isn't
+    // swappable at all, so it's far more likely to be real hash-level
+    // info (an archetype trait, an exotic intrinsic perk) than clutter.
+    return plugCount > 1 && isNoiseSocketCategory(label);
+  }
+
+  // Resolves one socket entry's raw plug-hash pool plus a stable identity
+  // key for that pool's source (used to dedupe exact-duplicate sockets).
+  async function resolveSocketPlugPool(entry){
+    if (entry.reusablePlugSetHash){
+      const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.reusablePlugSetHash);
+      return { plugHashes: ((plugSet && plugSet.reusablePlugItems) || []).map(p => p.plugItemHash), sourceKey: "rps:" + entry.reusablePlugSetHash };
+    }
+    if (entry.randomizedPlugSetHash){
+      const plugSet = await fetchDef("DestinyPlugSetDefinition", entry.randomizedPlugSetHash);
+      return { plugHashes: ((plugSet && plugSet.reusablePlugItems) || []).map(p => p.plugItemHash), sourceKey: "rnd:" + entry.randomizedPlugSetHash };
+    }
+    if (entry.reusablePlugItems && entry.reusablePlugItems.length){
+      const plugHashes = entry.reusablePlugItems.map(p => p.plugItemHash);
+      return { plugHashes, sourceKey: "inline:" + plugHashes.slice().sort().join(",") };
+    }
+    if (entry.singleInitialItemHash){
+      return { plugHashes: [entry.singleInitialItemHash], sourceKey: "single:" + entry.singleInitialItemHash };
+    }
+    return { plugHashes: [], sourceKey: null };
+  }
+
+  // Definition-level stats/sockets, not a live rolled instance (there's no
+  // character context here) — stats come from the item's base investment
+  // stats, and perks are every possible plug a non-noise socket can carry
+  // (its full plug-set pool via DestinyPlugSetDefinition), grouped under
+  // whatever DestinySocketCategoryDefinition name that socket belongs to.
+  // Each socket becomes its own column (DIM's perk-grid layout — barrel
+  // options, magazine options, trait columns, etc. all differ from each
+  // other even when they share a category), except sockets that are exact
+  // duplicates of one another (same underlying plug source — armor's three
+  // identical universal mod slots, for example), which collapse to one.
+  async function resolveItemSocketGroups(itemDef){
+    const socketEntries = (itemDef.sockets && itemDef.sockets.socketEntries) || [];
+    if (!socketEntries.length) return [];
+
+    const categories = (itemDef.sockets && itemDef.sockets.socketCategories) || [];
+    const categoryNameByIndex = {};
+    const categoryHashByIndex = {};
+    await mapWithConcurrency(categories, 5, async (cat) => {
+      const catDef = await fetchDef("DestinySocketCategoryDefinition", cat.socketCategoryHash);
+      const catName = (catDef && catDef.displayProperties && catDef.displayProperties.name) || null;
+      (cat.socketIndexes || []).forEach(idx => {
+        categoryNameByIndex[idx] = catName;
+        categoryHashByIndex[idx] = cat.socketCategoryHash;
+      });
+    });
+
+    const perSocket = await mapWithConcurrency(socketEntries, 5, async (entry, index) => {
+      const label = categoryNameByIndex[index] || ("Socket " + index);
+      const categoryHash = categoryHashByIndex[index];
+
+      const { plugHashes, sourceKey } = await resolveSocketPlugPool(entry);
+      if (!plugHashes.length) return null;
+
+      if (isExcludedSocket(categoryHash, label, plugHashes.length)) return null;
+
+      const perks = (await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
+        const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
+        const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
+        if (!plugName || isJunkSocketPlug(plugName)) return null;
+        return { name: plugName, icon: plugDef ? iconUrl(plugDef.displayProperties) : null };
+      })).filter(Boolean);
+      if (!perks.length) return null;
+
+      return { label, categoryHash, sourceKey, perks };
+    });
+
+    const columnsByLabel = new Map();
+    const seenSources = new Set();
+    for (const socket of perSocket){
+      if (!socket) continue;
+      const dupeKey = socket.label + "|" + socket.sourceKey;
+      if (seenSources.has(dupeKey)) continue;
+      seenSources.add(dupeKey);
+
+      if (!columnsByLabel.has(socket.label)) columnsByLabel.set(socket.label, { categoryHash: socket.categoryHash, columns: [] });
+      columnsByLabel.get(socket.label).columns.push(socket.perks);
+    }
+
+    return Array.from(columnsByLabel.entries()).map(([label, group]) => ({ label, categoryHash: group.categoryHash, columns: group.columns }));
+  }
+
+  async function itemStatsAndPerksHtml(itemDef){
+    let html = "";
+
+    const stats = (itemDef.stats && itemDef.stats.stats) ? Object.values(itemDef.stats.stats) : [];
+    if (stats.length){
+      const resolvedStats = (await mapWithConcurrency(stats, 5, async (stat) => {
+        const statDef = await fetchDef("DestinyStatDefinition", stat.statHash);
+        const statName = statDef && statDef.displayProperties && statDef.displayProperties.name;
+        if (!statName || (!stat.value && !stat.maximum)) return null;
+        return { name: statName, value: stat.value };
+      })).filter(Boolean);
+
+      html += '<div class="section-label">Stats</div>';
+      if (itemDef.itemType === 3){
+        // Weapon: real base stats live right on the definition
+        // (hasDisplayableStats:true, confirmed on Eighty-Six), unlike
+        // armor's roll — laid out per weapon type (top rate-stat, ordered
+        // bars, bottom capacity-stat) instead of a flat list.
+        html += weaponStatBarsHtml(resolvedStats, weaponStatLayoutFor(itemDef.itemTypeDisplayName)) ||
+          '<div class="empty">No stat data on this item.</div>';
+      } else {
+        // Confirmed live on a Legendary gauntlet's raw definition: every
+        // entry here sits at value:0/minimum:0/maximum:0 (only
+        // displayMaximum is nonzero) with hasDisplayableStats:false —
+        // Bungie's own flag that this block isn't meant to be shown. The
+        // real per-copy stat total lives on the rolled instance instead
+        // (itemInstanceId, or a vendor sale's stats component), same as
+        // weapon perks — that's why this reliably comes up empty for armor.
+        html += statBarsHtml(sortStatsToGameOrder(resolvedStats)) ||
+          '<div class="empty">No definitional stat roll on this item — armor\'s actual stat total is locked in per-drop (its own itemInstanceId), not shared across every copy of this item the way its name/icon/perk pool are, so a bare hash lookup can\'t show one specific copy\'s numbers. Sign in above and use Vendor Hash Lookup to see a real current roll\'s stats.</div>';
+      }
+    }
+
+    const socketGroups = await resolveItemSocketGroups(itemDef);
+    const archetypeGroups = socketGroups.filter(g => isArchetypeCategory(g.categoryHash));
+    // Weapons: barrel/launch/blade type, magazine/arrow/grenade type,
+    // perk 1, and perk 2 render together as one DIM-style 4-column grid
+    // (WEAPON_PERKS_CATEGORY_HASH, already in socket order), not as a
+    // separate per-category section. Origin Trait is dropped entirely —
+    // isExcludedSocket always excludes WEAPON_COSMETICS_MIXED_CATEGORY_HASH,
+    // by request.
+    const perkColumnGroups = itemDef.itemType === 3
+      ? socketGroups.filter(g => g.categoryHash === WEAPON_PERKS_CATEGORY_HASH)
+      : [];
+    const otherGroups = socketGroups.filter(g => !isArchetypeCategory(g.categoryHash) && !perkColumnGroups.includes(g));
+
+    // Archetype (armor) / Frame (weapon) rendered above the perk pool with
+    // visible names, not just an icon among the rest — the one trait that
+    // defines the item at a glance, same treatment Vendor Hash Lookup's
+    // live-roll cards already give it.
+    if (archetypeGroups.length){
+      html += '<div class="section-label">Archetype</div>';
+      for (const group of archetypeGroups){
+        html += '<div class="chip-row">' + group.columns.flat().map(p => chipHtml(p.name, null, p.icon)).join("") + '</div>';
+      }
+    }
+
+    if (perkColumnGroups.length){
+      html += '<div class="section-label">Weapon Perks</div>';
+      html += '<div class="perk-grid">' + perkColumnGroups.flatMap(g => g.columns).map(column =>
+        '<div class="perk-grid-col">' + column.map(p => perkIconHtml(p.name, p.icon)).join("") + '</div>'
+      ).join("") + '</div>';
+    }
+
+    if (otherGroups.length){
+      html += '<div class="section-label">Perks &amp; Sockets</div>';
+      for (const group of otherGroups){
+        html += '<div class="chip-sub" style="margin:6px 0 3px;">' + group.label + '</div>';
+        html += '<div class="perk-grid">' + group.columns.map(column =>
+          '<div class="perk-grid-col">' + column.map(p => perkIconHtml(p.name, p.icon)).join("") + '</div>'
+        ).join("") + '</div>';
+      }
+    }
+
+    return html;
+  }
+
+  async function runItemLookup(hash){
+    const statusEl = document.getElementById("item-lookup-status");
+    const outputEl = document.getElementById("item-lookup-output");
+    statusEl.className = "status";
+    outputEl.innerHTML = "";
+
+    if (!hash){
+      statusEl.className = "status err";
+      statusEl.textContent = "Enter an item hash first.";
+      return;
+    }
+
+    statusEl.textContent = "Looking up item " + hash + "…";
+    try {
+      const itemDef = await fetchDef("DestinyInventoryItemDefinition", hash);
+      if (!itemDef){
+        statusEl.className = "status err";
+        statusEl.textContent = "No item found for hash " + hash + ".";
+        return;
+      }
+
+      const displayProps = itemDef.displayProperties || {};
+      const name = displayProps.name || ("Unknown (" + hash + ")");
+      const icon = iconUrl(displayProps);
+      const description = displayProps.description || "";
+      const flavorText = itemDef.flavorText || "";
+      const typeName = itemDef.itemTypeDisplayName || "";
+      const tierName = (itemDef.inventory && itemDef.inventory.tierTypeName) || "";
+
+      statusEl.className = "status ok";
+      statusEl.textContent = "OK: " + name;
+
+      const card = document.createElement("div");
+      card.className = "card";
+      let html =
+        '<div class="card-head">' +
+          (icon ? '<img src="' + icon + '" alt="">' : '') +
+          '<div>' +
+            '<div class="card-name">' + name + '</div>' +
+            '<div class="card-hash">hash: ' + hash + '</div>' +
+            (typeName ? '<span class="badge unknown">' + typeName + '</span>' : '') +
+            (tierName ? '<span class="badge unknown">' + tierName + '</span>' : '') +
+          '</div>' +
+        '</div>';
+
+      if (description) html += '<div class="desc">' + description + '</div>';
+      if (flavorText && flavorText !== description) html += '<div class="about">' + flavorText + '</div>';
+
+      const rawId = "item-raw-" + (rawIdCounter++);
+      html += '<span class="raw-toggle" data-target="' + rawId + '">▸ raw json</span>';
+      html += '<pre class="raw" id="' + rawId + '"></pre>';
+
+      card.innerHTML = html;
+      outputEl.appendChild(card);
+
+      statusEl.textContent = "Resolving stats/perks for " + name + "…";
+      const statsPerksHtml = await itemStatsAndPerksHtml(itemDef);
+      if (statsPerksHtml){
+        const rawToggleEl = card.querySelector(".raw-toggle");
+        rawToggleEl.insertAdjacentHTML("beforebegin", statsPerksHtml);
+      }
+      statusEl.className = "status ok";
+      statusEl.textContent = "OK: " + name;
+
+      const rawEl = document.getElementById(rawId);
+      rawEl.textContent = JSON.stringify(itemDef, null, 2);
+      card.querySelector(".raw-toggle").addEventListener("click", (e) => {
+        rawEl.classList.toggle("open");
+        e.target.textContent = (e.target.textContent[0] === "▸" ? "▾" : "▸") + " raw json";
+      });
+    } catch (err){
+      statusEl.className = "status err";
+      statusEl.textContent = "Error: " + err.message;
+    }
+  }
+
+  document.getElementById("item-lookup-hash-btn").addEventListener("click", () => {
+    runItemLookup(document.getElementById("item-lookup-hash-input").value.trim());
+  });
+  document.getElementById("item-lookup-hash-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runItemLookup(document.getElementById("item-lookup-hash-input").value.trim());
   });
 
   // ---------------- Eververse (Tess Everis) discovery ----------------
