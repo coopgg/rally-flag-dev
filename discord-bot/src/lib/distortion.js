@@ -34,15 +34,22 @@ function discordTimestamp(ms, style){
   return `<t:${Math.floor(ms / 1000)}:${style}>`;
 }
 
+// Distortion's rotation slug IS the armor set's slug on armor-set-bonuses.html
+// (confirmed against sets-data.js) — same ?highlight=/#set- pattern
+// distortions.html itself uses for its "View set bonuses" link.
+function armorSetUrl(slug){
+  return `https://rallyflag.gg/armor-set-bonuses.html?highlight=${slug}#set-${slug}`;
+}
+
 function formatDistortionMessage({ current, upcoming, nextShiftAt }){
   const lines = [
     `**Distortion — live now:** ${current.name} (${current.loot})`,
-    `Shifts ${discordTimestamp(nextShiftAt, "R")}`,
+    `Shifts ${discordTimestamp(nextShiftAt, "R")} · [View ${current.loot} set bonuses →](${armorSetUrl(current.slug)})`,
     "",
     "**Up next:**"
   ];
   upcoming.forEach(u => {
-    lines.push(`• ${discordTimestamp(u.hourStart, "f")} — ${u.name} (${u.loot})`);
+    lines.push(`• ${discordTimestamp(u.hourStart, "f")} — ${u.name} ([${u.loot}](${armorSetUrl(u.slug)}))`);
   });
   return lines.join("\n");
 }
