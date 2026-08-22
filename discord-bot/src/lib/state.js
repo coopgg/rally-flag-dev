@@ -7,7 +7,12 @@ function readState(){
   try {
     return JSON.parse(fs.readFileSync(STATE_PATH, "utf8"));
   } catch (err){
-    return { lastDistortionHourIndex: null, lastFeaturedWeekIndex: null };
+    return {
+      lastDistortionHourIndex: null,
+      lastDistortionMessageId: null,
+      lastFeaturedWeekIndex: null,
+      lastFeaturedMessageId: null
+    };
   }
 }
 

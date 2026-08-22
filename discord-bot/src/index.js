@@ -47,6 +47,21 @@ client.on("interactionCreate", async interaction => {
   }
 });
 
+// Deletes the bot's own previous post in a channel, if any, before a new
+// one goes up — otherwise hourly Distortion posts especially would just
+// pile up forever. Deleting your own message only needs Send Messages
+// (Manage Messages is only required to delete *other* users' messages),
+// so this doesn't need any extra bot permission. Tolerant of the old
+// message already being gone (manually deleted, channel purged, etc).
+async function deletePreviousPost(channel, messageId){
+  if (!messageId) return;
+  try {
+    await channel.messages.delete(messageId);
+  } catch (err){
+    if (err.code !== 10008) console.error("Couldn't delete previous post:", err); // 10008 = Unknown Message
+  }
+}
+
 async function postDistortionUpdate(){
   if (!DISTORTION_CHANNEL_ID){
     console.warn("DISTORTION_CHANNEL_ID not set — skipping scheduled Distortion post.");
@@ -54,9 +69,11 @@ async function postDistortionUpdate(){
   }
   const update = getDistortionUpdate();
   const channel = await client.channels.fetch(DISTORTION_CHANNEL_ID);
-  await channel.send(formatDistortionMessage(update));
   const state = readState();
+  await deletePreviousPost(channel, state.lastDistortionMessageId);
+  const message = await channel.send(formatDistortionMessage(update));
   state.lastDistortionHourIndex = update.hourIndex;
+  state.lastDistortionMessageId = message.id;
   writeState(state);
 }
 
@@ -67,9 +84,11 @@ async function postFeaturedUpdate(){
   }
   const update = getFeaturedUpdate();
   const channel = await client.channels.fetch(THISWEEK_CHANNEL_ID);
-  await channel.send(formatFeaturedMessage(update));
   const state = readState();
+  await deletePreviousPost(channel, state.lastFeaturedMessageId);
+  const message = await channel.send(formatFeaturedMessage(update));
   state.lastFeaturedWeekIndex = update.weekIndex;
+  state.lastFeaturedMessageId = message.id;
   writeState(state);
 }
 
