@@ -1,7 +1,7 @@
 require("dotenv").config();
 const fs = require("fs");
 const path = require("path");
-const { Client, GatewayIntentBits, Collection } = require("discord.js");
+const { Client, GatewayIntentBits, Collection, MessageFlags } = require("discord.js");
 const cron = require("node-cron");
 
 const { getDistortionUpdate, formatDistortionMessage } = require("./lib/distortion");
@@ -82,7 +82,7 @@ async function postDistortionUpdate(){
   const channel = await client.channels.fetch(DISTORTION_CHANNEL_ID);
   const state = readState();
   await deletePreviousPost(channel, state.lastDistortionMessageId);
-  const message = await channel.send(formatDistortionMessage(update));
+  const message = await channel.send({ content: formatDistortionMessage(update), flags: MessageFlags.SuppressEmbeds });
   state.lastDistortionHourIndex = update.hourIndex;
   state.lastDistortionMessageId = message.id;
   writeState(state);
@@ -97,7 +97,7 @@ async function postFeaturedUpdate(){
   const channel = await client.channels.fetch(THISWEEK_CHANNEL_ID);
   const state = readState();
   await deletePreviousPost(channel, state.lastFeaturedMessageId);
-  const message = await channel.send(formatFeaturedMessage(update));
+  const message = await channel.send({ content: formatFeaturedMessage(update), flags: MessageFlags.SuppressEmbeds });
   state.lastFeaturedWeekIndex = update.weekIndex;
   state.lastFeaturedMessageId = message.id;
   writeState(state);

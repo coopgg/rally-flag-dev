@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const { findBuild, searchBuilds, formatBuildMessage } = require("../lib/builds");
 
 module.exports = {
@@ -20,9 +20,9 @@ module.exports = {
     const query = interaction.options.getString("name");
     const build = findBuild(query);
     if (!build){
-      await interaction.reply({ content: `Couldn't find a build called "${query}". Check the spelling, or browse https://rallyflag.gg/builds.html`, ephemeral: true });
+      await interaction.reply({ content: `Couldn't find a build called "${query}". Check the spelling, or browse https://rallyflag.gg/builds.html`, flags: MessageFlags.Ephemeral | MessageFlags.SuppressEmbeds });
       return;
     }
-    await interaction.reply(formatBuildMessage(build));
+    await interaction.reply({ content: formatBuildMessage(build), flags: MessageFlags.SuppressEmbeds });
   }
 };

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require("discord.js");
+const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const { findWeapon, searchWeapons, formatWeaponMessage } = require("../lib/godrolls");
 
 module.exports = {
@@ -20,9 +20,9 @@ module.exports = {
     const query = interaction.options.getString("weapon");
     const weapon = findWeapon(query);
     if (!weapon){
-      await interaction.reply({ content: `Couldn't find a curated roll for "${query}". Check the spelling, or browse https://rallyflag.gg/god-rolls.html`, ephemeral: true });
+      await interaction.reply({ content: `Couldn't find a curated roll for "${query}". Check the spelling, or browse https://rallyflag.gg/god-rolls.html`, flags: MessageFlags.Ephemeral | MessageFlags.SuppressEmbeds });
       return;
     }
-    await interaction.reply(formatWeaponMessage(weapon));
+    await interaction.reply({ content: formatWeaponMessage(weapon), flags: MessageFlags.SuppressEmbeds });
   }
 };
