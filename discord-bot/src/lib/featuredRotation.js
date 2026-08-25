@@ -8,7 +8,10 @@ function armorSetLink(slug, setsBySlug){
   return `[${name}](https://rallyflag.gg/armor-set-bonuses.html?highlight=${slug}#set-${slug})`;
 }
 
-function describeEntries(slugs, list, hrefBase, alwaysFeaturedSlug, setsBySlug){
+// withLinks is on for This Week (actionable right now) and off for Next
+// Week (just a prediction) — same info either way, just plain text there
+// instead of clickable.
+function describeEntries(slugs, list, hrefBase, alwaysFeaturedSlug, setsBySlug, withLinks){
   const bySlug = {};
   list.forEach(item => { bySlug[item.slug] = item; });
 
@@ -16,12 +19,16 @@ function describeEntries(slugs, list, hrefBase, alwaysFeaturedSlug, setsBySlug){
     const item = bySlug[slug];
     if (!item) return slug; // rotation slug didn't match raids-data.js/dungeons-data.js — surface the raw slug rather than hiding the mismatch
 
-    const titleLink = `[${item.name}](https://rallyflag.gg/${hrefBase}?slug=${slug})`;
-    const armorLinks = (item.armorSlugs || []).map(s => armorSetLink(s, setsBySlug));
-    const armorSuffix = armorLinks.length ? ` (${armorLinks.join(", ")})` : "";
+    const title = withLinks
+      ? `[${item.name}](https://rallyflag.gg/${hrefBase}?slug=${slug})`
+      : item.name;
+    const armorNames = (item.armorSlugs || []).map(s => withLinks
+      ? armorSetLink(s, setsBySlug)
+      : (setsBySlug[s] ? setsBySlug[s].name : s));
+    const armorSuffix = armorNames.length ? ` (${armorNames.join(", ")})` : "";
     const alwaysSuffix = slug === alwaysFeaturedSlug ? " — Always Featured" : "";
 
-    return `${titleLink}${armorSuffix}${alwaysSuffix}`;
+    return `${title}${armorSuffix}${alwaysSuffix}`;
   });
 }
 
@@ -41,12 +48,12 @@ function getFeaturedUpdate(now = Date.now()){
   return {
     weekIndex,
     thisWeek: {
-      raids: describeEntries(thisWeek.raids, RaidsData.RAIDS, "raid-guide.html", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug),
-      dungeons: describeEntries(thisWeek.dungeons, DungeonsData.DUNGEONS, "dungeon-guide.html", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug)
+      raids: describeEntries(thisWeek.raids, RaidsData.RAIDS, "raid-guide.html", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug, true),
+      dungeons: describeEntries(thisWeek.dungeons, DungeonsData.DUNGEONS, "dungeon-guide.html", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug, true)
     },
     nextWeek: {
-      raids: describeEntries(nextWeek.raids, RaidsData.RAIDS, "raid-guide.html", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug),
-      dungeons: describeEntries(nextWeek.dungeons, DungeonsData.DUNGEONS, "dungeon-guide.html", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug)
+      raids: describeEntries(nextWeek.raids, RaidsData.RAIDS, "raid-guide.html", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug, false),
+      dungeons: describeEntries(nextWeek.dungeons, DungeonsData.DUNGEONS, "dungeon-guide.html", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug, false)
     }
   };
 }
