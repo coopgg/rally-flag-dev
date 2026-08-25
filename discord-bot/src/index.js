@@ -5,7 +5,7 @@ const { Client, GatewayIntentBits, Collection, MessageFlags } = require("discord
 const cron = require("node-cron");
 
 const { getDistortionUpdate, formatDistortionMessage } = require("./lib/distortion");
-const { getFeaturedUpdate, formatFeaturedMessage } = require("./lib/featuredRotation");
+const { getFeaturedUpdate, formatThisWeekMessage, formatNextWeekMessage } = require("./lib/featuredRotation");
 const { readState, writeState } = require("./lib/state");
 
 const {
@@ -96,10 +96,14 @@ async function postFeaturedUpdate(){
   const update = getFeaturedUpdate();
   const channel = await client.channels.fetch(THISWEEK_CHANNEL_ID);
   const state = readState();
-  await deletePreviousPost(channel, state.lastFeaturedMessageId);
-  const message = await channel.send({ content: formatFeaturedMessage(update), flags: MessageFlags.SuppressEmbeds });
+  for (const id of state.lastFeaturedMessageIds || []){
+    await deletePreviousPost(channel, id);
+  }
+  const thisWeekMsg = await channel.send({ content: formatThisWeekMessage(update), flags: MessageFlags.SuppressEmbeds });
+  const nextWeekMsg = await channel.send({ content: formatNextWeekMessage(update), flags: MessageFlags.SuppressEmbeds });
   state.lastFeaturedWeekIndex = update.weekIndex;
-  state.lastFeaturedMessageId = message.id;
+  state.lastFeaturedMessageIds = [thisWeekMsg.id, nextWeekMsg.id];
+  delete state.lastFeaturedMessageId; // migrated to lastFeaturedMessageIds (array, two posts now)
   writeState(state);
 }
 

@@ -11,7 +11,7 @@ function readState(){
       lastDistortionHourIndex: null,
       lastDistortionMessageId: null,
       lastFeaturedWeekIndex: null,
-      lastFeaturedMessageId: null
+      lastFeaturedMessageIds: []
     };
   }
 }

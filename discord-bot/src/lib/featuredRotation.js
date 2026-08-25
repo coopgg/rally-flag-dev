@@ -51,21 +51,25 @@ function getFeaturedUpdate(now = Date.now()){
   };
 }
 
-function formatFeaturedMessage({ thisWeek, nextWeek }){
-  const lines = [
-    "**Featured This Week**",
+// Split into two messages rather than one — with title + armor-set links
+// on every entry, the combined text runs well past Discord's 2000-char
+// message limit.
+function formatSection(title, entries){
+  return [
+    `**${title}**`,
     "Raids:",
-    ...thisWeek.raids.map(r => `• ${r}`),
+    ...entries.raids.map(r => `• ${r}`),
     "Dungeons:",
-    ...thisWeek.dungeons.map(d => `• ${d}`),
-    "",
-    "**Next Week (Predicted)**",
-    "Raids:",
-    ...nextWeek.raids.map(r => `• ${r}`),
-    "Dungeons:",
-    ...nextWeek.dungeons.map(d => `• ${d}`)
-  ];
-  return lines.join("\n");
+    ...entries.dungeons.map(d => `• ${d}`)
+  ].join("\n");
 }
 
-module.exports = { getFeaturedUpdate, formatFeaturedMessage };
+function formatThisWeekMessage({ thisWeek }){
+  return formatSection("Featured This Week", thisWeek);
+}
+
+function formatNextWeekMessage({ nextWeek }){
+  return formatSection("Next Week (Predicted)", nextWeek);
+}
+
+module.exports = { getFeaturedUpdate, formatThisWeekMessage, formatNextWeekMessage };
