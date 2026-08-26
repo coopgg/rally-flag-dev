@@ -32,6 +32,14 @@ function describeEntries(slugs, list, hrefBase, alwaysFeaturedSlug, setsBySlug, 
   });
 }
 
+// Same anchor as this-week.html's Iron Banner banner: confirmed active
+// 8/25-9/1/2026, returning 9/22/2026 — a clean 4-week cadence (week
+// index 2 mod 4), tracked off the same RESET_EPOCH_UTC as the raid/
+// dungeon rotation rather than a live API signal.
+const IRON_BANNER_WEEK_MOD = 2;
+const IRON_BANNER_CYCLE_WEEKS = 4;
+const IRON_BANNER_ARMOR_SLUGS = ["iron-battalion-set", "iron-panoply-set"];
+
 function getFeaturedUpdate(now = Date.now()){
   const FeaturedRotationData = loadWindowModule("featured-rotation-data.js", "FeaturedRotationData");
   const RaidsData = loadWindowModule("raids-data.js", "RaidsData");
@@ -44,9 +52,12 @@ function getFeaturedUpdate(now = Date.now()){
   const weekIndex = FeaturedRotationData.currentWeekIndex(now);
   const thisWeek = FeaturedRotationData.featuredForWeek(weekIndex);
   const nextWeek = FeaturedRotationData.featuredForWeek(weekIndex + 1);
+  const ironBannerActive = FeaturedRotationData.mod(weekIndex, IRON_BANNER_CYCLE_WEEKS) === IRON_BANNER_WEEK_MOD;
 
   return {
     weekIndex,
+    ironBannerActive,
+    ironBannerArmor: IRON_BANNER_ARMOR_SLUGS.map(slug => armorSetLink(slug, setsBySlug)),
     thisWeek: {
       raids: describeEntries(thisWeek.raids, RaidsData.RAIDS, "raid-guide.html", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug, true),
       dungeons: describeEntries(thisWeek.dungeons, DungeonsData.DUNGEONS, "dungeon-guide.html", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug, true)
@@ -71,8 +82,11 @@ function formatSection(title, entries){
   ].join("\n");
 }
 
-function formatThisWeekMessage({ thisWeek }){
-  return formatSection("Featured This Week", thisWeek);
+function formatThisWeekMessage({ thisWeek, ironBannerActive, ironBannerArmor }){
+  const ironBannerLine = ironBannerActive
+    ? `**Iron Banner is active this week** (${ironBannerArmor.join(", ")})\n\n`
+    : "";
+  return ironBannerLine + formatSection("Featured This Week", thisWeek);
 }
 
 function formatNextWeekMessage({ nextWeek }){
