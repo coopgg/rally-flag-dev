@@ -92,6 +92,16 @@
   }
   .featured-link:hover{ text-decoration:underline; }
 
+  .ib-banner{
+    padding:16px 18px; margin-bottom:16px;
+    border-left:3px solid var(--accent); background:var(--accent-dim);
+  }
+  .ib-banner-label{
+    font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.1em;
+    color:var(--accent-bright); text-transform:uppercase; margin-bottom:6px;
+  }
+  .ib-banner-name{ font-family:'Oswald', sans-serif; font-weight:700; font-size:16px; color:var(--text); margin-bottom:10px; }
+
   .featured-card.predicted{ border-style:dashed; opacity:0.82; }
   .tw-predicted-badge{
     display:inline-block; font-family:'JetBrains Mono', monospace; font-size:9.5px;
@@ -117,6 +127,8 @@
     <div class="tw-section-title">Featured This Week</div>
     <div class="tw-refresh-note" id="reset-countdown-note">Resets in --</div>
   </div>
+  <div id="iron-banner-slot"></div>
+
   <div class="tw-subsection-label">Raids</div>
   <div id="featured-raids-content"></div>
   <div class="tw-subsection-label">Dungeons</div>
@@ -193,6 +205,18 @@
 
   function mod(n, m){
     return ((n % m) + m) % m;
+  }
+
+  // Confirmed active week: reset of 8/25/2026 through reset of 9/1/2026,
+  // returning 9/22/2026 — that's a clean 4-week cadence (8/25 is week
+  // index 2 off RESET_EPOCH_UTC, 9/22 is week index 6, 6 mod 4 === 2),
+  // so it's tracked the same way as the raid/dungeon rotation: an anchor
+  // plus a fixed-length cycle, not a live API signal.
+  const IRON_BANNER_WEEK_MOD = 2;
+  const IRON_BANNER_CYCLE_WEEKS = 4;
+
+  function isIronBannerActiveThisWeek(){
+    return mod(currentWeekIndex(), IRON_BANNER_CYCLE_WEEKS) === IRON_BANNER_WEEK_MOD;
   }
 
   function slotRotationPick(slugs, slotOffsets, week){
@@ -289,10 +313,34 @@
     return slugs.map(s => bySlug[s]).filter(Boolean);
   }
 
+  const IRON_BANNER_ARMOR_SLUGS = ["iron-battalion-set", "iron-panoply-set"];
+
+  function renderIronBanner(){
+    const slotEl = document.getElementById("iron-banner-slot");
+    if (!isIronBannerActiveThisWeek()){
+      slotEl.innerHTML = "";
+      return;
+    }
+    const setsBySlug = {};
+    (window.ArmorSetsData ? window.ArmorSetsData.SETS : []).forEach(s => setsBySlug[s.slug] = s);
+    const armorLinksHtml = IRON_BANNER_ARMOR_SLUGS.map(slug => {
+      const set = setsBySlug[slug];
+      const label = set ? set.name : slug;
+      return '<a class="set-link" href="armor-set-bonuses.html?highlight=' + slug + '">' + label + ' →</a>';
+    }).join("");
+    slotEl.innerHTML =
+      '<div class="ib-banner panel-card">' +
+        '<div class="ib-banner-label">Event · Ends at Weekly Reset</div>' +
+        '<div class="ib-banner-name">Iron Banner is active this week</div>' +
+        '<div class="set-links">' + armorLinksHtml + '</div>' +
+      '</div>';
+  }
+
   function renderFeatured(){
     const raidList = window.RaidsData ? window.RaidsData.RAIDS : [];
     const dungeonList = window.DungeonsData ? window.DungeonsData.DUNGEONS : [];
 
+    renderIronBanner();
     renderCategoryCards("featured-raids-content", "Raid", toEntries(FEATURED_THIS_WEEK.raids, raidList), "raid-guide.html?slug=", false, ALWAYS_FEATURED_RAID_SLUG);
     renderCategoryCards("featured-dungeons-content", "Dungeon", toEntries(FEATURED_THIS_WEEK.dungeons, dungeonList), "dungeon-guide.html?slug=", false, ALWAYS_FEATURED_DUNGEON_SLUG);
     renderCategoryCards("next-week-raids-content", "Raid", toEntries(FEATURED_NEXT_WEEK.raids, raidList), "raid-guide.html?slug=", true, ALWAYS_FEATURED_RAID_SLUG);
