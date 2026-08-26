@@ -5,7 +5,7 @@ const { Client, GatewayIntentBits, Collection, MessageFlags } = require("discord
 const cron = require("node-cron");
 
 const { getDistortionUpdate, formatDistortionMessage } = require("./lib/distortion");
-const { getFeaturedUpdate, formatThisWeekMessage, formatNextWeekMessage } = require("./lib/featuredRotation");
+const { getFeaturedUpdate, formatThisWeekMessage } = require("./lib/featuredRotation");
 const { readState, writeState } = require("./lib/state");
 
 const {
@@ -100,10 +100,8 @@ async function postFeaturedUpdate(){
     await deletePreviousPost(channel, id);
   }
   const thisWeekMsg = await channel.send({ content: formatThisWeekMessage(update), flags: MessageFlags.SuppressEmbeds });
-  const nextWeekMsg = await channel.send({ content: formatNextWeekMessage(update), flags: MessageFlags.SuppressEmbeds });
   state.lastFeaturedWeekIndex = update.weekIndex;
-  state.lastFeaturedMessageIds = [thisWeekMsg.id, nextWeekMsg.id];
-  delete state.lastFeaturedMessageId; // migrated to lastFeaturedMessageIds (array, two posts now)
+  state.lastFeaturedMessageIds = [thisWeekMsg.id]; // Next Week post dropped, but keep the array shape state.json already has
   writeState(state);
 }
 

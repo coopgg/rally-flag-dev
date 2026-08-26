@@ -8,10 +8,7 @@ function armorSetLink(slug, setsBySlug){
   return `[${name}](https://rallyflag.gg/armor-set-bonuses.html?highlight=${slug}#set-${slug})`;
 }
 
-// withLinks is on for This Week (actionable right now) and off for Next
-// Week (just a prediction) — same info either way, just plain text there
-// instead of clickable.
-function describeEntries(slugs, list, hrefBase, alwaysFeaturedSlug, setsBySlug, withLinks){
+function describeEntries(slugs, list, hrefBase, alwaysFeaturedSlug, setsBySlug){
   const bySlug = {};
   list.forEach(item => { bySlug[item.slug] = item; });
 
@@ -19,12 +16,8 @@ function describeEntries(slugs, list, hrefBase, alwaysFeaturedSlug, setsBySlug, 
     const item = bySlug[slug];
     if (!item) return slug; // rotation slug didn't match raids-data.js/dungeons-data.js — surface the raw slug rather than hiding the mismatch
 
-    const title = withLinks
-      ? `[${item.name}](https://rallyflag.gg/${hrefBase}?slug=${slug})`
-      : item.name;
-    const armorNames = (item.armorSlugs || []).map(s => withLinks
-      ? armorSetLink(s, setsBySlug)
-      : (setsBySlug[s] ? setsBySlug[s].name : s));
+    const title = `[${item.name}](https://rallyflag.gg/${hrefBase}?slug=${slug})`;
+    const armorNames = (item.armorSlugs || []).map(s => armorSetLink(s, setsBySlug));
     const armorSuffix = armorNames.length ? ` (${armorNames.join(", ")})` : "";
     const alwaysSuffix = slug === alwaysFeaturedSlug ? " — Always Featured" : "";
 
@@ -51,7 +44,6 @@ function getFeaturedUpdate(now = Date.now()){
 
   const weekIndex = FeaturedRotationData.currentWeekIndex(now);
   const thisWeek = FeaturedRotationData.featuredForWeek(weekIndex);
-  const nextWeek = FeaturedRotationData.featuredForWeek(weekIndex + 1);
   const ironBannerActive = FeaturedRotationData.mod(weekIndex, IRON_BANNER_CYCLE_WEEKS) === IRON_BANNER_WEEK_MOD;
 
   return {
@@ -59,38 +51,23 @@ function getFeaturedUpdate(now = Date.now()){
     ironBannerActive,
     ironBannerArmor: IRON_BANNER_ARMOR_SLUGS.map(slug => armorSetLink(slug, setsBySlug)),
     thisWeek: {
-      raids: describeEntries(thisWeek.raids, RaidsData.RAIDS, "raid-guide.html", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug, true),
-      dungeons: describeEntries(thisWeek.dungeons, DungeonsData.DUNGEONS, "dungeon-guide.html", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug, true)
-    },
-    nextWeek: {
-      raids: describeEntries(nextWeek.raids, RaidsData.RAIDS, "raid-guide.html", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug, false),
-      dungeons: describeEntries(nextWeek.dungeons, DungeonsData.DUNGEONS, "dungeon-guide.html", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug, false)
+      raids: describeEntries(thisWeek.raids, RaidsData.RAIDS, "raid-guide.html", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug),
+      dungeons: describeEntries(thisWeek.dungeons, DungeonsData.DUNGEONS, "dungeon-guide.html", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug)
     }
   };
-}
-
-// Split into two messages rather than one — with title + armor-set links
-// on every entry, the combined text runs well past Discord's 2000-char
-// message limit.
-function formatSection(title, entries){
-  return [
-    `**${title}**`,
-    "Raids:",
-    ...entries.raids.map(r => `• ${r}`),
-    "Dungeons:",
-    ...entries.dungeons.map(d => `• ${d}`)
-  ].join("\n");
 }
 
 function formatThisWeekMessage({ thisWeek, ironBannerActive, ironBannerArmor }){
   const ironBannerLine = ironBannerActive
     ? `**Iron Banner is active this week** (${ironBannerArmor.join(", ")})\n\n`
     : "";
-  return ironBannerLine + formatSection("Featured This Week", thisWeek);
+  return ironBannerLine + [
+    "**Featured This Week**",
+    "Raids:",
+    ...thisWeek.raids.map(r => `• ${r}`),
+    "Dungeons:",
+    ...thisWeek.dungeons.map(d => `• ${d}`)
+  ].join("\n");
 }
 
-function formatNextWeekMessage({ nextWeek }){
-  return formatSection("Next Week (Predicted)", nextWeek);
-}
-
-module.exports = { getFeaturedUpdate, formatThisWeekMessage, formatNextWeekMessage };
+module.exports = { getFeaturedUpdate, formatThisWeekMessage };
