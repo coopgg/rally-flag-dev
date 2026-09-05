@@ -44,12 +44,13 @@
   }
   .twitch-player-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
   .twitch-links{ display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
-  .twitch-link{
+  .twitch-link, .discord-link{
     font-size:12.5px; font-family:'JetBrains Mono', monospace; color:var(--accent-bright);
     text-decoration:none; background:var(--accent-dim); border:1px solid var(--panel-border);
     padding:8px 14px; border-radius:999px; transition: border-color 0.2s ease;
   }
-  .twitch-link:hover, .twitch-link:focus-visible{ border-color:var(--accent-bright); }
+  .twitch-link:hover, .twitch-link:focus-visible,
+  .discord-link:hover, .discord-link:focus-visible{ border-color:var(--accent-bright); }
 
   .faq-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; }
   @media (max-width:640px){ .faq-grid{ grid-template-columns:1fr; } }
@@ -104,6 +105,7 @@
     <div class="twitch-links">
       <a class="twitch-link" href="https://www.twitch.tv/coopgg__" target="_blank" rel="noopener">Watch on Twitch →</a>
       <a class="twitch-link" href="https://www.twitch.tv/coopgg__/videos?filter=archives&sort=time" target="_blank" rel="noopener">Past Broadcasts →</a>
+      <a class="discord-link" href="https://discord.gg/cMR3QTrDJ" target="_blank" rel="noopener">Join the Discord →</a>
     </div>
   </div>
 

@@ -96,6 +96,15 @@ nav.site-nav{
 .nav-links-panel a:hover, .nav-links-panel a:focus-visible{ background:var(--panel); color:var(--text); }
 .nav-links-panel a.active{ color:var(--accent-bright); font-weight:600; }
 
+.nav-right-wrap{ display:flex; align-items:center; gap:10px; }
+.nav-discord-btn{
+  display:flex; align-items:center; justify-content:center;
+  background:none; border:1px solid var(--panel-border); border-radius:6px;
+  padding:7px; color:var(--text-dim); line-height:1;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+.nav-discord-btn:hover, .nav-discord-btn:focus-visible{ border-color:var(--accent); color:var(--accent-bright); }
+
 .nav-menu-wrap{ position:relative; }
 .nav-menu-btn{
   display:flex; align-items:center; gap:8px;
