@@ -46,6 +46,9 @@
   .weapon-unlock-badge.exact-roll{
     background:var(--accent-bright); color:#0b0700;
   }
+  .weapon-unlock-rating{
+    font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dimmer);
+  }
   .unlock-legend{
     max-width:1000px; margin:14px auto 0; padding:0 24px;
     display:flex; flex-wrap:wrap; justify-content:center; gap:8px 28px;
@@ -109,7 +112,7 @@
   }
   .ammo-badge img{ width:12px; height:12px; object-fit:contain; }
   .weapon-meta{ font-size:11.5px; font-family:'JetBrains Mono', monospace; color:var(--text-dimmer); }
-  .weapon-unlock-row{ margin-top:8px; min-height:20px; display:flex; justify-content:flex-end; }
+  .weapon-unlock-row{ margin-top:8px; min-height:20px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
   .weapon-flavor{ font-size:12.5px; color:var(--text-dim); font-style:italic; margin-top:8px; line-height:1.5; }
 
   .perk-section{ margin-top:16px; padding-top:16px; border-top:1px solid var(--panel-border); }
@@ -237,8 +240,8 @@
 
 <div class="owned-auth-row" id="owned-auth-row"></div>
 <div class="unlock-legend">
-  <div class="unlock-legend-item"><span class="weapon-unlock-badge exact-roll">Owned 5/5</span><span>a copy has every perk in this roll</span></div>
-  <div class="unlock-legend-item"><span class="weapon-unlock-badge">Unlocked 3/5</span><span>obtained, X/N is your best copy's perk match</span></div>
+  <div class="unlock-legend-item"><span class="weapon-unlock-rating">5/5</span><span class="weapon-unlock-badge exact-roll">Owned</span><span>a copy has every perk in this roll</span></div>
+  <div class="unlock-legend-item"><span class="weapon-unlock-rating">3/5</span><span class="weapon-unlock-badge">Unlocked</span><span>X/N is your best copy's perk match</span></div>
   <div class="unlock-legend-item"><span class="weapon-unlock-badge missing">Not Unlocked</span><span>never obtained</span></div>
 </div>
 
@@ -609,13 +612,16 @@
           // instance in vault/inventory/equipped is proof on its own,
           // regardless of what Collections says.
           const unlocked = owned || hasAnyInstance || (item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash)));
-          // Fraction only makes sense when there's an actual owned
-          // instance to have counted perks on — collectibles-only
-          // "Unlocked" (no live copy found) has no roll to compare against.
-          const fraction = hasAnyInstance ? " " + matchCount + "/" + totalPerks : "";
-          const label = owned ? ("Owned " + matchCount + "/" + totalPerks) : (unlocked ? ("Unlocked" + fraction) : "Not Unlocked");
+          const label = owned ? "Owned" : (unlocked ? "Unlocked" : "Not Unlocked");
           const cls = owned ? "exact-roll" : (unlocked ? "" : "missing");
-          unlockBadgeEl.innerHTML = '<span class="weapon-unlock-badge' + (cls ? " " + cls : "") + '">' + label + '</span>';
+          // Fraction shown as its own separate element, not folded into
+          // the pill text — "Unlocked 5/5" read like a fourth, confusing
+          // state distinct from "Owned". Only shown when there's an
+          // actual owned instance to have counted perks on —
+          // collectibles-only "Unlocked" (no live copy found) has no
+          // roll to compare against.
+          const ratingHtml = hasAnyInstance ? '<span class="weapon-unlock-rating">' + matchCount + '/' + totalPerks + '</span>' : "";
+          unlockBadgeEl.innerHTML = ratingHtml + '<span class="weapon-unlock-badge' + (cls ? " " + cls : "") + '">' + label + '</span>';
         } else {
           unlockBadgeEl.innerHTML = "";
         }
