@@ -238,8 +238,8 @@
 
 <div class="owned-auth-row" id="owned-auth-row"></div>
 <div class="unlock-legend">
-  <div class="unlock-legend-item"><span class="weapon-unlock-badge exact-roll">Owned</span><span>a copy has every perk in this roll</span></div>
-  <div class="unlock-legend-item"><span class="weapon-unlock-badge">Unlocked</span><span>obtained, but no exact match</span></div>
+  <div class="unlock-legend-item"><span class="weapon-unlock-badge exact-roll">Owned 5/5</span><span>a copy has every perk in this roll</span></div>
+  <div class="unlock-legend-item"><span class="weapon-unlock-badge">Unlocked 3/5</span><span>obtained, X/N is your best copy's perk match</span></div>
   <div class="unlock-legend-item"><span class="weapon-unlock-badge missing">Not Unlocked</span><span>never obtained</span></div>
 </div>
 
@@ -411,16 +411,24 @@
     return itemHashes.flatMap(h => ownership.instancesByHash.get(h) || []);
   }
 
-  // True if any owned instance across itemHashes currently has every
-  // hash in perkHashes socketed somewhere (barrel/mag/traits/etc are
-  // all just sockets — a flat union across all of an instance's
-  // sockets is enough, no need to know which socket is which column).
-  function anyInstanceMatchesRoll(itemHashes, perkHashes, ownership){
-    return instancesFor(itemHashes, ownership).some(instanceId => {
+  // Highest number of perkHashes found socketed together on any single
+  // owned instance across itemHashes (barrel/mag/traits/etc are all just
+  // sockets — a flat union across all of an instance's sockets is
+  // enough, no need to know which socket is which column). Takes the
+  // best copy, not just the first one found, in case you own more than
+  // one roll of the same weapon. Returns 0 if you don't own any copy at
+  // all — that's different from "owns it with 0 matching perks", but
+  // this page never has both perkHashes.length === 0 and an owned
+  // instance to confuse the two.
+  function bestRollMatchCount(itemHashes, perkHashes, ownership){
+    let best = 0;
+    for (const instanceId of instancesFor(itemHashes, ownership)){
       const sockets = (ownership.socketsByInstanceId[instanceId] && ownership.socketsByInstanceId[instanceId].sockets) || [];
       const plugHashes = new Set(sockets.map(s => s.plugHash).filter(Boolean));
-      return perkHashes.every(h => plugHashes.has(h));
-    });
+      const matched = perkHashes.filter(h => plugHashes.has(h)).length;
+      if (matched > best) best = matched;
+    }
+    return best;
   }
 
   let ownershipDataPromise = null;
@@ -592,7 +600,9 @@
           // real item hash (weapon.craftedItemHash) — a player could own
           // either, or both.
           const candidateHashes = [roll.itemHash, weapon.craftedItemHash].filter(Boolean);
-          const owned = anyInstanceMatchesRoll(candidateHashes, roll.perkHashes, ownership);
+          const totalPerks = roll.perkHashes.length;
+          const matchCount = bestRollMatchCount(candidateHashes, roll.perkHashes, ownership);
+          const owned = totalPerks > 0 && matchCount === totalPerks;
           const hasAnyInstance = instancesFor(candidateHashes, ownership).length > 0;
           // Some weapons (a lot of newer craftable ones) don't expose a
           // normal collectibleHash at all, so Collectibles alone can't
@@ -600,7 +610,11 @@
           // instance in vault/inventory/equipped is proof on its own,
           // regardless of what Collections says.
           const unlocked = owned || hasAnyInstance || (item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash)));
-          const label = owned ? "Owned" : (unlocked ? "Unlocked" : "Not Unlocked");
+          // Fraction only makes sense when there's an actual owned
+          // instance to have counted perks on — collectibles-only
+          // "Unlocked" (no live copy found) has no roll to compare against.
+          const fraction = hasAnyInstance ? " " + matchCount + "/" + totalPerks : "";
+          const label = owned ? ("Owned " + matchCount + "/" + totalPerks) : (unlocked ? ("Unlocked" + fraction) : "Not Unlocked");
           const cls = owned ? "exact-roll" : (unlocked ? "" : "missing");
           unlockBadgeEl.innerHTML = '<span class="weapon-unlock-badge' + (cls ? " " + cls : "") + '">' + label + '</span>';
         } else {
