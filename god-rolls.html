@@ -47,10 +47,14 @@
     background:var(--accent-bright); color:#0b0700;
   }
   .unlock-legend{
-    max-width:1000px; margin:10px auto 0; padding:0 24px;
-    font-size:12px; color:var(--text-dimmer); line-height:1.6; text-align:center;
+    max-width:1000px; margin:14px auto 0; padding:0 24px;
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px 28px;
   }
-  .unlock-legend .weapon-unlock-badge{ vertical-align:middle; margin:0 2px; }
+  .unlock-legend-item{
+    display:flex; align-items:center; gap:8px;
+    font-size:12px; color:var(--text-dimmer); white-space:nowrap;
+  }
+  .unlock-legend .weapon-unlock-badge{ flex-shrink:0; }
 
   section{ max-width:1000px; margin:40px auto 0; padding:0 24px 90px; }
   .weapon-grid{
@@ -234,9 +238,9 @@
 
 <div class="owned-auth-row" id="owned-auth-row"></div>
 <div class="unlock-legend">
-  <span class="weapon-unlock-badge exact-roll">Owned</span> = a copy in your vault/inventory currently has every perk in this roll.
-  <span class="weapon-unlock-badge">Unlocked</span> = you've obtained this weapon pattern before, but no copy matches this exact roll right now.
-  <span class="weapon-unlock-badge missing">Not Unlocked</span> = never obtained.
+  <div class="unlock-legend-item"><span class="weapon-unlock-badge exact-roll">Owned</span><span>a copy has every perk in this roll</span></div>
+  <div class="unlock-legend-item"><span class="weapon-unlock-badge">Unlocked</span><span>obtained, but no exact match</span></div>
+  <div class="unlock-legend-item"><span class="weapon-unlock-badge missing">Not Unlocked</span><span>never obtained</span></div>
 </div>
 
 <div class="controls">
