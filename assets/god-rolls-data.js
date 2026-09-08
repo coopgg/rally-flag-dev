@@ -118,6 +118,13 @@ window.GodRollsData = (function(){
       pairing: null },
     { name:"Qua-Vinctus IV", slug:"qua-vinctus-iv",
       itemHash: 4176551594,
+      // Crafted weapons get their own distinct item hash for the actual
+      // owned/craftable instance, separate from the "pattern" hash above
+      // (itemHash) — that pattern hash is what light.gg/perks use, but a
+      // player's real crafted copy in their vault/inventory lives under
+      // this hash instead. Confirmed via a live inventory scan. Checked
+      // in addition to itemHash for ownership purposes only.
+      craftedItemHash: 337893613,
       perkHashes: [111235976, 3267421167, 102912326, 2896748467, 2671305723, 384158423, 1523545668],
       raidSlug: null, dungeonSlug: null,
       note: "Heavy pick for Contagion Chain and Panic Weave (Strand), but stays in the Power slot since only Special/Primary Strand and Stasis weapons move to Kinetic.",

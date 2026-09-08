@@ -402,13 +402,21 @@
     return { unlockedHashes, instancesByHash, socketsByInstanceId };
   }
 
-  // True if any owned instance of this itemHash currently has every
+  // itemHashes is a list, not a single hash — crafted weapons carry a
+  // separate item hash for the actual owned/craftable instance from the
+  // "pattern" hash used for perks/light.gg links, so a weapon can have
+  // real owned instances split across more than one hash (see
+  // craftedItemHash in god-rolls-data.js).
+  function instancesFor(itemHashes, ownership){
+    return itemHashes.flatMap(h => ownership.instancesByHash.get(h) || []);
+  }
+
+  // True if any owned instance across itemHashes currently has every
   // hash in perkHashes socketed somewhere (barrel/mag/traits/etc are
   // all just sockets — a flat union across all of an instance's
   // sockets is enough, no need to know which socket is which column).
-  function anyInstanceMatchesRoll(itemHash, perkHashes, ownership){
-    const instanceIds = ownership.instancesByHash.get(itemHash) || [];
-    return instanceIds.some(instanceId => {
+  function anyInstanceMatchesRoll(itemHashes, perkHashes, ownership){
+    return instancesFor(itemHashes, ownership).some(instanceId => {
       const sockets = (ownership.socketsByInstanceId[instanceId] && ownership.socketsByInstanceId[instanceId].sockets) || [];
       const plugHashes = new Set(sockets.map(s => s.plugHash).filter(Boolean));
       return perkHashes.every(h => plugHashes.has(h));
@@ -580,8 +588,13 @@
       if (unlockBadgeEl){
         if (ownershipDataPromise){
           const ownership = await ownershipDataPromise;
-          const owned = anyInstanceMatchesRoll(roll.itemHash, roll.perkHashes, ownership);
-          const hasAnyInstance = (ownership.instancesByHash.get(roll.itemHash) || []).length > 0;
+          // Check both the "pattern" hash (roll.itemHash, what perks/
+          // light.gg use) and, when known, the crafted weapon's separate
+          // real item hash (weapon.craftedItemHash) — a player could own
+          // either, or both.
+          const candidateHashes = [roll.itemHash, weapon.craftedItemHash].filter(Boolean);
+          const owned = anyInstanceMatchesRoll(candidateHashes, roll.perkHashes, ownership);
+          const hasAnyInstance = instancesFor(candidateHashes, ownership).length > 0;
           // Some weapons (a lot of newer craftable ones) don't expose a
           // normal collectibleHash at all, so Collectibles alone can't
           // confirm "unlocked" for them — but finding an actual owned
@@ -591,13 +604,12 @@
           const label = owned ? "Owned" : (unlocked ? "Unlocked" : "Not Unlocked");
           const cls = owned ? "exact-roll" : (unlocked ? "" : "missing");
           unlockBadgeEl.innerHTML = '<span class="weapon-unlock-badge' + (cls ? " " + cls : "") + '">' + label + '</span>';
-          // TEMP DEBUG — remove once the Hullabaloo/Qua-Vinctus "Not
-          // Unlocked" false-negative is root-caused. Dumps exactly what
-          // this check saw for every weapon.
+          // TEMP DEBUG — remove once confirmed working. Dumps exactly
+          // what this check saw for every weapon.
           console.log("[owned-debug]", weapon.name, {
-            itemHash: roll.itemHash,
+            candidateHashes: candidateHashes,
             collectibleHash: item.collectibleHash,
-            instanceIds: ownership.instancesByHash.get(roll.itemHash) || [],
+            instanceIds: instancesFor(candidateHashes, ownership),
             collectibleUnlocked: !!(item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash))),
             hasAnyInstance,
             owned,
