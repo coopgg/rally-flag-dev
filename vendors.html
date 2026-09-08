@@ -85,10 +85,11 @@
     letter-spacing:0.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px;
     border:1px solid var(--accent); color:var(--accent-bright); margin-top:8px;
   }
+  .vend-owned-row{ display:flex; justify-content:flex-end; margin-top:8px; }
   .vend-owned-badge{
     display:inline-block; font-family:'JetBrains Mono', monospace; font-size:9.5px;
     letter-spacing:0.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px;
-    background:var(--accent); color:var(--bg); margin-top:8px; margin-left:6px;
+    background:var(--accent); color:var(--bg);
   }
 
   .vend-perks-row{ display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
@@ -381,7 +382,7 @@
 
   function ownedBadgeHtml(itemDef, ownedHashes){
     if (!itemDef || !itemDef.collectibleHash) return "";
-    return ownedHashes.has(String(itemDef.collectibleHash)) ? '<div class="vend-owned-badge">Owned</div>' : "";
+    return ownedHashes.has(String(itemDef.collectibleHash)) ? '<div class="vend-owned-row"><div class="vend-owned-badge">Owned</div></div>' : "";
   }
 
   function costSignature(costs){
