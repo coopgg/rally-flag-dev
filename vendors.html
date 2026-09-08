@@ -85,6 +85,11 @@
     letter-spacing:0.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px;
     border:1px solid var(--accent); color:var(--accent-bright); margin-top:8px;
   }
+  .vend-owned-badge{
+    display:inline-block; font-family:'JetBrains Mono', monospace; font-size:9.5px;
+    letter-spacing:0.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px;
+    background:var(--accent); color:var(--bg); margin-top:8px; margin-left:6px;
+  }
 
   .vend-perks-row{ display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
   .vend-perk-chip{
@@ -336,6 +341,35 @@
     if (!characterList.length) throw new Error("No characters found on this account's primary membership.");
 
     return { membershipType: primary.membershipType, membershipId: primary.membershipId, characters: characterList };
+  }
+
+  // Collectibles (component 800) is the right source for "do I own this"
+  // on cosmetics — it's Bungie's own unlock-tracking system for shaders/
+  // ornaments/emotes, so it stays true even if the item was since
+  // dismantled or was account-wide-unlocked via a different character
+  // than the one currently equipped/holding it. Cached per membership
+  // since Eververse and Ada-1 both need it on the same page load.
+  const ownedCollectiblesCache = new Map();
+  const COLLECTIBLE_STATE_NOT_ACQUIRED = 1;
+  function getOwnedCollectibleHashes(membershipType, membershipId){
+    const cacheKey = membershipType + ":" + membershipId;
+    if (!ownedCollectiblesCache.has(cacheKey)){
+      ownedCollectiblesCache.set(cacheKey, (async () => {
+        const profile = await authedApiGet("/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId + "/?components=800");
+        const collectibles = (profile.profileCollectibles && profile.profileCollectibles.data && profile.profileCollectibles.data.collectibles) || {};
+        const owned = new Set();
+        for (const hash of Object.keys(collectibles)){
+          if (!(collectibles[hash].state & COLLECTIBLE_STATE_NOT_ACQUIRED)) owned.add(hash);
+        }
+        return owned;
+      })());
+    }
+    return ownedCollectiblesCache.get(cacheKey);
+  }
+
+  function ownedBadgeHtml(itemDef, ownedHashes){
+    if (!itemDef || !itemDef.collectibleHash) return "";
+    return ownedHashes.has(String(itemDef.collectibleHash)) ? '<div class="vend-owned-badge">Owned</div>' : "";
   }
 
   function costSignature(costs){
@@ -957,6 +991,7 @@
 
     try {
       const { membershipType, membershipId, characters } = await resolveAllCharacters();
+      const ownedHashesPromise = getOwnedCollectibleHashes(membershipType, membershipId);
       statusEl.textContent = "Discovering vendors across " + characters.length + " character(s)…";
 
       // Phase 1: bulk vendor+sales list per character, in parallel — each
@@ -1022,6 +1057,7 @@
       // something random rather than being the specific cosmetic itself,
       // per request.
       statusEl.textContent = "Resolving " + itemsByKey.size + " item(s)…";
+      const ownedHashes = await ownedHashesPromise;
       const resolved = await mapWithConcurrency(Array.from(itemsByKey.values()), 6, async ({ sale }) => {
         const costDefs = await mapWithConcurrency(sale.costs || [], 3, c => fetchDef("DestinyInventoryItemDefinition", c.itemHash));
         const brightDust = costDefs.some(d => /bright dust/i.test((d && d.displayProperties && d.displayProperties.name) || ""));
@@ -1049,7 +1085,7 @@
 
         const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
         const costText = await costChipsHtml(sale.costs);
-        return { groupKey, card: itemCardHtml(name, icon, null, costText, tagText) };
+        return { groupKey, card: itemCardHtml(name, icon, null, costText, tagText, ownedBadgeHtml(itemDef, ownedHashes)) };
       });
 
       const groups = new Map(); // typeName -> card html[]
@@ -1103,6 +1139,7 @@
 
     try {
       const { membershipType, membershipId, characters } = await resolveAllCharacters();
+      const ownedHashesPromise = getOwnedCollectibleHashes(membershipType, membershipId);
       const itemsByKey = new Map();
 
       statusEl.textContent = "Checking Ada-1 across " + characters.length + " character(s)…";
@@ -1129,13 +1166,14 @@
         return;
       }
 
+      const ownedHashes = await ownedHashesPromise;
       const resolved = await mapWithConcurrency(Array.from(itemsByKey.values()), 6, async ({ sale }) => {
         const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
         if (!itemDef || itemDef.itemTypeDisplayName !== "Shader") return null;
         const name = (itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
         const icon = iconUrl(itemDef.displayProperties);
         const costText = await costChipsHtml(sale.costs);
-        return itemCardHtml(name, icon, "Shader", costText, null);
+        return itemCardHtml(name, icon, "Shader", costText, null, ownedBadgeHtml(itemDef, ownedHashes));
       });
       const cards = resolved.filter(Boolean);
 
