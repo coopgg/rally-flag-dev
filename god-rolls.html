@@ -86,11 +86,10 @@
     position:absolute; bottom:3px; right:3px; width:16px; height:16px;
     object-fit:contain; pointer-events:none;
   }
-  .weapon-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:19px; color:var(--text); }
+  .weapon-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:19px; color:var(--text); margin-bottom:4px; }
   .weapon-name.tier-exotic{ color:#ceae33; }
   .weapon-name.tier-legendary{ color:#a892d1; }
-  .weapon-name-row{ display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap; }
-  .weapon-badges{ display:flex; align-items:center; gap:6px; }
+  .weapon-badges{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
   .alt-roll-btn{
     font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dim);
     background:var(--panel); border:1px solid var(--panel-border); border-radius:999px;
@@ -500,12 +499,12 @@
       '<div class="weapon-head">' +
         '<span class="weapon-caret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></span>' +
         '<div class="weapon-icon" id="icon-' + weapon.slug + '">' + monogram(weapon.name) + '</div>' +
-        '<div><div class="weapon-name-row">' +
+        '<div>' +
           '<div class="weapon-name" id="name-' + weapon.slug + '">' + weapon.name + '</div>' +
           '<span class="weapon-badges" id="badges-' + weapon.slug + '"></span>' +
+          '<div class="weapon-meta" id="meta-' + weapon.slug + '">Loading live data\u2026</div>' +
+          '<div class="weapon-unlock-row" id="unlock-badge-' + weapon.slug + '"></div>' +
         '</div>' +
-        '<div class="weapon-meta" id="meta-' + weapon.slug + '">Loading live data\u2026</div>' +
-        '<div class="weapon-unlock-row" id="unlock-badge-' + weapon.slug + '"></div></div>' +
       '</div>' +
       '<div class="weapon-body">' +
         '<div class="weapon-flavor" id="flavor-' + weapon.slug + '"></div>' +
