@@ -561,6 +561,16 @@
           const label = owned ? "Owned" : (unlocked ? "Unlocked" : "Not Unlocked");
           const cls = owned ? "exact-roll" : (unlocked ? "" : "missing");
           unlockBadgeEl.innerHTML = '<span class="weapon-unlock-badge' + (cls ? " " + cls : "") + '">' + label + '</span>';
+          // TEMP DEBUG — remove once the Hullabaloo/Qua-Vinctus "Not
+          // Unlocked" false-negative is root-caused. Dumps exactly what
+          // this check saw for every weapon.
+          console.log("[owned-debug]", weapon.name, {
+            itemHash: roll.itemHash,
+            collectibleHash: item.collectibleHash,
+            instanceIds: ownership.instancesByHash.get(roll.itemHash) || [],
+            collectibleUnlocked: !!(item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash))),
+            label
+          });
         } else {
           unlockBadgeEl.innerHTML = "";
         }
