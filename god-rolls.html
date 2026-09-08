@@ -365,7 +365,7 @@
 
     const profile = await authedApiGet(
       "/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId +
-      "/?components=102,201,205,305,800"
+      "/?components=102,201,205,305,310,800"
     );
 
     const unlockedHashes = new Set();
@@ -400,8 +400,9 @@
     for (const characterId of Object.keys(characterEquipment)) addItems(characterEquipment[characterId].items);
 
     const socketsByInstanceId = (profile.itemComponents && profile.itemComponents.sockets && profile.itemComponents.sockets.data) || {};
+    const reusablePlugsByInstanceId = (profile.itemComponents && profile.itemComponents.reusablePlugs && profile.itemComponents.reusablePlugs.data) || {};
 
-    return { unlockedHashes, instancesByHash, socketsByInstanceId };
+    return { unlockedHashes, instancesByHash, socketsByInstanceId, reusablePlugsByInstanceId };
   }
 
   // itemHashes is a list, not a single hash — crafted weapons carry a
@@ -413,20 +414,31 @@
     return itemHashes.flatMap(h => ownership.instancesByHash.get(h) || []);
   }
 
-  // Highest number of perkHashes found socketed together on any single
-  // owned instance across itemHashes (barrel/mag/traits/etc are all just
+  // Highest number of perkHashes found available on any single owned
+  // instance across itemHashes (barrel/mag/traits/etc are all just
   // sockets — a flat union across all of an instance's sockets is
-  // enough, no need to know which socket is which column). Takes the
-  // best copy, not just the first one found, in case you own more than
-  // one roll of the same weapon. Returns 0 if you don't own any copy at
-  // all — that's different from "owns it with 0 matching perks", but
-  // this page never has both perkHashes.length === 0 and an owned
-  // instance to confuse the two.
+  // enough, no need to know which socket is which column). "Available"
+  // means either currently equipped (component 305) OR freely
+  // re-rollable into right now (component 310's reusable-plugs pool) —
+  // a weapon whose god-roll perks are all sitting in its per-socket
+  // pool but not currently selected is still functionally "owned", you
+  // could swap into that exact roll for free without a new drop.
+  // Takes the best copy, not just the first one found, in case you own
+  // more than one roll of the same weapon. Returns 0 if you don't own
+  // any copy at all — that's different from "owns it with 0 matching
+  // perks", but this page never has both perkHashes.length === 0 and
+  // an owned instance to confuse the two.
   function bestRollMatchCount(itemHashes, perkHashes, ownership){
     let best = 0;
     for (const instanceId of instancesFor(itemHashes, ownership)){
       const sockets = (ownership.socketsByInstanceId[instanceId] && ownership.socketsByInstanceId[instanceId].sockets) || [];
       const plugHashes = new Set(sockets.map(s => s.plugHash).filter(Boolean));
+      const reusablePlugs = (ownership.reusablePlugsByInstanceId[instanceId] && ownership.reusablePlugsByInstanceId[instanceId].plugs) || {};
+      for (const socketIndex of Object.keys(reusablePlugs)){
+        for (const plug of reusablePlugs[socketIndex]){
+          if (plug.plugItemHash) plugHashes.add(plug.plugItemHash);
+        }
+      }
       const matched = perkHashes.filter(h => plugHashes.has(h)).length;
       if (matched > best) best = matched;
     }
@@ -674,7 +686,7 @@
     // re-subscription here.
     ownershipDataPromise = RallyFlagAuth.isSignedIn() ? fetchOwnershipData().catch(err => {
       console.warn("Ownership data fetch failed:", err.message);
-      return { unlockedHashes: new Set(), instancesByHash: new Map(), socketsByInstanceId: {} };
+      return { unlockedHashes: new Set(), instancesByHash: new Map(), socketsByInstanceId: {}, reusablePlugsByInstanceId: {} };
     }) : null;
 
     const grid = document.getElementById("weapon-grid");
