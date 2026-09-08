@@ -1493,10 +1493,26 @@
           if (plugHashes.length > 1) perkSocketIndexes.add(idx);
         });
 
+        // Masterwork sockets don't resolve a normal multi-option plug
+        // pool the way barrel/mag/trait sockets do (confirmed live —
+        // "Masterworked: Range" got wrongly excluded by the swappable-
+        // only check above even though it's genuinely a real, wanted
+        // pick), so it's checked separately here by name on whatever's
+        // actually socketed right now, regardless of pool size.
+        const categoryOnlyIndexes = Array.from(perkCategoryIndexes).filter(idx => !perkSocketIndexes.has(idx));
+
         for (const instanceId of instanceIds){
           const sockets = (ownership.socketsByInstanceId[instanceId] && ownership.socketsByInstanceId[instanceId].sockets) || [];
+          const includedIndexes = new Set(perkSocketIndexes);
+          await mapWithConcurrency(categoryOnlyIndexes, 5, async (idx) => {
+            const plugHash = sockets[idx] && sockets[idx].plugHash;
+            if (!plugHash) return;
+            const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
+            const plugName = plugDef && plugDef.displayProperties && plugDef.displayProperties.name;
+            if (plugName && /^masterworked:/i.test(plugName)) includedIndexes.add(idx);
+          });
           const plugHashes = sockets
-            .map((s, idx) => (perkSocketIndexes.has(idx) ? s.plugHash : null))
+            .map((s, idx) => (includedIndexes.has(idx) ? s.plugHash : null))
             .filter(Boolean);
           const resolvedPerks = await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
             const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
