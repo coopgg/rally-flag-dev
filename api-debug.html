@@ -1468,11 +1468,29 @@
         // of this tool did) pulls in the intrinsic frame, the crafted
         // "Shaped Weapon" flag, whatever shader happens to be equipped,
         // and other noise that isn't a rollable perk at all.
-        const perkSocketIndexes = new Set();
+        //
+        // That category alone still isn't precise enough, though —
+        // confirmed against a live pull: it also contains sockets with
+        // only ONE possible plug ever (an intrinsic weapon-family trait
+        // that reads like a normal perk, or a crafted weapon's leveled-in
+        // "enhanced tier" bonus slot) — fixed, not something that varies
+        // roll to roll, so it's meaningless for a god-roll comparison.
+        // Only keep sockets with more than one possible option — a real
+        // rollable column has alternatives, an intrinsic/fixed slot
+        // doesn't.
+        const socketEntries = (itemDef.sockets && itemDef.sockets.socketEntries) || [];
+        const perkCategoryIndexes = new Set();
         ((itemDef.sockets && itemDef.sockets.socketCategories) || []).forEach(cat => {
           if (cat.socketCategoryHash === WEAPON_PERKS_CATEGORY_HASH){
-            (cat.socketIndexes || []).forEach(idx => perkSocketIndexes.add(idx));
+            (cat.socketIndexes || []).forEach(idx => perkCategoryIndexes.add(idx));
           }
+        });
+        const perkSocketIndexes = new Set();
+        await mapWithConcurrency(Array.from(perkCategoryIndexes), 5, async (idx) => {
+          const entry = socketEntries[idx];
+          if (!entry) return;
+          const { plugHashes } = await resolveSocketPlugPool(entry);
+          if (plugHashes.length > 1) perkSocketIndexes.add(idx);
         });
 
         for (const instanceId of instanceIds){
