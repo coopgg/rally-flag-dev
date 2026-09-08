@@ -97,6 +97,15 @@
 <div id="item-lookup-status" class="status">Enter an item hash above and click Look up.</div>
 <div id="item-lookup-output"></div>
 
+<h2>My Owned Rolls (OAuth)</h2>
+<p class="note">Search your vault plus every character's inventory and equipped items by name, and see the actual currently-socketed perk hashes for each owned instance — the exact data needed to build or verify a <code>god-rolls-data.js</code> entry: the item hash, its <code>collectibleHash</code>, and a ready-to-paste <code>perkHashes</code> array. Also surfaces a crafted weapon's separate real item hash when it differs from the "pattern" hash used for its perks/light.gg link — confirmed this happens (Qua-Vinctus IV: pattern hash <code>4176551594</code>, real crafted instance hash <code>337893613</code>).</p>
+<div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
+  <input type="text" id="roll-lookup-name-input" placeholder="e.g. qua vinctus" style="background:#1a1a1f; border:1px solid #2c2c33; color:#e4e4e8; padding:6px 10px; border-radius:3px; font-family:'JetBrains Mono', monospace; font-size:12px; width:220px;">
+  <button id="roll-lookup-btn" style="background:#1a2a3a; color:#7fbfff; border:1px solid #2c2c33; padding:6px 14px; border-radius:3px; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:12px;">Search my inventory</button>
+</div>
+<div id="roll-lookup-status" class="status">Sign in above to load this.</div>
+<div id="roll-lookup-output"></div>
+
 <h2>Eververse (Tess Everis)</h2>
 <p class="note">Prod already chased this down once, before this site had OAuth: Bungie's <em>public/anonymous</em> Vendors endpoint drops Tess entirely, confirmed via a 3-way diagnostic (full request, bare Vendors-only request, and her own definition fetched directly — she came back <code>enabled:true</code>, genuinely active, the endpoint just can't serve her). Matches Bungie's documented rule that a vendor gets dropped wholesale from the public endpoint if any part of it can't be computed identically for everyone. Prod ended up sourcing her from a third-party feed, <a href="https://eververse.report/" target="_blank" rel="noopener">eververse.report</a>, instead — noted then as a stopgap "until this site has its own OAuth login."</p>
 <p class="note">That's now. This calls the <em>authenticated, character-scoped</em> <code>Character/{id}/Vendors/?components=400,402</code> — untested territory, since it wasn't an option before. Confirmed working, and confirmed via live testing to be structured very differently than expected: Bright Dust offers aren't nested as sale items under a single Tess Everis vendor hash at all. Each Bright Dust item is its own separate one-item vendor stub — dozens of them, most with no display name of their own (shown as "Unknown (hash)" in the discovered-vendors list below), sitting alongside the handful of real, named NPC vendors. So this pulls sale items from <em>every</em> discovered vendor, not just whichever one happens to be named "Tess Everis"/"Eververse" — that name match now only stars the likely-Eververse entries in the list, it doesn't gate what gets collected. If nothing turns up this way, eververse.report is the proven fallback.</p>
@@ -1363,6 +1372,123 @@
   });
   document.getElementById("item-lookup-hash-input").addEventListener("keydown", (e) => {
     if (e.key === "Enter") runItemLookup(document.getElementById("item-lookup-hash-input").value.trim());
+  });
+
+  // ---------------- My Owned Rolls (search by name) ----------------
+  // Bulk profile call — vault (102), every character's inventory (201)
+  // and equipped items (205), every instanced item's current sockets
+  // (305), and Collectibles (800) for collectibleHash cross-reference.
+  // Cached across searches in the same page load so re-searching a
+  // different name doesn't re-fetch the whole account again.
+  let ownershipSnapshotPromise = null;
+  function fetchOwnershipSnapshot(){
+    if (!ownershipSnapshotPromise){
+      ownershipSnapshotPromise = (async () => {
+        const { membershipType, membershipId } = await resolveAllCharacters();
+        const profile = await authedApiGet(
+          "/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId +
+          "/?components=102,201,205,305,800"
+        );
+        const instancesByHash = new Map();
+        const addItems = (items) => {
+          for (const it of items || []){
+            if (!it.itemInstanceId) continue;
+            if (!instancesByHash.has(it.itemHash)) instancesByHash.set(it.itemHash, []);
+            instancesByHash.get(it.itemHash).push(it.itemInstanceId);
+          }
+        };
+        addItems(profile.profileInventory && profile.profileInventory.data && profile.profileInventory.data.items);
+        const characterInventories = (profile.characterInventories && profile.characterInventories.data) || {};
+        for (const cid of Object.keys(characterInventories)) addItems(characterInventories[cid].items);
+        const characterEquipment = (profile.characterEquipment && profile.characterEquipment.data) || {};
+        for (const cid of Object.keys(characterEquipment)) addItems(characterEquipment[cid].items);
+
+        const socketsByInstanceId = (profile.itemComponents && profile.itemComponents.sockets && profile.itemComponents.sockets.data) || {};
+        return { instancesByHash, socketsByInstanceId };
+      })();
+    }
+    return ownershipSnapshotPromise;
+  }
+
+  async function runRollLookup(nameFragment){
+    const statusEl = document.getElementById("roll-lookup-status");
+    const outputEl = document.getElementById("roll-lookup-output");
+    statusEl.className = "status";
+    outputEl.innerHTML = "";
+
+    if (!nameFragment){
+      statusEl.className = "status err";
+      statusEl.textContent = "Enter part of a weapon name first.";
+      return;
+    }
+
+    try {
+      statusEl.textContent = "Loading your vault + character inventories…";
+      const ownership = await fetchOwnershipSnapshot();
+      const hashes = Array.from(ownership.instancesByHash.keys());
+
+      statusEl.textContent = "Resolving " + hashes.length + " distinct owned item(s)…";
+      const needle = nameFragment.toLowerCase();
+      const matches = [];
+      await mapWithConcurrency(hashes, 5, async (hash) => {
+        const itemDef = await fetchDef("DestinyInventoryItemDefinition", hash);
+        const name = itemDef && itemDef.displayProperties && itemDef.displayProperties.name;
+        if (name && name.toLowerCase().includes(needle)){
+          matches.push({ hash, name, itemDef });
+        }
+      });
+
+      if (!matches.length){
+        statusEl.className = "status err";
+        statusEl.textContent = "No owned item name matched \"" + nameFragment + "\".";
+        return;
+      }
+
+      statusEl.className = "status ok";
+      statusEl.textContent = "OK: " + matches.length + " matching item(s)";
+
+      for (const { hash, name, itemDef } of matches){
+        const instanceIds = ownership.instancesByHash.get(hash) || [];
+        const card = document.createElement("div");
+        card.className = "card";
+        const icon = iconUrl(itemDef.displayProperties);
+        let html =
+          '<div class="card-head">' +
+            (icon ? '<img src="' + icon + '" alt="">' : '') +
+            '<div>' +
+              '<div class="card-name">' + name + '</div>' +
+              '<div class="card-hash">itemHash: ' + hash + ' — collectibleHash: ' + (itemDef.collectibleHash || "none") + '</div>' +
+            '</div>' +
+          '</div>';
+
+        for (const instanceId of instanceIds){
+          const sockets = (ownership.socketsByInstanceId[instanceId] && ownership.socketsByInstanceId[instanceId].sockets) || [];
+          const plugHashes = sockets.map(s => s.plugHash).filter(Boolean);
+          const resolvedPerks = await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
+            const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
+            return { hash: plugHash, name: (plugDef && plugDef.displayProperties && plugDef.displayProperties.name) || null };
+          });
+          const realPerks = resolvedPerks.filter(p => p.name && !isJunkSocketPlug(p.name));
+
+          html += '<div class="section-label">Instance ' + instanceId + '</div>';
+          html += '<div class="chip-row">' + realPerks.map(p => chipHtml(p.name, String(p.hash), null)).join("") + '</div>';
+          html += '<pre class="raw open" style="margin-top:6px;">perkHashes: [' + realPerks.map(p => p.hash).join(", ") + ']</pre>';
+        }
+
+        card.innerHTML = html;
+        outputEl.appendChild(card);
+      }
+    } catch (err){
+      statusEl.className = "status err";
+      statusEl.textContent = "Error: " + err.message;
+    }
+  }
+
+  document.getElementById("roll-lookup-btn").addEventListener("click", () => {
+    runRollLookup(document.getElementById("roll-lookup-name-input").value.trim());
+  });
+  document.getElementById("roll-lookup-name-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") runRollLookup(document.getElementById("roll-lookup-name-input").value.trim());
   });
 
   // ---------------- Eververse (Tess Everis) discovery ----------------
