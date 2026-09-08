@@ -417,6 +417,30 @@
 
   let ownershipDataPromise = null;
 
+  // TEMP DEBUG — console-only helper, not wired to any UI. Scans every
+  // itemHash actually found in your vault/inventory/equipped and
+  // resolves its real name, so we can find the true item hash for a
+  // crafted weapon whose "pattern" hash (the one used for perks/
+  // light.gg links) doesn't match what's actually sitting in your
+  // inventory. Usage from the browser console once signed in:
+  //   debugFindItemsByName("vinctus")
+  window.debugFindItemsByName = async function(nameFragment){
+    if (!ownershipDataPromise){ console.warn("[owned-debug] Not signed in / ownership data not loaded yet."); return; }
+    const ownership = await ownershipDataPromise;
+    const hashes = Array.from(ownership.instancesByHash.keys());
+    const matches = [];
+    await Promise.all(hashes.map(async (hash) => {
+      try {
+        const item = await fetchItemByHash(hash);
+        if (item.name && item.name.toLowerCase().includes(nameFragment.toLowerCase())){
+          matches.push({ hash: hash, name: item.name, instanceIds: ownership.instancesByHash.get(hash) });
+        }
+      } catch (e) {}
+    }));
+    console.log("[owned-debug] name search '" + nameFragment + "':", matches);
+    return matches;
+  };
+
   function renderAuthRow(){
     const row = document.getElementById("owned-auth-row");
     if (RallyFlagAuth.isSignedIn()){
