@@ -228,6 +228,19 @@
     }
   }
 
+  // Cloudflare Web Analytics — cookieless, no visitor data stored beyond
+  // aggregate counts (matches privacy.html's existing "no stored user
+  // data" claim). Only loads on the real domain so dev/testing traffic
+  // doesn't skew the real site's numbers.
+  function setupAnalytics(){
+    if (window.location.hostname !== "rallyflag.gg") return;
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src = "https://static.cloudflareinsights.com/beacon.min.js";
+    script.setAttribute("data-cf-beacon", '{"token": "88388f52592a4b29aeb836f383009636"}');
+    document.head.appendChild(script);
+  }
+
   function buildNav(){
     const activeGroup = document.body.getAttribute("data-nav-group") || "";
     const container = document.getElementById("site-nav");
@@ -303,6 +316,7 @@
   }
 
   setupPWA();
+  setupAnalytics();
   buildNav();
   applyTheme(getStoredTheme());
   applyMode(getStoredMode());

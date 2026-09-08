@@ -66,7 +66,7 @@
     <li>The site itself doesn't have a server or database — it's static pages plus client-side JavaScript.</li>
     <li>Pages that show Destiny data (raids, dungeons, builds, etc.) call Bungie's public API directly from your browser using a shared, non-personal API key. No account or personal info is required to use them.</li>
     <li>The optional "sign in with Bungie.net" feature on <a href="vendors.html">Vendors</a> uses Bungie's own OAuth login to show your loadouts. The resulting access token is kept in your browser's <code>sessionStorage</code> only — it's never sent to us, because there's no "us" to send it to. It's cleared automatically when you close the tab.</li>
-    <li>We don't run analytics, tracking pixels, or advertising on the site.</li>
+    <li>We use <a href="https://www.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Cloudflare Web Analytics</a> to see aggregate traffic (page views, referrers, rough location by country). It's cookieless and doesn't fingerprint or track you individually — Cloudflare's own privacy policy covers exactly what it collects. We don't run any other analytics, tracking pixels, or advertising on the site.</li>
   </ul>
 
   <h2>Changes</h2>
