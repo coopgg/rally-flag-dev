@@ -28,6 +28,22 @@
   }
   .disclosure strong{ color:var(--accent-bright); }
 
+  .owned-auth-row{
+    max-width:1000px; margin:16px auto 0; padding:0 24px;
+    font-size:12.5px; font-family:'JetBrains Mono', monospace; text-align:center;
+  }
+  .owned-auth-row a{ color:var(--accent-bright); text-decoration:none; cursor:pointer; }
+  .owned-auth-row a:hover{ text-decoration:underline; }
+  .owned-auth-row .signed-in-text{ color:var(--text-dimmer); }
+  .weapon-owned-badge{
+    font-family:'JetBrains Mono', monospace; font-size:9.5px; letter-spacing:0.04em;
+    text-transform:uppercase; padding:3px 8px; border-radius:999px;
+    background:var(--accent); color:var(--bg);
+  }
+  .weapon-owned-badge.missing{
+    background:none; border:1px solid var(--panel-border); color:var(--text-dimmer);
+  }
+
   section{ max-width:1000px; margin:40px auto 0; padding:0 24px 90px; }
   .weapon-grid{
     display:flex; flex-wrap:wrap; justify-content:center; gap:16px;
@@ -207,6 +223,8 @@
   These aren't community popularity stats. What's here is <strong>our own personal picks from our own playtime</strong>: the rolls we've actually chased and use, not a claim that they're the objectively best for everyone. Your mileage (and your subclass, your playstyle, your favorite activity) may vary.
 </div>
 
+<div class="owned-auth-row" id="owned-auth-row"></div>
+
 <div class="controls">
   <div class="search-row">
     <div class="search-box">
@@ -246,6 +264,7 @@
 <script src="assets/nav.js"></script>
 <script src="assets/god-rolls-data.js"></script>
 <script src="assets/api-keys.js"></script>
+<script src="assets/oauth.js"></script>
 <script>
 (function(){
   // ---------------------------------------------------------------
@@ -293,8 +312,67 @@
       tierName: def.inventory?.tierTypeName || "",
       flavorText: def.flavorText || "",
       ammoTypeName: AMMO_TYPE_NAMES[ammoType] || null,
-      damageTypeHash: def.damageTypeHashes && def.damageTypeHashes.length ? def.damageTypeHashes[0] : null
+      damageTypeHash: def.damageTypeHashes && def.damageTypeHashes.length ? def.damageTypeHashes[0] : null,
+      collectibleHash: def.collectibleHash || null
     };
+  }
+
+  // ---------------------------------------------------------------
+  // Ownership badges (signed-in only) — same Collectibles-based
+  // approach as vendors.html's Eververse/Ada-1 badges: a weapon's
+  // collectible tracks whether you've ever obtained that weapon
+  // pattern at all, not which roll, so this answers "do I have this
+  // weapon" rather than "do I have this exact god roll" (that's a
+  // separate, bigger feature: it'd need scanning vault/inventory
+  // instances and their actual socketed perks).
+  // ---------------------------------------------------------------
+  const COLLECTIBLE_STATE_NOT_ACQUIRED = 1;
+
+  async function authedApiGet(path){
+    const res = await RallyFlagAuth.authedFetch(path);
+    const data = await res.json();
+    if (!res.ok || data.ErrorCode !== 1) throw new Error((data && data.Message) || ("HTTP " + res.status));
+    return data.Response;
+  }
+
+  async function fetchOwnedCollectibleHashes(){
+    const memberships = await authedApiGet("/Platform/User/GetMembershipsForCurrentUser/");
+    const destinyMemberships = memberships.destinyMemberships || [];
+    if (!destinyMemberships.length) throw new Error("This Bungie account has no linked Destiny 2 platform.");
+    const primary = destinyMemberships.find(m => m.membershipId === memberships.primaryMembershipId) || destinyMemberships[0];
+
+    const profile = await authedApiGet("/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId + "/?components=800");
+    const owned = new Set();
+    const addAcquired = (collectibles) => {
+      for (const hash of Object.keys(collectibles || {})){
+        if (!(collectibles[hash].state & COLLECTIBLE_STATE_NOT_ACQUIRED)) owned.add(hash);
+      }
+    };
+    // Most weapon collectibles are account-wide, but check per-character
+    // too — same bulk call returns both, and this was a real bug on the
+    // Eververse/Ada-1 badges when only account-wide was checked.
+    addAcquired(profile.profileCollectibles && profile.profileCollectibles.data && profile.profileCollectibles.data.collectibles);
+    const characterCollectibles = (profile.characterCollectibles && profile.characterCollectibles.data) || {};
+    for (const characterId of Object.keys(characterCollectibles)){
+      addAcquired(characterCollectibles[characterId].collectibles);
+    }
+    return owned;
+  }
+
+  let ownedHashesPromise = null;
+
+  function renderAuthRow(){
+    const row = document.getElementById("owned-auth-row");
+    if (RallyFlagAuth.isSignedIn()){
+      const name = RallyFlagAuth.getDisplayName() || "Signed in";
+      row.innerHTML = '<span class="signed-in-text">Signed in as ' + name + ' — Owned badges shown below</span>';
+    } else {
+      row.innerHTML = '<a href="#" id="owned-signin-link">Sign in with Bungie.net to see what you already own →</a>';
+      document.getElementById("owned-signin-link").addEventListener("click", (e) => {
+        e.preventDefault();
+        RallyFlagAuth.signIn();
+      });
+    }
   }
 
   const damageTypeCache = {};
@@ -330,6 +408,7 @@
         '<div><div class="weapon-name-row">' +
           '<div class="weapon-name" id="name-' + weapon.slug + '">' + weapon.name + '</div>' +
           '<span class="weapon-badges" id="badges-' + weapon.slug + '"></span>' +
+          '<span id="owned-badge-' + weapon.slug + '"></span>' +
         '</div>' +
         '<div class="weapon-meta" id="meta-' + weapon.slug + '">Loading live data\u2026</div></div>' +
       '</div>' +
@@ -416,6 +495,17 @@
         badgesHtml += '<span class="ammo-badge" title="' + item.ammoTypeName + '"><img src="' + AMMO_TYPE_ICONS[item.ammoTypeName] + '" alt="' + item.ammoTypeName + '"></span>';
       }
       badgesEl.innerHTML = badgesHtml;
+
+      const ownedBadgeEl = document.getElementById("owned-badge-" + weapon.slug);
+      if (ownedBadgeEl){
+        if (ownedHashesPromise && item.collectibleHash){
+          const ownedHashes = await ownedHashesPromise;
+          const owned = ownedHashes.has(String(item.collectibleHash));
+          ownedBadgeEl.innerHTML = '<span class="weapon-owned-badge' + (owned ? "" : " missing") + '">' + (owned ? "Owned" : "Not Owned") + '</span>';
+        } else {
+          ownedBadgeEl.innerHTML = "";
+        }
+      }
     } catch (err){
       console.warn("Weapon fetch failed for " + weapon.name + ":", err.message);
       document.getElementById("meta-" + weapon.slug).innerHTML = '<span class="load-error">Live data unavailable, check console</span>';
@@ -453,6 +543,20 @@
   }
 
   async function render(){
+    renderAuthRow();
+    // Fetched once here rather than lazily per-weapon so every card's
+    // first hydration already has it available — kicked off before the
+    // per-weapon loop so it resolves in parallel with the first few
+    // weapon/perk fetches instead of adding its own serial delay.
+    // Sign-in itself is a full OAuth redirect (via oauth-callback.html
+    // back to this page), so a fresh render() on page load already
+    // picks up the signed-in state correctly without needing a live
+    // re-subscription here.
+    ownedHashesPromise = RallyFlagAuth.isSignedIn() ? fetchOwnedCollectibleHashes().catch(err => {
+      console.warn("Owned-collectibles fetch failed:", err.message);
+      return new Set();
+    }) : null;
+
     const grid = document.getElementById("weapon-grid");
     grid.innerHTML = "";
     for (const weapon of window.GodRollsData.WEAPONS){
