@@ -34,7 +34,7 @@ window.GodRollsData = (function(){
       pairing: null },
     { name:"Rufus's Fury", slug:"rufuss-fury",
       itemHash: 484515708,
-      perkHashes: [3048246338, 1968098204, 461595545, 102912326],
+      perkHashes: [3048246338, 1968098204, 461595545, 2939589096, 622249644],
       raidSlug: "root-of-nightmares", dungeonSlug: null,
       note: "Kinetic pick for Ionic Overclock.",
       buildTags: ["ionic-overclock"],
