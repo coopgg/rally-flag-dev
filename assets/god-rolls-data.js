@@ -118,7 +118,7 @@ window.GodRollsData = (function(){
       pairing: null },
     { name:"Qua-Vinctus IV", slug:"qua-vinctus-iv",
       itemHash: 4176551594,
-      perkHashes: [111235976, 3267421167, 102912326, 2896748467, 4236235115, 3513245618, 1523545668],
+      perkHashes: [111235976, 3267421167, 102912326, 2896748467, 2671305723, 384158423, 1523545668],
       raidSlug: null, dungeonSlug: null,
       note: "Heavy pick for Contagion Chain and Panic Weave (Strand), but stays in the Power slot since only Special/Primary Strand and Stasis weapons move to Kinetic.",
       buildTags: ["contagion-chain", "panic-weave"],
