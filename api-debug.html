@@ -1461,9 +1461,25 @@
             '</div>' +
           '</div>';
 
+        // Only the confirmed weapon-perk-column category (barrel, mag,
+        // trait 1, trait 2, etc.) — same WEAPON_PERKS_CATEGORY_HASH the
+        // rest of this page already trusts for "real perks" elsewhere.
+        // A raw dump of every socketed plugHash (like the first version
+        // of this tool did) pulls in the intrinsic frame, the crafted
+        // "Shaped Weapon" flag, whatever shader happens to be equipped,
+        // and other noise that isn't a rollable perk at all.
+        const perkSocketIndexes = new Set();
+        ((itemDef.sockets && itemDef.sockets.socketCategories) || []).forEach(cat => {
+          if (cat.socketCategoryHash === WEAPON_PERKS_CATEGORY_HASH){
+            (cat.socketIndexes || []).forEach(idx => perkSocketIndexes.add(idx));
+          }
+        });
+
         for (const instanceId of instanceIds){
           const sockets = (ownership.socketsByInstanceId[instanceId] && ownership.socketsByInstanceId[instanceId].sockets) || [];
-          const plugHashes = sockets.map(s => s.plugHash).filter(Boolean);
+          const plugHashes = sockets
+            .map((s, idx) => (perkSocketIndexes.has(idx) ? s.plugHash : null))
+            .filter(Boolean);
           const resolvedPerks = await mapWithConcurrency(plugHashes, 5, async (plugHash) => {
             const plugDef = await fetchDef("DestinyInventoryItemDefinition", plugHash);
             return { hash: plugHash, name: (plugDef && plugDef.displayProperties && plugDef.displayProperties.name) || null };
