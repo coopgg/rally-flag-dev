@@ -425,13 +425,12 @@
 
   let ownershipDataPromise = null;
 
-  // TEMP DEBUG — console-only helper, not wired to any UI. Scans every
-  // itemHash actually found in your vault/inventory/equipped and
-  // resolves its real name, so we can find the true item hash for a
-  // crafted weapon whose "pattern" hash (the one used for perks/
-  // light.gg links) doesn't match what's actually sitting in your
-  // inventory. Usage from the browser console once signed in:
-  //   debugFindItemsByName("vinctus")
+  // Console-only utility, not wired to any UI. Scans every itemHash
+  // actually found in your vault/inventory/equipped and resolves its
+  // real name — useful for finding a crafted weapon's true item hash
+  // when it doesn't match the "pattern" hash used for its perks/
+  // light.gg link (see craftedItemHash in god-rolls-data.js). Usage
+  // from the browser console once signed in: debugFindItemsByName("vinctus")
   window.debugFindItemsByName = async function(nameFragment){
     if (!ownershipDataPromise){ console.warn("[owned-debug] Not signed in / ownership data not loaded yet."); return; }
     const ownership = await ownershipDataPromise;
@@ -604,17 +603,6 @@
           const label = owned ? "Owned" : (unlocked ? "Unlocked" : "Not Unlocked");
           const cls = owned ? "exact-roll" : (unlocked ? "" : "missing");
           unlockBadgeEl.innerHTML = '<span class="weapon-unlock-badge' + (cls ? " " + cls : "") + '">' + label + '</span>';
-          // TEMP DEBUG — remove once confirmed working. Dumps exactly
-          // what this check saw for every weapon.
-          console.log("[owned-debug]", weapon.name, {
-            candidateHashes: candidateHashes,
-            collectibleHash: item.collectibleHash,
-            instanceIds: instancesFor(candidateHashes, ownership),
-            collectibleUnlocked: !!(item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash))),
-            hasAnyInstance,
-            owned,
-            label
-          });
         } else {
           unlockBadgeEl.innerHTML = "";
         }
