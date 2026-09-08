@@ -356,10 +356,22 @@
     if (!ownedCollectiblesCache.has(cacheKey)){
       ownedCollectiblesCache.set(cacheKey, (async () => {
         const profile = await authedApiGet("/Platform/Destiny2/" + membershipType + "/Profile/" + membershipId + "/?components=800");
-        const collectibles = (profile.profileCollectibles && profile.profileCollectibles.data && profile.profileCollectibles.data.collectibles) || {};
         const owned = new Set();
-        for (const hash of Object.keys(collectibles)){
-          if (!(collectibles[hash].state & COLLECTIBLE_STATE_NOT_ACQUIRED)) owned.add(hash);
+        const addAcquired = (collectibles) => {
+          for (const hash of Object.keys(collectibles || {})){
+            if (!(collectibles[hash].state & COLLECTIBLE_STATE_NOT_ACQUIRED)) owned.add(hash);
+          }
+        };
+        // Most cosmetics are account-wide (profileCollectibles), but some
+        // are tracked per-character instead — same bulk call returns both,
+        // so check every character rather than assuming profile-scope covers
+        // everything (this was the bug: a character-scoped shader the
+        // player owned wasn't showing as owned because only
+        // profileCollectibles was being read).
+        addAcquired(profile.profileCollectibles && profile.profileCollectibles.data && profile.profileCollectibles.data.collectibles);
+        const characterCollectibles = (profile.characterCollectibles && profile.characterCollectibles.data) || {};
+        for (const characterId of Object.keys(characterCollectibles)){
+          addAcquired(characterCollectibles[characterId].collectibles);
         }
         return owned;
       })());
