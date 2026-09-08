@@ -557,7 +557,13 @@
         if (ownershipDataPromise){
           const ownership = await ownershipDataPromise;
           const owned = anyInstanceMatchesRoll(roll.itemHash, roll.perkHashes, ownership);
-          const unlocked = owned || (item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash)));
+          const hasAnyInstance = (ownership.instancesByHash.get(roll.itemHash) || []).length > 0;
+          // Some weapons (a lot of newer craftable ones) don't expose a
+          // normal collectibleHash at all, so Collectibles alone can't
+          // confirm "unlocked" for them — but finding an actual owned
+          // instance in vault/inventory/equipped is proof on its own,
+          // regardless of what Collections says.
+          const unlocked = owned || hasAnyInstance || (item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash)));
           const label = owned ? "Owned" : (unlocked ? "Unlocked" : "Not Unlocked");
           const cls = owned ? "exact-roll" : (unlocked ? "" : "missing");
           unlockBadgeEl.innerHTML = '<span class="weapon-unlock-badge' + (cls ? " " + cls : "") + '">' + label + '</span>';
@@ -569,6 +575,8 @@
             collectibleHash: item.collectibleHash,
             instanceIds: ownership.instancesByHash.get(roll.itemHash) || [],
             collectibleUnlocked: !!(item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash))),
+            hasAnyInstance,
+            owned,
             label
           });
         } else {
