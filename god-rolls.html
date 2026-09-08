@@ -43,6 +43,9 @@
   .weapon-unlock-badge.missing{
     background:none; border:1px solid var(--panel-border); color:var(--text-dimmer);
   }
+  .weapon-unlock-badge.exact-roll{
+    background:var(--accent-bright); color:#0b0700;
+  }
   .unlock-legend{
     max-width:1000px; margin:10px auto 0; padding:0 24px;
     font-size:12px; color:var(--text-dimmer); line-height:1.6; text-align:center;
@@ -229,7 +232,11 @@
 </div>
 
 <div class="owned-auth-row" id="owned-auth-row"></div>
-<div class="unlock-legend"><span class="weapon-unlock-badge">Unlocked</span> means you've obtained this weapon pattern before, via Collections — not necessarily with this exact roll. We don't check whether your specific copy has these perks yet.</div>
+<div class="unlock-legend">
+  <span class="weapon-unlock-badge exact-roll">Owned</span> = a copy in your vault/inventory currently has every perk in this roll.
+  <span class="weapon-unlock-badge">Unlocked</span> = you've obtained this weapon pattern before, but no copy matches this exact roll right now.
+  <span class="weapon-unlock-badge missing">Not Unlocked</span> = never obtained.
+</div>
 
 <div class="controls">
   <div class="search-row">
@@ -324,13 +331,15 @@
   }
 
   // ---------------------------------------------------------------
-  // Ownership badges (signed-in only) — same Collectibles-based
-  // approach as vendors.html's Eververse/Ada-1 badges: a weapon's
-  // collectible tracks whether you've ever obtained that weapon
-  // pattern at all, not which roll, so this answers "do I have this
-  // weapon" rather than "do I have this exact god roll" (that's a
-  // separate, bigger feature: it'd need scanning vault/inventory
-  // instances and their actual socketed perks).
+  // Ownership badges (signed-in only). Two separate checks:
+  //   - Unlocked: this weapon pattern has ever been obtained, via
+  //     Collectibles (component 800) — same approach as vendors.html's
+  //     Eververse/Ada-1 badges.
+  //   - Owned: an actual copy in your vault/inventory/equipped right
+  //     now has every perk in the recommended roll socketed. Needs the
+  //     full inventory (102 vault, 201 character inventories, 205
+  //     equipped) plus each instanced item's current sockets (305) —
+  //     all in the one bulk Profile call below, no per-item requests.
   // ---------------------------------------------------------------
   const COLLECTIBLE_STATE_NOT_ACQUIRED = 1;
 
@@ -341,17 +350,21 @@
     return data.Response;
   }
 
-  async function fetchOwnedCollectibleHashes(){
+  async function fetchOwnershipData(){
     const memberships = await authedApiGet("/Platform/User/GetMembershipsForCurrentUser/");
     const destinyMemberships = memberships.destinyMemberships || [];
     if (!destinyMemberships.length) throw new Error("This Bungie account has no linked Destiny 2 platform.");
     const primary = destinyMemberships.find(m => m.membershipId === memberships.primaryMembershipId) || destinyMemberships[0];
 
-    const profile = await authedApiGet("/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId + "/?components=800");
-    const owned = new Set();
+    const profile = await authedApiGet(
+      "/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId +
+      "/?components=102,201,205,305,800"
+    );
+
+    const unlockedHashes = new Set();
     const addAcquired = (collectibles) => {
       for (const hash of Object.keys(collectibles || {})){
-        if (!(collectibles[hash].state & COLLECTIBLE_STATE_NOT_ACQUIRED)) owned.add(hash);
+        if (!(collectibles[hash].state & COLLECTIBLE_STATE_NOT_ACQUIRED)) unlockedHashes.add(hash);
       }
     };
     // Most weapon collectibles are account-wide, but check per-character
@@ -362,16 +375,48 @@
     for (const characterId of Object.keys(characterCollectibles)){
       addAcquired(characterCollectibles[characterId].collectibles);
     }
-    return owned;
+
+    // instancesByHash: itemHash -> [itemInstanceId, ...], across vault,
+    // every character's inventory, and every character's equipped slot.
+    const instancesByHash = new Map();
+    const addItems = (items) => {
+      for (const it of items || []){
+        if (!it.itemInstanceId) continue;
+        if (!instancesByHash.has(it.itemHash)) instancesByHash.set(it.itemHash, []);
+        instancesByHash.get(it.itemHash).push(it.itemInstanceId);
+      }
+    };
+    addItems(profile.profileInventory && profile.profileInventory.data && profile.profileInventory.data.items);
+    const characterInventories = (profile.characterInventories && profile.characterInventories.data) || {};
+    for (const characterId of Object.keys(characterInventories)) addItems(characterInventories[characterId].items);
+    const characterEquipment = (profile.characterEquipment && profile.characterEquipment.data) || {};
+    for (const characterId of Object.keys(characterEquipment)) addItems(characterEquipment[characterId].items);
+
+    const socketsByInstanceId = (profile.itemComponents && profile.itemComponents.sockets && profile.itemComponents.sockets.data) || {};
+
+    return { unlockedHashes, instancesByHash, socketsByInstanceId };
   }
 
-  let ownedHashesPromise = null;
+  // True if any owned instance of this itemHash currently has every
+  // hash in perkHashes socketed somewhere (barrel/mag/traits/etc are
+  // all just sockets — a flat union across all of an instance's
+  // sockets is enough, no need to know which socket is which column).
+  function anyInstanceMatchesRoll(itemHash, perkHashes, ownership){
+    const instanceIds = ownership.instancesByHash.get(itemHash) || [];
+    return instanceIds.some(instanceId => {
+      const sockets = (ownership.socketsByInstanceId[instanceId] && ownership.socketsByInstanceId[instanceId].sockets) || [];
+      const plugHashes = new Set(sockets.map(s => s.plugHash).filter(Boolean));
+      return perkHashes.every(h => plugHashes.has(h));
+    });
+  }
+
+  let ownershipDataPromise = null;
 
   function renderAuthRow(){
     const row = document.getElementById("owned-auth-row");
     if (RallyFlagAuth.isSignedIn()){
       const name = RallyFlagAuth.getDisplayName() || "Signed in";
-      row.innerHTML = '<span class="signed-in-text">Signed in as ' + name + ' — Unlocked badges shown below</span>';
+      row.innerHTML = '<span class="signed-in-text">Signed in as ' + name + ' — Owned/Unlocked badges shown below</span>';
     } else {
       row.innerHTML = '<a href="#" id="owned-signin-link">Sign in with Bungie.net to see what you already own →</a>';
       document.getElementById("owned-signin-link").addEventListener("click", (e) => {
@@ -504,10 +549,13 @@
 
       const unlockBadgeEl = document.getElementById("unlock-badge-" + weapon.slug);
       if (unlockBadgeEl){
-        if (ownedHashesPromise && item.collectibleHash){
-          const ownedHashes = await ownedHashesPromise;
-          const unlocked = ownedHashes.has(String(item.collectibleHash));
-          unlockBadgeEl.innerHTML = '<span class="weapon-unlock-badge' + (unlocked ? "" : " missing") + '">' + (unlocked ? "Unlocked" : "Not Unlocked") + '</span>';
+        if (ownershipDataPromise){
+          const ownership = await ownershipDataPromise;
+          const owned = anyInstanceMatchesRoll(roll.itemHash, roll.perkHashes, ownership);
+          const unlocked = owned || (item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash)));
+          const label = owned ? "Owned" : (unlocked ? "Unlocked" : "Not Unlocked");
+          const cls = owned ? "exact-roll" : (unlocked ? "" : "missing");
+          unlockBadgeEl.innerHTML = '<span class="weapon-unlock-badge' + (cls ? " " + cls : "") + '">' + label + '</span>';
         } else {
           unlockBadgeEl.innerHTML = "";
         }
@@ -558,9 +606,9 @@
     // back to this page), so a fresh render() on page load already
     // picks up the signed-in state correctly without needing a live
     // re-subscription here.
-    ownedHashesPromise = RallyFlagAuth.isSignedIn() ? fetchOwnedCollectibleHashes().catch(err => {
-      console.warn("Owned-collectibles fetch failed:", err.message);
-      return new Set();
+    ownershipDataPromise = RallyFlagAuth.isSignedIn() ? fetchOwnershipData().catch(err => {
+      console.warn("Ownership data fetch failed:", err.message);
+      return { unlockedHashes: new Set(), instancesByHash: new Map(), socketsByInstanceId: {} };
     }) : null;
 
     const grid = document.getElementById("weapon-grid");
