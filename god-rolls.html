@@ -35,14 +35,19 @@
   .owned-auth-row a{ color:var(--accent-bright); text-decoration:none; cursor:pointer; }
   .owned-auth-row a:hover{ text-decoration:underline; }
   .owned-auth-row .signed-in-text{ color:var(--text-dimmer); }
-  .weapon-owned-badge{
+  .weapon-unlock-badge{
     font-family:'JetBrains Mono', monospace; font-size:9.5px; letter-spacing:0.04em;
     text-transform:uppercase; padding:3px 8px; border-radius:999px;
     background:var(--accent); color:var(--bg);
   }
-  .weapon-owned-badge.missing{
+  .weapon-unlock-badge.missing{
     background:none; border:1px solid var(--panel-border); color:var(--text-dimmer);
   }
+  .unlock-legend{
+    max-width:1000px; margin:10px auto 0; padding:0 24px;
+    font-size:12px; color:var(--text-dimmer); line-height:1.6; text-align:center;
+  }
+  .unlock-legend .weapon-unlock-badge{ vertical-align:middle; margin:0 2px; }
 
   section{ max-width:1000px; margin:40px auto 0; padding:0 24px 90px; }
   .weapon-grid{
@@ -224,6 +229,7 @@
 </div>
 
 <div class="owned-auth-row" id="owned-auth-row"></div>
+<div class="unlock-legend"><span class="weapon-unlock-badge">Unlocked</span> means you've obtained this weapon pattern before, via Collections — not necessarily with this exact roll. We don't check whether your specific copy has these perks yet.</div>
 
 <div class="controls">
   <div class="search-row">
@@ -365,7 +371,7 @@
     const row = document.getElementById("owned-auth-row");
     if (RallyFlagAuth.isSignedIn()){
       const name = RallyFlagAuth.getDisplayName() || "Signed in";
-      row.innerHTML = '<span class="signed-in-text">Signed in as ' + name + ' — Owned badges shown below</span>';
+      row.innerHTML = '<span class="signed-in-text">Signed in as ' + name + ' — Unlocked badges shown below</span>';
     } else {
       row.innerHTML = '<a href="#" id="owned-signin-link">Sign in with Bungie.net to see what you already own →</a>';
       document.getElementById("owned-signin-link").addEventListener("click", (e) => {
@@ -408,7 +414,7 @@
         '<div><div class="weapon-name-row">' +
           '<div class="weapon-name" id="name-' + weapon.slug + '">' + weapon.name + '</div>' +
           '<span class="weapon-badges" id="badges-' + weapon.slug + '"></span>' +
-          '<span id="owned-badge-' + weapon.slug + '"></span>' +
+          '<span id="unlock-badge-' + weapon.slug + '"></span>' +
         '</div>' +
         '<div class="weapon-meta" id="meta-' + weapon.slug + '">Loading live data\u2026</div></div>' +
       '</div>' +
@@ -496,14 +502,14 @@
       }
       badgesEl.innerHTML = badgesHtml;
 
-      const ownedBadgeEl = document.getElementById("owned-badge-" + weapon.slug);
-      if (ownedBadgeEl){
+      const unlockBadgeEl = document.getElementById("unlock-badge-" + weapon.slug);
+      if (unlockBadgeEl){
         if (ownedHashesPromise && item.collectibleHash){
           const ownedHashes = await ownedHashesPromise;
-          const owned = ownedHashes.has(String(item.collectibleHash));
-          ownedBadgeEl.innerHTML = '<span class="weapon-owned-badge' + (owned ? "" : " missing") + '">' + (owned ? "Owned" : "Not Owned") + '</span>';
+          const unlocked = ownedHashes.has(String(item.collectibleHash));
+          unlockBadgeEl.innerHTML = '<span class="weapon-unlock-badge' + (unlocked ? "" : " missing") + '">' + (unlocked ? "Unlocked" : "Not Unlocked") + '</span>';
         } else {
-          ownedBadgeEl.innerHTML = "";
+          unlockBadgeEl.innerHTML = "";
         }
       }
     } catch (err){
