@@ -44,13 +44,14 @@
   }
   .twitch-player-wrap iframe{ position:absolute; inset:0; width:100%; height:100%; border:0; }
   .twitch-links{ display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
-  .twitch-link, .discord-link{
+  .twitch-link, .discord-link, .kofi-link{
     font-size:12.5px; font-family:'JetBrains Mono', monospace; color:var(--accent-bright);
     text-decoration:none; background:var(--accent-dim); border:1px solid var(--panel-border);
     padding:8px 14px; border-radius:999px; transition: border-color 0.2s ease;
   }
   .twitch-link:hover, .twitch-link:focus-visible,
-  .discord-link:hover, .discord-link:focus-visible{ border-color:var(--accent-bright); }
+  .discord-link:hover, .discord-link:focus-visible,
+  .kofi-link:hover, .kofi-link:focus-visible{ border-color:var(--accent-bright); }
 
   .faq-grid{ display:grid; grid-template-columns:repeat(2, 1fr); gap:14px; }
   @media (max-width:640px){ .faq-grid{ grid-template-columns:1fr; } }
@@ -106,6 +107,7 @@
       <a class="twitch-link" href="https://www.twitch.tv/coopgg__" target="_blank" rel="noopener">Watch on Twitch →</a>
       <a class="twitch-link" href="https://www.twitch.tv/coopgg__/videos?filter=archives&sort=time" target="_blank" rel="noopener">Past Broadcasts →</a>
       <a class="discord-link" href="https://discord.gg/9rp2QAfNZs" target="_blank" rel="noopener">Join the Discord →</a>
+      <a class="kofi-link" href="https://ko-fi.com/coopgg" target="_blank" rel="noopener">Support us on Ko-fi →</a>
     </div>
   </div>
 
