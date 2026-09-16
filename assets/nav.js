@@ -3,7 +3,7 @@
    Every page includes this file and a `<div id="site-nav"></div>`
    right after the opening <body> tag. Set `<body data-nav-group="...">`
    to control which top-level nav link is marked active:
-     "distortions" | "setbonuses" | "guides" | "godrolls" | "artifacts" | "builds" | "puzzlehelper" | "codes" | "tracker" | "vendors" | "debug"
+     "distortions" | "setbonuses" | "guides" | "godrolls" | "artifacts" | "builds" | "puzzlehelper" | "codes" | "tracker" | "vendors" | "publicevents" | "debug"
 
    Theme (element) and mode (dark/light) are stored in localStorage
    so they persist across every page on the site, not just the one
@@ -43,6 +43,7 @@
       label: "Reference",
       items: [
         { label: "Guides", href: "guides.html", group: "guides" },
+        { label: "Public Events", href: "public-events.html", group: "publicevents" },
         { label: "Puzzle Helper", href: "puzzle-helper.html", group: "puzzlehelper" },
         { label: "Codes", href: "codes.html", group: "codes" }
       ]
