@@ -76,6 +76,17 @@
   }
   .hud-set-link:hover, .hud-set-link:focus-visible{ color:var(--accent-bright); }
 
+  .nine-touched-box{
+    position:relative; margin-top:22px; padding-top:18px;
+    border-top:1px solid var(--panel-border); text-align:left;
+  }
+  .nine-touched-label{
+    font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--accent); margin-bottom:8px;
+  }
+  .nine-touched-body{ font-size:13.5px; color:var(--text-dim); line-height:1.6; }
+  .nine-touched-body strong{ color:var(--text); }
+
   /* ---------- Up next ---------- */
   section{ max-width:1000px; margin:80px auto 0; padding:0 24px 90px; }
   .next-grid{
@@ -111,6 +122,7 @@
     <a href="rotation.html" class="hud-cta" id="cta-btn">Farm at higher tier</a>
     <div class="hud-trail"></div>
     <a href="#" class="hud-set-link" id="hud-set-link">View set bonuses →</a>
+    <div class="nine-touched-box" id="nine-touched-box"></div>
   </div>
 </div>
 
@@ -130,6 +142,23 @@
 (function(){
   const D = window.DistortionData;
 
+  // Nine-Touched: a red corruption sitting inside one specific, fixed
+  // Lost Sector per destination — completely invisible and inert unless
+  // that destination is the current hourly Distortion. Unrelated to the
+  // rotating daily/Legend/Master Lost Sector on tracker.html (that's a
+  // different rotation entirely) — this is always the same Lost Sector
+  // per destination, done at normal difficulty, not Master. Keyed by
+  // the exact destination name strings from rotation-data.js.
+  const NINE_TOUCHED_BY_DESTINATION = {
+    "Cosmodrome": { lostSector: "Veles Labyrinth (Forgotten Shore)", boss: "Ak-Baral, Nine-Touched" },
+    "EDZ": { lostSector: "Quarry (Sunken Isles)", boss: "Fortifier Yann, Nine-Touched" },
+    "Nessus": { lostSector: "The Rift (Exodus Black)", boss: "Talas, Nine-Touched" },
+    "Moon": { lostSector: "K1 Revelation (Sorrow's Harbor)", boss: "Nightmare of Arguth, Nine-Touched" },
+    "Dreaming City": { lostSector: "Chamber of Starlight (Rheasilvia)", boss: "Inkasi, Nine-Touched" },
+    "Europa": { lostSector: "Concealed Void (Asterion Abyss)", boss: "Teliks, Nine-Touched" },
+    "Savathûn's Throne World": { lostSector: "Sepulcher (Florescent Canal)", boss: "Bar-Zel, Nine-Touched" }
+  };
+
   function render(){
     const now = new Date();
     const hourStart = D.currentHourStart(now);
@@ -137,6 +166,14 @@
 
     document.getElementById("current-dest").textContent = current.name;
     document.getElementById("cta-btn").textContent = "Farm " + current.loot + " at higher tier";
+
+    const nineTouchedBox = document.getElementById("nine-touched-box");
+    const nineTouched = NINE_TOUCHED_BY_DESTINATION[current.name];
+    nineTouchedBox.innerHTML = nineTouched
+      ? '<div class="nine-touched-label">Nine-Touched Active</div>' +
+        '<div class="nine-touched-body">' + current.name + ' being Distorted means the corruption in <strong>' + nineTouched.lostSector +
+        '</strong> is active too — head in on normal difficulty (Master isn’t needed) and defeat <strong>' + nineTouched.boss + '</strong> for the triumph.</div>'
+      : "";
     const setLink = document.getElementById("hud-set-link");
     setLink.textContent = "View " + current.loot + " set bonuses \u2192";
     setLink.href = "armor-set-bonuses.html?highlight=" + current.slug;
