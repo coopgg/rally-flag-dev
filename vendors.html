@@ -168,6 +168,16 @@
     color:var(--text-dim); margin-bottom:24px;
   }
   .vend-departure-note .clock{ color:var(--accent-bright); font-weight:700; }
+
+  .vend-predicted-wrap{ margin-top:8px; padding-top:26px; border-top:1px dashed var(--panel-border); }
+  .vend-predicted-label{
+    text-align:center; font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.1em;
+    text-transform:uppercase; color:var(--accent); margin-bottom:8px;
+  }
+  .vend-predicted-note{
+    text-align:center; font-size:11.5px; color:var(--text-dimmer); max-width:480px;
+    margin:0 auto 20px; line-height:1.55;
+  }
   .vend-build-note{
     margin-top:10px; padding-top:10px; border-top:1px solid var(--panel-border);
     font-size:11.5px; color:var(--text-dim);
@@ -314,6 +324,17 @@
 
   async function authedApiGet(path){
     const res = await RallyFlagAuth.authedFetch(path);
+    const data = await res.json();
+    if (!res.ok || data.ErrorCode !== 1){
+      throw new Error((data && data.Message) || ("HTTP " + res.status));
+    }
+    return data.Response;
+  }
+
+  // Public, no-login endpoint — same data every visitor gets, used only
+  // for the Xûr "Predicted" preview below (see fetchXurPredicted).
+  async function anonApiGet(path){
+    const res = await fetch(BUNGIE_ROOT + path, { headers: { "X-API-Key": BUNGIE_API_KEY } });
     const data = await res.json();
     if (!res.ok || data.ErrorCode !== 1){
       throw new Error((data && data.Message) || ("HTTP " + res.status));
@@ -1233,6 +1254,97 @@
     return null;
   }
 
+  // Confirmed live (2026-09-18): Bungie's public, anonymous Vendors
+  // endpoint already resolved next rotation's Xûr stock ~4 hours before
+  // his official Friday arrival — the exact same item list was still
+  // there once he actually showed up. Uses that same endpoint (no OAuth,
+  // same data every visitor gets) to show a preview while he's off the
+  // map. We've only verified this holds a few hours out from reset, not
+  // the full week he's gone, so it's always labeled unconfirmed rather
+  // than presented as a lock.
+  async function fetchXurPredicted(){
+    const vendorsResp = await anonApiGet("/Platform/Destiny2/Vendors/?components=Vendors,VendorCategories,VendorSales");
+    const itemsByHash = new Map();
+
+    for (const vHash of [XUR_HASH, ...XUR_SUB_HASHES]){
+      const vendorEntry = vendorsResp.vendors && vendorsResp.vendors.data && vendorsResp.vendors.data[vHash];
+      if (!vendorEntry) continue;
+      const saleItems = (vendorsResp.sales && vendorsResp.sales.data && vendorsResp.sales.data[vHash] && vendorsResp.sales.data[vHash].saleItems) || {};
+      for (const sale of Object.values(saleItems)){
+        if (!itemsByHash.has(sale.itemHash)) itemsByHash.set(sale.itemHash, sale);
+      }
+    }
+
+    if (!itemsByHash.size) return null;
+
+    const resolved = await mapWithConcurrency(Array.from(itemsByHash.values()), 6, async (sale) => {
+      const itemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
+      const name = (itemDef && itemDef.displayProperties && itemDef.displayProperties.name) || ("Unknown (" + sale.itemHash + ")");
+      const typeName = (itemDef && itemDef.itemTypeDisplayName) || "";
+      const tier = itemDef && itemDef.inventory ? itemDef.inventory.tierTypeName : null;
+      const isCatalyst = /catalyst/i.test(name);
+
+      if (!isCatalyst && XUR_SKIP_TYPES.has(typeName)) return null;
+
+      const icon = itemDef ? iconUrl(itemDef.displayProperties) : null;
+      const tag = isCatalyst ? "Catalyst" : (tier === "Exotic" ? "Exotic" : null);
+      const isArmor = XUR_ARMOR_TYPES.has(typeName);
+      const costText = await costChipsHtml(sale.costs);
+      const card = itemCardHtml(name, icon, typeName || (isCatalyst ? "Catalyst" : ""), costText, tag, "");
+      const classType = isArmor ? ((itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3) : null;
+      return { card, isArmor, classType };
+    });
+
+    const weapons = [];
+    const armorByClass = new Map();
+    let itemCount = 0;
+    for (const r of resolved){
+      if (!r) continue;
+      itemCount++;
+      if (r.isArmor){
+        if (!armorByClass.has(r.classType)) armorByClass.set(r.classType, []);
+        armorByClass.get(r.classType).push(r.card);
+      } else {
+        weapons.push(r.card);
+      }
+    }
+    return { weapons, armorByClass, itemCount };
+  }
+
+  async function renderXurPredicted(container){
+    const wrap = document.createElement("div");
+    wrap.className = "vend-predicted-wrap";
+    wrap.innerHTML =
+      '<div class="vend-predicted-label">Predicted — Unconfirmed</div>' +
+      '<div class="vend-predicted-note">Bungie’s public vendor data resolved to this exact lineup a few hours before Xûr’s last arrival, before it was officially live anywhere. Treat it as a strong early look, not a lock, until he actually shows up.</div>';
+    container.appendChild(wrap);
+
+    try {
+      const predicted = await fetchXurPredicted();
+      if (!predicted || !predicted.itemCount){
+        wrap.insertAdjacentHTML("beforeend", '<div class="tw-status">Nothing resolving yet — check back closer to reset.</div>');
+        return;
+      }
+      if (predicted.weapons.length){
+        const labelEl = document.createElement("div");
+        labelEl.className = "vend-category-label";
+        labelEl.textContent = "Weapons (" + predicted.weapons.length + ")";
+        wrap.appendChild(labelEl);
+        const grid = document.createElement("div");
+        grid.className = "vend-grid";
+        grid.innerHTML = predicted.weapons.join("");
+        wrap.appendChild(grid);
+      }
+      for (const classType of [0, 1, 2, 3]){
+        if (!predicted.armorByClass.has(classType)) continue;
+        const items = predicted.armorByClass.get(classType);
+        appendCollapsibleCategory(wrap, VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")", items);
+      }
+    } catch (err){
+      wrap.insertAdjacentHTML("beforeend", '<div class="tw-status tw-error">Predicted preview failed: ' + err.message + '</div>');
+    }
+  }
+
   async function runXur(){
     const statusEl = document.getElementById("xur-status");
     const outputEl = document.getElementById("xur-output");
@@ -1241,6 +1353,7 @@
       statusEl.className = "";
       statusEl.textContent = "";
       renderArrivalCountdown(outputEl, estimateNextXurArrival());
+      renderXurPredicted(outputEl);
       return;
     }
 
