@@ -1350,12 +1350,7 @@
     const statusEl = document.getElementById("xur-status");
     const outputEl = document.getElementById("xur-output");
 
-    // TEMPORARY test hook — remove once the Predicted section has been
-    // eyeballed live. ?xurTest=predicted forces the "he's gone" branch so
-    // it can be checked without waiting for Xur to actually leave.
-    const forceXurGone = new URLSearchParams(location.search).get("xurTest") === "predicted";
-
-    if (forceXurGone || !isWithinXurSchedule()){
+    if (!isWithinXurSchedule()){
       statusEl.className = "";
       statusEl.textContent = "";
       renderArrivalCountdown(outputEl, estimateNextXurArrival());
