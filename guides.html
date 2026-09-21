@@ -23,13 +23,12 @@
 <style>
   .link-grid{
     max-width:800px; margin:48px auto 0; padding:0 24px 90px;
-    display:grid; grid-template-columns:repeat(2, 1fr); gap:16px;
+    display:flex; flex-wrap:wrap; justify-content:center; gap:16px;
   }
-  @media (max-width:640px){ .link-grid{ grid-template-columns:1fr; } }
 
   .link-card{
     position:relative; display:block; text-decoration:none;
-    padding:32px 28px; text-align:center;
+    flex:0 1 240px; padding:32px 28px; text-align:center;
     transition: border-color 0.2s ease, background 0.2s ease;
   }
   .link-card:hover, .link-card:focus-visible{ border-color:var(--accent); background:var(--accent-dim); }
