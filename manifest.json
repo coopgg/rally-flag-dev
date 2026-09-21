@@ -1,7 +1,7 @@
 {
   "name": "Rally Flag",
   "short_name": "Rally Flag",
-  "description": "A companion site for Destiny 2 — live Distortion tracking, the full armor set bonus database, guides, and god rolls, all in one place.",
+  "description": "A companion site for Destiny 2 — raid and dungeon guides, weapon god rolls, ready-to-run builds, the full armor set bonus database, and live trackers for Distortions, vendors, and what's active now.",
   "start_url": ".",
   "scope": ".",
   "display": "standalone",
