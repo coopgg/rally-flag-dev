@@ -1322,15 +1322,17 @@
         wrap.insertAdjacentHTML("beforeend", '<div class="tw-status">Nothing resolving yet — check back closer to reset.</div>');
         return;
       }
+      const weaponsLabelEl = document.createElement("div");
+      weaponsLabelEl.className = "vend-category-label";
+      weaponsLabelEl.textContent = "Weapons (" + predicted.weapons.length + ")";
+      wrap.appendChild(weaponsLabelEl);
       if (predicted.weapons.length){
-        const labelEl = document.createElement("div");
-        labelEl.className = "vend-category-label";
-        labelEl.textContent = "Weapons (" + predicted.weapons.length + ")";
-        wrap.appendChild(labelEl);
         const grid = document.createElement("div");
         grid.className = "vend-grid";
         grid.innerHTML = predicted.weapons.join("");
         wrap.appendChild(grid);
+      } else {
+        wrap.insertAdjacentHTML("beforeend", '<div class="vend-empty-note">Nothing resolving yet — check back closer to reset.</div>');
       }
       for (const classType of [0, 1, 2, 3]){
         if (!predicted.armorByClass.has(classType)) continue;
