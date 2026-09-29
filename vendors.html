@@ -176,9 +176,6 @@
     color:var(--text-dimmer); border:1px solid var(--panel-border); border-radius:999px;
     padding:3px 8px; margin-left:8px; vertical-align:middle;
   }
-  .vend-predicted-note{
-    font-size:11.5px; color:var(--text-dimmer); max-width:520px; line-height:1.55; margin-bottom:18px;
-  }
   .vend-build-note{
     margin-top:10px; padding-top:10px; border-top:1px solid var(--panel-border);
     font-size:11.5px; color:var(--text-dim);
@@ -1316,8 +1313,7 @@
     const wrap = document.createElement("details");
     wrap.className = "vend-category-collapsible vend-predicted-wrap";
     wrap.innerHTML =
-      '<summary class="vend-category-label">Predicted Next Drop<span class="vend-predicted-badge">Unconfirmed</span><span class="vend-category-chevron">&#9656;</span></summary>' +
-      '<div class="vend-predicted-note">Bungie’s public vendor data resolved to this exact lineup a few hours before Xûr’s last arrival, before it was officially live anywhere. Treat it as a strong early look, not a lock, until he actually shows up.</div>';
+      '<summary class="vend-category-label">Predicted Next Drop<span class="vend-predicted-badge">Unconfirmed</span><span class="vend-category-chevron">&#9656;</span></summary>';
     container.appendChild(wrap);
 
     try {
