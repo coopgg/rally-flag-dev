@@ -331,8 +331,13 @@
 
   // Public, no-login endpoint — same data every visitor gets, used only
   // for the Xûr "Predicted" preview below (see fetchXurPredicted).
+  // credentials:"omit" is deliberate: without it, a visitor who's also
+  // signed into Bungie.net in the same browser (for Live Roll Detail
+  // below) risks this "anonymous" call quietly picking up their session
+  // and personalizing the response to their own character/class instead
+  // of returning the same data every visitor gets.
   async function anonApiGet(path){
-    const res = await fetch(BUNGIE_ROOT + path, { headers: { "X-API-Key": BUNGIE_API_KEY } });
+    const res = await fetch(BUNGIE_ROOT + path, { headers: { "X-API-Key": BUNGIE_API_KEY }, credentials: "omit" });
     const data = await res.json();
     if (!res.ok || data.ErrorCode !== 1){
       throw new Error((data && data.Message) || ("HTTP " + res.status));
