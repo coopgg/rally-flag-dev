@@ -88,13 +88,20 @@
   .mixer-category-chevron{ font-size:11px; color:var(--accent); transition:transform 0.15s ease; }
   .mixer-suggestions-sub{ font-size:12px; color:var(--text-dimmer); margin:10px 0 16px; line-height:1.5; }
 
-  .mixer-suggestion-group{ margin-bottom:18px; }
+  .mixer-suggestion-group{ margin-bottom:10px; }
   .mixer-suggestion-group:last-child{ margin-bottom:0; }
   .mixer-suggestion-group-label{
+    display:flex; align-items:center; justify-content:space-between; gap:8px;
+    cursor:pointer; list-style:none; user-select:none;
     font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.06em;
-    color:var(--text-dimmer); text-transform:uppercase; margin-bottom:8px;
+    color:var(--text-dimmer); text-transform:uppercase;
+    padding:8px 2px;
   }
-  .mixer-suggestion-group-count{ color:var(--text-dimmer); }
+  .mixer-suggestion-group-label::-webkit-details-marker{ display:none; }
+  .mixer-suggestion-group[open] > .mixer-suggestion-group-label{ color:var(--accent); }
+  .mixer-suggestion-group[open] > .mixer-suggestion-group-label .mixer-category-chevron{ transform:rotate(90deg); }
+  .mixer-suggestion-group-count{ color:var(--text-dimmer); font-weight:400; }
+  .mixer-suggestion-group .mixer-suggestion-list{ margin-top:8px; }
   .mixer-suggestion-list{ display:flex; flex-direction:column; gap:6px; }
   .mixer-suggestion-btn{
     display:block; width:100%; text-align:left; cursor:pointer;
@@ -824,10 +831,13 @@
         '</button>'
       ).join("");
       return (
-        '<div class="mixer-suggestion-group">' +
-          '<div class="mixer-suggestion-group-label">' + label + ' <span class="mixer-suggestion-group-count">(' + g.combos.length + ')</span></div>' +
+        '<details class="mixer-suggestion-group">' +
+          '<summary class="mixer-suggestion-group-label">' +
+            '<span>' + label + ' <span class="mixer-suggestion-group-count">(' + g.combos.length + ')</span></span>' +
+            '<span class="mixer-category-chevron">&#9656;</span>' +
+          '</summary>' +
           '<div class="mixer-suggestion-list">' + rows + '</div>' +
-        '</div>'
+        '</details>'
       );
     }).join("");
 
