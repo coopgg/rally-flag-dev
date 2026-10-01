@@ -43,6 +43,13 @@
   }
   .mixer-select:focus{ border-color:var(--accent); }
   .mixer-select:disabled{ opacity:0.45; cursor:not-allowed; }
+  /* The dropdown popup is browser-rendered, not styled by the rules
+     above — Chrome/Firefox do respect background/color set directly
+     on <option>/<optgroup>, so without this the popup falls back to
+     the OS default (white background, near-invisible light text). */
+  .mixer-select option, .mixer-select optgroup{
+    background:var(--panel); color:var(--text);
+  }
   .mixer-slot-note{ font-size:11.5px; color:var(--text-dimmer); margin-top:6px; line-height:1.4; }
   .mixer-results{ border-top:1px solid var(--panel-border); padding-top:18px; }
   .mixer-empty{ font-size:13px; color:var(--text-dimmer); font-style:italic; }
