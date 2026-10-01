@@ -21,6 +21,36 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/theme.css">
 <style>
+  /* ---------- Mixer (build crafting) ---------- */
+  .mixer{ max-width:1180px; margin:40px auto 0; padding:0 24px; }
+  .mixer-card{ padding:26px 26px 22px; }
+  .mixer-label{
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.12em;
+    color:var(--accent); text-transform:uppercase; margin-bottom:6px;
+  }
+  .mixer-sub{ font-size:13px; color:var(--text-dim); margin-bottom:18px; line-height:1.5; }
+  .mixer-slots{ display:flex; flex-wrap:wrap; gap:16px; margin-bottom:18px; }
+  .mixer-slot{ flex:1 1 260px; min-width:240px; }
+  .mixer-slot-label{
+    font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.08em;
+    color:var(--text-dimmer); text-transform:uppercase; margin-bottom:8px;
+  }
+  .mixer-select{
+    width:100%; background:var(--panel); border:1px solid var(--panel-border);
+    color:var(--text); font-family:'Inter', sans-serif; font-size:13.5px;
+    padding:12px 14px; border-radius:2px; outline:none;
+    transition: border-color 0.2s ease;
+  }
+  .mixer-select:focus{ border-color:var(--accent); }
+  .mixer-select:disabled{ opacity:0.45; cursor:not-allowed; }
+  .mixer-slot-note{ font-size:11.5px; color:var(--text-dimmer); margin-top:6px; line-height:1.4; }
+  .mixer-results{ border-top:1px solid var(--panel-border); padding-top:18px; }
+  .mixer-empty{ font-size:13px; color:var(--text-dimmer); font-style:italic; }
+  .mixer-flex-note{
+    margin-top:14px; padding-top:14px; border-top:1px solid var(--panel-border);
+    font-size:12px; color:var(--text-dimmer); line-height:1.5;
+  }
+
   /* ---------- Controls ---------- */
   .controls{ max-width:1180px; margin:40px auto 0; padding:0 24px; }
 
@@ -192,6 +222,25 @@
   <div class="eyebrow">Destiny 2 · Set Bonus Lookup</div>
   <h1 class="title">Armor Set Bonuses</h1>
   <p class="subtitle">Every 2-piece and 4-piece armor set perk in one place. Filter by source, subclass, weapon pairing, or artifact synergy, or search for a build piece by name.</p>
+</div>
+
+<div class="mixer">
+  <div class="mixer-card panel-card">
+    <div class="mixer-label">Mix & Match</div>
+    <div class="mixer-sub">You've got 5 armor slots. Run two different 2-piece bonuses together (4 of 5 slots), or commit to one set's 4-piece bonus (also 4 of 5) — pick below to see them side by side.</div>
+    <div class="mixer-slots">
+      <div class="mixer-slot">
+        <div class="mixer-slot-label">Piece 1</div>
+        <select class="mixer-select" id="mixer-slot-1"></select>
+      </div>
+      <div class="mixer-slot">
+        <div class="mixer-slot-label">Piece 2</div>
+        <select class="mixer-select" id="mixer-slot-2"></select>
+        <div class="mixer-slot-note" id="mixer-slot-2-note"></div>
+      </div>
+    </div>
+    <div class="mixer-results" id="mixer-results"></div>
+  </div>
 </div>
 
 <div class="controls">
@@ -531,6 +580,116 @@
     cards.forEach(c => c.classList.toggle("expanded", anyCollapsed));
     updateExpandAllLabel();
   });
+
+  // ---------- Mix & Match (build crafting) ----------
+  // A Guardian has 5 armor slots total. Two different 2-piece bonuses
+  // uses 4 of them; one set's 4-piece bonus also uses 4 (and already
+  // includes that set's own 2-piece effect, since 4 >= 2). There's no
+  // valid combo beyond that — a second 4-piece needs 8 slots, a third
+  // 2-piece needs 6 — so Slot 2 only ever offers a second 2-piece pick,
+  // and only once Slot 1 is itself a 2-piece pick.
+  const mixerSlot1 = document.getElementById("mixer-slot-1");
+  const mixerSlot2 = document.getElementById("mixer-slot-2");
+  const mixerSlot2Note = document.getElementById("mixer-slot-2-note");
+  const mixerResultsEl = document.getElementById("mixer-results");
+  const SETS_BY_NAME = [...SETS].sort((a, b) => a.name.localeCompare(b.name));
+
+  function mixerValue(slug, tier){ return slug + ":" + tier; }
+  function mixerLookup(value){
+    if (!value) return null;
+    const sepIndex = value.lastIndexOf(":");
+    const slug = value.slice(0, sepIndex);
+    const tier = Number(value.slice(sepIndex + 1));
+    const set = SETS.find(s => s.slug === slug);
+    if (!set) return null;
+    const bonus = tier === 2 ? set.two : set.four;
+    return { set, tier, bonusName: bonus[0], bonusText: bonus[1] };
+  }
+
+  function fillMixerSelect(selectEl, placeholderText, excludeSlug, tiersToShow){
+    const prevValue = selectEl.value;
+    selectEl.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = placeholderText;
+    selectEl.appendChild(placeholder);
+
+    SETS_BY_NAME.forEach(set => {
+      if (set.slug === excludeSlug) return;
+      const group = document.createElement("optgroup");
+      group.label = set.name;
+      tiersToShow.forEach(tier => {
+        const bonus = tier === 2 ? set.two : set.four;
+        const opt = document.createElement("option");
+        opt.value = mixerValue(set.slug, tier);
+        opt.textContent = tier + "-Piece: " + bonus[0];
+        group.appendChild(opt);
+      });
+      selectEl.appendChild(group);
+    });
+
+    selectEl.value = [...selectEl.options].some(o => o.value === prevValue) ? prevValue : "";
+  }
+
+  function mixerPerkHtml(pick){
+    return (
+      '<div class="perk">' +
+        '<div class="perk-badge">' + pick.tier + '</div>' +
+        '<div class="perk-body">' +
+          '<div class="perk-name">' + pick.tier + ' Piece — ' + pick.set.name + ' | ' + pick.bonusName + '</div>' +
+          '<div class="perk-desc">' + pick.bonusText + '</div>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
+  function renderMixerResults(){
+    const pick1 = mixerLookup(mixerSlot1.value);
+    const pick2 = pick1 && pick1.tier === 2 ? mixerLookup(mixerSlot2.value) : null;
+
+    if (!pick1){
+      mixerResultsEl.innerHTML = '<div class="mixer-empty">Pick a piece above to see its bonus.</div>';
+      return;
+    }
+
+    let html = mixerPerkHtml(pick1);
+    if (pick2) html += mixerPerkHtml(pick2);
+
+    const usedSlots = pick1.tier === 4 ? 4 : (pick2 ? 4 : 2);
+    html += '<div class="mixer-flex-note">' + usedSlots + ' of 5 armor slots committed' +
+      (usedSlots < 5 ? ' — the rest is open for an exotic, a crafted class item, or whatever else you want to run.' : '.') +
+      '</div>';
+    mixerResultsEl.innerHTML = html;
+  }
+
+  function refreshMixerSlot2(){
+    if (!mixerSlot1.value){
+      mixerSlot2.disabled = true;
+      mixerSlot2.value = "";
+      mixerSlot2Note.textContent = "";
+      return;
+    }
+    const pick1 = mixerLookup(mixerSlot1.value);
+    if (pick1.tier === 4){
+      mixerSlot2.disabled = true;
+      mixerSlot2.value = "";
+      mixerSlot2Note.textContent = "A 4-piece bonus already fills 4 of your 5 slots — no room for a second one.";
+      return;
+    }
+    mixerSlot2.disabled = false;
+    mixerSlot2Note.textContent = "Pick a second 2-piece bonus from a different set.";
+    fillMixerSelect(mixerSlot2, "Select a second 2-piece…", pick1.set.slug, [2]);
+  }
+
+  fillMixerSelect(mixerSlot1, "Select a piece…", null, [2, 4]);
+  refreshMixerSlot2();
+  renderMixerResults();
+
+  mixerSlot1.addEventListener("change", () => {
+    refreshMixerSlot2();
+    renderMixerResults();
+  });
+  mixerSlot2.addEventListener("change", renderMixerResults);
 
   render();
 })();
