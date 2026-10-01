@@ -332,6 +332,10 @@
   <div class="filter-row">
     <div class="filter-label">Artifact</div>
     <div class="chip-group" id="artifact-chips"></div>
+  </div>
+  <div class="filter-row">
+    <div class="filter-label">Keyword</div>
+    <div class="chip-group" id="keyword-chips"></div>
     <button class="clear-btn" id="clear-btn">Clear filters</button>
   </div>
 </div>
@@ -493,7 +497,7 @@
   }
 
   // ---------- Filter state ----------
-  const state = { search:"", sources:new Set(), weapons:new Set(), artifacts:new Set(), subclasses:new Set() };
+  const state = { search:"", sources:new Set(), weapons:new Set(), artifacts:new Set(), subclasses:new Set(), keywords:new Set() };
 
   const ALL_SOURCES = [...new Set(SETS.map(s => s.source))].sort();
   const ALL_WEAPONS = [...new Set(SETS.flatMap(s => s.pairs))].sort();
@@ -503,12 +507,31 @@
   const ALL_ARTIFACTS = [...new Set(SETS.flatMap(s => matchingArtifacts(s).map(a => a.name)))].sort();
   const ALL_SUBCLASSES = ELEMENT_ORDER.filter(e => SETS.some(s => (s.elementPairs || []).includes(e)));
 
-  function buildChips(container, values, set){
+  // Shared with the Mix & Match section below (see Suggested Combos):
+  // the only tags that can ever appear on both sides of the produces/
+  // triggers overlap, i.e. the exact keywords that actually drive a
+  // suggested pairing. Same label text used for both the filter chips
+  // here and the group headings down there.
+  const KEYWORD_TAG_LABELS = {
+    "orb-of-power": "Orb of Power",
+    "pickup-ammo": "Ammo Pickups",
+    "healing": "Healing",
+    "disorient": "Disorient",
+    "elemental-pickup": "Elemental Pickup"
+  };
+  const ALL_KEYWORDS = Object.keys(KEYWORD_TAG_LABELS).filter(tag =>
+    SETS.some(s => (s.twoTriggers || []).includes(tag) || (s.twoProduces || []).includes(tag))
+  );
+  function keywordTags(set){
+    return [...(set.twoTriggers || []), ...(set.twoProduces || [])];
+  }
+
+  function buildChips(container, values, set, labelFn){
     container.innerHTML = "";
     values.forEach(v => {
       const chip = document.createElement("div");
       chip.className = "chip";
-      chip.textContent = v;
+      chip.textContent = labelFn ? labelFn(v) : v;
       chip.addEventListener("click", () => {
         if (set.has(v)) set.delete(v); else set.add(v);
         chip.classList.toggle("on");
@@ -521,6 +544,7 @@
   buildChips(document.getElementById("weapon-chips"), ALL_WEAPONS, state.weapons);
   buildChips(document.getElementById("artifact-chips"), ALL_ARTIFACTS, state.artifacts);
   buildChips(document.getElementById("subclass-chips"), ALL_SUBCLASSES, state.subclasses);
+  buildChips(document.getElementById("keyword-chips"), ALL_KEYWORDS, state.keywords, tag => KEYWORD_TAG_LABELS[tag]);
 
   document.getElementById("search-input").addEventListener("input", e => {
     state.search = e.target.value.trim().toLowerCase();
@@ -533,6 +557,7 @@
     state.weapons.clear();
     state.artifacts.clear();
     state.subclasses.clear();
+    state.keywords.clear();
     document.getElementById("search-input").value = "";
     document.querySelectorAll(".chip.on").forEach(c => c.classList.remove("on"));
     render();
@@ -549,6 +574,7 @@
     if (state.weapons.size && !set.pairs.some(p => state.weapons.has(p))) return false;
     if (state.artifacts.size && !matchingArtifacts(set).some(a => state.artifacts.has(a.name))) return false;
     if (state.subclasses.size && !(set.elementPairs || []).some(e => state.subclasses.has(e))) return false;
+    if (state.keywords.size && !keywordTags(set).some(t => state.keywords.has(t))) return false;
     if (state.search){
       const hay = (set.name + " " + set.two[0] + " " + set.two[1] + " " + set.four[0] + " " + set.four[1] + " " + set.sourceDetail).toLowerCase();
       if (!hay.includes(state.search)) return false;
@@ -773,14 +799,6 @@
     return combos;
   }
 
-  const TAG_SHORT_LABEL = {
-    "orb-of-power": "Orb of Power",
-    "pickup-ammo": "Ammo Pickups",
-    "healing": "Healing",
-    "disorient": "Disorient",
-    "elemental-pickup": "Elemental Pickup"
-  };
-
   function renderMixerSuggestions(){
     const el = document.getElementById("mixer-suggestions");
     const combos = computeSuggestedCombos();
@@ -798,7 +816,7 @@
     const sortedGroups = [...groups.values()].sort((a, b) => b.combos.length - a.combos.length);
 
     el.innerHTML = sortedGroups.map(g => {
-      const label = g.tags.map(t => TAG_SHORT_LABEL[t] || t).join(" + ");
+      const label = g.tags.map(t => KEYWORD_TAG_LABELS[t] || t).join(" + ");
       const rows = g.combos.map(c =>
         '<button type="button" class="mixer-suggestion-btn" data-slug-a="' + c.pick1.set.slug + '" data-slug-b="' + c.pick2.set.slug + '">' +
           '<strong>' + c.pick1.set.name + '</strong> (' + c.pick1.bonusName + ') + ' +
