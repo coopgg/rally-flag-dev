@@ -73,12 +73,28 @@
   .mixer-keyword-arrow{ color:var(--accent-bright); }
   .mixer-keyword-none{ font-style:italic; color:var(--text-dimmer); }
 
-  .mixer-suggestions{ margin-top:22px; padding-top:18px; border-top:1px solid var(--panel-border); }
+  .mixer-suggestions-card{ margin-top:16px; padding:22px 26px; }
+  .mixer-suggestions-summary{
+    display:flex; align-items:center; justify-content:space-between;
+    cursor:pointer; list-style:none; user-select:none;
+  }
+  .mixer-suggestions-summary::-webkit-details-marker{ display:none; }
+  .mixer-suggestions-card[open] .mixer-suggestions-summary{ margin-bottom:4px; }
+  .mixer-suggestions-card[open] .mixer-category-chevron{ transform:rotate(90deg); }
   .mixer-suggestions-label{
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.12em;
-    color:var(--accent); text-transform:uppercase; margin-bottom:6px;
+    color:var(--accent); text-transform:uppercase;
   }
-  .mixer-suggestions-sub{ font-size:12px; color:var(--text-dimmer); margin-bottom:12px; line-height:1.5; }
+  .mixer-category-chevron{ font-size:11px; color:var(--accent); transition:transform 0.15s ease; }
+  .mixer-suggestions-sub{ font-size:12px; color:var(--text-dimmer); margin:10px 0 16px; line-height:1.5; }
+
+  .mixer-suggestion-group{ margin-bottom:18px; }
+  .mixer-suggestion-group:last-child{ margin-bottom:0; }
+  .mixer-suggestion-group-label{
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.06em;
+    color:var(--text-dimmer); text-transform:uppercase; margin-bottom:8px;
+  }
+  .mixer-suggestion-group-count{ color:var(--text-dimmer); }
   .mixer-suggestion-list{ display:flex; flex-direction:column; gap:6px; }
   .mixer-suggestion-btn{
     display:block; width:100%; text-align:left; cursor:pointer;
@@ -90,7 +106,6 @@
     border-color:var(--accent); color:var(--text);
   }
   .mixer-suggestion-btn strong{ color:var(--text); }
-  .mixer-suggestion-tag{ color:var(--accent-bright); font-family:'JetBrains Mono', monospace; font-size:11px; }
 
   /* ---------- Controls ---------- */
   .controls{ max-width:1180px; margin:40px auto 0; padding:0 24px; }
@@ -281,8 +296,16 @@
       </div>
     </div>
     <div class="mixer-results" id="mixer-results"></div>
-    <div class="mixer-suggestions" id="mixer-suggestions"></div>
   </div>
+
+  <details class="mixer-suggestions-card panel-card">
+    <summary class="mixer-suggestions-summary">
+      <span class="mixer-suggestions-label">Suggested Combos</span>
+      <span class="mixer-category-chevron">&#9656;</span>
+    </summary>
+    <div class="mixer-suggestions-sub">Every 2-piece pairing our own keyword tags flag, grouped by what they share — tap one to load it into the picker above.</div>
+    <div id="mixer-suggestions"></div>
+  </details>
 </div>
 
 <div class="controls">
@@ -750,24 +773,45 @@
     return combos;
   }
 
+  const TAG_SHORT_LABEL = {
+    "orb-of-power": "Orb of Power",
+    "pickup-ammo": "Ammo Pickups",
+    "healing": "Healing",
+    "disorient": "Disorient",
+    "elemental-pickup": "Elemental Pickup"
+  };
+
   function renderMixerSuggestions(){
     const el = document.getElementById("mixer-suggestions");
     const combos = computeSuggestedCombos();
-    const rows = combos.map(c => {
-      const tagLabels = [...new Set(c.matches.map(m => m.tag))];
-      return (
+
+    // Group by the exact set of matched tags, not a flat list — a wall of
+    // 27 identical-looking rows reads as noise, a handful of labeled
+    // categories reads as organized. Biggest category first.
+    const groups = new Map();
+    combos.forEach(c => {
+      const tags = [...new Set(c.matches.map(m => m.tag))].sort();
+      const key = tags.join("+");
+      if (!groups.has(key)) groups.set(key, { tags, combos: [] });
+      groups.get(key).combos.push(c);
+    });
+    const sortedGroups = [...groups.values()].sort((a, b) => b.combos.length - a.combos.length);
+
+    el.innerHTML = sortedGroups.map(g => {
+      const label = g.tags.map(t => TAG_SHORT_LABEL[t] || t).join(" + ");
+      const rows = g.combos.map(c =>
         '<button type="button" class="mixer-suggestion-btn" data-slug-a="' + c.pick1.set.slug + '" data-slug-b="' + c.pick2.set.slug + '">' +
           '<strong>' + c.pick1.set.name + '</strong> (' + c.pick1.bonusName + ') + ' +
-          '<strong>' + c.pick2.set.name + '</strong> (' + c.pick2.bonusName + ') ' +
-          '<span class="mixer-suggestion-tag">' + tagLabels.join(", ") + '</span>' +
+          '<strong>' + c.pick2.set.name + '</strong> (' + c.pick2.bonusName + ')' +
         '</button>'
+      ).join("");
+      return (
+        '<div class="mixer-suggestion-group">' +
+          '<div class="mixer-suggestion-group-label">' + label + ' <span class="mixer-suggestion-group-count">(' + g.combos.length + ')</span></div>' +
+          '<div class="mixer-suggestion-list">' + rows + '</div>' +
+        '</div>'
       );
     }).join("");
-
-    el.innerHTML =
-      '<div class="mixer-suggestions-label">Suggested Combos</div>' +
-      '<div class="mixer-suggestions-sub">Every 2-piece pairing our own keyword tags flag above — tap one to load it into the picker.</div>' +
-      '<div class="mixer-suggestion-list">' + rows + '</div>';
 
     el.querySelectorAll(".mixer-suggestion-btn").forEach(btn => {
       btn.addEventListener("click", () => {
@@ -775,7 +819,7 @@
         refreshMixerSlot2();
         mixerSlot2.value = mixerValue(btn.dataset.slugB, 2);
         renderMixerResults();
-        mixerSlot1.scrollIntoView({ behavior: "smooth", block: "center" });
+        document.querySelector(".mixer-card").scrollIntoView({ behavior: "smooth", block: "center" });
       });
     });
   }
