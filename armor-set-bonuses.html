@@ -46,9 +46,13 @@
   /* The dropdown popup is browser-rendered, not styled by the rules
      above — Chrome/Firefox do respect background/color set directly
      on <option>/<optgroup>, so without this the popup falls back to
-     the OS default (white background, near-invisible light text). */
+     the OS default (white background, near-invisible light text).
+     Uses --bg (solid) rather than --panel: --panel is a translucent
+     white overlay meant to sit on top of the page's dark background,
+     which the native popup doesn't have behind it, so it would still
+     render as plain white here. */
   .mixer-select option, .mixer-select optgroup{
-    background:var(--panel); color:var(--text);
+    background-color:var(--bg); color:var(--text);
   }
   .mixer-slot-note{ font-size:11.5px; color:var(--text-dimmer); margin-top:6px; line-height:1.4; }
   .mixer-results{ border-top:1px solid var(--panel-border); padding-top:18px; }
