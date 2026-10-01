@@ -290,7 +290,7 @@
 <div class="mixer">
   <div class="mixer-card panel-card">
     <div class="mixer-label">Mix & Match</div>
-    <div class="mixer-sub">You've got 5 armor slots. Run two different 2-piece bonuses together (4 of 5 slots), or commit to one set's 4-piece bonus (also 4 of 5) — pick below to see them side by side.</div>
+    <div class="mixer-sub">Pick two 2-piece bonuses from different sets (4 of your 5 armor slots) to see them side by side, plus any keyword overlap between them.</div>
     <div class="mixer-slots">
       <div class="mixer-slot">
         <div class="mixer-slot-label">Piece 1</div>
@@ -843,28 +843,23 @@
 
     el.querySelectorAll(".mixer-suggestion-btn").forEach(btn => {
       btn.addEventListener("click", () => {
-        mixerSlot1.value = mixerValue(btn.dataset.slugA, 2);
+        mixerSlot1.value = btn.dataset.slugA;
         refreshMixerSlot2();
-        mixerSlot2.value = mixerValue(btn.dataset.slugB, 2);
+        mixerSlot2.value = btn.dataset.slugB;
         renderMixerResults();
         document.querySelector(".mixer-card").scrollIntoView({ behavior: "smooth", block: "center" });
       });
     });
   }
 
-  function mixerValue(slug, tier){ return slug + ":" + tier; }
-  function mixerLookup(value){
-    if (!value) return null;
-    const sepIndex = value.lastIndexOf(":");
-    const slug = value.slice(0, sepIndex);
-    const tier = Number(value.slice(sepIndex + 1));
+  function mixerLookup(slug){
+    if (!slug) return null;
     const set = SETS.find(s => s.slug === slug);
     if (!set) return null;
-    const bonus = tier === 2 ? set.two : set.four;
-    return { set, tier, bonusName: bonus[0], bonusText: bonus[1] };
+    return { set, bonusName: set.two[0], bonusText: set.two[1] };
   }
 
-  function fillMixerSelect(selectEl, placeholderText, excludeSlug, tiersToShow){
+  function fillMixerSelect(selectEl, placeholderText, excludeSlug){
     const prevValue = selectEl.value;
     selectEl.innerHTML = "";
     const placeholder = document.createElement("option");
@@ -874,16 +869,10 @@
 
     SETS_BY_NAME.forEach(set => {
       if (set.slug === excludeSlug) return;
-      const group = document.createElement("optgroup");
-      group.label = set.name;
-      tiersToShow.forEach(tier => {
-        const bonus = tier === 2 ? set.two : set.four;
-        const opt = document.createElement("option");
-        opt.value = mixerValue(set.slug, tier);
-        opt.textContent = tier + "-Piece: " + bonus[0];
-        group.appendChild(opt);
-      });
-      selectEl.appendChild(group);
+      const opt = document.createElement("option");
+      opt.value = set.slug;
+      opt.textContent = set.name + " — " + set.two[0];
+      selectEl.appendChild(opt);
     });
 
     selectEl.value = [...selectEl.options].some(o => o.value === prevValue) ? prevValue : "";
@@ -892,9 +881,9 @@
   function mixerPerkHtml(pick){
     return (
       '<div class="perk">' +
-        '<div class="perk-badge">' + pick.tier + '</div>' +
+        '<div class="perk-badge">2</div>' +
         '<div class="perk-body">' +
-          '<div class="perk-name">' + pick.tier + ' Piece — ' + pick.set.name + ' | ' + pick.bonusName + '</div>' +
+          '<div class="perk-name">' + pick.set.name + ' | ' + pick.bonusName + '</div>' +
           '<div class="perk-desc">' + pick.bonusText + '</div>' +
         '</div>' +
       '</div>'
@@ -903,10 +892,10 @@
 
   function renderMixerResults(){
     const pick1 = mixerLookup(mixerSlot1.value);
-    const pick2 = pick1 && pick1.tier === 2 ? mixerLookup(mixerSlot2.value) : null;
+    const pick2 = mixerLookup(mixerSlot2.value);
 
     if (!pick1){
-      mixerResultsEl.innerHTML = '<div class="mixer-empty">Pick a piece above to see its bonus.</div>';
+      mixerResultsEl.innerHTML = '<div class="mixer-empty">Pick a 2-piece bonus above to see it.</div>';
       return;
     }
 
@@ -914,10 +903,8 @@
     if (pick2) html += mixerPerkHtml(pick2);
     if (pick2) html += mixerKeywordsHtml(pick1, pick2);
 
-    const usedSlots = pick1.tier === 4 ? 4 : (pick2 ? 4 : 2);
-    html += '<div class="mixer-flex-note">' + usedSlots + ' of 5 armor slots committed' +
-      (usedSlots < 5 ? ' — the rest is open for an exotic, a crafted class item, or whatever else you want to run.' : '.') +
-      '</div>';
+    const usedSlots = pick2 ? 4 : 2;
+    html += '<div class="mixer-flex-note">' + usedSlots + ' of 5 armor slots committed — the rest is open for an exotic, a crafted class item, or whatever else you want to run.</div>';
     mixerResultsEl.innerHTML = html;
   }
 
@@ -929,18 +916,12 @@
       return;
     }
     const pick1 = mixerLookup(mixerSlot1.value);
-    if (pick1.tier === 4){
-      mixerSlot2.disabled = true;
-      mixerSlot2.value = "";
-      mixerSlot2Note.textContent = "A 4-piece bonus already fills 4 of your 5 slots — no room for a second one.";
-      return;
-    }
     mixerSlot2.disabled = false;
     mixerSlot2Note.textContent = "Pick a second 2-piece bonus from a different set.";
-    fillMixerSelect(mixerSlot2, "Select a second 2-piece…", pick1.set.slug, [2]);
+    fillMixerSelect(mixerSlot2, "Select a second 2-piece…", pick1.set.slug);
   }
 
-  fillMixerSelect(mixerSlot1, "Select a piece…", null, [2, 4]);
+  fillMixerSelect(mixerSlot1, "Select a 2-piece bonus…", null);
   refreshMixerSlot2();
   renderMixerResults();
   renderMixerSuggestions();
