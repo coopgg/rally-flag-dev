@@ -73,6 +73,25 @@
   .mixer-keyword-arrow{ color:var(--accent-bright); }
   .mixer-keyword-none{ font-style:italic; color:var(--text-dimmer); }
 
+  .mixer-suggestions{ margin-top:22px; padding-top:18px; border-top:1px solid var(--panel-border); }
+  .mixer-suggestions-label{
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.12em;
+    color:var(--accent); text-transform:uppercase; margin-bottom:6px;
+  }
+  .mixer-suggestions-sub{ font-size:12px; color:var(--text-dimmer); margin-bottom:12px; line-height:1.5; }
+  .mixer-suggestion-list{ display:flex; flex-direction:column; gap:6px; }
+  .mixer-suggestion-btn{
+    display:block; width:100%; text-align:left; cursor:pointer;
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:4px;
+    padding:10px 12px; font-family:'Inter', sans-serif; font-size:12.5px; color:var(--text-dim);
+    transition: border-color 0.15s ease, color 0.15s ease;
+  }
+  .mixer-suggestion-btn:hover, .mixer-suggestion-btn:focus-visible{
+    border-color:var(--accent); color:var(--text);
+  }
+  .mixer-suggestion-btn strong{ color:var(--text); }
+  .mixer-suggestion-tag{ color:var(--accent-bright); font-family:'JetBrains Mono', monospace; font-size:11px; }
+
   /* ---------- Controls ---------- */
   .controls{ max-width:1180px; margin:40px auto 0; padding:0 24px; }
 
@@ -262,6 +281,7 @@
       </div>
     </div>
     <div class="mixer-results" id="mixer-results"></div>
+    <div class="mixer-suggestions" id="mixer-suggestions"></div>
   </div>
 </div>
 
@@ -714,6 +734,52 @@
     );
   }
 
+  // Every 2pc/2pc pair that our own keyword tags actually flag — computed
+  // once against the full set list, not hand-picked. "Suggested" means
+  // "the data says these feed each other," nothing more.
+  function computeSuggestedCombos(){
+    const combos = [];
+    for (let i = 0; i < SETS.length; i++){
+      for (let j = i + 1; j < SETS.length; j++){
+        const pick1 = { set: SETS[i], bonusName: SETS[i].two[0] };
+        const pick2 = { set: SETS[j], bonusName: SETS[j].two[0] };
+        const matches = keywordMatches(pick1, pick2);
+        if (matches.length) combos.push({ pick1, pick2, matches });
+      }
+    }
+    return combos;
+  }
+
+  function renderMixerSuggestions(){
+    const el = document.getElementById("mixer-suggestions");
+    const combos = computeSuggestedCombos();
+    const rows = combos.map(c => {
+      const tagLabels = [...new Set(c.matches.map(m => m.tag))];
+      return (
+        '<button type="button" class="mixer-suggestion-btn" data-slug-a="' + c.pick1.set.slug + '" data-slug-b="' + c.pick2.set.slug + '">' +
+          '<strong>' + c.pick1.set.name + '</strong> (' + c.pick1.bonusName + ') + ' +
+          '<strong>' + c.pick2.set.name + '</strong> (' + c.pick2.bonusName + ') ' +
+          '<span class="mixer-suggestion-tag">' + tagLabels.join(", ") + '</span>' +
+        '</button>'
+      );
+    }).join("");
+
+    el.innerHTML =
+      '<div class="mixer-suggestions-label">Suggested Combos</div>' +
+      '<div class="mixer-suggestions-sub">Every 2-piece pairing our own keyword tags flag above — tap one to load it into the picker.</div>' +
+      '<div class="mixer-suggestion-list">' + rows + '</div>';
+
+    el.querySelectorAll(".mixer-suggestion-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        mixerSlot1.value = mixerValue(btn.dataset.slugA, 2);
+        refreshMixerSlot2();
+        mixerSlot2.value = mixerValue(btn.dataset.slugB, 2);
+        renderMixerResults();
+        mixerSlot1.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+    });
+  }
+
   function mixerValue(slug, tier){ return slug + ":" + tier; }
   function mixerLookup(value){
     if (!value) return null;
@@ -805,6 +871,7 @@
   fillMixerSelect(mixerSlot1, "Select a piece…", null, [2, 4]);
   refreshMixerSlot2();
   renderMixerResults();
+  renderMixerSuggestions();
 
   mixerSlot1.addEventListener("change", () => {
     refreshMixerSlot2();
