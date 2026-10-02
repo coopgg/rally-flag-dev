@@ -1391,10 +1391,16 @@
         }
         for (const sale of saleItems){
           const socketEntry = socketsByIndex[sale.vendorItemIndex];
+          const saleItemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
+          const saleTypeName = (saleItemDef && saleItemDef.itemTypeDisplayName) || "";
+          const saleIsArmor = XUR_ARMOR_TYPES.has(saleTypeName);
           // Same reasoning as Zavala: fold each socket's plugHash into the
           // key so genuinely different rolls of the same item stay as
-          // separate cards instead of collapsing into one.
-          const rollSignature = (socketEntry && socketEntry.sockets) ? socketEntry.sockets.map(s => s.plugHash || 0).join(",") : "";
+          // separate cards instead of collapsing into one. Armor is exempt —
+          // Xûr's exotic armor has no random roll, but its masterwork
+          // archetype preview varies by which character queries it, which
+          // would otherwise split one item into "duplicate" cards.
+          const rollSignature = saleIsArmor ? "" : ((socketEntry && socketEntry.sockets) ? socketEntry.sockets.map(s => s.plugHash || 0).join(",") : "");
           const key = sale.itemHash + "|" + costSignature(sale.costs) + "|" + rollSignature;
           if (!itemsByKey.has(key)){
             itemsByKey.set(key, {
