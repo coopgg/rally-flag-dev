@@ -1394,22 +1394,36 @@
           const saleItemDef = await fetchDef("DestinyInventoryItemDefinition", sale.itemHash);
           const saleTypeName = (saleItemDef && saleItemDef.itemTypeDisplayName) || "";
           const saleIsArmor = XUR_ARMOR_TYPES.has(saleTypeName);
+          const saleClassType = saleIsArmor ? ((saleItemDef && typeof saleItemDef.classType === "number") ? saleItemDef.classType : 3) : null;
           // Same reasoning as Zavala: fold each socket's plugHash into the
           // key so genuinely different rolls of the same item stay as
           // separate cards instead of collapsing into one. Armor is exempt —
-          // Xûr's exotic armor has no random roll, but its masterwork
-          // archetype preview varies by which character queries it, which
-          // would otherwise split one item into "duplicate" cards.
+          // confirmed live that Bungie's API hands back a bogus archetype
+          // roll for class-exclusive armor when queried by a character of a
+          // different class (e.g. a Titan-only piece previewed by a Hunter),
+          // which split one real item into "duplicate" cards with different
+          // (and sometimes wrong) archetypes. So armor dedupes on item + cost
+          // only, and below we prefer whichever capture actually came from a
+          // character of that item's own class.
           const rollSignature = saleIsArmor ? "" : ((socketEntry && socketEntry.sockets) ? socketEntry.sockets.map(s => s.plugHash || 0).join(",") : "");
           const key = sale.itemHash + "|" + costSignature(sale.costs) + "|" + rollSignature;
-          if (!itemsByKey.has(key)){
+          const isOwnClassCapture = saleIsArmor && saleClassType !== 3 && VANGUARD_CLASS_LABELS[saleClassType] === classLabel;
+          const existing = itemsByKey.get(key);
+          if (!existing){
             itemsByKey.set(key, {
               sale,
               statEntry: statsByIndex[sale.vendorItemIndex],
               socketEntry,
               reusablePlugsEntry: reusablePlugsByIndex[sale.vendorItemIndex],
-              seenOn: new Set()
+              seenOn: new Set(),
+              capturedOwnClass: isOwnClassCapture
             });
+          } else if (isOwnClassCapture && !existing.capturedOwnClass){
+            existing.sale = sale;
+            existing.statEntry = statsByIndex[sale.vendorItemIndex];
+            existing.socketEntry = socketEntry;
+            existing.reusablePlugsEntry = reusablePlugsByIndex[sale.vendorItemIndex];
+            existing.capturedOwnClass = true;
           }
           itemsByKey.get(key).seenOn.add(classLabel);
         }
