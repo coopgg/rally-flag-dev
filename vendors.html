@@ -1349,6 +1349,36 @@
     }
   }
 
+  // Flat card grid under one label — "Exotic Gear" / "Legendary Weapons".
+  function renderXurFlatSection(outputEl, label, cards){
+    if (!cards.length) return;
+    const labelEl = document.createElement("div");
+    labelEl.className = "vend-category-label";
+    labelEl.textContent = label + " (" + cards.length + ")";
+    outputEl.appendChild(labelEl);
+    const grid = document.createElement("div");
+    grid.className = "vend-grid";
+    grid.innerHTML = cards.join("");
+    outputEl.appendChild(grid);
+  }
+
+  // Armor under one label, split into a per-class collapsible group each —
+  // "Multivarious Strange Offers" / "Legendary Armor".
+  function renderXurClassGroupedSection(outputEl, label, byClass){
+    let total = 0;
+    byClass.forEach(items => { total += items.length; });
+    if (!total) return;
+    const labelEl = document.createElement("div");
+    labelEl.className = "vend-category-label";
+    labelEl.textContent = label + " (" + total + ")";
+    outputEl.appendChild(labelEl);
+    for (const classType of [0, 1, 2, 3]){
+      if (!byClass.has(classType)) continue;
+      const items = byClass.get(classType);
+      appendCollapsibleCategory(outputEl, VANGUARD_CLASS_LABELS[classType] + " (" + items.length + ")", items);
+    }
+  }
+
   async function runXur(){
     const statusEl = document.getElementById("xur-status");
     const outputEl = document.getElementById("xur-output");
@@ -1458,20 +1488,28 @@
           : "";
         const card = itemCardHtml(name, icon, typeName || (isCatalyst ? "Catalyst" : ""), costText, tag, rollHtml + buildHtml);
         const classType = isArmor ? ((itemDef && typeof itemDef.classType === "number") ? itemDef.classType : 3) : null;
-        return { card, isArmor, classType };
+        return { card, isArmor, classType, isExotic: tier === "Exotic", isCatalyst };
       });
 
-      const weapons = [];
-      const armorByClass = new Map(); // classType -> card html[]
+      // Mirrors how Xûr's own UI groups his offers: exotic armor under
+      // "Multivarious Strange Offers", exotic weapons/catalysts under
+      // "Exotic Gear", then the legendary weapons and armor he also sells.
+      const exoticArmorByClass = new Map(); // classType -> card html[]
+      const legendaryArmorByClass = new Map();
+      const exoticGear = [];
+      const legendaryWeapons = [];
       let itemCount = 0;
       for (const r of resolved){
         if (!r) continue;
         itemCount++;
         if (r.isArmor){
-          if (!armorByClass.has(r.classType)) armorByClass.set(r.classType, []);
-          armorByClass.get(r.classType).push(r.card);
+          const bucket = r.isExotic ? exoticArmorByClass : legendaryArmorByClass;
+          if (!bucket.has(r.classType)) bucket.set(r.classType, []);
+          bucket.get(r.classType).push(r.card);
+        } else if (r.isCatalyst || r.isExotic){
+          exoticGear.push(r.card);
         } else {
-          weapons.push(r.card);
+          legendaryWeapons.push(r.card);
         }
       }
 
@@ -1485,22 +1523,10 @@
       statusEl.className = "tw-status";
       statusEl.textContent = "OK: " + itemCount + " item(s) across " + characters.length + " character(s)";
 
-      if (weapons.length){
-        const labelEl = document.createElement("div");
-        labelEl.className = "vend-category-label";
-        labelEl.textContent = "Weapons (" + weapons.length + ")";
-        outputEl.appendChild(labelEl);
-        const grid = document.createElement("div");
-        grid.className = "vend-grid";
-        grid.innerHTML = weapons.join("");
-        outputEl.appendChild(grid);
-      }
-
-      for (const classType of [0, 1, 2, 3]){
-        if (!armorByClass.has(classType)) continue;
-        const items = armorByClass.get(classType);
-        appendCollapsibleCategory(outputEl, VANGUARD_CLASS_LABELS[classType] + " Armor (" + items.length + ")", items);
-      }
+      renderXurClassGroupedSection(outputEl, "Multivarious Strange Offers", exoticArmorByClass);
+      renderXurFlatSection(outputEl, "Exotic Gear", exoticGear);
+      renderXurFlatSection(outputEl, "Legendary Weapons", legendaryWeapons);
+      renderXurClassGroupedSection(outputEl, "Legendary Armor", legendaryArmorByClass);
     } catch (err){
       statusEl.className = "tw-status tw-error";
       statusEl.textContent = "Error: " + err.message;
