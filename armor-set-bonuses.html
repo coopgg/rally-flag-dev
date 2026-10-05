@@ -762,6 +762,28 @@
     "grenade-cast": { trigger: "triggers on casting your grenade" }
   };
 
+  // A second, separate kind of overlap: two bonuses that both grant the
+  // same effect from different triggers (e.g. Smoke Jumper's orb pickup
+  // and Ferropotent's shield regen both grant damage resistance) — not a
+  // chain where one feeds the other, but two independent paths to the
+  // same buff. Deliberately narrow: most produce-tags are too generic
+  // for this to mean anything (a quarter of all sets buff weapon
+  // handling, so flagging every pair of those would just be noise), so
+  // this list is hand-picked to effects specific enough that sharing one
+  // is actually worth surfacing.
+  const SHARED_EFFECT_TAGS = ["damage-resistance", "healing", "weapon-damage-buff", "reload-speed-buff", "health-regen", "speed-booster"];
+  const SHARED_EFFECT_LABELS = {
+    "damage-resistance": "Damage Resistance",
+    "healing": "Healing",
+    "weapon-damage-buff": "Weapon Damage",
+    "reload-speed-buff": "Reload Speed",
+    "health-regen": "Health Regen",
+    "speed-booster": "Movement Speed"
+  };
+  function tagLabel(tag){
+    return KEYWORD_TAG_LABELS[tag] || SHARED_EFFECT_LABELS[tag] || tag;
+  }
+
   function keywordMatches(pick1, pick2){
     const matches = [];
     (pick1.set.twoProduces || []).forEach(tag => {
@@ -773,13 +795,23 @@
     return matches;
   }
 
+  function sharedEffectMatches(pick1, pick2){
+    return SHARED_EFFECT_TAGS.filter(tag =>
+      (pick1.set.twoProduces || []).includes(tag) && (pick2.set.twoProduces || []).includes(tag)
+    );
+  }
+
   function mixerKeywordsHtml(pick1, pick2){
-    const matches = keywordMatches(pick1, pick2);
-    const rows = matches.map(m => {
+    const chainRows = keywordMatches(pick1, pick2).map(m => {
       const info = TAG_INFO[m.tag] || {};
       return '<div class="mixer-keyword-row">' + m.from.bonusName + ' ' + (info.produce || m.tag) +
         ' <span class="mixer-keyword-arrow">→</span> ' + m.to.bonusName + ' ' + (info.trigger || m.tag) + '</div>';
     });
+    const sharedRows = sharedEffectMatches(pick1, pick2).map(tag =>
+      '<div class="mixer-keyword-row">' + pick1.bonusName + ' and ' + pick2.bonusName +
+      ' both grant <span class="mixer-keyword-arrow">' + tagLabel(tag) + '</span> — different triggers, same effect.</div>'
+    );
+    const rows = chainRows.concat(sharedRows);
     return (
       '<div class="mixer-keywords">' +
         '<div class="mixer-keywords-label">Shared Keywords</div>' +
@@ -790,9 +822,10 @@
     );
   }
 
-  // Every 2pc/2pc pair that our own keyword tags actually flag — computed
-  // once against the full set list, not hand-picked. "Suggested" means
-  // "the data says these feed each other," nothing more.
+  // Every 2pc/2pc pair that our own keyword tags actually flag — either a
+  // produce→trigger chain or a shared-effect overlap, computed once
+  // against the full set list, not hand-picked pairings. "Suggested"
+  // means "the data says these feed each other or double up," nothing more.
   function computeSuggestedCombos(){
     const combos = [];
     for (let i = 0; i < SETS.length; i++){
@@ -800,7 +833,8 @@
         const pick1 = { set: SETS[i], bonusName: SETS[i].two[0] };
         const pick2 = { set: SETS[j], bonusName: SETS[j].two[0] };
         const matches = keywordMatches(pick1, pick2);
-        if (matches.length) combos.push({ pick1, pick2, matches });
+        const sharedTags = sharedEffectMatches(pick1, pick2);
+        if (matches.length || sharedTags.length) combos.push({ pick1, pick2, matches, sharedTags });
       }
     }
     return combos;
@@ -815,7 +849,7 @@
     // categories reads as organized. Biggest category first.
     const groups = new Map();
     combos.forEach(c => {
-      const tags = [...new Set(c.matches.map(m => m.tag))].sort();
+      const tags = [...new Set([...c.matches.map(m => m.tag), ...c.sharedTags])].sort();
       const key = tags.join("+");
       if (!groups.has(key)) groups.set(key, { tags, combos: [] });
       groups.get(key).combos.push(c);
@@ -823,7 +857,7 @@
     const sortedGroups = [...groups.values()].sort((a, b) => b.combos.length - a.combos.length);
 
     el.innerHTML = sortedGroups.map(g => {
-      const label = g.tags.map(t => KEYWORD_TAG_LABELS[t] || t).join(" + ");
+      const label = g.tags.map(t => tagLabel(t)).join(" + ");
       const rows = g.combos.map(c =>
         '<button type="button" class="mixer-suggestion-btn" data-slug-a="' + c.pick1.set.slug + '" data-slug-b="' + c.pick2.set.slug + '">' +
           '<strong>' + c.pick1.set.name + '</strong> (' + c.pick1.bonusName + ') + ' +
