@@ -87,7 +87,7 @@ window.RaidsData = (function(){
       summary:"Garden of Salvation is short compared to most raids (just four encounters), but it makes up for that with pure endurance. There's very little in the way of puzzles here; it's mostly about managing timers, buffs, and constant enemy pressure without anyone getting overwhelmed.",
       encounters:[
         { name:"Evade the Consecrated Mind",
-          objective:"Push through three barriers while dodging a slow-moving boss, then sprint through an open field to finish.",
+          objective:"Push through a series of barriers while dodging a slow-moving boss, then sprint through an open field to finish.",
           roles:"Split into a forward group opening barriers and a rear group babysitting the boss, leapfrogging forward as the boss advances.",
           steps:[
             "Have a few players shoot a floating box near the start to form a tether that opens the first door and starts the encounter.",
@@ -100,13 +100,13 @@ window.RaidsData = (function(){
           wipe:"Ignoring one of the boss's orb-drops for too long kills the whole team, so always keep someone assigned to grab it no matter what else is going on." },
         { name:"Summon the Consecrated Mind",
           objective:"Secure four relay points around the map, then hold a fifth in the center until the boss is fully summoned.",
-          roles:"Rotate around the map clockwise as a group, leaving one or two defenders behind at each relay you clear.",
+          roles:"Rotate around the map clockwise as a group, leaving exactly one defender at each relay beyond the first (which starts with two); the two players freed up once the last corner is secured float between posts to help and refresh buffs.",
           steps:[
             "Kill the enemies in the center to start the fight.",
-            "Push clockwise as a group, clearing a relay, tethering it for a buff, then leaving one or two players behind to defend it before moving to the next.",
+            "Push clockwise as a group, clearing each relay, tethering it for a buff, then leaving one player behind to defend it before the rest move to the next — the first relay keeps two players, and the last two players free up to float once the final corner is secured.",
             "Repeat until all four corner relays are active and defended.",
-            "Once all four are up, waves of flying enemies attack each relay in turn, and clear them using the buff to break their shields.",
-            "When all of those waves are cleared, the center opens up, and everyone regroups there to defend one final relay until the encounter ends."
+            "Once all four are up, each one is assaulted by its own group of flying enemies — defenders and floaters clear them using the buff to break their shields.",
+            "Once every relay has survived its assault, the center opens up, and everyone regroups there to defend one final relay until the encounter ends."
           ],
           wipe:"Losing a relay to enemies while it's undefended forces you to reclaim it from scratch. It's not an instant wipe, but it can snowball into one if multiple points fall at once, so don't leave a relay with zero defenders for long." },
         { name:"Defeat Consecrated Mind",
@@ -115,8 +115,8 @@ window.RaidsData = (function(){
           steps:[
             "Tether the starting relay to begin the fight.",
             "Have one group kill the enemies that drop motes and deposit them at the glowing relay, aiming for 10 at a time before the pickup timer expires.",
-            "Have the other group follow the boss, and whoever picks up its dropped charge gets locked in place and must call out which of the glowing eyes are lit.",
-            "The two free players shoot the called-out eyes to free their trapped teammate.",
+            "Have the other group follow the boss, and whoever picks up its dropped charge gets locked in place and must call out which of the glowing eyes are lit, then shoot their own assigned eye.",
+            "The two free players each shoot one of the other called-out eyes, so all three go down together to free the trapped teammate.",
             "Once 30 motes are banked, follow the boss to the relay for a damage phase: shine all its eyes red, then shoot its exposed core as it backs away.",
             "Repeat the whole mote-and-eye cycle until the boss is dead."
           ],
