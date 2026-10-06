@@ -25,12 +25,12 @@ window.RaidsData = (function(){
           wipe:"Standing on the wrong section of a plate when it explodes kills you instantly, and failing to reach a safe room before Kalli's wipe attack fires kills the whole team. Stepping onto a plate that doesn't actually match a symbol currently in the center also spawns an Ogre instead of clearing anything, so double check you've got the right plate before committing to it." },
         { name:"Shuro Chi, the Corrupted",
           objective:"Break Shuro Chi's shield with a laser weapon, damage her, and interrupt her wipe attack — twice per level across three levels — then solve a picture puzzle each time before the four-minute timer runs out.",
-          roles:"Three players handle the laser weapon together; others rotate through picking up the Eye of Riven relic that interrupts her wipe attack (the same player can't reuse it right away) and solving the puzzle room.",
+          roles:"Three players handle the laser weapon together; others rotate through picking up the item dropped by Eye of Riven, a special Taken Captain, to interrupt her wipe attack (the same player can't reuse it right away) and solving the puzzle room.",
           steps:[
-            "Push forward and clear enemies until you reach Shuro Chi, then defeat a Taken Captain, which drops the Eye of Riven relic needed to interrupt her wipe attack.",
+            "Push forward and clear enemies until you reach Shuro Chi, then defeat Eye of Riven, a special Taken Captain that drops the item needed to interrupt her wipe attack.",
             "Pick up the laser-type weapon, get into position, and form a triangle of laser fire with your team to strip her shield.",
-            "Damage her until a chunk of health is removed, then have the relic holder use its ability the moment she starts her wipe attack to interrupt it.",
-            "Repeat the shield-break-and-damage cycle a second time on the same level — since the Eye of Riven relic can't be reused right away, hand it off to a different player this round.",
+            "Damage her until a chunk of health is removed, then have the item-holder use their ability the moment she starts her wipe attack to interrupt it.",
+            "Repeat the shield-break-and-damage cycle a second time on the same level — since the interrupt item can't be reused right away, hand it off to a different player this round.",
             "Enter the puzzle room, split up to man the floor buttons, and recreate each picture in sequence to reset the timer.",
             "Climb up to the next level and repeat the entire process: three levels total, each needing two damage windows and one puzzle."
           ],
@@ -40,10 +40,10 @@ window.RaidsData = (function(){
           roles:"Split into two groups covering each side of the arena; each group has its own dedicated player responsible for rescuing anyone who gets locked down.",
           steps:[
             "Collect Taken Strength orbs that spawn around the arena before Morgeth absorbs them. Each player can safely hold two at once — a third kills you instantly, there's no freeze chance at that point.",
-            "At two stacks, a player can instead get hit with Umbral Enervation and frozen in place. A player with zero stacks of their own needs to kill a Taken Captain, grab the Eye of Riven relic it drops, and use it to cleanse them — cleansing transfers the trapped player's two stacks onto you, so going in already holding any is how you kill yourself instead. The freed player can then start collecting again from zero.",
+            "At two stacks, a player can instead get hit with Umbral Enervation and frozen in place. A player with zero stacks of their own needs to kill Eye of Riven, a special Taken Captain, grab the item it drops, and use it to cleanse them — cleansing transfers the trapped player's two stacks onto you, so going in already holding any is how you kill yourself instead. The freed player can then start collecting again from zero.",
             "Once every orb is collected, group up and unload damage on Morgeth's exposed back.",
             "Watch for homing projectiles during the damage phase and shoot them down before they connect.",
-            "When Morgeth's power meter gets close to full, the same Eye of Riven relic must be used on him directly to interrupt the wipe and keep the damage phase going."
+            "When Morgeth's power meter gets close to full, the same item must be used on him directly to interrupt the wipe and keep the damage phase going."
           ],
           wipe:"Picking up a third Taken Strength stack instantly kills you, cleansing a trapped teammate while already holding stacks of your own can do the same, and letting Morgeth's power hit maximum wipes the whole team. Clear callouts about who's carrying what and who's free to cleanse are what keep this fight from unraveling." },
         { name:"The Vault",
@@ -51,7 +51,7 @@ window.RaidsData = (function(){
           roles:"Three players each hold down one room and read out their symbols; whoever kills the right enemy carries the cleansing energy to the correct lock.",
           steps:[
             "Stand on the three locks at once to reveal symbols, then call out your center symbol and figure out which other room has a matching duplicate.",
-            "Kill the Taken Captain that spawns to claim the Eye of Riven relic, which grants either Penumbra or Antumbra — this tells you whether the matching lock needs to be cleansed on the left-duplicate or right-duplicate side.",
+            "Kill Eye of Riven, the special Taken Captain that spawns, to claim the item it drops, which grants either Penumbra or Antumbra — this tells you whether the matching lock needs to be cleansed on the left-duplicate or right-duplicate side.",
             "Carry that Penumbra or Antumbra energy through the connecting tunnels to the correct lock and cleanse it.",
             "Repeat until all three locks are cleared, which opens a beam of light and restarts the whole process.",
             "Do this a total of three times to fully open the vault door."
@@ -63,7 +63,7 @@ window.RaidsData = (function(){
           steps:[
             "Split into two groups of three and head into separate rooms below the starting platform.",
             "In whichever room Riven appears, damage her until she staggers and two of her eyes start glowing, then call those out to the other room immediately.",
-            "In whichever room an Eye of Riven enemy appears instead, kill it, grab the Eye of Riven relic it drops, and use callouts from a teammate to cleanse the correct symbol.",
+            "In whichever room Eye of Riven appears instead, kill it, grab the item it drops, and use callouts from a teammate to cleanse the correct symbol.",
             "When Riven enters a room with her mouth open, damage the glowing target inside it, then destroy the correct eyes the instant her mouth closes.",
             "Move up a level and repeat the same process a second time.",
             "On the top floor, work together as one team, damaging Riven and remembering an assigned eye each of the three times she appears, then destroy your assigned eye during the final damage window.",
