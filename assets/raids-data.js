@@ -539,7 +539,7 @@ window.RaidsData = (function(){
             "Kill the Swordbearer enemy that spawns. It drops a Hive sword that only an Enlightened player can pick up.",
             "Send the sword-carrier across the bridge to fight the Gatekeeper, since only a Hive sword can damage it.",
             "After the Gatekeeper dies, a new Swordbearer spawns, so repeat sending players across until three are on the far side.",
-            "Once three players are across, the far side takes over plate and totem duty while the rest finish crossing.",
+            "Once three players are across, the far side takes over plate and totem duty; the rest can then cross either by grabbing a sword from a new Swordbearer or simply carrying the charged Chalice itself, since holding either one lets you cross.",
             "With everyone across, defeat a final wave of Gatekeepers using swords to close out the encounter."
           ],
           wipe:"Leaving an Annihilator Totem unguarded while the plate is active kills the whole team instantly. This matters more than anything else in the fight." },
@@ -569,9 +569,11 @@ window.RaidsData = (function(){
           roles:"Some players clear adds in the two towers; one focuses on finishing the Swordbearer each round; several rotate through the Chalice to stay Enlightened for swords, damage, and Oversoul duty.",
           mapImage:{ url:"https://images.steamusercontent.com/ugc/2041874640882815568/256CF39CEE16D75F4738CB31718E681525F47BD5/", credit:"Map by pryanie", creditUrl:"https://www.reddit.com/r/raidsecrets/comments/16ccxr0/destiny_2_crotas_end_raid_maps_guide_loot_table/" },
           steps:[
+            "A debuff blocks normal health and shield regeneration for the whole fight — the only way to heal is to hold the Chalice, so pass it around for that too, not just swords and damage.",
+            "Unlike earlier encounters, the Chalice can only be exchanged inside a roaming aura that appears at one of several fixed spots around the arena — watch for it and call out its location so whoever's charged can reach it in time.",
             "Clear the Hive Knights in both towers to spawn a Swordbearer in the middle door.",
             "Get Enlightened and defeat the Swordbearer to claim a Hive sword. It takes two to three swords' worth of hits to break Crota's shield.",
-            "Once the shield drops, the team piles on damage until Crota resets and the round ends.",
+            "Once the shield drops, the team piles on damage until Crota resets and the round ends. Any spare Enlightened players beyond what's needed for swords and Oversoul duty can also hit him directly for a free burst of damage.",
             "During each damage phase, Crota also summons an Oversoul that wipes the team if left alone too long. An Enlightened player has to destroy it, though doing so ends the damage phase early, so it's worth waiting as long as safely possible.",
             "Repeat the shield-break-and-damage cycle across several rounds until Crota reaches his final stand, a shorter and more dangerous last phase.",
             "After his final stand ends, back away from Crota immediately. He's briefly invulnerable and can still one-shot anyone standing too close."
