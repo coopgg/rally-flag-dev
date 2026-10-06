@@ -595,8 +595,8 @@ window.RaidsData = (function(){
             "Collect three resources per player before using them to lock the local generator.",
             "Repeat this whole loop until all six generators around the map are locked and your collected resources are deposited at the end."
           ],
-          wipe:"Ignoring a plate that's just received a signal spawns a tough enemy in that room instead of progressing, and letting the shared timer expire wipes the team, so always have someone ready to answer a signal." },
-        { name:"Dissipation",
+          wipe:"Ignoring a plate that's just received a signal spawns a tough enemy in that room instead of progressing, and letting the shared timer expire wipes the team, so always have someone ready to answer a signal. You can only hold three resources at once, too — collecting a fourth kills you, so deposit or lock them before grabbing more." },
+        { name:"Herald of Finality",
           objective:"Split into three zones to fight a boss, cycle a special buff to unlock exposed weak points, then use plates in each zone to lock generators while managing a boss timer.",
           roles:"Three pairs, one per zone; a rotating group earns the ability to damage the boss directly.",
           steps:[
