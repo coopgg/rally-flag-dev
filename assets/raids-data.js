@@ -151,10 +151,10 @@ window.RaidsData = (function(){
           objective:"Use two rotating buffs, Scanner and Operator, to identify and destroy six hidden fuses, split between an upstairs team and a basement teammate.",
           roles:"Split into two teams of three (light side and dark side); one player goes alone into the basement as Operator.",
           steps:[
-            "One player grabs the Operator buff from the terminal and heads to the basement alone.",
+            "One player grabs the Operator buff from the terminal to begin the fight, but stays up top rather than heading down right away.",
             "Defeat the enemy that drops the Scanner buff and use it to look through the floor and call out which basement keypads are lit on your side.",
             "Pass the Scanner buff across to the other side using the terminal so they can call out their two keypads.",
-            "The Operator shoots all four called-out keypads from the basement.",
+            "Once enough keypads have been called out, the Operator heads down to the basement alone and shoots them.",
             "Pass the Operator buff back upstairs and give the Scanner buff to whoever's now in the basement.",
             "The new basement Scanner calls out which of six fuses is lit; everyone upstairs on that side shoots the matching fuse.",
             "Repeat calling out and destroying fuses one at a time until all six are gone."
@@ -205,7 +205,7 @@ window.RaidsData = (function(){
             "Everyone focuses Taniks' wings to knock loose Nuclear Cores, then two players carry them toward the correct buckets.",
             "Swap a Nuclear Core to a fresh carrier before the radiation debuff maxes out on whoever's holding it.",
             "The Suppressor moves under three drones in sequence, stunning Taniks each time so the cores can actually be deposited.",
-            "The Operator frees any core carrier who gets trapped in a barrier during this process.",
+            "The Operator frees any core carrier who gets trapped in a barrier during this process. The third time the Suppressor stuns Taniks, a buff gets disabled at random — swap it to a new player using the terminal.",
             "Repeat until four cores are deposited, at which point Taniks moves to the center for a damage phase: jump past the outer ring but stay inside the inner one to deal damage.",
             "Repeat the whole core-and-damage cycle until his final health chunk, when he starts teleporting around the arena, then chase him down and finish the fight."
           ],
