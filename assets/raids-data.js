@@ -24,27 +24,28 @@ window.RaidsData = (function(){
           ],
           wipe:"Standing on the wrong section of a plate when it explodes kills you instantly, and failing to reach a safe room before Kalli's wipe attack fires kills the whole team. Stepping onto a plate that doesn't actually match a symbol currently in the center also spawns an Ogre instead of clearing anything, so double check you've got the right plate before committing to it." },
         { name:"Shuro Chi, the Corrupted",
-          objective:"Break Shuro Chi's shield using a laser weapon, damage her, interrupt her wipe attack, then solve a picture puzzle, all within a four-minute timer, three times over.",
-          roles:"One player collects a special item to interrupt her wipe attack; others handle the laser weapon and the puzzle room.",
+          objective:"Break Shuro Chi's shield with a laser weapon, damage her, and interrupt her wipe attack — twice per level across three levels — then solve a picture puzzle each time before the four-minute timer runs out.",
+          roles:"Three players handle the laser weapon together; others rotate through picking up the item that interrupts her wipe attack (the same player can't reuse it right away) and solving the puzzle room.",
           steps:[
-            "Push forward and clear enemies until you reach Shuro Chi, then defeat a specific enemy that drops an item needed to interrupt her later.",
+            "Push forward and clear enemies until you reach Shuro Chi, then defeat a specific enemy that drops an item needed to interrupt her wipe attack.",
             "Pick up the laser-type weapon, get into position, and form a triangle of laser fire with your team to strip her shield.",
             "Damage her until a chunk of health is removed, then have the item-holder use their ability the moment she starts her wipe attack to interrupt it.",
+            "Repeat the shield-break-and-damage cycle a second time on the same level — since the interrupt item can't be reused right away, hand it off to a different player this round.",
             "Enter the puzzle room, split up to man the floor buttons, and recreate each picture in sequence to reset the timer.",
-            "Climb up to the next level and repeat the entire process: three times total, once per level of the building."
+            "Climb up to the next level and repeat the entire process: three levels total, each needing two damage windows and one puzzle."
           ],
           wipe:"The four-minute timer wipes the team if it runs out before the puzzle is solved, and failing to interrupt her wipe attack in time does the same. Speed matters as much as accuracy here." },
         { name:"Morgeth, the Spirekeeper",
-          objective:"Collect a set of orbs before the boss reaches full power, then damage him while managing who's allowed to carry what.",
-          roles:"Split into two groups covering each side of the arena; one player is responsible for rescuing anyone who gets locked down.",
+          objective:"Collect a set of orbs before the boss reaches full power, then damage his exposed back while managing who's allowed to carry what.",
+          roles:"Split into two groups covering each side of the arena; each group has its own dedicated player responsible for rescuing anyone who gets locked down.",
           steps:[
             "Collect orbs of energy that spawn around the arena before Morgeth absorbs them. Each player can safely hold two at once.",
-            "If someone gets stuck holding too many and becomes locked in place, another player needs to kill a specific enemy, grab the item it drops, and use it to free them.",
-            "Once every orb is collected, group up and unload damage on Morgeth's exposed weak point.",
+            "If someone gets stuck holding too many and becomes locked in place, a player with zero orbs of their own needs to kill a specific enemy, grab the item it drops, and use it to free them — freeing someone transfers their stacks onto you, so going in already holding any is how you kill yourself instead.",
+            "Once every orb is collected, group up and unload damage on Morgeth's exposed back.",
             "Watch for homing projectiles during the damage phase and shoot them down before they connect.",
-            "When Morgeth's power meter gets close to full, the same freeing ability must be used on him directly to prevent a wipe."
+            "When Morgeth's power meter gets close to full, the same freeing ability must be used on him directly to interrupt the wipe and keep the damage phase going."
           ],
-          wipe:"Picking up a third orb instantly kills you, and letting Morgeth's power hit maximum wipes the whole team. Both are avoidable with clear callouts about who's carrying what." },
+          wipe:"Picking up a third orb instantly kills you, freeing a trapped teammate while already holding orbs of your own can do the same, and letting Morgeth's power hit maximum wipes the whole team. Clear callouts about who's carrying what and who's free to cleanse are what keep this fight from unraveling." },
         { name:"The Vault",
           objective:"Identify matching symbols across three rooms and cleanse the correct locks with the correct type of energy, all within a tight timer.",
           roles:"Three players each hold down one room and read out their symbols; whoever kills the right enemy carries the cleansing energy to the correct lock.",
