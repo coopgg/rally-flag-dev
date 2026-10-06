@@ -321,13 +321,13 @@ window.RaidsData = (function(){
           wipe:"The darkness debuff kills you outright if it maxes out, so don't wander too far from the payload for too long." },
         { name:"Acquisition",
           objective:"Identify a hidden three-symbol code for each of three obelisks by clearing rooms and reading callouts, then shoot the right symbols before the room's own meter forces a wipe.",
-          roles:"Split into pairs, one pair per obelisk, working together to solve their obelisk's code.",
+          roles:"Split into pairs, one pair per obelisk, but treat the three obelisks as one shared puzzle — the code your team pieces together might end up matching a different obelisk than the one that revealed it.",
           steps:[
             "Shoot the central crystal to start the encounter and get the doors moving.",
-            "Watch a reference pillar near your obelisk: it lights up to tell you which side of the room to check, and defeating the enemy there reveals which room to enter.",
+            "Watch the reference pillars: one lights up to show which side of the room an enemy is spawning on, and defeating it reveals which room to enter.",
             "Clear the enemies inside that room, which reveals a matching pair of symbols; a callout on the pillar tells you which of the two to remember.",
-            "Repeat this two more times until you've collected three symbols total.",
-            "Find all three symbols on your obelisk and shoot them in quick succession.",
+            "Repeat this two more times until a full three-symbol code is known.",
+            "Check all three obelisks — only one of them will actually display that exact combination, even if it isn't the one that revealed it — and shoot its three symbols in quick succession.",
             "Repeat the entire process two more times, once for each obelisk."
           ],
           wipe:"The obelisk fills a hidden meter as the fight goes on, faster if you shoot wrong symbols or let enemies attack it. If it fills completely, the team wipes, so speed and accuracy both matter." },
@@ -335,7 +335,7 @@ window.RaidsData = (function(){
           objective:"Stun a boss to keep him from reaching a central obelisk, collect symbols from a dark side room to unlock a damage phase, then repeat across three floors.",
           roles:"Two players keep the boss's attention and stun him, two clear enemies and support, two rotate through a dark room collecting symbols.",
           steps:[
-            "Have two players bait the boss and take turns shooting him in the face to stun him, then his back to stop him from summoning obstacles.",
+            "Have two players bait the boss — one gets close to trigger his slam attack, then shoots his face the moment it's exposed to stagger him, while the other shoots his back to drop him to the ground and halt his advance toward the obelisk.",
             "Send the other two players in and out of a dark room one at a time, each grabbing three symbols before shooting them onto the central obelisk.",
             "Watch a stacking darkness debuff while inside the dark room. It clears once you're back outside.",
             "Once all nine symbols are collected and delivered, a damage phase begins on three rotating floor plates.",
@@ -355,17 +355,20 @@ window.RaidsData = (function(){
           ],
           wipe:"The shared timer wipes the whole team if it hits zero. Killing the time-adding enemy and depositing artifacts promptly are the only ways to keep pace with it." },
         { name:"Rhulk, Disciple of the Witness",
-          objective:"Cycle a shared buff between players to build a matching debuff, deposit it at the correct location based on symbol callouts, then damage the boss across several rounds before his final stand.",
-          roles:"Two players juggle the base buff back and forth; two more turn it into the deliverable version and carry it to a called-out location.",
+          objective:"Split a shared buff between players and feed it through one of the boss's attacks to build a deliverable version, bank it at the right pillar to push back his barrier, then repeat a weak-point sequence each round before damaging him and finishing with his final stand.",
+          roles:"Two players dedicate themselves to splitting and re-splitting the base buff; two more convert it and carry it to a called-out pillar; the last two clear adds and call out matching symbols.",
           steps:[
-            "Shoot the central crystal or the boss's weapon to gain the base buff, then pass it to teammates by shooting nearby crystals so multiple people can cycle it.",
-            "Have two players stand in one of the boss's darkness blasts while holding the buff to convert it into the deliverable version.",
-            "Watch for symbols that appear as enemies are cleared, call out which one matches, then figure out which location it corresponds to.",
-            "Deposit the converted buff at the correct location, then repeat until enough have been delivered.",
-            "Once the boss is exposed, group up and deal damage until he resets, then repeat the whole cycle.",
-            "Save your strongest abilities for his final stand, where he moves constantly and a darkness debuff starts stacking on the whole team."
+            "Destroy the dark crystal above Rhulk's head to grant whoever shot it a buff and stop a team-wide darkness debuff from stacking. If nobody's holding that buff when the window runs out, he summons another crystal — let that happen three times without reaching a damage phase and the team wipes outright.",
+            "Whoever has the buff stands on a specific floor marker, which spawns two crystals nearby — have teammates shoot those to split the buff from the floor-stander onto the two crystal-shooters.",
+            "Have only one of those two holders deliberately take one of Rhulk's laser beams to convert their buff into its deliverable form — doing this with both at once loses the buff entirely instead of splitting it.",
+            "Meanwhile, clear adds and kill the Glyphkeepers that spawn to reveal two sets of symbols, one visible only to buffed players and one only to unbuffed — find the match and call out which of six pillars it points to.",
+            "Deposit the converted buff at that pillar to push the barrier back, then repeat the whole split-convert-deposit cycle (six pillars total) until the barrier fully recedes and the stairs open.",
+            "Inside, shoot Rhulk's glaive after he stabs it into the ground to gain the buff again and reveal a symbol pointing to one of four corner pillars — convert it in his laser beam as before and deposit it there to expose a weak point.",
+            "Destroy that weak point, then repeat the glaive-convert-deposit sequence three more times until all four weak points are down and he's finally vulnerable.",
+            "Damage him until he resets and goes immune, then retreat and repeat the whole weak-point sequence to force another damage window. Expect to do this a few times.",
+            "In his final stand, save your strongest abilities — he moves constantly and a darkness debuff stacks on the whole team until he's dead."
           ],
-          wipe:"Letting the darkness debuff max out during the final stand wipes the team, and losing track of the buff entirely (no one holding it) forces you to restart that portion of the cycle. Clear, fast callouts are what keep this fight moving." }
+          wipe:"Letting Rhulk summon a third unclaimed crystal is an instant wipe on its own, separate from the final stand's darkness debuff maxing out. Converting both buff holders into the deliverable version at the same time loses your progress entirely instead of splitting it, so always keep one Leeching holder in reserve." }
       ] },
     { name:"King's Fall", slug:"kings-fall", armorSlugs:["oryxs-memory"],
       summary:"King's Fall reintroduces a lot of ideas from Destiny's original raids: statues, totems, and boss fights that hinge on trading a single buff back and forth between a handful of players. Nothing here is subtle: if a role isn't being covered, you'll know almost immediately.",
