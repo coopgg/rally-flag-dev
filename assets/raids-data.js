@@ -299,9 +299,9 @@ window.RaidsData = (function(){
             "Clear Harpies until three players get randomly teleported away.",
             "The teleported players immediately call out which side they're on.",
             "The team left behind opens the matching portal and calls out the order Oracles are spawning above them, so the teleported group can destroy their own Oracles in the same order.",
-            "One teleported player grabs a Relic on their side to clear Praetorians and cleanse a blinding debuff from the group.",
+            "One teleported player grabs a Relic on their side to clear Praetorians and cleanse Marked by the Void from the group.",
             "After nine Oracles are destroyed across three rounds, the teleported players escape back through the portal.",
-            "Everyone gets a short buff that opens a damage window on Atheon. Focus fire immediately since it doesn't last long, and if a player gets randomly detained during this window, have them move well away from the group while teammates shoot the detainment field to free them.",
+            "Everyone gets the Time's Vengeance buff, which opens a damage window on Atheon. Focus fire immediately since it doesn't last long, and if a player gets randomly detained during this window, have them move well away from the group while teammates shoot the detainment field to free them.",
             "Repeat the whole cycle until Atheon is dead. There's no separate final stand phase."
           ],
           wipe:"Getting the Oracle order wrong on either side, or running out of time before the teleported players escape, ends the run, and dropping the Relic for more than about 10 seconds does too. Clean callouts between the inside and outside teams matter more here than anywhere else in the raid." }
