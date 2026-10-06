@@ -666,13 +666,13 @@ window.RaidsData = (function(){
           roles:"Two pairs head into side rooms carrying a buff; two players hold the middle, clear enemies, and relay callouts.",
           steps:[
             "Defeat the tough enemies that spawn to reveal two buff plates, and send a pair to each side room.",
-            "Inside each side room, watch for a lit symbol overhead and call it out to the other room, then shoot the enemy shield-eye that your counterpart calls back to you.",
-            "Meanwhile, the two players in the middle read a set of markers near the central pillar and call out which one is unlit.",
-            "Side room players shoot the correct orb based on that callout.",
-            "Everyone regroups in the middle to clear enemies again, finish off any remaining shield-eyes, then destroy the central glowing eye.",
-            "Return to the middle to trigger a damage phase, extending it by handling additional eye call-outs as they appear."
+            "In each side room, watch for a lit symbol over your Hydra and call it to the other room — then shoot the shield-eye position your counterpart calls back to you, not the one you saw yourself. Repeat this cross-call-and-shoot four times total.",
+            "Meanwhile, the two players in the middle read a set of markers near the central pillar, call out which one is unlit, and the side room players shoot the matching orb in a triangle above their Hydra based on that callout.",
+            "Everyone regroups in the middle and clears enemies again, then the two buffed players head back into their side rooms a second time to finish the two remaining shield-eyes, followed by the large central eye on each Hydra.",
+            "With every side-room eye destroyed, return to the middle and shoot the matching eyes on the main boss's shield to start the damage phase.",
+            "During damage, the boss periodically pulls a new pair of players into its eye-beams to shoot fresh eyes and keep the phase going; everyone else just keeps unloading damage."
           ],
-          wipe:"Shield-eyes that aren't shot at nearly the same moment will seal back up, usually forcing a restart on that step. The whole encounter lives and dies on tight, simultaneous callouts between rooms." },
+          wipe:"Shield-eyes that aren't shot at nearly the same moment grow back and seal shut, almost always forcing a wipe. The whole encounter lives and dies on tight, simultaneous callouts between rooms." },
         { name:"Iatros, Inward-Tuned",
           objective:"Defeat waves of enemies to bank a resource, use it to briefly empower a set of shooters, and reach a climbing plate for a damage phase, all before a shared timer runs out.",
           roles:"A couple of players run add-clear and bank resources; a small team shoots targets together on cue; one player handles a platforming section.",
@@ -702,10 +702,10 @@ window.RaidsData = (function(){
           roles:"Players split by buff type to read hidden information about mines and a central ring below; above, three buffed players activate crystal pillars while others manage adds and additional resources.",
           steps:[
             "On the lower platform, split into buff groups so different players can see the color of scattered mines, whether they're active, and the current color of a central ring.",
-            "Stand together on a marked plate to briefly gain the ability to compare that information, then destroy any mine matching the ring's current color while it's active.",
+            "Stand together on a marked plate to briefly gain the ability to compare that information, then have whoever can see the ring's color confirm and destroy whichever mine is both active and matching it.",
             "Collect the resource it drops and repeat this multiple times to fill the shared meter, while a couple of players handle the boss's dangerous turrets in the background.",
             "Once the meter is full, move up to the boss's upper platform.",
-            "Three differently-buffed players identify a shared marker between their pairs and interact with it, repeating this a few times to expose the boss's real weak points.",
+            "Up top, the same three buff types each reveal different cubes at four separate pillars — the player who can see all of them interacts with whichever cube the other two both see, and repeating this across all four pillars exposes the boss's real weak points.",
             "With the boss vulnerable, the team unloads damage while one player keeps banking resources through a ring to extend the fight, avoiding hazards on the ground and from above."
           ],
           wipe:"Ignoring the boss's turrets or hazard zones during either phase gets people killed fast, and letting the shared resource run dry cuts your damage window short. This fight demands the most multitasking in the raid, so keep your assigned job simple and stick to it." }
