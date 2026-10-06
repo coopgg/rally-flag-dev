@@ -375,26 +375,26 @@ window.RaidsData = (function(){
       summary:"King's Fall reintroduces a lot of ideas from Destiny's original raids: statues, totems, and boss fights that hinge on trading a single buff back and forth between a handful of players. Nothing here is subtle: if a role isn't being covered, you'll know almost immediately.",
       encounters:[
         { name:"Relics & Opening the Gate",
-          objective:"Carry glowing orbs from two side rooms back to a central set of statues to unlock the path forward.",
+          objective:"Carry two orbs, one from each side room, back to whichever statue in the center is currently lit, and deposit them there together to unlock the path forward.",
           roles:"Split into two groups of three, one per side, each with a dedicated orb carrier.",
           steps:[
             "Send one group left and one right, with one player per group responsible for grabbing the orb.",
             "Have the other two players in each group clear enemies and destroy barriers blocking the return path.",
-            "Carry the orb back to the central statues and deposit it there.",
-            "Repeat, since orbs spawn slightly farther away each time and expire if held too long.",
-            "Once all orbs are deposited, clear the remaining enemies near the portal to open it."
+            "Carry the orb back to the center and deposit it at whichever statue is currently lit — the left and right orb need to land there within a few seconds of each other, so whichever side gets there first should wait on the other.",
+            "Repeat for six rounds total, since orbs spawn slightly farther away each round and expire if held too long.",
+            "Once all six rounds are done, clear the remaining enemies near the portal to open it."
           ],
-          wipe:"Orbs expire if carried too long without being deposited. If a carrier goes down or gets cut off, grab it quickly or the timer will force a restart on that run." },
+          wipe:"Orbs expire if carried too long without being deposited, and depositing without the other side's orb landing at nearly the same time fails that round, forcing a retry. If a carrier goes down or gets cut off, grab the dropped orb quickly or the timer will force a restart on that run." },
         { name:"Annihilator Totems",
-          objective:"Keep a totem in each of two side rooms defended at all times while cycling a buff between teammates to charge a central plate.",
-          roles:"Two teams of three, one per side room, constantly passing a buff and defending their totem.",
+          objective:"Keep a totem in each of two side rooms defended at all times while running a three-player rotation that charges a central plate.",
+          roles:"Two teams of three, one per side room, each running a fixed rotation: buff holder, plate depositor, balcony claimer.",
           steps:[
             "Send half the team to each side room.",
-            "Have one player grab the buff and stand near their totem getting kills to build charge.",
-            "Send another player to defeat a specific enemy elsewhere in the room, which drops an item that lets them steal the buff from the current holder.",
-            "Once someone has built up charge, send them to the center room to drain it at the plate.",
-            "Cycle the buff continuously between your three players so someone is always defending the totem.",
-            "Repeat this loop until the encounter ends. There's no boss here, just constant buff management."
+            "Have one player grab the buff and stand near the totem, killing enemies to build charge — never leave the totem undefended, even briefly.",
+            "Have another player clear the balcony (kill the enemy that spawns there, then the one it summons) to get an item that lets them steal the buff from the current holder.",
+            "Once the buff is stolen, the player who lost it heads to the center plate and stands there until their built-up charge fully drains.",
+            "After draining, that same player becomes the next balcony claimer, continuing the rotation: holder, to depositor, to claimer, and back to holder again.",
+            "Repeat this loop on both sides until the encounter ends. There's no boss here, just constant buff management."
           ],
           wipe:"Leaving a totem completely undefended wipes the team after a few seconds, so even mid-rotation, always make sure someone's covering it." },
         { name:"The Warpriest",
@@ -408,7 +408,7 @@ window.RaidsData = (function(){
             "When the buff's timer runs low, have someone grab an item from a specific enemy to pass the buff to a new player, keeping the damage phase going.",
             "When the boss unleashes his room-clearing attack, take cover behind one of the pillars to avoid it, then repeat the whole sequence."
           ],
-          wipe:"Letting the damage buff's timer expire with nobody ready to take it over stalls the whole encounter, and getting caught without cover during the boss's blast can wipe the team outright." },
+          wipe:"Letting the damage buff's timer expire with nobody ready to take it over stalls the whole encounter, and getting caught without cover during the boss's blast can wipe the team outright. There's also a hard ceiling: using a pillar for cover destroys it, so you've only got a few uses before you're out of cover entirely." },
         { name:"Golgoroth",
           objective:"Juggle a boss's attention between two players while the rest of the team shoots down orbs and deals damage from special pools on the ground.",
           roles:"Two players trade the boss's aggro back and forth; everyone else destroys orbs, stands in the resulting pools, and deals damage.",
@@ -417,7 +417,7 @@ window.RaidsData = (function(){
             "While that's active, other players destroy an overhead orb, which creates a damage pool on the ground.",
             "Stand in the pool to damage the boss's exposed weak point.",
             "Just before the aggro timer runs out, the second player takes over the boss's attention so the first can rotate to safety.",
-            "Repeat with a new orb and pool each time the aggro swaps, watching for a debuff that will explode on whoever's affected, so move away from allies if you get marked.",
+            "Repeat with a new orb and pool each time the aggro swaps, watching for a debuff that will explode on whoever's affected — move away from allies once you're marked, though exploding close to the boss himself deals him a solid chunk of damage, so use it as a parting shot if you can.",
             "Continue until either all the available orbs are used or the boss is defeated."
           ],
           wipe:"Failing to pass the boss's attention in time gets whoever's exposed killed, and letting too many orbs go unused across the fight eventually wipes the whole team. Both are about timing, not damage." },
@@ -428,8 +428,8 @@ window.RaidsData = (function(){
             "Stand on the glowing plate to reveal which second plate needs to be activated, forming a path across the room.",
             "The randomly chosen player crosses that path to collect a piece of a shared buff.",
             "Repeat this three times to gather all the pieces needed.",
-            "On the third piece, the same player uses it to steal the boss's protective aura while she's using her wipe attack.",
-            "With the aura stolen, the whole team groups up inside it and burns the boss down.",
+            "On the third piece, the same player uses it to steal the protective aura from whichever daughter is actively shooting at the team, not the one singing — this is also around when her sister's wipe-attack timer is running out, so move quickly.",
+            "With the aura stolen, the whole team groups up inside it and burns down that same daughter, the one you stole the aura from, before her sister's song finishes.",
             "Repeat the entire process for the second boss."
           ],
           wipe:"The boss's song wipes the team automatically if nobody steals her aura in time. The whole encounter is a race to build the path and grab the buff pieces fast enough to make that deadline every round." },
@@ -440,12 +440,12 @@ window.RaidsData = (function(){
             "Build the path and send the selected player across to collect a piece of a shared buff, repeating this three times as in the earlier fight.",
             "Defeat the large enemies that drop stun bombs around the room, along with the smaller enemies that try to disarm them.",
             "On the third piece, use it to steal the protective aura from a specific target.",
-            "When the boss begins his wipe attack, everyone must be standing near the bombs to trigger them at once, then retreat into the stolen aura for protection from the resulting blast.",
+            "When the boss begins his wipe attack, each assigned player must walk fully into their bomb and wait for it to arm, then sprint back to the aura holder's position before it detonates — anyone still outside the aura when it goes off is killed.",
             "With Oryx stunned, unload damage on his exposed chest.",
             "After the damage window ends, either survive a wave of extra attacks or fight through a side challenge, depending on which one triggers, then repeat the whole cycle until his health is low enough for the final stand.",
-            "In the final stand, repeat the bomb-and-damage cycle one last time to finish him off."
+            "In the final stand, two Light-Eater Ogres spawn and drop two more bombs instead of four — trigger them one at a time rather than together, and finish him off before you run out of chances; failing here wipes the team even while standing in the aura."
           ],
-          wipe:"Missing the bomb detonation window during his wipe attack, or failing to reach the protective aura in time, both end the run. This is one of the longest fights in the game, so pace your ammo and your patience accordingly." }
+          wipe:"Missing the bomb detonation window during his wipe attack is an instant wipe, though triggering even just one bomb is enough to stun him and avoid that — triggering more just extends the damage window. Failing to get back into the aura before a triggered bomb detonates kills whoever's still outside it. This is one of the longest fights in the game, so pace your ammo and your patience accordingly." }
       ] },
     { name:"Root of Nightmares", slug:"root-of-nightmares", armorSlugs:["nezarecs-nightmare"],
       puzzleHelper:{ slug:"nezarec-extra-chest", title:"Nezarec's Extra Chest", blurb:"Note the reference wall's Light/Dark pattern at the start, then work out which orbs to connect in each of the raid's three hidden rooms." },
