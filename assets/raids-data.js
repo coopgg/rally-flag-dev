@@ -481,19 +481,19 @@ window.RaidsData = (function(){
             "Find the planets that don't belong on their current side, carry them across, and swap them with a partner doing the same from the other direction.",
             "Once all mismatched planets are swapped, defeat more enemies to reveal the color pattern needed on three central plates.",
             "Carry matching planets from the sides to the correct central plate based on that pattern.",
-            "Stand on whichever plate matches the boss's current shield type to deal bonus damage, and rotate to the next one as its shield changes.",
+            "Stand on whichever plate matches the boss's current shield type to deal bonus damage, and rotate to the next one as its shield changes — the sequence always follows a pattern where whichever color appears twice among the three plates goes first and last, so you can call the full rotation order before damage even starts.",
             "Repeat the whole cycle until the boss is defeated."
           ],
           wipe:"Nothing here directly wipes the team, but failing to deal enough damage during a plate rotation means you can't cycle through all of them. Slow, correct swaps beat fast, wrong ones." },
         { name:"Nezarec, Final God of Pain",
           objective:"Build two networks of nodes (one of each energy type) while periodically stunning the boss, then burn him down in short damage phases across multiple rounds.",
-          roles:"Two players build the node networks; everyone else keeps Nezarec's weak points cracked to prevent his wipe attack.",
+          roles:"Two players build the node networks; two more take turns tanking Nezarec's aggro and signaling which safe zone color is needed; everyone else keeps both lanes clear of adds.",
           steps:[
             "Assign two players to build a Light network and a Dark network simultaneously, same node logic as earlier encounters.",
-            "While that's happening, shoot Nezarec's shoulders and chest as he roams to keep him stunned.",
-            "If his wipe attack goes off before both networks are finished, take a differently-colored energy buff to an opposite-colored node to create a temporary safe zone, and stand in it to survive.",
+            "Have two players take turns tanking Nezarec: shoot his chest to pull his aggro off the team and onto yourself, then shoot one of his shoulders — the color of the resulting blast tells your network builders which color safe zone to prepare.",
+            "If his wipe attack goes off before both networks are finished, take a buff to an already-completed node of the opposite color (light to a dark node, or vice versa) to create a safe zone matching the color his shoulder revealed, and have the team shelter in it.",
             "Once both networks are complete, group up as he's exposed and unload as much damage as possible before he goes immune.",
-            "Reset and repeat: each round gives you less time before his wipe attack triggers, so move faster each time.",
+            "Reset and repeat: each round gives you less time before his wipe attack triggers, so move faster each time, with the tanks swapping his aggro back and forth to buy extra seconds.",
             "Continue until his final stand, where you'll need to finish him off before he wipes the team outright."
           ],
           wipe:"Getting caught outside a safe zone during his wipe attack kills everyone who isn't protected. The fastest way to avoid needing one at all is finishing both node networks before his patience runs out." }
