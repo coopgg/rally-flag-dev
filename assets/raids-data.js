@@ -706,17 +706,17 @@ window.RaidsData = (function(){
       summary:"Pantheon isn't a traditional raid — it's three ways to fight vaulted raid bosses without running the full raids. Calus Resplendent runs the three Leviathan-era bosses (Argos, Gahlran, Emperor Calus) close to their original encounters. Morgeth Surpassing takes three bosses from three different raids — Warpriest (King's Fall), Consecrated Mind (Garden of Salvation), and Morgeth (Last Wish) — and merges each one with the non-boss encounter that originally came right before it. The Gauntlet strings all six of those together and caps it off with a seventh boss, Insurrection Prime: not new, but the returning final boss of the vaulted Scourge of the Past raid. Since the roster can keep changing over time, treat this as a snapshot rather than a fixed lineup.",
       encounters:[
         { name:"Argos, Planetary Core (Calus Resplendent)",
-          objective:"Charge three elemental resources to match the shield's current combination, detonate them together to open a damage window, then destroy several weak points before a follow-up timer runs out.",
-          roles:"Three pairs, one per elemental station, each with a runner and a defender.",
+          objective:"Charge elemental orbs to match the shield's current combination, shoot them down together to drop the shield and open a damage window, then deal with a guaranteed wipe bomb by destroying weak points on the boss's body.",
+          roles:"Three pairs, one per elemental station, each with a runner carrying charges and a defender holding the platform.",
           steps:[
             "Split into three pairs and take a station each: one per element.",
-            "Watch the boss's shield for the combination of elements it's currently displaying.",
-            "Charge your station's resource with the correct element and carry it to the matching orb on the shield.",
-            "Once all three are in place, they detonate together to drop the shield and grant a team-wide damage buff.",
-            "During the damage window, spread out to avoid a tether attack that can chain between clustered players, and focus the glowing weak points. They're the only points that take real damage.",
-            "After the damage phase, destroy the additional weak points that appear before the follow-up timer expires."
+            "Keep charging orbs back-to-back at your station without waiting for them to be needed — you'll often need two of the same element before the encounter's over.",
+            "Watch which side of the shield is active and which combination of elements its floating mines are asking for.",
+            "Once three players are holding the matching elements, shoot those mines down together on a synced countdown — destroying all three at once grants a bonus to the damage phase that follows.",
+            "During the damage window, watch for a grabbing net attack that snatches a player away and kills them on a short timer if they're not freed, and shoot down the homing missiles the boss throws before they reach the group.",
+            "At some point regardless of what you do, the boss disengages completely and starts charging a guaranteed wipe attack. One pair of matching weak points (head, arms, or back) lights up — split into two groups of three and each group destroys its side's point before the timer runs out, then go back to charging orbs."
           ],
-          wipe:"Bringing the wrong combination of charged elements wastes that attempt entirely, and you only get a handful of tries before the encounter fails outright, so confirm the shield's combination out loud before committing resources to it." },
+          wipe:"Bringing the wrong combination of charged elements wastes that attempt entirely, and you only get a handful of tries before the encounter fails outright, so confirm the shield's combination out loud before committing resources to it. Letting the wipe-bomb timer run out without destroying that cycle's weak points kills the whole team outright." },
         { name:"Gahlran, the Sorrow-Bearer (Calus Resplendent)",
           objective:"Manage a shared, timed buff across three sections of the arena to survive, damage shielded targets, and eventually expose the real boss among decoys.",
           roles:"Three pairs, one buffed and one unbuffed player each, managing their own section.",
