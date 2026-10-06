@@ -321,14 +321,14 @@ window.RaidsData = (function(){
           wipe:"The darkness debuff kills you outright if it maxes out, so don't wander too far from the payload for too long." },
         { name:"Acquisition",
           objective:"Identify a hidden three-symbol code for each of three obelisks by clearing rooms and reading callouts, then shoot the right symbols before the room's own meter forces a wipe.",
-          roles:"Split into pairs, one pair per obelisk, but treat the three obelisks as one shared puzzle — the code your team pieces together might end up matching a different obelisk than the one that revealed it.",
+          roles:"Split into pairs, one pair per obelisk, but treat the three obelisks as one shared puzzle — the code your team pieces together might end up matching a different obelisk than the one that revealed it. Once an obelisk has taken its code, it's done for the rest of the encounter unless the team wipes, so by the third round you already know which one is left.",
           steps:[
             "Shoot the central crystal to start the encounter and get the doors moving.",
             "Watch the reference pillars: one lights up to show which side of the room an enemy is spawning on, and defeating it reveals which room to enter.",
             "Clear the enemies inside that room, which reveals a matching pair of symbols; a callout on the pillar tells you which of the two to remember.",
             "Repeat this two more times until a full three-symbol code is known.",
-            "Check all three obelisks — only one of them will actually display that exact combination, even if it isn't the one that revealed it — and shoot its three symbols in quick succession.",
-            "Repeat the entire process two more times, once for each obelisk."
+            "Check the obelisks that haven't been cleared yet — only one of them will actually display that exact combination, even if it isn't the one that revealed it — and shoot its three symbols in quick succession.",
+            "Repeat the entire process two more times, once for each remaining obelisk — by the third round only one is left, so you just need the code."
           ],
           wipe:"The obelisk fills a hidden meter as the fight goes on, faster if you shoot wrong symbols or let enemies attack it. If it fills completely, the team wipes, so speed and accuracy both matter." },
         { name:"The Caretaker",
@@ -361,6 +361,7 @@ window.RaidsData = (function(){
             "Destroy the dark crystal above Rhulk's head to grant whoever shot it a buff and stop a team-wide darkness debuff from stacking. If nobody's holding that buff when the window runs out, he summons another crystal — let that happen three times without reaching a damage phase and the team wipes outright.",
             "Whoever has the buff stands on a specific floor marker, which spawns two crystals nearby — have teammates shoot those to split the buff from the floor-stander onto the two crystal-shooters.",
             "Have only one of those two holders deliberately take one of Rhulk's laser beams to convert their buff into its deliverable form — doing this with both at once loses the buff entirely instead of splitting it.",
+            "A smoother version of this loop: instead of converting both new holders right away, send one of them straight back to the floor marker to start the next split while the other converts and carries their buff to the pillar. Keeping a holder already mid-split this way means the team isn't stuck waiting on a brand new symbol callout before every single pillar — it just takes tighter coordination so the leeching buff never gets dropped entirely.",
             "Meanwhile, clear adds and kill the Glyphkeepers that spawn to reveal two sets of symbols, one visible only to buffed players and one only to unbuffed — find the match and call out which of six pillars it points to.",
             "Deposit the converted buff at that pillar to push the barrier back, then repeat the whole split-convert-deposit cycle (six pillars total) until the barrier fully recedes and the stairs open.",
             "Inside, shoot Rhulk's glaive after he stabs it into the ground to gain the buff again and reveal a symbol pointing to one of four corner pillars — convert it in his laser beam as before and deposit it there to expose a weak point.",
