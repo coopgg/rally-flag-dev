@@ -39,8 +39,8 @@ window.RaidsData = (function(){
           objective:"Collect a set of orbs before the boss reaches full power, then damage his exposed back while managing who's allowed to carry what.",
           roles:"Split into two groups covering each side of the arena; each group has its own dedicated player responsible for rescuing anyone who gets locked down.",
           steps:[
-            "Collect orbs of energy that spawn around the arena before Morgeth absorbs them. Each player can safely hold two at once.",
-            "If someone gets stuck holding too many and becomes locked in place, a player with zero orbs of their own needs to kill a specific enemy, grab the item it drops, and use it to free them — freeing someone transfers their stacks onto you, so going in already holding any is how you kill yourself instead.",
+            "Collect orbs of energy that spawn around the arena before Morgeth absorbs them. Each player can safely hold two at once — a third kills you instantly, there's no freeze chance at that point.",
+            "At two stacks, a player can instead get frozen in place by Morgeth. A player with zero orbs of their own needs to kill a specific enemy, grab the item it drops, and use it to free them — freeing someone transfers their two stacks onto you, so going in already holding any is how you kill yourself instead. The freed player can then start collecting again from zero.",
             "Once every orb is collected, group up and unload damage on Morgeth's exposed back.",
             "Watch for homing projectiles during the damage phase and shoot them down before they connect.",
             "When Morgeth's power meter gets close to full, the same freeing ability must be used on him directly to interrupt the wipe and keep the damage phase going."
