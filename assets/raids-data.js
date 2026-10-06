@@ -310,12 +310,12 @@ window.RaidsData = (function(){
       summary:"Vow of the Disciple hinges on symbol callouts more than any raid before it. Nearly every encounter has you finding two or three symbols, matching them to a target, and acting fast once you do. It also introduces a stacking darkness debuff that follows you through the whole raid, so managing that matters as much as the mechanics themselves.",
       encounters:[
         { name:"Payload",
-          objective:"Escort a moving payload across the map by collecting a buff from defeated enemies and depositing it to keep the payload rolling forward.",
+          objective:"Escort a moving payload across the map by collecting pickups that spawn from defeated enemies and bringing them back to keep the payload rolling forward.",
           roles:"No fixed roles, split up to clear enemies and keep the payload fed.",
           steps:[
-            "Defeat the large enemies that drop a collectible buff along the route.",
-            "Pick up the buff and deposit it at the payload to push it forward.",
-            "Stay near the payload periodically to clear a stacking darkness debuff that builds up as you travel.",
+            "Defeat the large enemies along the route, which spawn collectible pickups in the area around them.",
+            "Gather the pickups (you can only carry three at once) and bring them back to the payload to push it forward.",
+            "Standing near the payload actively reduces your stacking darkness debuff, while keeping the area's enemies cleared stops it from climbing further.",
             "Keep clearing enemies and feeding the payload until it reaches the end of the path."
           ],
           wipe:"The darkness debuff kills you outright if it maxes out, so don't wander too far from the payload for too long." },
