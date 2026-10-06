@@ -6,7 +6,7 @@ const cron = require("node-cron");
 
 const { getDistortionUpdate, formatDistortionMessage } = require("./lib/distortion");
 const { getFeaturedUpdate, formatThisWeekMessage } = require("./lib/featuredRotation");
-const { readState, writeState } = require("./lib/state");
+const { readState, updateState } = require("./lib/state");
 
 const {
   DISCORD_TOKEN,
@@ -58,19 +58,37 @@ client.on("interactionCreate", async interaction => {
   }
 });
 
-// Deletes the bot's own previous post in a channel, if any, before a new
-// one goes up — otherwise hourly Distortion posts especially would just
-// pile up forever. Deleting your own message only needs Send Messages
-// (Manage Messages is only required to delete *other* users' messages),
-// so this doesn't need any extra bot permission. Tolerant of the old
-// message already being gone (manually deleted, channel purged, etc).
-async function deletePreviousPost(channel, messageId){
-  if (!messageId) return;
-  try {
-    await channel.messages.delete(messageId);
-  } catch (err){
-    if (err.code !== 10008) console.error("Couldn't delete previous post:", err); // 10008 = Unknown Message
+// Deletes the bot's own previous posts in a channel before a new one goes
+// up — otherwise hourly Distortion posts especially would just pile up
+// forever. Deleting your own message only needs Send Messages (Manage
+// Messages is only required to delete *other* users' messages), so this
+// doesn't need any extra bot permission.
+//
+// Returns the IDs that failed for a reason worth retrying (a network
+// timeout, say — this Pi's connection is flaky). The caller keeps those in
+// state.json so the *next* post tries again; without that, one transient
+// failure orphans the message forever, since its ID is overwritten by the
+// new post's. 10008 (Unknown Message) means it's already gone — manually
+// deleted, channel purged — so that's not a failure.
+const MAX_RETRY_IDS = 10;
+
+async function deletePreviousPosts(channel, ids){
+  const failed = [];
+  for (const id of new Set(ids.filter(Boolean))){
+    try {
+      await channel.messages.delete(id);
+    } catch (err){
+      if (err.code === 10008) continue;
+      console.error("Couldn't delete previous post, will retry with the next one:", err);
+      failed.push(id);
+    }
   }
+  return failed;
+}
+
+function rememberUndeleted(state, feature, ids){
+  state.undeletedMessageIds = state.undeletedMessageIds || {};
+  state.undeletedMessageIds[feature] = ids.slice(-MAX_RETRY_IDS);
 }
 
 async function postDistortionUpdate(){
@@ -80,12 +98,19 @@ async function postDistortionUpdate(){
   }
   const update = getDistortionUpdate();
   const channel = await client.channels.fetch(DISTORTION_CHANNEL_ID);
-  const state = readState();
-  await deletePreviousPost(channel, state.lastDistortionMessageId);
+  const before = readState();
+  const failedDeletes = await deletePreviousPosts(channel, [
+    before.lastDistortionMessageId,
+    ...(before.undeletedMessageIds?.distortion || [])
+  ]);
   const message = await channel.send({ content: formatDistortionMessage(update), flags: MessageFlags.SuppressEmbeds });
-  state.lastDistortionHourIndex = update.hourIndex;
-  state.lastDistortionMessageId = message.id;
-  writeState(state);
+  // Re-read inside updateState (not the `before` copy above — it's stale by
+  // now) so this only changes Distortion's fields.
+  updateState(state => {
+    state.lastDistortionHourIndex = update.hourIndex;
+    state.lastDistortionMessageId = message.id;
+    rememberUndeleted(state, "distortion", failedDeletes);
+  });
 }
 
 async function postFeaturedUpdate(){
@@ -95,14 +120,17 @@ async function postFeaturedUpdate(){
   }
   const update = getFeaturedUpdate();
   const channel = await client.channels.fetch(THISWEEK_CHANNEL_ID);
-  const state = readState();
-  for (const id of state.lastFeaturedMessageIds || []){
-    await deletePreviousPost(channel, id);
-  }
+  const before = readState();
+  const failedDeletes = await deletePreviousPosts(channel, [
+    ...(before.lastFeaturedMessageIds || []),
+    ...(before.undeletedMessageIds?.featured || [])
+  ]);
   const thisWeekMsg = await channel.send({ content: formatThisWeekMessage(update), flags: MessageFlags.SuppressEmbeds });
-  state.lastFeaturedWeekIndex = update.weekIndex;
-  state.lastFeaturedMessageIds = [thisWeekMsg.id]; // Next Week post dropped, but keep the array shape state.json already has
-  writeState(state);
+  updateState(state => {
+    state.lastFeaturedWeekIndex = update.weekIndex;
+    state.lastFeaturedMessageIds = [thisWeekMsg.id]; // Next Week post dropped, but keep the array shape state.json already has
+    rememberUndeleted(state, "featured", failedDeletes);
+  });
 }
 
 // Catches up on any post missed while the bot was offline (e.g. a Pi
