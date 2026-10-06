@@ -257,7 +257,7 @@ window.RaidsData = (function(){
           steps:[
             "Pick up the Relic to start the fight. Three Oracles spawn immediately and must be destroyed in order, same rule as the Oracles encounter.",
             "Once those Oracles are down, the Relic holder uses its charged attack to knock off Templar's shield.",
-            "With the shield down, everyone except the Relic holder focuses Templar's weak point until he drops a teleport ring on the ground.",
+            "With the shield down, everyone except the Relic holder focuses Templar's weak point until he drops a teleport ring on the ground. If a player gets randomly detained during this window, have them move away from the group while a teammate shoots the detainment field to free them.",
             "Optionally, the Relic holder can stand inside that ring to block the teleport and extend the damage window, but this spawns extra Praetorians that need clearing.",
             "If Templar does teleport, he regains his shield, so repeat the Oracle-shield-damage cycle until he's dead."
           ],
@@ -285,6 +285,7 @@ window.RaidsData = (function(){
             "The Relic holder rushes into whichever portal has the Praetorian, breaks its shield, then drops the Relic for the player already inside to pick up.",
             "That player carries the Relic back out and across to the opposite portal, where the process repeats.",
             "Watch the sync plates: if an Overload Minotaur reaches one, it shuts that portal down until it's cleared.",
+            "Additional Gatekeepers can respawn in the middle of the room and lock both portals again — kill them to reopen things and keep the rotation going.",
             "Once enough Praetorians are cleared this way, a Conflux appears in the main room. Regroup there and defend it, including a few Wyverns that show up near the end, until the encounter ends."
           ],
           wipe:"The Relic can only pass through one portal at a time before it has to be dropped for someone else to carry. Holding it too long, or losing the Relic holder mid-handoff, stalls the whole rotation." },
@@ -300,10 +301,10 @@ window.RaidsData = (function(){
             "The team left behind opens the matching portal and calls out the order Oracles are spawning above them, so the teleported group can destroy their own Oracles in the same order.",
             "One teleported player grabs a Relic on their side to clear Praetorians and cleanse a blinding debuff from the group.",
             "After nine Oracles are destroyed across three rounds, the teleported players escape back through the portal.",
-            "Everyone gets a short buff that opens a damage window on Atheon. Focus fire immediately since it doesn't last long.",
+            "Everyone gets a short buff that opens a damage window on Atheon. Focus fire immediately since it doesn't last long, and if a player gets randomly detained during this window, have them move well away from the group while teammates shoot the detainment field to free them.",
             "Repeat the whole cycle until Atheon is dead. There's no separate final stand phase."
           ],
-          wipe:"Getting the Oracle order wrong on either side, or running out of time before the teleported players escape, ends the run. Clean callouts between the inside and outside teams matter more here than anywhere else in the raid." }
+          wipe:"Getting the Oracle order wrong on either side, or running out of time before the teleported players escape, ends the run, and dropping the Relic for more than about 10 seconds does too. Clean callouts between the inside and outside teams matter more here than anywhere else in the raid." }
       ] },
     { name:"Vow of the Disciple", slug:"vow-of-the-disciple", armorSlugs:["resonant-fury"],
       summary:"Vow of the Disciple hinges on symbol callouts more than any raid before it. Nearly every encounter has you finding two or three symbols, matching them to a target, and acting fast once you do. It also introduces a stacking darkness debuff that follows you through the whole raid, so managing that matters as much as the mechanics themselves.",
