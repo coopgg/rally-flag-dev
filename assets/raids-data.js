@@ -535,6 +535,7 @@ window.RaidsData = (function(){
             "At the end of the path, use Enlightened on the plate to start building the bridge, then survive the enemies that rush in until it finishes."
           ],
           wipe:"Engulfed in Darkness is a visible 60-second timer on your screen that kills the whole team if it reaches zero. Lighting a lantern resets it, and so does depositing the Chalice at a preservation node. Separately, Weight of Darkness stacks up to 10 times the longer you go without lighting a lantern, slowing your movement. Preserving the Chalice resets the death timer but does nothing for this stack, only actually lighting a lantern clears it.",
+          master:"On Master, expect extra Unstoppable Ogres and a Barrier Knight during the final plate defense.",
           advancedTactics:[
             "You don't need to light every lantern along the path. Since depositing the Chalice at a preservation node resets Engulfed in Darkness on its own, a fast team can skip several lanterns in a row and just preserve often enough to stay ahead of the timer.",
             "The catch is Weight of Darkness: preserving doesn't clear it, so skipping too many lanterns in a row leaves the whole team slowed even though the death timer is fine. Budget in an actual lantern light every so often specifically to knock that stack back down, not just to reset the timer."
@@ -553,7 +554,8 @@ window.RaidsData = (function(){
             "Once three players are across, the far side takes over plate and totem duty; the rest can then cross either by grabbing a sword from a new Swordbearer or simply carrying the charged Chalice itself, since holding either one lets you cross.",
             "With everyone across, defeat a final wave of Gatekeepers using swords to close out the encounter."
           ],
-          wipe:"Leaving an Annihilator Totem unguarded while the plate is active kills the whole team instantly. This matters more than anything else in the fight." },
+          wipe:"Leaving an Annihilator Totem unguarded while the plate is active kills the whole team instantly. This matters more than anything else in the fight.",
+          master:"On Master, expect more Barrier Knights, and the Ogres in the final wave become Unstoppable Champions." },
         { name:"The Thrallway",
           objective:"Push through a short corridor of Thrall and Shriekers using the Enlightened buff to pass through barriers.",
           roles:"No fixed roles, just keep pushing forward as a group.",
@@ -574,7 +576,8 @@ window.RaidsData = (function(){
             "With her shield down, the whole team focuses damage, aiming to hit a specific notch in her health bar before time runs out.",
             "Each round adds one more Wizard to find and kill (three, then four, then five)."
           ],
-          wipe:"A countdown called the Dark Liturgy starts automatically a few minutes in. If it hits zero before you've dealt enough damage, the team wipes." },
+          wipe:"A countdown called the Dark Liturgy starts automatically a few minutes in. If it hits zero before you've dealt enough damage, the team wipes.",
+          master:"On Master, expect recurring Barrier Champions in the center room and through the add-clear sequence." },
         { name:"Crota, Son of Oryx",
           objective:"Break Crota's shield with Hive swords, burn his health across several damage phases, and manage a recurring hazard called the Oversoul, until his final stand.",
           roles:"Some players clear adds in the two towers; one focuses on finishing the Swordbearer each round; several rotate through the Chalice to stay Enlightened for swords, damage, and Oversoul duty.",
@@ -589,7 +592,8 @@ window.RaidsData = (function(){
             "Repeat the shield-break-and-damage cycle across several rounds until Crota reaches his final stand, a shorter and more dangerous last phase.",
             "After his final stand ends, back away from Crota immediately. He's briefly invulnerable and can still one-shot anyone standing too close."
           ],
-          wipe:"Letting the Oversoul run out without destroying it wipes the whole team, so always keep at least one Enlightened player free to handle it instead of spending every buff on swords or damage." }
+          wipe:"Letting the Oversoul run out without destroying it wipes the whole team, so always keep at least one Enlightened player free to handle it instead of spending every buff on swords or damage.",
+          master:"On Master, the Revenant Ogres become Unstoppable Champions." }
       ] },
     { name:"Salvation's Edge", slug:"salvations-edge", armorSlugs:["promised"], difficulties:["Normal","Master"],
       puzzleHelper:{ slug:"witness-extra-chest", title:"Witness's Extra Chest", blurb:"Note the reference column's shapes at the start, then check all 5 hidden rooms across the raid, and deposit the right shape at whichever 3 turn out active." },
