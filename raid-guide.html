@@ -31,6 +31,17 @@
   .raid-difficulty{ font-size:12px; font-family:'JetBrains Mono', monospace; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); margin-top:-4px; margin-bottom:4px; }
   .block p{ font-size:14px; color:var(--text-dim); line-height:1.6; }
 
+  .block-label-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  .block-label-row .block-label{ margin-bottom:0; }
+  .difficulty-toggle{ display:flex; gap:6px; }
+  .difficulty-toggle-btn{
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--text-dim); background:none; border:1px solid var(--panel-border); cursor:pointer;
+    padding:6px 14px; border-radius:999px; transition: all 0.15s ease;
+  }
+  .difficulty-toggle-btn:hover{ color:var(--accent-bright); border-color:var(--accent); }
+  .difficulty-toggle-btn.active{ color:var(--accent-bright); border-color:var(--accent); background:var(--accent-dim); }
+
   .encounter-block{ padding:18px 0; border-top:1px solid var(--panel-border); }
   .encounter-block:first-child{ border-top:none; padding-top:0; }
   .encounter-head{ display:flex; align-items:center; gap:12px; margin-bottom:12px; }
@@ -194,23 +205,33 @@
     return "encounter-" + (e.name ? slugify(e.name) : (i + 1));
   }
 
-  const encounterSubnavEl = document.getElementById("encounter-subnav");
-  if (raid.encounters.length){
-    encounterSubnavEl.innerHTML = raid.encounters.map((e, i) =>
-      '<a href="#' + encounterAnchorId(e, i) + '">' + e.name + '</a>'
-    ).join("");
-    encounterSubnavEl.addEventListener("click", (ev) => {
-      const link = ev.target.closest("a");
-      if (!link) return;
-      const target = document.querySelector(link.getAttribute("href"));
-      if (!target) return;
-      ev.preventDefault();
-      target.scrollIntoView({ behavior: "smooth", block: "start" });
-      history.replaceState(null, "", link.getAttribute("href"));
-    });
-  } else {
-    encounterSubnavEl.style.display = "none";
+  let activeDifficulty = "Normal";
+  function currentEncounters(){
+    return (activeDifficulty === "Epic" && raid.epicEncounters) ? raid.epicEncounters : raid.encounters;
   }
+
+  const encounterSubnavEl = document.getElementById("encounter-subnav");
+  function renderSubnav(){
+    const encounters = currentEncounters();
+    if (encounters.length){
+      encounterSubnavEl.style.display = "";
+      encounterSubnavEl.innerHTML = encounters.map((e, i) =>
+        '<a href="#' + encounterAnchorId(e, i) + '">' + e.name + '</a>'
+      ).join("");
+    } else {
+      encounterSubnavEl.style.display = "none";
+    }
+  }
+  renderSubnav();
+  encounterSubnavEl.addEventListener("click", (ev) => {
+    const link = ev.target.closest("a");
+    if (!link) return;
+    const target = document.querySelector(link.getAttribute("href"));
+    if (!target) return;
+    ev.preventDefault();
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    history.replaceState(null, "", link.getAttribute("href"));
+  });
 
   const setsBySlug = {};
   window.ArmorSetsData.SETS.forEach(s => setsBySlug[s.slug] = s);
@@ -221,8 +242,9 @@
     return '<a class="set-link" href="armor-set-bonuses.html?highlight=' + slug + '">' + label + ' \u2192</a>';
   }).join("");
 
-  const encountersHtml = raid.encounters.length
-    ? raid.encounters.map((e, i) => {
+  function buildEncountersHtml(encounters){
+    return encounters.length
+    ? encounters.map((e, i) => {
         if (e.objective || e.steps){
           const hl = window.GameTerms.highlight;
           const stepsHtml = (e.steps || []).map(s => '<li>' + hl(s) + '</li>').join("");
@@ -279,6 +301,14 @@
           '<div><div class="encounter-name">' + e.name + '</div><div class="encounter-notes">' + (e.notes || "") + '</div></div></div>';
       }).join("")
     : '<div class="block-empty">Encounter notes coming soon.</div>';
+  }
+
+  const difficultyToggleHtml = raid.epicEncounters
+    ? '<div class="difficulty-toggle" id="difficulty-toggle">' +
+        '<button type="button" class="difficulty-toggle-btn active" data-difficulty="Normal">Normal</button>' +
+        '<button type="button" class="difficulty-toggle-btn" data-difficulty="Epic">Epic</button>' +
+      '</div>'
+    : '';
 
   const puzzleHelperHtml = raid.puzzleHelper
     ? '<a class="block panel-card puzzle-helper-link" href="puzzle-helper.html?tool=' + raid.puzzleHelper.slug + '">' +
@@ -296,8 +326,8 @@
       (raid.summary ? '<p>' + raid.summary + '</p>' : '<div class="block-empty">Overview coming soon.</div>') +
     '</div>' +
     '<div class="block panel-card">' +
-      '<div class="block-label">Encounters</div>' +
-      encountersHtml +
+      '<div class="block-label-row"><div class="block-label">Encounters</div>' + difficultyToggleHtml + '</div>' +
+      '<div id="encounters-body">' + buildEncountersHtml(currentEncounters()) + '</div>' +
     '</div>' +
     puzzleHelperHtml +
     '<div class="block panel-card">' +
@@ -305,8 +335,21 @@
       '<div class="set-links">' + setLinksHtml + '</div>' +
     '</div>';
 
-  content.querySelectorAll(".encounter-advanced-toggle").forEach(btn => {
-    btn.addEventListener("click", () => btn.closest(".encounter-advanced").classList.toggle("open"));
+  content.addEventListener("click", (ev) => {
+    const advToggle = ev.target.closest(".encounter-advanced-toggle");
+    if (advToggle){
+      advToggle.closest(".encounter-advanced").classList.toggle("open");
+      return;
+    }
+    const diffBtn = ev.target.closest(".difficulty-toggle-btn");
+    if (diffBtn){
+      const newDifficulty = diffBtn.dataset.difficulty;
+      if (newDifficulty === activeDifficulty) return;
+      activeDifficulty = newDifficulty;
+      content.querySelectorAll(".difficulty-toggle-btn").forEach(b => b.classList.toggle("active", b.dataset.difficulty === activeDifficulty));
+      document.getElementById("encounters-body").innerHTML = buildEncountersHtml(currentEncounters());
+      renderSubnav();
+    }
   });
 })();
 </script>
