@@ -62,12 +62,12 @@
     font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.08em;
     color:var(--accent-bright); text-transform:uppercase; display:block; margin-bottom:4px;
   }
-  .encounter-master{
+  .encounter-master, .raid-master-note{
     margin-top:12px; padding:12px 14px;
     background:var(--panel); border-left:3px solid var(--text-dimmer);
     font-size:13px; color:var(--text-dim); line-height:1.55;
   }
-  .encounter-master-label{
+  .encounter-master-label, .raid-master-note-label{
     font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.08em;
     color:var(--text); text-transform:uppercase; display:block; margin-bottom:4px;
   }
@@ -320,10 +320,17 @@
       '</a>'
     : '';
 
+  const raidMasterNoteHtml = (raid.difficulties && raid.difficulties.includes("Master"))
+    ? '<div class="raid-master-note"><span class="raid-master-note-label">Master Difficulty</span>' +
+        "Master raises enemies well above the raid's Normal Power level — expect a Power deficit unless you're specifically geared for it — and every hit lands harder across the board. Several encounters also add Champions (Barrier, Overload, or Unstoppable) that don't appear on Normal; check the callout under an affected encounter below for which ones and where." +
+      '</div>'
+    : '';
+
   content.innerHTML =
     '<div class="block panel-card">' +
       '<div class="block-label">Overview</div>' +
       (raid.summary ? '<p>' + raid.summary + '</p>' : '<div class="block-empty">Overview coming soon.</div>') +
+      raidMasterNoteHtml +
     '</div>' +
     '<div class="block panel-card">' +
       '<div class="block-label-row"><div class="block-label">Encounters</div>' + difficultyToggleHtml + '</div>' +
