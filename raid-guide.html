@@ -51,6 +51,15 @@
     font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.08em;
     color:var(--accent-bright); text-transform:uppercase; display:block; margin-bottom:4px;
   }
+  .encounter-master{
+    margin-top:12px; padding:12px 14px;
+    background:var(--panel); border-left:3px solid var(--text-dimmer);
+    font-size:13px; color:var(--text-dim); line-height:1.55;
+  }
+  .encounter-master-label{
+    font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.08em;
+    color:var(--text); text-transform:uppercase; display:block; margin-bottom:4px;
+  }
   em.term-buff{ font-style:italic; color:#7fd8a8; }
   em.term-debuff{ font-style:italic; color:#e88a95; }
   .encounter-map{ margin:14px 0; }
@@ -260,6 +269,7 @@
             strategyHtml +
             (stepsHtml ? '<ol class="encounter-steps">' + stepsHtml + '</ol>' : '') +
             (e.wipe ? '<div class="encounter-wipe"><span class="encounter-wipe-label">What wipes you</span>' + hl(e.wipe) + '</div>' : '') +
+            (e.master ? '<div class="encounter-master"><span class="encounter-master-label">On Master</span>' + hl(e.master) + '</div>' : '') +
             advancedHtml +
             encounterPuzzleHelperHtml +
           '</div>';

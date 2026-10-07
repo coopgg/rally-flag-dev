@@ -237,7 +237,8 @@ window.RaidsData = (function(){
             "Prioritize Wyverns and any tougher Champion-type enemies the instant they appear over regular Vex.",
             "Watch for glowing pools left behind by defeated enemies. Standing in one marks you for Negation, and there's a cleansing well in the center of the arena to clear the debuff."
           ],
-          wipe:"Letting too many regular Vex sacrifice into a Conflux fails it, but letting even one Wyvern sacrifice is an instant wipe, so kill Wyverns the moment you see them, no exceptions." },
+          wipe:"Letting too many regular Vex sacrifice into a Conflux fails it, but letting even one Wyvern sacrifice is an instant wipe, so kill Wyverns the moment you see them, no exceptions.",
+          master:"On Master, the Minotaurs that show up during this encounter are Overload Champions." },
         { name:"Oracles",
           objective:"Destroy Oracles in the exact order they spawn, across five rounds that each add one more (3, then 4, 5, 6, and 7).",
           roles:"Assign each player to watch one or two specific spawn points and call out a number the instant theirs appears.",
@@ -284,7 +285,7 @@ window.RaidsData = (function(){
             "Send one player into each portal. They call out as soon as a shielded Praetorian appears on their side.",
             "The Relic holder rushes into whichever portal has the Praetorian, breaks its shield, then drops the Relic for the player already inside to pick up.",
             "That player carries the Relic back out and across to the opposite portal, where the process repeats.",
-            "Watch the sync plates: if an Overload Minotaur reaches one, it shuts that portal down until it's cleared.",
+            "Watch the sync plates: if a Minotaur reaches one, it shuts that portal down until it's cleared.",
             "Additional Gatekeepers can respawn in the middle of the room and lock both portals again — kill them to reopen things and keep the rotation going.",
             "Once enough Praetorians are cleared this way, a Conflux appears in the main room. Regroup there and defend it, including a few Wyverns that show up near the end, until the encounter ends."
           ],
@@ -384,7 +385,8 @@ window.RaidsData = (function(){
             "Repeat for six rounds total, since orbs spawn slightly farther away each round and expire if held too long.",
             "Once all six rounds are done, clear the remaining enemies near the portal to open it."
           ],
-          wipe:"Orbs expire if carried too long without being deposited, and depositing without the other side's orb landing at nearly the same time fails that round, forcing a retry. If a carrier goes down or gets cut off, grab the dropped orb quickly or the timer will force a restart on that run." },
+          wipe:"Orbs expire if carried too long without being deposited, and depositing without the other side's orb landing at nearly the same time fails that round, forcing a retry. If a carrier goes down or gets cut off, grab the dropped orb quickly or the timer will force a restart on that run.",
+          master:"On Master, the side-route Taken Phalanxes become Unstoppable Champions, and the central Taken Hobgoblin becomes an Overload Champion." },
         { name:"Annihilator Totems",
           objective:"Keep a totem in each of two side rooms defended at all times while running a three-player rotation that charges a central plate.",
           roles:"Two teams of three, one per side room, each running a fixed rotation: Brand holder, plate depositor, balcony claimer.",
@@ -396,7 +398,8 @@ window.RaidsData = (function(){
             "After draining, that same player becomes the next balcony claimer, continuing the rotation: holder, to depositor, to claimer, and back to holder again.",
             "Repeat this loop on both sides until the encounter ends. There's no boss here, just constant buff management."
           ],
-          wipe:"Leaving a totem completely undefended wipes the team after a few seconds, so even mid-rotation, always make sure someone's covering it." },
+          wipe:"Leaving a totem completely undefended wipes the team after a few seconds, so even mid-rotation, always make sure someone's covering it.",
+          master:"On Master, three Unstoppable Champion Ogres appear together: one in the center room and one in each totem room." },
         { name:"The Warpriest",
           objective:"Read a hidden sequence of glowing plates to earn the Brand of the Initiate, then burn the boss down while managing who's exposed to a room-clearing blast.",
           roles:"Split into three pairs across the room; whoever ends up on the final plate gets the Brand of the Initiate and needs it passed along by teammates.",
@@ -408,7 +411,8 @@ window.RaidsData = (function(){
             "When the Brand's timer runs low, have someone grab the Brand Claimer buff from a Knight to pass the Brand to a new player, keeping the damage phase going.",
             "When the boss unleashes his room-clearing attack, take cover behind one of the pillars to avoid it, then repeat the whole sequence."
           ],
-          wipe:"Letting the Brand of the Initiate's timer expire with nobody ready to take it over stalls the whole encounter, and getting caught without cover during the boss's blast can wipe the team outright. There's also a hard ceiling: using a pillar for cover destroys it, so you've only got a few uses before you're out of cover entirely." },
+          wipe:"Letting the Brand of the Initiate's timer expire with nobody ready to take it over stalls the whole encounter, and getting caught without cover during the boss's blast can wipe the team outright. There's also a hard ceiling: using a pillar for cover destroys it, so you've only got a few uses before you're out of cover entirely.",
+          master:"On Master, the glyph-plate Knights become Barrier Champions. Once the fight shifts to its Taken-heavy state, their replacements are Overload Taken Hobgoblins instead." },
         { name:"Golgoroth",
           objective:"Juggle a boss's attention between two players while the rest of the team shoots down orbs and deals damage from special pools on the ground.",
           roles:"Two players trade the boss's aggro back and forth; everyone else destroys orbs, stands in the resulting pools, and deals damage.",
@@ -420,7 +424,8 @@ window.RaidsData = (function(){
             "Repeat with a new orb and pool each time the Gaze swaps, watching for Unstable Light, which will explode on whoever's affected — move away from allies once you're marked, though exploding close to the boss himself deals him a solid chunk of damage, so use it as a parting shot if you can.",
             "Continue until either all the available orbs are used or the boss is defeated."
           ],
-          wipe:"Failing to pass the boss's attention in time gets whoever's exposed killed, and letting too many orbs go unused across the fight eventually wipes the whole team. Both are about timing, not damage." },
+          wipe:"Failing to pass the boss's attention in time gets whoever's exposed killed, and letting too many orbs go unused across the fight eventually wipes the whole team. Both are about timing, not damage.",
+          master:"On Master, the Knights controlling the final bridge or gate become Barrier Champions." },
         { name:"Daughters of Oryx",
           objective:"Repeatedly build a path across the arena to collect pieces of the Blightguard, then use it to steal the Aura of Immortality from one of two bosses and burn her down before a timer expires.",
           roles:"One player gets randomly selected each round to cross the path and collect the Blightguard piece; everyone else manages the plates and clears adds.",
@@ -432,7 +437,8 @@ window.RaidsData = (function(){
             "With the aura stolen, the whole team groups up inside it and burns down that same daughter, the one you stole the aura from, before her sister's song finishes.",
             "Repeat the entire process for the second boss."
           ],
-          wipe:"The boss's song wipes the team automatically if nobody steals her aura in time. The whole encounter is a race to build the path and grab the buff pieces fast enough to make that deadline every round." },
+          wipe:"The boss's song wipes the team automatically if nobody steals her aura in time. The whole encounter is a race to build the path and grab the buff pieces fast enough to make that deadline every round.",
+          master:"On Master, the Knight that begins each ascendant path becomes a Barrier Champion." },
         { name:"Oryx, The Taken King",
           objective:"Repeat a path-and-buff cycle similar to the Daughters fight to steal an aura, use it to safely detonate bombs that stun Oryx, then damage his exposed chest, across several long rounds.",
           roles:"One player gets randomly selected each round to cross the path; a few players are responsible for triggering bombs during the stun window; everyone else clears enemies and supports.",
@@ -445,7 +451,8 @@ window.RaidsData = (function(){
             "After the damage window ends, either survive a wave of extra attacks or fight through a side challenge, depending on which one triggers, then repeat the whole cycle until his health is low enough for the final stand.",
             "In the final stand, two Light-Eater Ogres spawn and drop two more bombs instead of four — trigger them one at a time rather than together, and finish him off before you run out of chances; failing here wipes the team even while standing in the aura."
           ],
-          wipe:"Missing the bomb detonation window during his wipe attack is an instant wipe, though triggering even just one bomb is enough to stun him and avoid that — triggering more just extends the damage window. Failing to get back into the aura before a triggered bomb detonates kills whoever's still outside it. This is one of the longest fights in the game, so pace your ammo and your patience accordingly." }
+          wipe:"Missing the bomb detonation window during his wipe attack is an instant wipe, though triggering even just one bomb is enough to stun him and avoid that — triggering more just extends the damage window. Failing to get back into the aura before a triggered bomb detonates kills whoever's still outside it. This is one of the longest fights in the game, so pace your ammo and your patience accordingly.",
+          master:"On Master, the Knights standing on the plates become Overload Taken Hobgoblins." }
       ] },
     { name:"Root of Nightmares", slug:"root-of-nightmares", armorSlugs:["nezarecs-nightmare"], difficulties:["Normal","Master"],
       puzzleHelper:{ slug:"nezarec-extra-chest", title:"Nezarec's Extra Chest", blurb:"Note the reference wall's Light/Dark pattern at the start, then work out which orbs to connect in each of the raid's three hidden rooms." },
