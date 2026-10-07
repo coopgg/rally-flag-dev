@@ -733,6 +733,56 @@ window.RaidsData = (function(){
             "With the boss vulnerable, the team unloads damage while one player keeps banking Chronons through a ring to extend the fight, avoiding hazards on the ground and from above."
           ],
           wipe:"Ignoring the boss's turrets or hazard zones during either phase gets people killed fast, and letting the shared resource run dry cuts your damage window short. This fight demands the most multitasking in the raid, so keep your assigned job simple and stick to it." }
+      ],
+      epicEncounters:[
+        { name:"Epoptes, Lord of Quanta (Epic)",
+          objective:"Run an inside/outside relay on both side rooms to clear every shield-eye, manage Detain Seekers and Function Collapse, then break three rotating shields with rotating pairs during damage.",
+          roles:"One pair per side room, with one player inside reading the room and one staying outside in the projected light; two more players hold the middle, clear adds, and back up the Seeker cleanup.",
+          steps:[
+            "Clear the opening enemies and send a pair into each side room: one player goes inside, the other stays outside in the rotating light.",
+            "The inside player sees two glowing positions and calls both to the outside player on the same side; the outside player shoots both on the entrance panel, and one of them lights up again.",
+            "That final re-lit call crosses the arena: the left room's inside player shoots whatever the right room's outside player called back, and vice versa.",
+            "After both sides finish a pair of eyes, kill the three Detain Seekers that spawn above each Lens before starting the next relay — a detained inside player can't free themselves.",
+            "Once Function Collapse triggers, the two middle players take the plates, read their side's single unlit node (top, left, or right), and call it to that side's inside player to destroy, while also shooting the two nodes called out by the opposite reader.",
+            "Finish the remaining outer eyes and both Lens center eyes, then return to the middle and break the boss's two central shield eyes to start damage."
+          ],
+          wipe:"Crossed calls that go to the wrong inside player, or Seekers left alive on a detained player, stall the relay fast. During damage, each rotating pair has to clear its side room's full local shield before the boss re-shields, so a slow pair costs the whole team a damage window." },
+        { name:"Iatros, Inward-Turned (Epic)",
+          objective:"Record a repeating three-color Chronon sequence, send three players to hold Temporality pointing at the raid's three towers, and build a staircase by firing volleys timed to the fourth Diastole pulse while a separate pair keeps depositing the sequence.",
+          roles:"Three shooters hold Temporality and fire on cue; one climber reads capsule colors without ever taking a buff; two runners keep collecting and depositing the recorded Chronon sequence.",
+          steps:[
+            "Reveal the hourglass-ring color and have two runners deposit matching Chronons as a pair, three times total, to lock in a three-color sequence that repeats for the rest of the encounter.",
+            "Send exactly three players to take Temporality from the plates — never the climber — so each shooter points at one of the three fixed towers.",
+            "Start the climb; the climber reads the capsule colors and calls them in order to shooter one, two, and three, and each shooter fires at the box height matching that color on their current tower.",
+            "Fire the volley together as the fourth Diastole pulse lights, jumping so the suspension doesn't interrupt the shot.",
+            "After each successful volley, Temporalities can stay, swap, or rotate before the next climb and the next three-color call — repeat across all three tiers.",
+            "Keep running the recorded Chronon sequence throughout to avoid running the clock out, and clear Detain Seekers before they reach the runners."
+          ],
+          wipe:"A fourth player touching a plate creates a duplicate Temporality and stalls the climb outright. Missing the fourth-pulse timing breaks a volley, and improvising a color instead of following the recorded sequence runs the hourglass dry." },
+        { name:"Agraios, Inherent (Epic)",
+          objective:"Use two hoop reads to solve a fixed two-two-one portal color pattern, charge all five portals and clear the Wyverns that spawn, then recharge four of five portals during Alignment to reflect Variable Elimination into the correct copy before clearing three headless copies for the final stand.",
+          roles:"Three players hold Temporality and watch the portals; one alignment runner carries the detain; two more carry Chronons and record portal colors.",
+          steps:[
+            "Carry one Chronon through the center hoop to reveal which portals need that color, wait for its glow to clear, then read a second color — the one or two portals still unmarked are the third color by elimination.",
+            "Carry the correct recorded color through each of the five portals to charge them all, then clear the three Wyverns that spawn once every portal is lit.",
+            "Have three players take the Temporality plates; when a named copy starts its attack, the matching Temporality holder aligns at that copy's position while the other two identify which four portals need recharging.",
+            "Recharge those four called portals with their recorded colors and leave the fifth alone, then have the alignment runner cross all five charged portals to convert their grenade into a detain and throw it to reflect the attack into the correct copy.",
+            "Focus the unnamed copy specifically — it's the one that actually takes damage — and track it as it teleports between the upper perches.",
+            "When three headless copies appear at the end, split into pairs, use Temporality to find and kill the one matching each pair's buff, then collapse to the center and burst the boss the moment it's exposed."
+          ],
+          wipe:"Charging a portal with the wrong color is lethal on contact. A missed or late detain throw lets Variable Elimination go unreflected, and leaving any of the three headless copies alive keeps the final boss immune to damage." },
+        { name:"Koregos, Fractured in Time (Epic)",
+          objective:"Clear Banishment each loop, send an assigned pair into one of three route-ordered side rooms behind a Chronon-alignment gate, open that room's Temporal Locus, fight off returning echoes as earlier rooms come back online, then finish with plate damage and a six-player platform climb.",
+          roles:"Pairs are assigned to specific side rooms and later own that room's returning echo and Locus; everyone needs to know the Banishment routine since it can target anyone.",
+          steps:[
+            "Clear Banishment every loop: the first selected pair enters a portal together while the outside team clears its entrance Cyclops, then the remaining four players each use a separate central cube.",
+            "Send that loop's assigned pair into its side-room door while the rest align a central canister to the color saved from the previous loop, kill the enemy it summons, and deposit the four matching Chronons it drops to fill the hourglass.",
+            "Have the room pair clear their boss-specific mechanic and kill the room's echo, earning that boss's Undoing.",
+            "Have the matching Temporality holder hit the newly exposed Temporal Locus's outer shell, then have an unbuffed player shoot the inner core to open a damage window — note the canister color for next loop before the reset.",
+            "On later loops, earlier echoes return near the boss; only players holding that boss's Undoing can damage them, and whoever lands the final blow earns the Temporality needed to reopen that boss's Locus again.",
+            "Once all three rooms and Loci have cycled through, move to the damage platform pairing a buffed interact-caller with an unbuffed core-breaker on each crystal, then stage for the final climb: killing the lone Harpy grants everyone Banishment, and the team crosses the resulting platforms in a fixed order, one cube per player, before finishing the boss at the top with the same outer-shell, inner-core routine."
+          ],
+          wipe:"Sending a Banishment pair through the portal separately locks the second player out. Damaging an echo with the wrong boss's Undoing wastes the kill, and shooting a Locus's outer shell while buffed — instead of the inner core while unbuffed — does nothing, so burning too much time on any of it lets the loop reset before the room or Locus is finished." }
       ] },
     { name:"Pantheon", slug:"pantheon", armorSlugs:["pantheos-resplendent"],
       summary:"Pantheon isn't a traditional raid — it's three ways to fight vaulted raid bosses without running the full raids. Calus Resplendent runs the three Leviathan-era bosses (Argos, Gahlran, Emperor Calus) close to their originals. Morgeth Surpassing takes three bosses from three different raids — Warpriest (King's Fall), Consecrated Mind (Garden of Salvation), Morgeth (Last Wish) — each merged with the non-boss encounter that originally preceded it. The Gauntlet strings all six together and adds a seventh: Insurrection Prime, the returning final boss of the vaulted Scourge of the Past raid.",
