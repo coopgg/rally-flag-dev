@@ -331,7 +331,8 @@ window.RaidsData = (function(){
             "Check the obelisks that haven't been cleared yet — only one of them will actually display that exact combination, even if it isn't the one that revealed it — and shoot its three symbols in quick succession.",
             "Repeat the entire process two more times, once for each remaining obelisk — by the third round only one is left, so you just need the code."
           ],
-          wipe:"The obelisk fills a hidden meter as the fight goes on, faster if you shoot wrong symbols or let enemies attack it. If it fills completely, the team wipes, so speed and accuracy both matter." },
+          wipe:"The obelisk fills a hidden meter as the fight goes on, faster if you shoot wrong symbols or let enemies attack it. If it fills completely, the team wipes, so speed and accuracy both matter.",
+          master:"On Master, the room Glyphkeepers become Overload Champions, and the Abominations that spawn during offerings become Unstoppable Champions." },
         { name:"The Caretaker",
           objective:"Stun a boss to keep him from reaching a central obelisk, collect symbols from a dark side room to unlock a damage phase, then repeat across three floors.",
           roles:"Two players keep the boss's attention and stun him, two clear enemies and support, two rotate through a dark room collecting symbols.",
@@ -343,7 +344,8 @@ window.RaidsData = (function(){
             "Stand on each plate as it activates, damage the boss, and rotate to the next plate when it deactivates.",
             "Repeat this whole loop on each of the raid's three floors, then finish with a final stand in a hallway with its own set of plates."
           ],
-          wipe:"Letting the boss reach the obelisk while unstunned wipes the team, and running out of plates during the final stand without finishing him off does the same. This fight is a straight damage race as much as a mechanics one." },
+          wipe:"Letting the boss reach the obelisk while unstunned wipes the team, and running out of plates during the final stand without finishing him off does the same. This fight is a straight damage race as much as a mechanics one.",
+          master:"On Master, the Vandals in the outer arena become Overload Champions." },
         { name:"The Upended",
           objective:"Carry one or more artifacts through several rooms, find matching symbols in each, and deposit the artifacts before a shared timer runs out.",
           roles:"Split into two groups of three to clear each room; different artifacts unlock different actions, so track who's holding what.",
@@ -354,7 +356,8 @@ window.RaidsData = (function(){
             "Defeat the enemy that spawns partway through each room for another chunk of extra time.",
             "Continue through each room, passing artifacts to new carriers as needed, until you reach the end."
           ],
-          wipe:"The shared timer wipes the whole team if it hits zero. Killing the time-adding enemy and depositing artifacts promptly are the only ways to keep pace with it." },
+          wipe:"The shared timer wipes the whole team if it hits zero. Killing the time-adding enemy and depositing artifacts promptly are the only ways to keep pace with it.",
+          master:"On Master, the Taken Glyphkeepers become Unstoppable Champions and the Scorn Glyphkeepers become Overload Champions." },
         { name:"Rhulk, Disciple of the Witness",
           objective:"Split a shared buff between players and feed it through one of the boss's attacks to build a deliverable version, bank it at the right pillar to push back his barrier, then repeat a weak-point sequence each round before damaging him and finishing with his final stand.",
           roles:"Two players dedicate themselves to splitting and re-splitting Leeching Force; two more convert it into Emanating Force and carry it to a called-out pillar; the last two clear adds and call out matching symbols.",
@@ -370,7 +373,8 @@ window.RaidsData = (function(){
             "Damage him until he resets and goes immune, then retreat and repeat the whole weak-point sequence to force another damage window. Expect to do this a few times.",
             "In his final stand, save your strongest abilities — he moves constantly and a darkness debuff stacks on the whole team until he's dead."
           ],
-          wipe:"Letting Rhulk summon a third unclaimed crystal is an instant wipe on its own, separate from the final stand's darkness debuff maxing out. Converting both holders into Emanating Force at the same time loses your progress entirely instead of splitting it, so always keep one Leeching Force holder in reserve." }
+          wipe:"Letting Rhulk summon a third unclaimed crystal is an instant wipe on its own, separate from the final stand's darkness debuff maxing out. Converting both holders into Emanating Force at the same time loses your progress entirely instead of splitting it, so always keep one Leeching Force holder in reserve.",
+          master:"On Master, the Taken Glyphkeeper becomes an Overload Champion and the Scorn Glyphkeeper becomes an Unstoppable Champion." }
       ] },
     { name:"King's Fall", slug:"kings-fall", armorSlugs:["oryxs-memory"], difficulties:["Normal","Master"],
       summary:"King's Fall reintroduces a lot of ideas from Destiny's original raids: statues, totems, and boss fights that hinge on trading a single buff back and forth between a handful of players. Nothing here is subtle: if a role isn't being covered, you'll know almost immediately.",
