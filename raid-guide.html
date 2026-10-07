@@ -28,6 +28,7 @@
     color:var(--accent); text-transform:uppercase; margin-bottom:14px;
   }
   .block-empty{ font-size:14px; color:var(--text-dimmer); font-style:italic; }
+  .raid-difficulty{ font-size:12px; font-family:'JetBrains Mono', monospace; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); margin-top:-4px; margin-bottom:4px; }
   .block p{ font-size:14px; color:var(--text-dim); line-height:1.6; }
 
   .encounter-block{ padding:18px 0; border-top:1px solid var(--panel-border); }
@@ -124,6 +125,7 @@
 <div class="hero" id="hero">
   <div class="eyebrow">Destiny 2 · Raid Guide</div>
   <h1 class="title" id="raid-title">…</h1>
+  <div class="raid-difficulty" id="raid-difficulty"></div>
   <div class="subnav">
     <a href="guides.html">Overview</a>
     <a href="raids.html" class="active">Raids</a>
@@ -157,6 +159,7 @@
 
   document.title = raid.name + " - Rally Flag";
   document.getElementById("raid-title").textContent = raid.name;
+  document.getElementById("raid-difficulty").textContent = raid.difficulties ? raid.difficulties.join(" · ") : "";
 
   // Updates the static fallback meta/OG tags with the actual raid once it's
   // known — helps crawlers that execute JS (Google) and keeps the tags

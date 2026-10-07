@@ -7,7 +7,7 @@
    ============================================================ */
 window.RaidsData = (function(){
   const RAIDS = [
-    { name:"Last Wish", slug:"last-wish", armorSlugs:["great-hunt"],
+    { name:"Last Wish", slug:"last-wish", armorSlugs:["great-hunt"], difficulties:["Normal"],
       puzzleHelper:{ slug:"wall-of-wishes", title:"Wall of Wishes Reference", blurb:"Look up any of the 15 wishes: plate location, effect, and the button pattern to shoot." },
       summary:"Last Wish was Destiny 2's first true modern raid, and it still has a reputation as one of the most mentally demanding raids in the series, not because the combat is brutal, but because nearly every encounter is a puzzle that needs constant callouts. If your team doesn't talk, this raid grinds to a halt fast.",
       encounters:[
@@ -83,7 +83,7 @@ window.RaidsData = (function(){
           ],
           wipe:"Letting the Creeping Darkness debuff reach its max stack kills whoever's affected, and losing too many carriers to enemies mid-transport can stall the whole relay. Keep the path clear ahead of whoever's currently carrying it." }
       ] },
-    { name:"Garden of Salvation", slug:"garden-of-salvation", armorSlugs:["kentarch-3"],
+    { name:"Garden of Salvation", slug:"garden-of-salvation", armorSlugs:["kentarch-3"], difficulties:["Normal"],
       summary:"Garden of Salvation is short compared to most raids (just four encounters), but it makes up for that with pure endurance. There's very little in the way of puzzles here; it's mostly about managing timers, buffs, and constant enemy pressure without anyone getting overwhelmed.",
       encounters:[
         { name:"Evade the Consecrated Mind",
@@ -134,7 +134,7 @@ window.RaidsData = (function(){
           ],
           wipe:"Standing on a platform when the boss destroys it kills you instantly, so use the relay tether to rebuild broken platforms before they're needed again, and always know which platforms are safe before you need to cross them." }
       ] },
-    { name:"Deep Stone Crypt", slug:"deep-stone-crypt", armorSlugs:["legacys-oath"],
+    { name:"Deep Stone Crypt", slug:"deep-stone-crypt", armorSlugs:["legacys-oath"], difficulties:["Normal"],
       summary:"Deep Stone Crypt introduced two buffs, Scanner and Operator, that show up again and again through the raid: Scanner lets you see something hidden that other players can't, and Operator lets you interact with terminals and free trapped teammates. Nearly every encounter comes down to the same loop: find the right target, tell someone else, and don't let the timers run out.",
       encounters:[
         { name:"Pike & Sparrow",
@@ -211,7 +211,7 @@ window.RaidsData = (function(){
           ],
           wipe:"This fight punishes indecision: letting radiation max out on a core carrier kills them, and running out of time in the final teleporting phase is a hard wipe with no second chances, so keep pushing damage even when things feel chaotic." }
       ] },
-    { name:"Vault of Glass", slug:"vault-of-glass", armorSlugs:["atheons-memory"],
+    { name:"Vault of Glass", slug:"vault-of-glass", armorSlugs:["atheons-memory"], difficulties:["Normal","Master"],
       summary:"Vault of Glass is Destiny's oldest raid, brought back from the original game. The whole thing is built around Vex time-travel shenanigans: if you get pulled through a portal alone, that's supposed to happen, not a sign you messed up. A few ideas repeat through every encounter: one person carries a special item called the Relic that does something different in each fight, callouts matter more than damage, and almost every encounter has a specific 'do this wrong and the raid wipes' rule. Learn that one rule per encounter and the rest takes care of itself.",
       encounters:[
         { name:"Opening the Vault of Glass",
@@ -306,7 +306,7 @@ window.RaidsData = (function(){
           ],
           wipe:"Getting the Oracle order wrong on either side, or running out of time before the teleported players escape, ends the run, and dropping the Relic for more than about 10 seconds does too. Clean callouts between the inside and outside teams matter more here than anywhere else in the raid." }
       ] },
-    { name:"Vow of the Disciple", slug:"vow-of-the-disciple", armorSlugs:["resonant-fury"],
+    { name:"Vow of the Disciple", slug:"vow-of-the-disciple", armorSlugs:["resonant-fury"], difficulties:["Normal","Master"],
       summary:"Vow of the Disciple hinges on symbol callouts more than any raid before it. Nearly every encounter has you finding two or three symbols, matching them to a target, and acting fast once you do. It also introduces a stacking darkness debuff that follows you through the whole raid, so managing that matters as much as the mechanics themselves.",
       encounters:[
         { name:"Payload",
@@ -371,7 +371,7 @@ window.RaidsData = (function(){
           ],
           wipe:"Letting Rhulk summon a third unclaimed crystal is an instant wipe on its own, separate from the final stand's darkness debuff maxing out. Converting both holders into Emanating Force at the same time loses your progress entirely instead of splitting it, so always keep one Leeching Force holder in reserve." }
       ] },
-    { name:"King's Fall", slug:"kings-fall", armorSlugs:["oryxs-memory"],
+    { name:"King's Fall", slug:"kings-fall", armorSlugs:["oryxs-memory"], difficulties:["Normal","Master"],
       summary:"King's Fall reintroduces a lot of ideas from Destiny's original raids: statues, totems, and boss fights that hinge on trading a single buff back and forth between a handful of players. Nothing here is subtle: if a role isn't being covered, you'll know almost immediately.",
       encounters:[
         { name:"Relics & Opening the Gate",
@@ -447,7 +447,7 @@ window.RaidsData = (function(){
           ],
           wipe:"Missing the bomb detonation window during his wipe attack is an instant wipe, though triggering even just one bomb is enough to stun him and avoid that — triggering more just extends the damage window. Failing to get back into the aura before a triggered bomb detonates kills whoever's still outside it. This is one of the longest fights in the game, so pace your ammo and your patience accordingly." }
       ] },
-    { name:"Root of Nightmares", slug:"root-of-nightmares", armorSlugs:["nezarecs-nightmare"],
+    { name:"Root of Nightmares", slug:"root-of-nightmares", armorSlugs:["nezarecs-nightmare"], difficulties:["Normal","Master"],
       puzzleHelper:{ slug:"nezarec-extra-chest", title:"Nezarec's Extra Chest", blurb:"Note the reference wall's Light/Dark pattern at the start, then work out which orbs to connect in each of the raid's three hidden rooms." },
       summary:"Root of Nightmares runs almost entirely on one shared idea: building a network of glowing nodes by carrying a short-lived buff from one to the next. Once you understand that loop, every encounter in this raid is a variation on the same theme, just with a different twist bolted on.",
       encounters:[
@@ -498,7 +498,7 @@ window.RaidsData = (function(){
           ],
           wipe:"Getting caught outside a Refuge during his wipe attack kills everyone who isn't protected. The fastest way to avoid needing one at all is finishing both node networks before his patience runs out." }
       ] },
-    { name:"Crota's End", slug:"crotas-end", armorSlugs:["crotas-memory"],
+    { name:"Crota's End", slug:"crotas-end", armorSlugs:["crotas-memory"], difficulties:["Normal","Master"],
       summary:"Crota's End is built entirely around one shared item, the Chalice of Light. Whoever holds it slowly charges up, and handing it off gives the new holder a buff called Enlightened, which lets you do whatever the current encounter needs: light lanterns, pick up Hive swords, cross bridges, or damage the final boss. The whole raid is really just different ways of passing that buff around your team at the right moment.",
       encounters:[
         { name:"Descend into the Hellmouth",
@@ -580,7 +580,7 @@ window.RaidsData = (function(){
           ],
           wipe:"Letting the Oversoul run out without destroying it wipes the whole team, so always keep at least one Enlightened player free to handle it instead of spending every buff on swords or damage." }
       ] },
-    { name:"Salvation's Edge", slug:"salvations-edge", armorSlugs:["promised"],
+    { name:"Salvation's Edge", slug:"salvations-edge", armorSlugs:["promised"], difficulties:["Normal","Master"],
       puzzleHelper:{ slug:"witness-extra-chest", title:"Witness's Extra Chest", blurb:"Note the reference column's shapes at the start, then check all 5 hidden rooms across the raid, and deposit the right shape at whichever 3 turn out active." },
       summary:"Salvation's Edge is the final raid of the original Light and Darkness saga, and it plays like it: five long, intricate encounters that layer symbol logic, split teams, and shared timers on top of each other. It's widely considered one of the most mechanically demanding raids ever made, so take each encounter slowly the first time through.",
       encounters:[
@@ -652,7 +652,7 @@ window.RaidsData = (function(){
           ],
           wipe:"Building the wrong shape during the boss's pattern test wipes the whole team instantly. This one has zero room for guessing, so make sure whoever's calling out the shape is confident before anyone shoots." }
       ] },
-    { name:"The Desert Perpetual", slug:"the-desert-perpetual", armorSlugs:["collective-psyche","wayward-psyche-set"],
+    { name:"The Desert Perpetual", slug:"the-desert-perpetual", armorSlugs:["collective-psyche","wayward-psyche-set"], difficulties:["Normal","Epic"],
       summary:"The Desert Perpetual is built around a hub-and-spoke structure: you clear three boss encounters in whatever order you like before the final fight. Nearly everything in this raid runs on the same core loop: collect a resource called Chronons, bank them to buy time, and use buffs to reveal information only certain players can see.",
       encounters:[
         { name:"Predestination",
