@@ -472,7 +472,8 @@ window.RaidsData = (function(){
             "Meanwhile, everyone else defeats Psion pairs as they appear. Killing both spawns a Tormentor that, when defeated, buys the network builders extra time.",
             "Repeat across the arena until all sections are complete."
           ],
-          wipe:"The Sweeping Terror timer wipes the team if it runs out. Finishing a network pauses it, so the faster your two builders work, the less pressure everyone else is under." },
+          wipe:"The Sweeping Terror timer wipes the team if it runs out. Finishing a network pauses it, so the faster your two builders work, the less pressure everyone else is under.",
+          master:"On Master, expect more Barrier Champion Colossi and Solar-shielded Centurions." },
         { name:"Scission",
           objective:"Build two zig-zagging node networks across a gap by jumping back and forth with Field of Light or Flux of Darkness, while clearing enemies that can only be damaged by whoever's holding it.",
           roles:"One dedicated jumper per side who crosses the gap repeatedly; everyone else clears enemies and can relay-run nodes on their own side.",
@@ -483,7 +484,8 @@ window.RaidsData = (function(){
             "Defeat the Redolence of Splendor or Redolence of Decay enemies that spawn, prioritizing the type that only takes damage from whoever's holding the matching buff.",
             "Once a full network on a level is done, a tougher version of that same enemy spawns, so defeat it to unlock the next level and repeat."
           ],
-          wipe:"There's no instant wipe here, but stacking distractions slows your builders down against the encounter's shared timer, so keep the crossing player's job as simple as possible and handle everything else around them." },
+          wipe:"There's no instant wipe here, but stacking distractions slows your builders down against the encounter's shared timer, so keep the crossing player's job as simple as possible and handle everything else around them.",
+          master:"On Master, Unstoppable Champion Incendiors are added on each floor, and Barrier Champion Colossi still show up near the end of each floor." },
         { name:"Zo'Aurc, Explicator of Planets",
           objective:"Swap mismatched planets to their correct sides using Planetary Insight, then deliver the right combination to a set of central plates for a damage phase.",
           roles:"Two pairs handle planet-swapping on each side; the rest handle add-clear and later plate positioning.",
@@ -495,7 +497,8 @@ window.RaidsData = (function(){
             "Stand on whichever plate matches the boss's current shield type to deal bonus damage, and rotate to the next one as its shield changes — the sequence always follows a pattern where whichever color appears twice among the three plates goes first and last, so you can call the full rotation order before damage even starts.",
             "Repeat the whole cycle until the boss is defeated."
           ],
-          wipe:"Nothing here directly wipes the team, but failing to deal enough damage during a plate rotation means you can't cycle through all of them. Slow, correct swaps beat fast, wrong ones." },
+          wipe:"Nothing here directly wipes the team, but failing to deal enough damage during a plate rotation means you can't cycle through all of them. Slow, correct swaps beat fast, wrong ones.",
+          master:"On Master, Barrier Champion Colossi replace the Terrestrial Lieutenants that grant Planetary Insight, so you'll need Barrier coverage just to start reading planets. Solar-shielded Centurions still show up as the trigger wave." },
         { name:"Nezarec, Final God of Pain",
           objective:"Build two networks of nodes (one of each energy type) while periodically stunning the boss, then burn him down in short damage phases across multiple rounds.",
           roles:"Two players build the node networks; two more take turns tanking Nezarec's aggro and signaling which safe zone color is needed; everyone else keeps both lanes clear of adds.",
@@ -507,7 +510,8 @@ window.RaidsData = (function(){
             "Reset and repeat: each round gives you less time before his wipe attack triggers, so move faster each time, with the tanks swapping Nezarec's Hatred back and forth to buy extra seconds.",
             "Continue until his final stand, where you'll need to finish him off before he wipes the team outright."
           ],
-          wipe:"Getting caught outside a Refuge during his wipe attack kills everyone who isn't protected. The fastest way to avoid needing one at all is finishing both node networks before his patience runs out." }
+          wipe:"Getting caught outside a Refuge during his wipe attack kills everyone who isn't protected. The fastest way to avoid needing one at all is finishing both node networks before his patience runs out.",
+          master:"On Master, Barrier Champion Colossi replace the normal Esteemed Colossi." }
       ] },
     { name:"Crota's End", slug:"crotas-end", armorSlugs:["crotas-memory"], difficulties:["Normal","Master"],
       summary:"Crota's End is built entirely around one shared item, the Chalice of Light. Whoever holds it slowly charges up, and handing it off gives the new holder a buff called Enlightened, which lets you do whatever the current encounter needs: light lanterns, pick up Hive swords, cross bridges, or damage the final boss. The whole raid is really just different ways of passing that buff around your team at the right moment.",
