@@ -22,6 +22,7 @@
 <meta name="twitter:image" content="https://rallyflag.gg/assets/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.bungie.net">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/theme.css">
 <style>
@@ -41,7 +42,7 @@
   .difficulty-toggle-btn{
     font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.06em; text-transform:uppercase;
     color:var(--text-dim); background:none; border:1px solid var(--panel-border); cursor:pointer;
-    padding:6px 14px; border-radius:999px; transition: all 0.15s ease;
+    padding:6px 14px; border-radius:999px; transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   }
   .difficulty-toggle-btn:hover{ color:var(--accent-bright); border-color:var(--accent); }
   .difficulty-toggle-btn.active{ color:var(--accent-bright); border-color:var(--accent); background:var(--accent-dim); }
@@ -87,7 +88,7 @@
     font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.06em;
     color:var(--text-dim); background:none; border:1px dashed var(--panel-border);
     padding:6px 12px; border-radius:999px; text-transform:uppercase;
-    transition: all 0.15s ease;
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   }
   .encounter-advanced-toggle:hover{ color:var(--accent-bright); border-color:var(--accent); }
   .encounter-advanced-toggle .caret{ display:inline-block; transition: transform 0.18s ease; }
@@ -242,7 +243,7 @@
     const target = document.querySelector(link.getAttribute("href"));
     if (!target) return;
     ev.preventDefault();
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    target.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
     history.replaceState(null, "", link.getAttribute("href"));
   });
 

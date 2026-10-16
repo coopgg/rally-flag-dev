@@ -59,6 +59,29 @@ html,body{ margin:0; padding:0; }
    without this, every button/input silently falls back to the
    OS's system UI font instead of the site's actual typefaces. */
 button, input, select, textarea{ font-family: inherit; }
+
+/* Native scrollbars, form controls and pickers follow the site's mode. */
+:root{ color-scheme: dark; }
+[data-mode="light"]{ color-scheme: light; }
+
+/* Balanced line breaks on headings (no one-word last lines). */
+h1, h2, h3, .title{ text-wrap: balance; }
+
+/* No double-tap-zoom delay on controls. */
+a, button, input, select, textarea, summary, label, [role="button"]{ touch-action: manipulation; }
+
+/* Visible keyboard focus on form fields. Several pages set outline:none on
+   their inputs with only a border-colour change; html raises specificity
+   over those page rules. */
+html :is(input, select, textarea):focus-visible{ outline:2px solid var(--accent-text); outline-offset:1px; }
+
+/* Honour the OS "reduce motion" setting: no transitions or animations. */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after{
+    animation-duration:0.01ms !important; animation-iteration-count:1 !important;
+    transition-duration:0.01ms !important; scroll-behavior:auto !important;
+  }
+}
 body{
   min-height:100vh;
   background:
@@ -254,7 +277,7 @@ button.chip{ line-height:inherit; }
 .subnav a{
   font-family:'JetBrains Mono', monospace; font-size:12px; text-decoration:none;
   color:var(--text-dim); border:1px solid var(--panel-border); background:var(--panel);
-  padding:8px 16px; border-radius:999px; transition: all 0.15s ease;
+  padding:8px 16px; border-radius:999px; transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 .subnav a:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
 .subnav a.active{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:700; }
@@ -289,7 +312,7 @@ h1.title{
   display:inline-block; font-family:'JetBrains Mono', monospace; font-size:11px;
   text-decoration:none; color:var(--accent-bright); border:1px solid var(--panel-border);
   background:var(--accent-dim); padding:6px 14px; border-radius:999px;
-  transition: all 0.15s ease;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
 }
 .loot-pill:hover, .loot-pill:focus-visible{ border-color:var(--accent-bright); }
 

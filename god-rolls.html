@@ -23,6 +23,8 @@
 <meta name="twitter:image" content="https://rallyflag.gg/assets/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.bungie.net">
+<link rel="preconnect" href="https://www.bungie.net" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/theme.css">
 <style>
@@ -111,7 +113,7 @@
   .alt-roll-btn{
     font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dim);
     background:var(--panel); border:1px solid var(--panel-border); border-radius:999px;
-    padding:5px 12px; cursor:pointer; margin-top:10px; transition: all 0.15s ease;
+    padding:5px 12px; cursor:pointer; margin-top:10px; transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   }
   .alt-roll-btn:hover{ color:var(--accent-bright); border-color:var(--accent); }
   .alt-roll-btn.showing-alt{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
@@ -213,7 +215,7 @@
   .expand-all-btn{
     font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dim);
     background:var(--panel); border:1px solid var(--panel-border); border-radius:999px;
-    padding:6px 12px; cursor:pointer; white-space:nowrap; transition: all 0.15s ease;
+    padding:6px 12px; cursor:pointer; white-space:nowrap; transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   }
   .expand-all-btn:hover{ color:var(--accent-bright); border-color:var(--accent); }
 
@@ -232,7 +234,7 @@
     font-family:'Inter', sans-serif; font-size:12.5px; font-weight:500;
     color:var(--text-dim); background:var(--panel); border:1px solid var(--panel-border);
     padding:7px 14px; border-radius:999px; cursor:pointer;
-    transition: all 0.15s ease; user-select:none;
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease; user-select:none;
   }
   .chip:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
   .chip.on{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
@@ -285,9 +287,9 @@
   </div>
   <div class="search-row">
     <div class="search-box">
-      <input type="text" id="search-input" placeholder="Search weapons or perks…" autocomplete="off">
+      <input type="text" id="search-input" aria-label="Search weapons or perks" placeholder="Search weapons or perks…" autocomplete="off">
     </div>
-    <div class="result-count"><strong id="count-num">…</strong> weapons</div>
+    <div class="result-count" aria-live="polite" aria-atomic="true"><strong id="count-num">…</strong> weapons</div>
     <button class="expand-all-btn" id="expand-all-btn">Expand all</button>
   </div>
 
