@@ -268,10 +268,12 @@
     themeColor.content = MODE_THEME_COLORS.dark; // applyModePref() updates it
     head.appendChild(themeColor);
 
-    const appleCapable = document.createElement("meta");
-    appleCapable.name = "apple-mobile-web-app-capable";
-    appleCapable.content = "yes";
-    head.appendChild(appleCapable);
+    // No apple-mobile-web-app-capable: it forces iPhone home-screen icons
+    // into a full-screen app whose storage is walled off from Safari, and
+    // Bungie sign-in always finishes in Safari, so it could never complete
+    // inside the app. Without it (and with manifest display "minimal-ui",
+    // which iOS treats as a regular browser tab) the icon opens in Safari
+    // and sign-in works in place. Android still installs it as an app.
 
     const appleTitle = document.createElement("meta");
     appleTitle.name = "apple-mobile-web-app-title";

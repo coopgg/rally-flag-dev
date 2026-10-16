@@ -4,7 +4,7 @@
   "description": "A companion site for Destiny 2 — raid and dungeon guides, weapon god rolls, ready-to-run builds, the full armor set bonus database, and live trackers for Distortions, vendors, and what's active now.",
   "start_url": ".",
   "scope": ".",
-  "display": "standalone",
+  "display": "minimal-ui",
   "background_color": "#07080a",
   "theme_color": "#07080a",
   "icons": [
