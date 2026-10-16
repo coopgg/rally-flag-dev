@@ -5,7 +5,7 @@
    to control which top-level nav link is marked active:
      "distortions" | "setbonuses" | "guides" | "godrolls" | "artifacts" | "builds" | "puzzlehelper" | "codes" | "tracker" | "vendors" | "publicevents" | "debug"
 
-   Theme (element) and mode (dark/light) are stored in localStorage
+   Theme (element) and mode (auto/light/dark) are stored in localStorage
    so they persist across every page on the site, not just the one
    you're on. First-ever visit picks a random element once, then
    remembers it from then on until changed via the menu.
@@ -14,7 +14,15 @@
   const THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
   const THEME_LABELS = { solar: "Solar", void: "Void", arc: "Arc", stasis: "Stasis", strand: "Strand", prismatic: "Prismatic" };
   const STORAGE_THEME_KEY = "rallyflag_theme";
-  const STORAGE_MODE_KEY = "rallyflag_mode";
+  // Mode preference: "light" or "dark" when the visitor picked one; no
+  // value means Auto (follow the device's prefers-color-scheme).
+  const STORAGE_MODE_PREF_KEY = "rallyflag_mode_pref";
+  // Old key: written as "dark" on every visit before Auto existed, so
+  // only a stored "light" reflects an actual choice. Migrated, then removed.
+  const LEGACY_MODE_KEY = "rallyflag_mode";
+  const MODE_PREFS = ["auto", "light", "dark"];
+  const MODE_PREF_LABELS = { auto: "Auto", light: "Light", dark: "Dark" };
+  const systemLightQuery = window.matchMedia ? window.matchMedia("(prefers-color-scheme: light)") : null;
 
   // Grouped (rather than one flat list) once the link count grew past
   // ~10 — same labeled-section treatment the Appearance panel already
@@ -107,11 +115,12 @@
   // nav must still render, just without remembering the choice.
   function storageGet(key){ try { return localStorage.getItem(key); } catch (e) { return null; } }
   function storageSet(key, value){ try { localStorage.setItem(key, value); } catch (e) {} }
+  function storageRemove(key){ try { localStorage.removeItem(key); } catch (e) {} }
 
   // Each page's <head> has a tiny inline script that applies the stored
   // theme/mode before first paint (otherwise light-mode visitors saw a
   // dark, accent-less flash until this file ran). Keep its logic in sync
-  // with these two functions.
+  // with getStoredTheme / getStoredModePref / resolveMode.
   function getStoredTheme(){
     let theme = storageGet(STORAGE_THEME_KEY);
     if (!theme || !THEMES.includes(theme)){
@@ -122,9 +131,22 @@
     return theme;
   }
 
-  function getStoredMode(){
-    const mode = storageGet(STORAGE_MODE_KEY);
-    return mode === "light" ? "light" : "dark";
+  function getStoredModePref(){
+    let pref = storageGet(STORAGE_MODE_PREF_KEY);
+    const legacy = storageGet(LEGACY_MODE_KEY);
+    if (legacy !== null){
+      if (pref !== "light" && pref !== "dark" && legacy === "light"){
+        pref = "light";
+        storageSet(STORAGE_MODE_PREF_KEY, pref);
+      }
+      storageRemove(LEGACY_MODE_KEY);
+    }
+    return pref === "light" || pref === "dark" ? pref : "auto";
+  }
+
+  function resolveMode(pref){
+    if (pref !== "auto") return pref;
+    return systemLightQuery && systemLightQuery.matches ? "light" : "dark";
   }
 
   // Browser UI color (mobile address bar, installed-app title bar)
@@ -141,13 +163,19 @@
     });
   }
 
-  function applyMode(mode){
+  let currentModePref = "auto";
+
+  function applyModePref(pref){
+    currentModePref = pref;
+    if (pref === "auto") storageRemove(STORAGE_MODE_PREF_KEY);
+    else storageSet(STORAGE_MODE_PREF_KEY, pref);
+    const mode = resolveMode(pref);
     document.documentElement.setAttribute("data-mode", mode);
-    storageSet(STORAGE_MODE_KEY, mode);
     const themeColor = document.querySelector('meta[name="theme-color"]');
     if (themeColor) themeColor.content = MODE_THEME_COLORS[mode];
-    const thumb = document.getElementById("mode-switch-thumb");
-    if (thumb) thumb.classList.toggle("is-dark", mode === "dark");
+    document.querySelectorAll(".mode-option").forEach(el => {
+      el.setAttribute("aria-pressed", String(el.dataset.modePref === pref));
+    });
   }
 
   function buildMenuPanel(){
@@ -161,11 +189,12 @@
       '<div class="nav-menu-panel" id="nav-menu-panel">' +
         '<div class="nav-menu-section">' +
           '<div class="nav-menu-section-label">Appearance</div>' +
-          '<button class="mode-switch" id="mode-switch" title="Toggle dark/light mode">' +
-            '<span class="mode-switch-icon">\u2600\ufe0f</span>' +
-            '<span class="mode-switch-icon">\ud83c\udf19</span>' +
-            '<span class="mode-switch-thumb" id="mode-switch-thumb"></span>' +
-          '</button>' +
+          '<div class="mode-options" role="group" aria-label="Color mode">' +
+            MODE_PREFS.map(pref =>
+              '<button type="button" class="mode-option" data-mode-pref="' + pref + '" aria-pressed="false"' +
+                (pref === "auto" ? ' title="Match your device setting"' : '') + '>' + MODE_PREF_LABELS[pref] + '</button>'
+            ).join("") +
+          '</div>' +
         '</div>' +
         '<div class="nav-menu-section">' +
           '<div class="nav-menu-section-label">Subclass Theme</div>' +
@@ -231,7 +260,7 @@
 
     const themeColor = document.createElement("meta");
     themeColor.name = "theme-color";
-    themeColor.content = MODE_THEME_COLORS.dark; // applyMode() updates it
+    themeColor.content = MODE_THEME_COLORS.dark; // applyModePref() updates it
     head.appendChild(themeColor);
 
     const appleCapable = document.createElement("meta");
@@ -331,10 +360,8 @@
       }
     });
 
-    const modeSwitch = document.getElementById("mode-switch");
-    modeSwitch.addEventListener("click", () => {
-      const current = document.documentElement.getAttribute("data-mode") === "light" ? "light" : "dark";
-      applyMode(current === "light" ? "dark" : "light");
+    document.querySelectorAll(".mode-option").forEach(el => {
+      el.addEventListener("click", () => applyModePref(el.dataset.modePref));
     });
     document.querySelectorAll(".element-swatch").forEach(el => {
       el.addEventListener("click", () => applyTheme(el.dataset.theme));
@@ -345,7 +372,13 @@
   setupAnalytics();
   buildNav();
   applyTheme(getStoredTheme());
-  applyMode(getStoredMode());
+  applyModePref(getStoredModePref());
+  // In Auto, follow the device live (e.g. an OS that switches at sunset).
+  if (systemLightQuery){
+    const onSystemChange = () => { if (currentModePref === "auto") applyModePref("auto"); };
+    if (systemLightQuery.addEventListener) systemLightQuery.addEventListener("change", onSystemChange);
+    else if (systemLightQuery.addListener) systemLightQuery.addListener(onSystemChange);
+  }
 
   ensureAuthReady().then(() => {
     renderAuthSection();
