@@ -326,8 +326,10 @@
       '<nav class="site-nav">' +
         '<div class="nav-links-wrap">' +
           '<button class="nav-links-btn" id="nav-links-btn" title="Menu" aria-label="Site menu">\u2630</button>' +
-          '<a href="index.html" class="brand"><span class="brand-mark"></span>RALLY FLAG</a>' +
+          // Panel sits right after its button (it's absolutely positioned,
+          // so this doesn't move it) so Tab goes from the button into the links.
           '<div class="nav-links-panel" id="nav-links-panel" style="--nav-cols:' + NAV_SECTIONS.length + '">' + linksHtml + '</div>' +
+          '<a href="index.html" class="brand"><span class="brand-mark"></span>RALLY FLAG</a>' +
         '</div>' +
         '<div class="nav-right-wrap">' +
           '<a class="nav-icon-btn" href="' + DISCORD_INVITE_URL + '" target="_blank" rel="noopener" title="Join the Discord">' + DISCORD_ICON_SVG + '</a>' +
@@ -342,27 +344,46 @@
         '</div>' +
       '</nav>';
 
-    const linksPanel = document.getElementById("nav-links-panel");
-    const linksBtn = document.getElementById("nav-links-btn");
-    linksBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      linksPanel.classList.toggle("open");
-    });
-
-    const panel = document.getElementById("nav-menu-panel");
-    const btn = document.getElementById("nav-menu-btn");
-
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      panel.classList.toggle("open");
+    // Both dropdowns share one open/close path so aria-expanded always
+    // matches what's on screen, only one is open at a time, and Escape /
+    // clicking outside / tabbing out all close them the same way.
+    const menus = [
+      { btn: document.getElementById("nav-links-btn"), panel: document.getElementById("nav-links-panel") },
+      { btn: document.getElementById("nav-menu-btn"), panel: document.getElementById("nav-menu-panel") }
+    ];
+    function setMenuOpen(menu, open){
+      menu.panel.classList.toggle("open", open);
+      menu.btn.setAttribute("aria-expanded", String(open));
+    }
+    menus.forEach(menu => {
+      menu.btn.setAttribute("aria-controls", menu.panel.id);
+      menu.btn.setAttribute("aria-expanded", "false");
+      menu.btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const open = !menu.panel.classList.contains("open");
+        menus.forEach(other => { if (other !== menu) setMenuOpen(other, false); });
+        setMenuOpen(menu, open);
+      });
+      // Tabbing past the last item (or Shift+Tabbing above the button)
+      // closes the panel. A null relatedTarget is a click on a non-
+      // focusable spot inside the panel, so that leaves it open.
+      [menu.btn, menu.panel].forEach(el => el.addEventListener("focusout", (e) => {
+        const next = e.relatedTarget;
+        if (next && !menu.btn.contains(next) && !menu.panel.contains(next)) setMenuOpen(menu, false);
+      }));
     });
     document.addEventListener("click", (e) => {
-      if (!panel.contains(e.target) && e.target !== btn){
-        panel.classList.remove("open");
-      }
-      if (!linksPanel.contains(e.target) && e.target !== linksBtn){
-        linksPanel.classList.remove("open");
-      }
+      menus.forEach(menu => {
+        if (!menu.panel.contains(e.target) && !menu.btn.contains(e.target)) setMenuOpen(menu, false);
+      });
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      menus.forEach(menu => {
+        if (!menu.panel.classList.contains("open")) return;
+        setMenuOpen(menu, false);
+        menu.btn.focus();
+      });
     });
 
     document.querySelectorAll(".mode-option").forEach(el => {
