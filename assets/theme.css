@@ -202,6 +202,19 @@ nav.site-nav{
 }
 .nav-auth-signout:hover{ color:var(--accent-bright); }
 
+/* ---------- Skip link + main landmark ----------
+   The skip link (injected by nav.js) sits off-screen until it gets
+   keyboard focus. <main tabindex="-1"> only takes focus from the skip
+   link, so it needs no focus ring of its own. */
+.skip-link{
+  position:absolute; left:16px; top:-100px; z-index:100;
+  padding:10px 16px; border-radius:8px;
+  background:var(--accent-fill); color:var(--on-accent);
+  font-weight:600; font-size:14px; text-decoration:none;
+}
+.skip-link:focus{ top:12px; outline:2px solid var(--text); outline-offset:2px; }
+main:focus{ outline:none; }
+
 /* ---------- Keyboard focus for custom controls ----------
    Filter chips (<button class="chip">) and expandable card headers
    ([role="button"]) on God Rolls, Builds, Armor Sets and Artifacts. */

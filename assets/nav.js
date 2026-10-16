@@ -324,7 +324,13 @@
       );
     }).join("");
 
-    container.innerHTML =
+    // First thing Tab reaches: jumps past the nav to the page's <main>.
+    // Handled in script (focus + scroll) so the URL doesn't gain a
+    // #main-content hash, which some pages use for their own deep links.
+    const skipLink = document.getElementById("main-content")
+      ? '<a class="skip-link" href="#main-content">Skip to main content</a>' : '';
+
+    container.innerHTML = skipLink +
       '<nav class="site-nav">' +
         '<div class="nav-links-wrap">' +
           '<button class="nav-links-btn" id="nav-links-btn" title="Menu" aria-label="Site menu">\u2630</button>' +
@@ -349,6 +355,17 @@
     // Both dropdowns share one open/close path so aria-expanded always
     // matches what's on screen, only one is open at a time, and Escape /
     // clicking outside / tabbing out all close them the same way.
+    const skip = container.querySelector(".skip-link");
+    if (skip){
+      skip.addEventListener("click", (e) => {
+        const main = document.getElementById("main-content");
+        if (!main) return;
+        e.preventDefault();
+        main.focus({ preventScroll: true });
+        main.scrollIntoView();
+      });
+    }
+
     const menus = [
       { btn: document.getElementById("nav-links-btn"), panel: document.getElementById("nav-links-panel") },
       { btn: document.getElementById("nav-menu-btn"), panel: document.getElementById("nav-menu-panel") }
