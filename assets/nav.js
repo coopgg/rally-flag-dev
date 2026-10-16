@@ -157,9 +157,11 @@
     document.documentElement.setAttribute("data-theme", theme);
     storageSet(STORAGE_THEME_KEY, theme);
     const btnIcon = document.getElementById("nav-menu-icon");
-    if (btnIcon) btnIcon.innerHTML = '<img src="' + BUNGIE_ROOT + THEME_ICON_PATHS[theme] + '" alt="' + theme + '">';
+    if (btnIcon) btnIcon.innerHTML = '<img src="' + BUNGIE_ROOT + THEME_ICON_PATHS[theme] + '" alt="">';
     document.querySelectorAll(".element-swatch").forEach(el => {
-      el.classList.toggle("active", el.dataset.theme === theme);
+      const isActive = el.dataset.theme === theme;
+      el.classList.toggle("active", isActive);
+      el.setAttribute("aria-pressed", String(isActive));
     });
   }
 
@@ -180,9 +182,12 @@
 
   function buildMenuPanel(){
     const swatchesHtml = THEMES.map(theme =>
-      '<div class="element-swatch" data-theme="' + theme + '" title="' + THEME_LABELS[theme] + '" style="background:' + THEME_ACCENT_COLORS[theme] + '">' +
-        '<img src="' + BUNGIE_ROOT + THEME_ICON_PATHS[theme] + '" alt="' + theme + '">' +
-      '</div>'
+      // Real <button>s (not divs) so the swatches are reachable with Tab
+      // and pickable with Enter/Space; aria-pressed marks the current one.
+      '<button type="button" class="element-swatch" data-theme="' + theme + '" title="' + THEME_LABELS[theme] + '"' +
+        ' aria-label="' + THEME_LABELS[theme] + ' theme" aria-pressed="false" style="background:' + THEME_ACCENT_COLORS[theme] + '">' +
+        '<img src="' + BUNGIE_ROOT + THEME_ICON_PATHS[theme] + '" alt="">' +
+      '</button>'
     ).join("");
 
     return (
@@ -198,7 +203,7 @@
         '</div>' +
         '<div class="nav-menu-section">' +
           '<div class="nav-menu-section-label">Subclass Theme</div>' +
-          '<div class="element-grid">' + swatchesHtml + '</div>' +
+          '<div class="element-grid" role="group" aria-label="Subclass theme">' + swatchesHtml + '</div>' +
         '</div>' +
         '<div class="nav-menu-section" id="nav-auth-section"></div>' +
       '</div>'

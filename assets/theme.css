@@ -175,11 +175,12 @@ nav.site-nav{
 .element-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
 .element-swatch{
   display:flex; align-items:center; justify-content:center;
-  width:100%; aspect-ratio:1; border-radius:8px; cursor:pointer;
+  width:100%; aspect-ratio:1; border-radius:8px; cursor:pointer; padding:0;
   background:var(--panel); border:2px solid transparent;
   transition: border-color 0.15s ease, transform 0.1s ease;
 }
-.element-swatch:hover{ transform: scale(1.05); }
+.element-swatch:hover, .element-swatch:focus-visible{ transform: scale(1.05); }
+.element-swatch:focus-visible{ outline:2px solid var(--text); outline-offset:2px; }
 .element-swatch.active{ border-color:var(--text); }
 .element-swatch img{ width:22px; height:22px; object-fit:contain; }
 
