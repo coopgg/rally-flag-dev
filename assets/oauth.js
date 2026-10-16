@@ -13,15 +13,19 @@
        actual access token still has its own real expiry (see
        getAccessToken() below for how that's handled without feeling
        like a hard timeout).
-     sessionStorage "rallyflag_oauth_state" — CSRF state for the one
-       in-flight authorize round trip.
-     sessionStorage "rallyflag_oauth_return" — page to bounce back to
-       after oauth-callback.html finishes.
+     localStorage "rallyflag_oauth_pending" — CSRF state(s) for in-flight
+       authorize round trips, each with the page to return to. Shared
+       across tabs (not sessionStorage) because Bungie's login can bring
+       the visitor back in a different tab/window than the one that
+       started it (platform logins, the Bungie app on phones), which used
+       to fail with a state mismatch. Entries expire after 15 minutes.
+     localStorage "rallyflag_oauth_retry_at" — when oauth-callback.html
+       last auto-restarted a failed sign-in, so it only does that once.
 
    Other scripts can call:
      RallyFlagAuth.isSignedIn()
      RallyFlagAuth.getDisplayName()
-     RallyFlagAuth.signIn()
+     RallyFlagAuth.signIn(returnTo?)     -> returnTo defaults to this page
      RallyFlagAuth.signOut()
      RallyFlagAuth.getAccessToken()      -> Promise<string|null>, refreshes if needed
      RallyFlagAuth.authedFetch(path)     -> Promise<Response>, adds both headers
@@ -32,8 +36,12 @@ window.RallyFlagAuth = (function(){
   const AUTHORIZE_URL = BUNGIE_ROOT + "/en/OAuth/Authorize";
   const TOKEN_URL = BUNGIE_ROOT + "/Platform/App/OAuth/token/";
   const AUTH_STORAGE_KEY = "rallyflag_bungie_auth";
-  const STATE_KEY = "rallyflag_oauth_state";
-  const RETURN_KEY = "rallyflag_oauth_return";
+  const PENDING_KEY = "rallyflag_oauth_pending";
+  const RETRY_AT_KEY = "rallyflag_oauth_retry_at";
+  const LAST_RETURN_KEY = "rallyflag_oauth_last_return";
+  const STARTED_AT_KEY = "rallyflag_oauth_started_at";
+  const PENDING_TTL_MS = 15 * 60 * 1000;
+  const AUTO_RETRY_COOLDOWN_MS = 2 * 60 * 1000;
   // Refresh this many ms before actual expiry so a call never races an
   // access token dying mid-request.
   const EXPIRY_BUFFER_MS = 60 * 1000;
@@ -74,17 +82,56 @@ window.RallyFlagAuth = (function(){
     return (auth && auth.display_name) || null;
   }
 
+  // localStorage when available (shared across tabs), else sessionStorage.
+  function sharedGet(key){
+    try { return localStorage.getItem(key); } catch (e) {}
+    try { return sessionStorage.getItem(key); } catch (e) { return null; }
+  }
+  function sharedSet(key, value){
+    try { localStorage.setItem(key, value); return; } catch (e) {}
+    try { sessionStorage.setItem(key, value); } catch (e) {}
+  }
+  function sharedRemove(key){
+    try { localStorage.removeItem(key); } catch (e) {}
+    try { sessionStorage.removeItem(key); } catch (e) {}
+  }
+
+  // { [state]: { returnTo, at } }, pruned of expired entries on read.
+  function loadPending(){
+    let pending = {};
+    try { pending = JSON.parse(sharedGet(PENDING_KEY) || "{}") || {}; } catch (e) {}
+    const now = Date.now();
+    for (const state of Object.keys(pending)){
+      if (!pending[state] || now - pending[state].at > PENDING_TTL_MS) delete pending[state];
+    }
+    return pending;
+  }
+  function savePending(pending){
+    if (Object.keys(pending).length) sharedSet(PENDING_KEY, JSON.stringify(pending));
+    else sharedRemove(PENDING_KEY);
+  }
+
+  function authError(kind, message, extra){
+    const err = new Error(message);
+    err.kind = kind;
+    return Object.assign(err, extra);
+  }
+
   function randomState(){
     const bytes = new Uint8Array(16);
     crypto.getRandomValues(bytes);
     return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
   }
 
-  function signIn(){
+  function signIn(returnTo){
     const clientId = window.RallyFlagAPI.BUNGIE_OAUTH_CLIENT_ID;
     const state = randomState();
-    sessionStorage.setItem(STATE_KEY, state);
-    sessionStorage.setItem(RETURN_KEY, window.location.pathname + window.location.search);
+    returnTo = returnTo || (window.location.pathname + window.location.search);
+    const pending = loadPending();
+    pending[state] = { returnTo, at: Date.now() };
+    savePending(pending);
+    sharedSet(LAST_RETURN_KEY, returnTo);
+    sharedSet(STARTED_AT_KEY, String(Date.now()));
     const url = AUTHORIZE_URL + "?client_id=" + encodeURIComponent(clientId) +
       "&response_type=code&state=" + encodeURIComponent(state);
     window.location.href = url;
@@ -101,19 +148,34 @@ window.RallyFlagAuth = (function(){
   // though the same header works fine on every GET call elsewhere in
   // the site. Content-Type: application/x-www-form-urlencoded is a
   // CORS-safelisted value, so this stays a preflight-free simple request.
+  //
+  // A network-level failure (fetch rejects: dropped connection, blip)
+  // is retried once after a short pause before giving up.
   async function exchangeToken(body){
     const clientId = window.RallyFlagAPI.BUNGIE_OAUTH_CLIENT_ID;
     const params = new URLSearchParams(Object.assign({ client_id: clientId }, body));
-    const res = await fetch(TOKEN_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded"
-      },
-      body: params.toString()
-    });
-    const data = await res.json();
+    let res;
+    for (let attempt = 0; ; attempt++){
+      try {
+        res = await fetch(TOKEN_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded"
+          },
+          body: params.toString()
+        });
+        break;
+      } catch (e) {
+        if (attempt >= 1) throw authError("network", "Couldn't reach Bungie.net (" + e.message + ").");
+        await new Promise(r => setTimeout(r, 800));
+      }
+    }
+    let data = {};
+    try { data = await res.json(); } catch (e) {}
     if (!res.ok || data.error) {
-      throw new Error(data.error_description || data.error || ("HTTP " + res.status));
+      // invalid_grant = the one-time code was already used or expired.
+      const kind = data.error === "invalid_grant" ? "code" : "exchange";
+      throw authError(kind, data.error_description || data.error || ("HTTP " + res.status));
     }
     return data;
   }
@@ -153,25 +215,45 @@ window.RallyFlagAuth = (function(){
 
   // Called only from oauth-callback.html after Bungie redirects back
   // with ?code=&state=.
+  //
+  // Failures throw an Error with .kind, which oauth-callback.html uses to
+  // decide between a silent restart, a friendly message, or skipping
+  // straight back (see there):
+  //   "cancelled" — the visitor declined on Bungie's consent screen
+  //   "state"     — no matching in-flight sign-in (expired, already
+  //                 completed, or a forged callback); the code is NOT used
+  //   "code"      — Bungie rejected the code (already used / expired)
+  //   "network" | "exchange" — the token request itself failed
+  // .returnTo is set whenever the page to go back to is known.
   async function completeCallback(){
     const params = new URLSearchParams(window.location.search);
+    const state = params.get("state");
+    const pending = loadPending();
+    const entry = state ? pending[state] : null;
+    if (entry){ delete pending[state]; savePending(pending); }
+    const returnTo = entry ? safeReturnTo(entry.returnTo) : getLastReturnTo();
+
     const error = params.get("error");
-    if (error) throw new Error(params.get("error_description") || error);
+    if (error){
+      const kind = error === "access_denied" ? "cancelled" : "exchange";
+      throw authError(kind, params.get("error_description") || error, { returnTo });
+    }
 
     const code = params.get("code");
-    const state = params.get("state");
-    const expectedState = sessionStorage.getItem(STATE_KEY);
-    sessionStorage.removeItem(STATE_KEY);
-    if (!code) throw new Error("Bungie did not return an authorization code.");
-    if (!state || state !== expectedState) throw new Error("OAuth state mismatch — possible CSRF, aborting sign-in.");
+    if (!code) throw authError("exchange", "Bungie did not return an authorization code.", { returnTo });
+    if (!entry) throw authError("state", "No matching sign-in in progress (state mismatch).", { returnTo });
 
-    const data = await exchangeToken({ grant_type: "authorization_code", code });
+    let data;
+    try {
+      data = await exchangeToken({ grant_type: "authorization_code", code });
+    } catch (e) {
+      e.returnTo = returnTo;
+      throw e;
+    }
     let auth = tokenResponseToAuth(data, null);
     auth.display_name = await fetchDisplayName(auth.access_token);
     saveAuth(auth);
-
-    const returnTo = sessionStorage.getItem(RETURN_KEY) || "index.html";
-    sessionStorage.removeItem(RETURN_KEY);
+    sharedRemove(RETRY_AT_KEY);
 
     // Diagnostic summary for oauth-callback.html to display — Bungie's
     // token response field names are assumed (access_token, expires_in,
@@ -190,6 +272,31 @@ window.RallyFlagAuth = (function(){
     };
   }
 
+  // Only ever redirect to a path on this site ("/..." but not "//host").
+  function safeReturnTo(path){
+    return typeof path === "string" && path.startsWith("/") && !path.startsWith("//") ? path : "index.html";
+  }
+
+  function getLastReturnTo(){
+    return safeReturnTo(sharedGet(LAST_RETURN_KEY));
+  }
+
+  // oauth-callback.html restarts a recoverable failed sign-in on its own
+  // (the visitor's bungie.net session usually exists by then, so it
+  // completes with no login form) — but only once per cooldown, so a
+  // persistent failure ends on an error message instead of looping.
+  // Only when this browser actually started a sign-in recently, so
+  // opening a stale or someone else's callback link doesn't kick off a
+  // sign-in the visitor never asked for.
+  function claimAutoRetry(){
+    const startedAt = Number(sharedGet(STARTED_AT_KEY)) || 0;
+    if (Date.now() - startedAt > PENDING_TTL_MS) return false;
+    const last = Number(sharedGet(RETRY_AT_KEY)) || 0;
+    if (Date.now() - last < AUTO_RETRY_COOLDOWN_MS) return false;
+    sharedSet(RETRY_AT_KEY, String(Date.now()));
+    return true;
+  }
+
   async function refresh(auth){
     const data = await exchangeToken({ grant_type: "refresh_token", refresh_token: auth.refresh_token });
     const next = tokenResponseToAuth(data, auth.display_name);
@@ -205,7 +312,7 @@ window.RallyFlagAuth = (function(){
   // sign in again," this silently re-runs the same authorize round trip
   // instead: the browser almost always still has an active bungie.net
   // session, so it completes with no login form and bounces right back
-  // to the current page (signIn()'s RETURN_KEY). Effectively, staying
+  // to the current page (signIn()'s returnTo). Effectively, staying
   // signed in lasts as long as this tab stays open — it only actually
   // ends when the tab/window closes (auth lives in sessionStorage now)
   // or sign-out is explicit.
@@ -254,6 +361,8 @@ window.RallyFlagAuth = (function(){
     signIn,
     signOut,
     completeCallback,
+    claimAutoRetry,
+    getLastReturnTo,
     getAccessToken,
     authedFetch,
     onChange
