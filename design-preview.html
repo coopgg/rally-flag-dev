@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en" data-dir="hud">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* Apply the saved theme + mode before first paint; nav.js does the rest. Keep in sync with getStoredTheme/getStoredModePref/resolveMode there. */(function(){var d=document.documentElement,T=["solar","void","arc","stasis","strand","prismatic"],t=null,p=null,o=null;try{t=localStorage.getItem("rallyflag_theme");if(T.indexOf(t)<0){t=T[Math.floor(Math.random()*T.length)];localStorage.setItem("rallyflag_theme",t);}p=localStorage.getItem("rallyflag_mode_pref");o=localStorage.getItem("rallyflag_mode");}catch(e){}if(T.indexOf(t)<0)t=T[Math.floor(Math.random()*T.length)];if(p!=="light"&&p!=="dark")p=o==="light"?"light":(window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");d.setAttribute("data-theme",t);d.setAttribute("data-mode",p);d.classList.add("rf-boot");var u=function(){d.classList.remove("rf-boot")};document.addEventListener("DOMContentLoaded",function(){Promise.race([document.fonts?document.fonts.ready:0,new Promise(function(r){setTimeout(r,400)})]).then(function(){requestAnimationFrame(u)})});setTimeout(u,2500);})();</script>
+<script>/* Direction from the URL hash before first paint, so switching never flashes the wrong style. */(function(){var h=location.hash.slice(1);if(["hud","cosmic","fantasy"].indexOf(h)>=0)document.documentElement.setAttribute("data-dir",h);})();</script>
+<title>Design Preview - Rally Flag</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="Dev-only: three design directions for Rally Flag, side by side.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.bungie.net">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Audiowide&family=New+Rocker&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  /* ============================================================
+     DEV-ONLY MOCK-UP for design item 8. Not linked from the nav,
+     noindex, never promoted to prod. Same real content (this week's
+     rotation, the raid list, one encounter) in three directions:
+       hud     — current HUD look kept, plus official art, a focal
+                 point and motion. Follows the 6 themes + light mode.
+       cosmic  — typeui "cosmic": Audiowide, deep-space ground,
+                 blue/violet neon, glass panels. Dark only.
+       fantasy — typeui "fantasy": New Rocker display, royal navy
+                 and gold, framed plates. Dark only.
+     ============================================================ */
+
+  .dp-wrap{ max-width:1100px; margin:0 auto; padding:0 24px 90px; }
+
+  /* ---------- switcher ---------- */
+  .dp-note{
+    max-width:1100px; margin:20px auto 0; padding:0 24px;
+    font-size:14px; color:var(--text-dim); text-align:center;
+  }
+  .dp-switch{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:8px;
+    margin:14px auto 0; padding:0 24px;
+  }
+  .dp-switch button{
+    min-height:44px; padding:0 18px; border-radius:999px; cursor:pointer;
+    border:1px solid var(--panel-border); background:var(--panel); color:var(--text);
+    font-size:15px; font-weight:500;
+    transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+  }
+  .dp-switch button:hover{ border-color:var(--accent); }
+  .dp-switch button[aria-pressed="true"]{ background:var(--accent-fill); border-color:var(--accent-fill); color:var(--on-accent); }
+  .dp-switch button:focus-visible{ outline:2px solid var(--accent-text); outline-offset:2px; }
+  .dp-pitch{ max-width:62ch; margin:14px auto 0; padding:0 24px; font-size:15px; color:var(--text-dim); text-align:center; min-height:3em; }
+
+  /* ---------- shared structure ---------- */
+  .dp-hero{
+    position:relative; margin-top:28px; min-height:440px; overflow:hidden;
+    display:flex; align-items:flex-end; isolation:isolate;
+  }
+  .dp-hero-art{ position:absolute; inset:0; z-index:-2; }
+  .dp-hero-art img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .dp-hero-art::after{ content:""; position:absolute; inset:0; }
+  .dp-hero-body{ padding:36px; max-width:640px; }
+  .dp-kicker{ font-size:13px; }
+  .dp-hero-name{ margin:8px 0 12px; line-height:1; }
+  .dp-hero-sum{ font-size:16px; line-height:1.6; max-width:52ch; margin:0 0 22px; }
+  .dp-actions{ display:flex; flex-wrap:wrap; align-items:center; gap:14px 20px; }
+  .dp-cta{
+    display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 22px;
+    text-decoration:none; font-weight:600; font-size:15px;
+  }
+  .dp-reset{ font-size:14px; font-variant-numeric:tabular-nums; }
+
+  .dp-also{ display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:14px; margin-top:14px; }
+  .dp-tile{
+    position:relative; display:flex; align-items:flex-end; min-height:120px; overflow:hidden;
+    text-decoration:none; isolation:isolate; padding:16px;
+  }
+  .dp-tile img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:-2; }
+  .dp-tile::after{ content:""; position:absolute; inset:0; z-index:-1; }
+  .dp-tile-kind{ font-size:12px; display:block; margin-bottom:4px; }
+  .dp-tile-name{ font-size:20px; line-height:1.1; }
+
+  .dp-h2{ margin:56px 0 18px; }
+  .dp-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); gap:16px; }
+  .dp-card{ display:flex; flex-direction:column; text-decoration:none; overflow:hidden; }
+  .dp-card-art{ position:relative; aspect-ratio:16/9; overflow:hidden; }
+  .dp-card-art img{ width:100%; height:100%; object-fit:cover; display:block; transition: transform 0.5s ease; }
+  .dp-card-fallback{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:34px; }
+  .dp-card-body{ padding:14px 16px 16px; }
+  .dp-card-name{ font-size:19px; line-height:1.15; }
+  .dp-card-meta{ font-size:13px; margin-top:6px; }
+  @media (prefers-reduced-motion: no-preference){
+    .dp-card:hover .dp-card-art img, .dp-card:focus-visible .dp-card-art img{ transform:scale(1.05); }
+    .dp-tile img{ transition: transform 0.5s ease; }
+    .dp-tile:hover img, .dp-tile:focus-visible img{ transform:scale(1.05); }
+  }
+
+  .dp-enc{ margin-top:16px; padding:28px; }
+  .dp-enc-title{ font-size:22px; margin:0 0 14px; }
+  .dp-enc p, .dp-enc li{ font-size:16px; line-height:1.6; max-width:62ch; color:var(--text-dim); }
+  .dp-enc p{ margin:0 0 12px; }
+  .dp-enc ol{ margin:0 0 14px; padding-left:22px; }
+  .dp-enc li{ margin-bottom:6px; }
+  .dp-label{ font-size:12px; margin-right:6px; }
+  .dp-wipe{ margin-top:6px; padding:14px 16px; font-size:15px; line-height:1.55; max-width:68ch; }
+
+  /* Phones: the art can't sit behind a readable text column, so it
+     becomes a band above the text. */
+  @media (max-width:640px){
+    .dp-wrap{ padding:0 16px 70px; }
+    .dp-hero{ display:block; min-height:0; }
+    html[data-dir] .dp-hero-art{ position:relative; inset:auto; height:210px; z-index:0; }
+    html[data-dir] .dp-hero-art::after{ background:linear-gradient(0deg, var(--bg) 0%, transparent 55%); }
+    .dp-hero-body{ position:relative; padding:0 20px 24px; margin-top:-34px; }
+    .dp-also{ grid-template-columns:1fr 1fr; gap:10px; }
+    .dp-tile{ min-height:104px; padding:12px; }
+    html[data-dir] .dp-tile-name{ font-size:17px; }
+    .dp-tile-kind{ font-size:11px; letter-spacing:0.06em !important; }
+    .dp-enc{ padding:20px 18px; }
+  }
+
+  /* ============================================================
+     A · HUD, refined — uses the live theme tokens, so it follows
+     the 6 subclass themes and light mode.
+     ============================================================ */
+  [data-dir="hud"] .dp-hero{ border:1px solid var(--panel-border); border-radius:4px; }
+  [data-dir="hud"] .dp-hero-art::after{ background:linear-gradient(90deg, var(--bg) 0%, color-mix(in srgb, var(--bg) 82%, transparent) 38%, transparent 78%), linear-gradient(0deg, var(--bg) 0%, transparent 45%); }
+  [data-dir="hud"] .dp-kicker, [data-dir="hud"] .dp-tile-kind, [data-dir="hud"] .dp-label{
+    font-family:'JetBrains Mono', monospace; text-transform:uppercase; letter-spacing:0.12em; color:var(--accent-text);
+  }
+  [data-dir="hud"] .dp-hero-name{ font-family:'Oswald', sans-serif; font-weight:700; text-transform:uppercase; font-size:clamp(44px, 8vw, 84px); letter-spacing:0.01em; color:var(--text); }
+  [data-dir="hud"] .dp-hero-sum{ color:var(--text-dim); }
+  [data-dir="hud"] .dp-cta{ background:var(--accent-fill); color:var(--on-accent); border-radius:4px; font-family:'Oswald', sans-serif; text-transform:uppercase; letter-spacing:0.06em; }
+  [data-dir="hud"] .dp-cta:hover{ filter:brightness(1.08); }
+  [data-dir="hud"] .dp-reset{ font-family:'JetBrains Mono', monospace; color:var(--text-dim); }
+  [data-dir="hud"] .dp-tile{ border:1px solid var(--panel-border); border-radius:4px; transition: border-color 0.2s ease; }
+  [data-dir="hud"] .dp-tile:hover{ border-color:var(--accent); }
+  [data-dir="hud"] .dp-tile::after{ background:linear-gradient(0deg, var(--bg) 8%, color-mix(in srgb, var(--bg) 55%, transparent) 60%, transparent); }
+  [data-dir="hud"] .dp-tile-name{ font-family:'Oswald', sans-serif; font-weight:600; color:var(--text); }
+  [data-dir="hud"] .dp-h2{ font-family:'Oswald', sans-serif; font-weight:600; font-size:26px; text-transform:uppercase; letter-spacing:0.04em; color:var(--text); }
+  [data-dir="hud"] .dp-card{ background:var(--panel); border:1px solid var(--panel-border); border-radius:4px; transition: border-color 0.2s ease; }
+  [data-dir="hud"] .dp-card:hover{ border-color:var(--accent); }
+  [data-dir="hud"] .dp-card-art{ border-bottom:1px solid var(--panel-border); }
+  [data-dir="hud"] .dp-card-fallback{ background:var(--accent-dim); color:var(--accent-text); font-family:'Oswald', sans-serif; font-weight:700; }
+  [data-dir="hud"] .dp-card-name{ font-family:'Oswald', sans-serif; font-weight:600; color:var(--text); }
+  [data-dir="hud"] .dp-card-meta{ font-family:'JetBrains Mono', monospace; color:var(--text-dimmer); }
+  [data-dir="hud"] .dp-enc{ background:var(--panel); border:1px solid var(--panel-border); border-radius:4px; }
+  [data-dir="hud"] .dp-enc-title{ font-family:'Oswald', sans-serif; font-weight:600; color:var(--text); }
+  [data-dir="hud"] .dp-wipe{ background:var(--accent-dim); border-left:3px solid var(--accent); color:var(--text-dim); }
+
+  /* ============================================================
+     B · Cosmic — typeui-cosmic. Dark only; overrides the theme
+     tokens (incl. the nav) with a fixed blue/violet palette.
+     ============================================================ */
+  html[data-dir="cosmic"][data-mode]{
+    color-scheme:dark;
+    --bg:#05060f; --panel:rgba(120,140,255,0.06); --panel-border:rgba(139,92,246,0.35);
+    --text:#eef0ff; --text-dim:#aab2d6; --text-dimmer:#8d96c2;
+    --accent:#3b82f6; --accent-bright:#93c5fd; --accent-dim:rgba(59,130,246,0.16); --glow:rgba(139,92,246,0.5);
+    --accent-text:#93c5fd; --accent-fill:#93c5fd; --accent-fill-deep:#3b82f6; --on-accent:#05060f;
+  }
+  html[data-dir="cosmic"] body{
+    background:
+      radial-gradient(1px 1px at 12% 18%, #fff8 50%, transparent 51%),
+      radial-gradient(1px 1px at 72% 8%, #fff6 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 38% 62%, #fff5 50%, transparent 51%),
+      radial-gradient(1px 1px at 88% 44%, #fff7 50%, transparent 51%),
+      radial-gradient(1px 1px at 22% 84%, #fff5 50%, transparent 51%),
+      radial-gradient(ellipse 900px 600px at 80% -10%, rgba(139,92,246,0.28), transparent 60%),
+      radial-gradient(ellipse 800px 600px at 0% 30%, rgba(59,130,246,0.18), transparent 60%),
+      #05060f;
+    background-size:420px 420px, 520px 520px, 610px 610px, 380px 380px, 470px 470px, auto, auto, auto;
+  }
+  [data-dir="cosmic"] .dp-hero{ border-radius:24px; border:1px solid rgba(139,92,246,0.45); box-shadow:0 0 0 1px rgba(59,130,246,0.15), 0 30px 80px -30px rgba(139,92,246,0.6); }
+  [data-dir="cosmic"] .dp-hero-art img{ filter:saturate(1.15) hue-rotate(-8deg); }
+  [data-dir="cosmic"] .dp-hero-art::after{ background:linear-gradient(90deg, rgba(5,6,15,0.95) 0%, rgba(5,6,15,0.75) 40%, rgba(40,20,90,0.15) 80%), linear-gradient(0deg, rgba(5,6,15,0.9), transparent 50%); }
+  [data-dir="cosmic"] .dp-kicker, [data-dir="cosmic"] .dp-tile-kind, [data-dir="cosmic"] .dp-label{ font-family:'Audiowide', sans-serif; letter-spacing:0.08em; color:#c4b5fd; text-transform:uppercase; }
+  [data-dir="cosmic"] .dp-hero-name, [data-dir="cosmic"] .dp-h2, [data-dir="cosmic"] .dp-card-name, [data-dir="cosmic"] .dp-tile-name, [data-dir="cosmic"] .dp-enc-title{ font-family:'Audiowide', sans-serif; font-weight:400; color:#fff; }
+  [data-dir="cosmic"] .dp-hero-name{ font-size:clamp(40px, 7vw, 76px); text-shadow:0 0 28px rgba(139,92,246,0.7); }
+  [data-dir="cosmic"] .dp-hero-sum{ color:#c9cff0; }
+  [data-dir="cosmic"] .dp-cta{ border-radius:999px; color:#05060f; background:linear-gradient(90deg, #93c5fd, #c4b5fd); box-shadow:0 0 24px rgba(139,92,246,0.55); }
+  [data-dir="cosmic"] .dp-reset{ font-family:'JetBrains Mono', monospace; color:#c4b5fd; }
+  [data-dir="cosmic"] .dp-tile{ border-radius:18px; border:1px solid rgba(139,92,246,0.35); }
+  [data-dir="cosmic"] .dp-tile::after{ background:linear-gradient(0deg, rgba(5,6,15,0.92) 10%, rgba(30,15,80,0.35) 70%, transparent); }
+  [data-dir="cosmic"] .dp-h2{ font-size:26px; text-shadow:0 0 18px rgba(59,130,246,0.6); }
+  [data-dir="cosmic"] .dp-card{ border-radius:18px; background:rgba(20,24,60,0.55); border:1px solid rgba(139,92,246,0.3); backdrop-filter:blur(8px); transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+  [data-dir="cosmic"] .dp-card:hover{ border-color:#93c5fd; box-shadow:0 0 30px -6px rgba(59,130,246,0.7); }
+  [data-dir="cosmic"] .dp-card-fallback{ background:radial-gradient(circle at 50% 40%, rgba(139,92,246,0.5), rgba(5,6,15,1) 70%); color:#fff; font-family:'Audiowide', sans-serif; }
+  [data-dir="cosmic"] .dp-card-name{ font-size:17px; }
+  [data-dir="cosmic"] .dp-card-meta{ color:#aab2d6; }
+  [data-dir="cosmic"] .dp-enc{ border-radius:20px; background:rgba(20,24,60,0.55); border:1px solid rgba(139,92,246,0.3); backdrop-filter:blur(8px); }
+  [data-dir="cosmic"] .dp-enc p, [data-dir="cosmic"] .dp-enc li{ color:#c9cff0; }
+  [data-dir="cosmic"] .dp-wipe{ border-radius:12px; background:rgba(139,92,246,0.14); border:1px solid rgba(139,92,246,0.4); color:#d6d0ff; }
+
+  /* ============================================================
+     C · Fantasy — typeui-fantasy. Dark only; royal navy and gold,
+     framed "plates", New Rocker for display type only (reading
+     text stays Inter).
+     ============================================================ */
+  html[data-dir="fantasy"][data-mode]{
+    color-scheme:dark;
+    --bg:#0a1228; --panel:rgba(253,200,0,0.04); --panel-border:rgba(253,200,0,0.28);
+    --text:#f6efd9; --text-dim:#c8c0a6; --text-dimmer:#a9a184;
+    --accent:#fdc800; --accent-bright:#ffe27a; --accent-dim:rgba(253,200,0,0.12); --glow:rgba(253,200,0,0.4);
+    --accent-text:#fdc800; --accent-fill:#fdc800; --accent-fill-deep:#fdc800; --on-accent:#0a1228;
+  }
+  html[data-dir="fantasy"] body{
+    background:
+      radial-gradient(ellipse 1000px 520px at 50% -12%, rgba(2,80,204,0.45), transparent 62%),
+      radial-gradient(ellipse 700px 500px at 100% 100%, rgba(253,200,0,0.06), transparent 60%),
+      #0a1228;
+  }
+  [data-dir="fantasy"] .dp-hero{ border:2px solid #fdc800; outline:1px solid rgba(253,200,0,0.45); outline-offset:5px; margin-left:6px; margin-right:6px; }
+  [data-dir="fantasy"] .dp-hero-art img{ filter:sepia(0.25) saturate(1.1); }
+  [data-dir="fantasy"] .dp-hero-art::after{ background:radial-gradient(ellipse at 70% 30%, transparent 20%, rgba(10,18,40,0.6) 70%), linear-gradient(0deg, rgba(10,18,40,0.97) 5%, rgba(10,18,40,0.55) 55%, transparent 90%); }
+  [data-dir="fantasy"] .dp-hero{ justify-content:center; text-align:center; }
+  [data-dir="fantasy"] .dp-hero-body{ margin:0 auto; }
+  [data-dir="fantasy"] .dp-hero-sum{ margin-left:auto; margin-right:auto; color:#e6dcc0; }
+  [data-dir="fantasy"] .dp-actions{ justify-content:center; }
+  [data-dir="fantasy"] .dp-kicker, [data-dir="fantasy"] .dp-tile-kind, [data-dir="fantasy"] .dp-label{ font-family:'Inter', sans-serif; font-weight:600; text-transform:uppercase; letter-spacing:0.2em; color:#fdc800; }
+  [data-dir="fantasy"] .dp-hero-name, [data-dir="fantasy"] .dp-h2, [data-dir="fantasy"] .dp-card-name, [data-dir="fantasy"] .dp-tile-name, [data-dir="fantasy"] .dp-enc-title{ font-family:'New Rocker', serif; font-weight:400; color:#f6efd9; }
+  [data-dir="fantasy"] .dp-hero-name{ font-size:clamp(46px, 8vw, 88px); text-shadow:0 2px 0 #000, 0 0 30px rgba(253,200,0,0.35); }
+  [data-dir="fantasy"] .dp-cta{ color:#0a1228; background:linear-gradient(180deg, #ffe27a, #fdc800 60%, #c99a00); border:1px solid #fff2b0; border-radius:2px; box-shadow:0 0 0 3px rgba(253,200,0,0.25); letter-spacing:0.08em; text-transform:uppercase; }
+  [data-dir="fantasy"] .dp-reset{ color:#e6dcc0; }
+  [data-dir="fantasy"] .dp-tile{ border:1px solid rgba(253,200,0,0.6); outline:1px solid rgba(253,200,0,0.2); outline-offset:3px; }
+  [data-dir="fantasy"] .dp-tile::after{ background:linear-gradient(0deg, rgba(10,18,40,0.95) 10%, rgba(10,18,40,0.4) 70%, transparent); }
+  [data-dir="fantasy"] .dp-tile-name{ font-size:24px; }
+  [data-dir="fantasy"] .dp-h2{ font-size:34px; text-align:center; }
+  [data-dir="fantasy"] .dp-h2::after{ content:""; display:block; width:120px; height:2px; margin:12px auto 0; background:linear-gradient(90deg, transparent, #fdc800, transparent); }
+  [data-dir="fantasy"] .dp-grid{ grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:22px; }
+  [data-dir="fantasy"] .dp-card{ background:linear-gradient(180deg, rgba(2,80,204,0.18), rgba(10,18,40,0.6)); border:1px solid rgba(253,200,0,0.55); outline:1px solid rgba(253,200,0,0.18); outline-offset:3px; text-align:center; transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+  [data-dir="fantasy"] .dp-card:hover{ border-color:#fdc800; box-shadow:0 0 28px -8px rgba(253,200,0,0.6); }
+  [data-dir="fantasy"] .dp-card-art{ aspect-ratio:4/5; border-bottom:1px solid rgba(253,200,0,0.45); }
+  [data-dir="fantasy"] .dp-card-art img{ filter:sepia(0.2) saturate(1.1); }
+  [data-dir="fantasy"] .dp-card-fallback{ background:radial-gradient(circle at 50% 40%, rgba(2,80,204,0.7), #0a1228 75%); color:#fdc800; font-family:'New Rocker', serif; font-size:48px; }
+  [data-dir="fantasy"] .dp-card-name{ font-size:22px; }
+  [data-dir="fantasy"] .dp-card-meta{ color:#c8c0a6; letter-spacing:0.08em; text-transform:uppercase; font-size:12px; }
+  [data-dir="fantasy"] .dp-enc{ background:rgba(10,18,40,0.75); border:1px solid rgba(253,200,0,0.5); outline:1px solid rgba(253,200,0,0.15); outline-offset:4px; }
+  [data-dir="fantasy"] .dp-enc-title{ font-size:28px; }
+  [data-dir="fantasy"] .dp-enc p, [data-dir="fantasy"] .dp-enc li{ color:#e6dcc0; }
+  [data-dir="fantasy"] .dp-enc li::marker{ color:#fdc800; }
+  [data-dir="fantasy"] .dp-wipe{ background:rgba(253,200,0,0.08); border-left:3px solid #fdc800; color:#efe4c4; }
+</style>
+</head>
+<body data-nav-group="guides">
+
+<div id="site-nav"></div>
+
+<main id="main-content" tabindex="-1">
+
+<p class="dp-note">Dev-only design preview (item 8). Same real content, three directions. Pick one, mix parts, or keep the current look.</p>
+<div class="dp-switch" role="group" aria-label="Design direction">
+  <button type="button" data-dir="hud" aria-pressed="true">A · HUD, refined</button>
+  <button type="button" data-dir="cosmic" aria-pressed="false">B · Cosmic</button>
+  <button type="button" data-dir="fantasy" aria-pressed="false">C · Fantasy</button>
+</div>
+<p class="dp-pitch" id="dp-pitch" aria-live="polite"></p>
+
+<div class="dp-wrap">
+  <section class="dp-hero" aria-labelledby="dp-hero-name">
+    <div class="dp-hero-art"><img id="dp-hero-img" alt="" fetchpriority="high"></div>
+    <div class="dp-hero-body">
+      <div class="dp-kicker">Featured raid this week</div>
+      <h1 class="dp-hero-name" id="dp-hero-name"></h1>
+      <p class="dp-hero-sum" id="dp-hero-sum"></p>
+      <div class="dp-actions">
+        <a class="dp-cta" id="dp-hero-cta" href="raids.html">Open the guide <span aria-hidden="true">→</span></a>
+        <span class="dp-reset" id="dp-reset"></span>
+      </div>
+    </div>
+  </section>
+
+  <div class="dp-also" id="dp-also"></div>
+
+  <h2 class="dp-h2">Raids</h2>
+  <div class="dp-grid" id="dp-grid"></div>
+
+  <h2 class="dp-h2">Guide reading view</h2>
+  <article class="dp-enc" id="dp-enc"></article>
+</div>
+
+</main>
+
+<footer>
+  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie. Activity art © Bungie, Inc.</div>
+</footer>
+
+<script src="assets/nav.js"></script>
+<script src="assets/raids-data.js"></script>
+<script src="assets/dungeons-data.js"></script>
+<script src="assets/featured-rotation-data.js"></script>
+<script>
+(function(){
+  // Official activity art (pgcrImage from Bungie's DestinyActivityDefinition).
+  // If a direction is chosen this map moves into raids-data.js / dungeons-data.js.
+  const ART = {
+    "last-wish":"raid_beanstalk", "garden-of-salvation":"raid_garden_of_salvation",
+    "deep-stone-crypt":"europa-raid-deep-stone-crypt", "vault-of-glass":"vault_of_glass",
+    "vow-of-the-disciple":"raid_nemesis", "kings-fall":"raid_kings_fall",
+    "root-of-nightmares":"raid_root_of_nightmares", "crotas-end":"raid_crotas_end",
+    "salvations-edge":"raid_splinter", "the-desert-perpetual":"raid_gateways",
+    "shattered-throne":"mission_labyrinth", "pit-of-heresy":"dungeon_pit_of_heresy",
+    "prophecy":"dungeon_prophecy", "grasp-of-avarice":"30th-anniversary-grasp-of-avarice",
+    "duality":"dungeon_duality", "spire-of-the-watcher":"dungeon_spire_of_the_watcher",
+    "ghosts-of-the-deep":"dungeon_ghosts_of_the_deep", "warlords-ruin":"dungeon_ridgeline",
+    "vespers-host":"vespers_host", "sundered-doctrine":"dungeon_delver",
+    "equilibrium":"dungeon_equilibrium"
+  };
+  const art = slug => ART[slug] ? "https://www.bungie.net/img/destiny_content/pgcr/" + ART[slug] + ".jpg" : "";
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" })[c]);
+
+  const RAIDS = window.RaidsData.RAIDS, DUNGEONS = window.DungeonsData.DUNGEONS;
+  const F = window.FeaturedRotationData;
+  const featured = F.featuredForWeek(F.currentWeekIndex());
+  const raidBy = s => RAIDS.find(r => r.slug === s), dungeonBy = s => DUNGEONS.find(d => d.slug === s);
+
+  // Hero: the first rotating raid (the always-featured one is in the strip below).
+  const hero = raidBy(featured.raids[1]) || RAIDS[0];
+  document.getElementById("dp-hero-img").src = art(hero.slug);
+  document.getElementById("dp-hero-name").textContent = hero.name;
+  document.getElementById("dp-hero-sum").textContent = (hero.summary.match(/^.*?[.!?](\s|$)/) || [hero.summary])[0].trim();
+  document.getElementById("dp-hero-cta").href = "raid-guide.html?slug=" + hero.slug;
+
+  function tickReset(){
+    const ms = F.msUntilNextReset(), d = Math.floor(ms / 864e5), h = Math.floor(ms / 36e5) % 24, m = Math.floor(ms / 6e4) % 60;
+    document.getElementById("dp-reset").textContent = "Rotates in " + d + "d " + h + "h " + String(m).padStart(2, "0") + "m";
+  }
+  tickReset(); setInterval(tickReset, 30000);
+
+  const also = [
+    ...featured.raids.filter(s => s !== hero.slug).map(s => ["Featured raid", raidBy(s), "raid-guide.html?slug="]),
+    ...featured.dungeons.slice(0, 2).map(s => ["Featured dungeon", dungeonBy(s), "dungeon-guide.html?slug="])
+  ].filter(x => x[1]);
+  document.getElementById("dp-also").innerHTML = also.map(([kind, a, base]) =>
+    '<a class="dp-tile" href="' + base + a.slug + '">' + (art(a.slug) ? '<img src="' + art(a.slug) + '" alt="" loading="lazy">' : '') +
+    '<span><span class="dp-tile-kind">' + kind + '</span><span class="dp-tile-name">' + esc(a.name) + '</span></span></a>').join("");
+
+  document.getElementById("dp-grid").innerHTML = RAIDS.map(r => {
+    const img = art(r.slug);
+    const initials = r.name.replace(/^The /, "").split(/\s+/).map(w => w[0]).join("").slice(0, 2);
+    return '<a class="dp-card" href="raid-guide.html?slug=' + r.slug + '"><div class="dp-card-art">' +
+      (img ? '<img src="' + img + '" alt="" loading="lazy">' : '<div class="dp-card-fallback" aria-hidden="true">' + esc(initials) + '</div>') +
+      '</div><div class="dp-card-body"><div class="dp-card-name">' + esc(r.name) + '</div>' +
+      '<div class="dp-card-meta">' + r.encounters.length + ' encounters' + (r.difficulties ? ' · ' + esc(r.difficulties.join(" / ")) : '') + '</div></div></a>';
+  }).join("");
+
+  const enc = hero.encounters[0];
+  document.getElementById("dp-enc").innerHTML =
+    '<h3 class="dp-enc-title">' + esc(hero.name) + ': ' + esc(enc.name) + '</h3>' +
+    '<p><span class="dp-label">Objective</span>' + esc(enc.objective) + '</p>' +
+    '<p><span class="dp-label">Roles</span>' + esc(enc.roles) + '</p>' +
+    '<ol>' + (enc.steps || []).slice(0, 4).map(s => '<li>' + esc(s) + '</li>').join("") + '</ol>' +
+    (enc.wipe ? '<div class="dp-wipe"><span class="dp-label">What wipes you</span>' + esc(enc.wipe) + '</div>' : '');
+
+  const PITCH = {
+    hud: "Keeps today's look, fonts and the 6 subclass themes (plus light mode). Adds Bungie's official art, one focal point per page, and gentle hover motion. Smallest change; could ship page by page.",
+    cosmic: "typeui “cosmic”: Audiowide headings, deep-space ground, blue-violet neon and glass panels. A full restyle; replaces the subclass themes with one fixed palette, dark only.",
+    fantasy: "typeui “fantasy”: New Rocker display type, royal navy and gold, framed plates and portrait art. A full restyle; one fixed palette, dark only. Reading text stays Inter."
+  };
+  const buttons = [...document.querySelectorAll(".dp-switch button")];
+  function setDir(dir, push){
+    document.documentElement.setAttribute("data-dir", dir);
+    buttons.forEach(b => b.setAttribute("aria-pressed", String(b.dataset.dir === dir)));
+    document.getElementById("dp-pitch").textContent = PITCH[dir];
+    if (push) history.replaceState(null, "", "#" + dir);
+  }
+  buttons.forEach(b => b.addEventListener("click", () => setDir(b.dataset.dir, true)));
+  setDir(document.documentElement.getAttribute("data-dir") || "hud", false);
+})();
+</script>
+</body>
+</html>

@@ -18,14 +18,16 @@ dev-only files, so apply only the reviewed commit range:
 git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)debug.html' ':(exclude)clan-admin.html' ':(exclude)discord-bot' \
   ':(exclude)api-debug.html' ':(exclude)xur-debug.html' ':(exclude).claude' \
-  ':(exclude)skills-lock.json' ':(exclude).gitignore' > /tmp/promote.patch
+  ':(exclude)skills-lock.json' ':(exclude).gitignore' \
+  ':(exclude)design-preview.html' > /tmp/promote.patch
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
 Expected rejects: hunks touching the Xûr "Predicted" preview in
 `vendors.html` (dev-only, unreleased). Anything else rejecting means prod and
 dev drifted — stop and look. After applying, `diff -rq` the two trees: the
-only differences should be `CNAME`, `.gitignore`, the dev-only files above,
+only differences should be `CNAME`, `.gitignore`, the dev-only files above
+(including `design-preview.html`, the item 8 mock-up),
 and the Xûr preview in `vendors.html`.
 
 ## Things that bite
