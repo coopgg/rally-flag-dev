@@ -103,23 +103,37 @@
     prismatic: "#ff6fd5"
   };
 
+  // localStorage can throw (blocked site data, some private modes); the
+  // nav must still render, just without remembering the choice.
+  function storageGet(key){ try { return localStorage.getItem(key); } catch (e) { return null; } }
+  function storageSet(key, value){ try { localStorage.setItem(key, value); } catch (e) {} }
+
+  // Each page's <head> has a tiny inline script that applies the stored
+  // theme/mode before first paint (otherwise light-mode visitors saw a
+  // dark, accent-less flash until this file ran). Keep its logic in sync
+  // with these two functions.
   function getStoredTheme(){
-    let theme = localStorage.getItem(STORAGE_THEME_KEY);
+    let theme = storageGet(STORAGE_THEME_KEY);
     if (!theme || !THEMES.includes(theme)){
-      theme = THEMES[Math.floor(Math.random() * THEMES.length)];
-      localStorage.setItem(STORAGE_THEME_KEY, theme);
+      theme = document.documentElement.getAttribute("data-theme");
+      if (!THEMES.includes(theme)) theme = THEMES[Math.floor(Math.random() * THEMES.length)];
+      storageSet(STORAGE_THEME_KEY, theme);
     }
     return theme;
   }
 
   function getStoredMode(){
-    const mode = localStorage.getItem(STORAGE_MODE_KEY);
+    const mode = storageGet(STORAGE_MODE_KEY);
     return mode === "light" ? "light" : "dark";
   }
 
+  // Browser UI color (mobile address bar, installed-app title bar)
+  // follows light/dark mode — matches --bg in theme.css.
+  const MODE_THEME_COLORS = { dark: "#07080a", light: "#f3f4f7" };
+
   function applyTheme(theme){
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem(STORAGE_THEME_KEY, theme);
+    storageSet(STORAGE_THEME_KEY, theme);
     const btnIcon = document.getElementById("nav-menu-icon");
     if (btnIcon) btnIcon.innerHTML = '<img src="' + BUNGIE_ROOT + THEME_ICON_PATHS[theme] + '" alt="' + theme + '">';
     document.querySelectorAll(".element-swatch").forEach(el => {
@@ -129,7 +143,9 @@
 
   function applyMode(mode){
     document.documentElement.setAttribute("data-mode", mode);
-    localStorage.setItem(STORAGE_MODE_KEY, mode);
+    storageSet(STORAGE_MODE_KEY, mode);
+    const themeColor = document.querySelector('meta[name="theme-color"]');
+    if (themeColor) themeColor.content = MODE_THEME_COLORS[mode];
     const thumb = document.getElementById("mode-switch-thumb");
     if (thumb) thumb.classList.toggle("is-dark", mode === "dark");
   }
@@ -215,7 +231,7 @@
 
     const themeColor = document.createElement("meta");
     themeColor.name = "theme-color";
-    themeColor.content = "#07080a";
+    themeColor.content = MODE_THEME_COLORS.dark; // applyMode() updates it
     head.appendChild(themeColor);
 
     const appleCapable = document.createElement("meta");
