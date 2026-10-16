@@ -41,7 +41,7 @@
   const statusEl = document.getElementById("callback-status");
   const wrap = document.querySelector(".callback-wrap");
 
-  function showError(message, detail, returnTo, canRetry){
+  function showError(message, detail, returnTo, canRetry, retryLabel){
     statusEl.className = "callback-status callback-error";
     statusEl.textContent = message;
     if (detail) wrap.insertAdjacentHTML("beforeend", '<div class="callback-detail"></div>');
@@ -50,7 +50,7 @@
     actions.className = "callback-actions";
     if (canRetry){
       const retry = document.createElement("button");
-      retry.type = "button"; retry.className = "callback-retry"; retry.textContent = "Try again";
+      retry.type = "button"; retry.className = "callback-retry"; retry.textContent = retryLabel || "Try again";
       retry.addEventListener("click", () => RallyFlagAuth.signIn(returnTo));
       actions.appendChild(retry);
     }
@@ -88,6 +88,14 @@
       // tab, a network blip, a reused code). Start a fresh sign-in once —
       // the bungie.net session normally exists by now, so it completes
       // with no login form, exactly like clicking Sign in again.
+      // This browser never started a sign-in: Bungie handed the visitor
+      // back to a different browser or app than the one they began in —
+      // e.g. an iPhone home-screen app, whose storage Safari can't see.
+      if (err.kind === "state" && err.startedElsewhere){
+        showError("This sign-in was started in another app or browser.",
+          "Bungie sent you back here instead, and sign-ins can't move between them. Tap Sign in to finish signing in here.", returnTo, true, "Sign in");
+        return;
+      }
       if (RallyFlagAuth.claimAutoRetry()){
         statusEl.textContent = "Finishing sign-in\u2026";
         RallyFlagAuth.signIn(returnTo);

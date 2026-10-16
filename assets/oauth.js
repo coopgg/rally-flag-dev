@@ -21,6 +21,13 @@
        to fail with a state mismatch. Entries expire after 15 minutes.
      localStorage "rallyflag_oauth_retry_at" — when oauth-callback.html
        last auto-restarted a failed sign-in, so it only does that once.
+     localStorage "rallyflag_auth_handoff" — a just-completed sign-in,
+       kept for 10 minutes so the tab/window that STARTED it can pick it
+       up. On phones the callback often lands somewhere else: the
+       installed app opens Bungie in an in-app browser panel (Android
+       Custom Tab), and Bungie's login can come back in a new tab. Only a
+       tab that called signIn() (sessionStorage "rallyflag_auth_awaiting")
+       adopts it, so a sign-in never spreads to unrelated tabs.
 
    Other scripts can call:
      RallyFlagAuth.isSignedIn()
@@ -40,6 +47,9 @@ window.RallyFlagAuth = (function(){
   const RETRY_AT_KEY = "rallyflag_oauth_retry_at";
   const LAST_RETURN_KEY = "rallyflag_oauth_last_return";
   const STARTED_AT_KEY = "rallyflag_oauth_started_at";
+  const HANDOFF_KEY = "rallyflag_auth_handoff";
+  const AWAITING_KEY = "rallyflag_auth_awaiting";
+  const HANDOFF_TTL_MS = 10 * 60 * 1000;
   const PENDING_TTL_MS = 15 * 60 * 1000;
   const AUTO_RETRY_COOLDOWN_MS = 2 * 60 * 1000;
   // Refresh this many ms before actual expiry so a call never races an
@@ -132,13 +142,35 @@ window.RallyFlagAuth = (function(){
     savePending(pending);
     sharedSet(LAST_RETURN_KEY, returnTo);
     sharedSet(STARTED_AT_KEY, String(Date.now()));
+    try { sessionStorage.setItem(AWAITING_KEY, String(Date.now())); } catch (e) {}
     const url = AUTHORIZE_URL + "?client_id=" + encodeURIComponent(clientId) +
       "&response_type=code&state=" + encodeURIComponent(state);
     window.location.href = url;
   }
 
   function signOut(){
+    sharedRemove(HANDOFF_KEY);
+    try { sessionStorage.removeItem(AWAITING_KEY); } catch (e) {}
     clearAuth();
+  }
+
+  // If this tab started a sign-in that finished somewhere else (see
+  // HANDOFF_KEY above), take that sign-in over. Returns true if it did.
+  function adoptHandoff(){
+    let awaitingSince = 0;
+    try { awaitingSince = Number(sessionStorage.getItem(AWAITING_KEY)) || 0; } catch (e) {}
+    if (!awaitingSince || isSignedIn()) return false;
+    let handoff = null;
+    try { handoff = JSON.parse(sharedGet(HANDOFF_KEY) || "null"); } catch (e) {}
+    if (!handoff || !handoff.auth || Date.now() - handoff.at > HANDOFF_TTL_MS || handoff.at < awaitingSince){
+      if (Date.now() - awaitingSince > HANDOFF_TTL_MS + 5 * 60 * 1000){
+        try { sessionStorage.removeItem(AWAITING_KEY); } catch (e) {}
+      }
+      return false;
+    }
+    try { sessionStorage.removeItem(AWAITING_KEY); } catch (e) {}
+    try { sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(handoff.auth)); } catch (e) { return false; }
+    return isSignedIn();
   }
 
   // No X-API-Key here on purpose: the token endpoint identifies the app
@@ -241,7 +273,10 @@ window.RallyFlagAuth = (function(){
 
     const code = params.get("code");
     if (!code) throw authError("exchange", "Bungie did not return an authorization code.", { returnTo });
-    if (!entry) throw authError("state", "No matching sign-in in progress (state mismatch).", { returnTo });
+    if (!entry){
+      const startedHere = Date.now() - (Number(sharedGet(STARTED_AT_KEY)) || 0) < PENDING_TTL_MS;
+      throw authError("state", "No matching sign-in in progress (state mismatch).", { returnTo, startedElsewhere: !startedHere });
+    }
 
     let data;
     try {
@@ -254,6 +289,8 @@ window.RallyFlagAuth = (function(){
     auth.display_name = await fetchDisplayName(auth.access_token);
     saveAuth(auth);
     sharedRemove(RETRY_AT_KEY);
+    try { sessionStorage.removeItem(AWAITING_KEY); } catch (e) {}
+    sharedSet(HANDOFF_KEY, JSON.stringify({ auth, at: Date.now() }));
 
     // Diagnostic summary for oauth-callback.html to display — Bungie's
     // token response field names are assumed (access_token, expires_in,
@@ -354,6 +391,17 @@ window.RallyFlagAuth = (function(){
   function onChange(fn){
     listeners.push(fn);
   }
+
+  // Picked up at load (no reload needed — nothing has rendered from auth
+  // state yet), and whenever this tab comes back to the foreground or
+  // another tab writes the handoff. A later pickup reloads the page so
+  // everything renders signed in (pages read sign-in state as they load).
+  adoptHandoff();
+  function adoptAndReload(){ if (adoptHandoff()) window.location.reload(); }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") adoptAndReload(); });
+  window.addEventListener("focus", adoptAndReload);
+  window.addEventListener("pageshow", (e) => { if (e.persisted) adoptAndReload(); });
+  window.addEventListener("storage", (e) => { if (e.key === HANDOFF_KEY) adoptAndReload(); });
 
   return {
     isSignedIn,
