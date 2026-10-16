@@ -68,7 +68,7 @@
   }
   .chip:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
   .chip.on{
-    color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright);
+    color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill);
     font-weight:600;
   }
   .clear-btn{
@@ -101,7 +101,7 @@
   .artifact-caret{
     flex-shrink:0; width:18px; height:18px; margin-top:3px;
     display:flex; align-items:center; justify-content:center;
-    color:var(--accent); transition: transform 0.18s ease;
+    color:var(--accent-text); transition: transform 0.18s ease;
   }
   .artifact-caret svg{ width:11px; height:11px; }
   .artifact-card.expanded .artifact-caret{ transform:rotate(90deg); }
@@ -139,7 +139,7 @@
   .tier-block:first-of-type{ margin-top:0; padding-top:0; border-top:none; }
   .tier-label{
     font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.08em;
-    text-transform:uppercase; color:var(--accent); margin-bottom:8px;
+    text-transform:uppercase; color:var(--accent-text); margin-bottom:8px;
   }
   .tier-note{ font-size:10.5px; color:var(--text-dimmer); font-weight:400; text-transform:none; letter-spacing:0; }
   .mod-list{ margin:0; padding:0; list-style:none; }

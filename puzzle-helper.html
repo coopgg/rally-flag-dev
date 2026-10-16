@@ -31,7 +31,7 @@
     transition: all 0.15s ease; -webkit-appearance:none; appearance:none; margin:0;
   }
   .tool-chip:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
-  .tool-chip.active{ color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright); font-weight:600; }
+  .tool-chip.active{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
 
   .tool-section{ max-width:1000px; margin:0 auto; padding:0 24px 90px; }
   .tool-head{ margin-bottom:14px; }
@@ -123,10 +123,10 @@
   .rune-row-icon{ width:34px; height:34px; flex-shrink:0; border-radius:4px; overflow:hidden; background:var(--accent-dim); }
   .rune-row-icon img{ width:100%; height:100%; object-fit:contain; }
   .rune-row-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:15px; color:var(--text); flex:1; }
-  .rune-row-name b{ color:var(--accent); margin-right:6px; }
+  .rune-row-name b{ color:var(--accent-text); margin-right:6px; }
   .rune-next-btn{
     font-family:'JetBrains Mono', monospace; font-size:12px; color:#0b0700;
-    background:var(--accent-bright); border:none; border-radius:4px; padding:8px 16px;
+    background:var(--accent-fill); border:none; border-radius:4px; padding:8px 16px;
     cursor:pointer; flex-shrink:0;
   }
   .rune-row-detail{
@@ -160,7 +160,7 @@
     transition: all 0.15s ease;
   }
   .verity-subtab:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
-  .verity-subtab.active{ color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright); }
+  .verity-subtab.active{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); }
 
   .ft-panel{ max-width:900px; margin:0 auto; }
   .ft-disclosure{
@@ -178,7 +178,7 @@
   .ft-search-row input:focus{ border-color:var(--accent); }
   .ft-search-row button{
     font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:600; color:#0b0700;
-    background:var(--accent-bright); border:none; border-radius:4px; padding:0 20px;
+    background:var(--accent-fill); border:none; border-radius:4px; padding:0 20px;
     cursor:pointer; -webkit-appearance:none;
   }
   .ft-search-error{
@@ -197,7 +197,7 @@
   .ft-settings-row input{ width:14px; height:14px; accent-color:var(--accent-bright); cursor:pointer; }
   .ft-section-label{
     font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.12em;
-    color:var(--accent); text-transform:uppercase; margin:32px 0 14px; text-align:center;
+    color:var(--accent-text); text-transform:uppercase; margin:32px 0 14px; text-align:center;
   }
   .ft-player-grid{
     display:flex; flex-wrap:wrap; justify-content:center; gap:14px;
@@ -226,7 +226,7 @@
   .verity-master-label input{ width:16px; height:16px; accent-color:var(--accent-bright); cursor:pointer; }
   .verity-section-label{
     font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
-    color:var(--accent); text-transform:uppercase; margin:26px 0 12px;
+    color:var(--accent-text); text-transform:uppercase; margin:26px 0 12px;
   }
   .verity-section-label:first-child{ margin-top:0; }
   .verity-hint{ font-size:12.5px; color:var(--text-dim); margin-bottom:14px; line-height:1.5; }
@@ -310,7 +310,7 @@
   .lr-tool-wrap{ max-width:560px; margin:0 auto; }
   .lr-section-label{
     font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
-    color:var(--accent); text-transform:uppercase; margin-bottom:10px;
+    color:var(--accent-text); text-transform:uppercase; margin-bottom:10px;
   }
   .lr-reference-text{
     font-size:13.5px; color:var(--text-dim); line-height:1.65; text-align:left;
@@ -323,7 +323,7 @@
   .lr-pair-icon{ width:40px; height:40px; flex-shrink:0; }
   .lr-pair-icon img{ width:100%; height:100%; object-fit:contain; }
   .lr-pair-label{ font-family:'Oswald', sans-serif; font-weight:600; font-size:15px; color:var(--text); flex:1; }
-  .lr-pair-label b{ color:var(--accent); margin-right:8px; }
+  .lr-pair-label b{ color:var(--accent-text); margin-right:8px; }
   .lr-pair-buttons{ display:flex; gap:8px; flex-shrink:0; }
   .lr-btn{
     font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:600; color:var(--text-dim);
@@ -332,13 +332,13 @@
     -webkit-appearance:none; appearance:none;
   }
   .lr-btn:hover{ color:var(--text); border-color:rgba(255,255,255,0.25); }
-  .lr-btn.selected{ color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright); }
+  .lr-btn.selected{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); }
 
   /* ---------- Light/Dark flower wall (Root of Nightmares) ---------- */
   .ld-tool-wrap{ max-width:640px; margin:0 auto; }
   .ld-section-label{
     font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
-    color:var(--accent); text-transform:uppercase; margin-bottom:10px;
+    color:var(--accent-text); text-transform:uppercase; margin-bottom:10px;
   }
   .ld-reference-text{
     font-size:13.5px; color:var(--text-dim); line-height:1.65; text-align:left;
@@ -408,7 +408,7 @@
   .sym-group-head{ margin-top:4px; }
   .sym-group-title{
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em;
-    color:var(--accent); text-transform:uppercase; margin-bottom:4px;
+    color:var(--accent-text); text-transform:uppercase; margin-bottom:4px;
   }
   .sym-group-note{ font-size:12.5px; color:var(--text-dim); line-height:1.5; }
 

@@ -64,7 +64,7 @@
   }
   .chip:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
   .chip.on{
-    color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright);
+    color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill);
     font-weight:600;
   }
   .clear-btn{
@@ -79,7 +79,7 @@
   .build-grid{ display:flex; flex-direction:column; gap:20px; }
   .build-class-label{
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.12em;
-    color:var(--accent); text-transform:uppercase; margin:32px 0 4px;
+    color:var(--accent-text); text-transform:uppercase; margin:32px 0 4px;
     padding-bottom:8px; border-bottom:1px solid var(--panel-border);
   }
   .build-class-label:first-child{ margin-top:0; }
@@ -93,7 +93,7 @@
   .build-caret{
     flex-shrink:0; width:18px; height:18px; margin-top:2px;
     display:flex; align-items:center; justify-content:center;
-    color:var(--accent); transition: transform 0.18s ease;
+    color:var(--accent-text); transition: transform 0.18s ease;
   }
   .build-caret svg{ width:11px; height:11px; }
   .build-card.expanded .build-caret{ transform:rotate(90deg); }
@@ -125,7 +125,7 @@
 
   .loadout-label, .section-label{
     font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.1em;
-    text-transform:uppercase; color:var(--accent); margin-bottom:10px;
+    text-transform:uppercase; color:var(--accent-text); margin-bottom:10px;
   }
   .loadout-grid{
     display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr));

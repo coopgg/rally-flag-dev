@@ -10,6 +10,11 @@
   --text:#eef1f5;
   --text-dim:#8b93a1;
   --text-dimmer:#5b6270;
+  /* --accent-text: accent used as a text color. --accent-fill: solid
+     accent behind text (active pills/tabs). Both match the regular accent
+     tokens in dark mode; light mode overrides them below. */
+  --accent-text: var(--accent);
+  --accent-fill: var(--accent-bright);
 }
 
 [data-theme="solar"]{ --accent:#ff8f3f; --accent-bright:#ffd27a; --accent-dim: rgba(255,143,63,0.14); --glow: rgba(255,143,63,0.4); }
@@ -28,13 +33,17 @@
   --text-dim:#42485a;
   --text-dimmer:#767c8f;
 }
-/* accent-bright gets darkened per theme in light mode so text stays legible on a white background */
-[data-mode="light"][data-theme="solar"]{ --accent-bright:#c9600a; }
-[data-mode="light"][data-theme="void"]{ --accent-bright:#7a3fd6; }
-[data-mode="light"][data-theme="arc"]{ --accent-bright:#0d84a8; }
-[data-mode="light"][data-theme="stasis"]{ --accent-bright:#2f6fb0; }
-[data-mode="light"][data-theme="strand"]{ --accent-bright:#1f9a5a; }
-[data-mode="light"][data-theme="prismatic"]{ --accent-bright:#c23fa0; }
+/* Light mode: the bright accents are tuned for the dark background and
+   drop to ~1.5-3:1 as text on light surfaces. Text uses a darkened shade
+   per theme, checked at >=4.7:1 against the page, cards, and accent-dim
+   pills. --accent-fill keeps the lighter shade so filled chips/tabs stay
+   recognizably colored. */
+[data-mode="light"][data-theme="solar"]{     --accent-text:#994908; --accent-bright:#994908; --accent-fill:#c9600a; }
+[data-mode="light"][data-theme="void"]{      --accent-text:#733bc9; --accent-bright:#733bc9; --accent-fill:#7a3fd6; }
+[data-mode="light"][data-theme="arc"]{       --accent-text:#0b6b88; --accent-bright:#0b6b88; --accent-fill:#0d84a8; }
+[data-mode="light"][data-theme="stasis"]{    --accent-text:#2b65a1; --accent-bright:#2b65a1; --accent-fill:#2f6fb0; }
+[data-mode="light"][data-theme="strand"]{    --accent-text:#177242; --accent-bright:#177242; --accent-fill:#1f9a5a; }
+[data-mode="light"][data-theme="prismatic"]{ --accent-text:#a23485; --accent-bright:#a23485; --accent-fill:#c23fa0; }
 
 *{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
@@ -221,13 +230,13 @@ nav.site-nav{
   padding:8px 16px; border-radius:999px; transition: all 0.15s ease;
 }
 .subnav a:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
-.subnav a.active{ color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright); font-weight:700; }
+.subnav a.active{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); font-weight:700; }
 
 /* ---------- Hero (shared shape, page-specific size/copy) ---------- */
 .hero{ max-width:760px; margin:32px auto 0; padding:0 24px; text-align:center; }
 .eyebrow{
   font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.18em;
-  color:var(--accent); text-transform:uppercase; margin-bottom:18px;
+  color:var(--accent-text); text-transform:uppercase; margin-bottom:18px;
 }
 h1.title{
   font-size:clamp(34px, 6vw, 54px); line-height:1.05; font-weight:700;
@@ -238,7 +247,7 @@ h1.title{
 /* ---------- Section labels ---------- */
 .section-label{
   text-align:center; font-family:'JetBrains Mono', monospace; font-size:12px;
-  letter-spacing:0.18em; color:var(--accent); text-transform:uppercase; margin-bottom:22px;
+  letter-spacing:0.18em; color:var(--accent-text); text-transform:uppercase; margin-bottom:22px;
 }
 
 /* ---------- Reusable elevated card shape ---------- */

@@ -44,7 +44,7 @@
     background:none; border:1px solid var(--panel-border); color:var(--text-dimmer);
   }
   .weapon-unlock-badge.exact-roll{
-    background:var(--accent-bright); color:#0b0700;
+    background:var(--accent-fill); color:#0b0700;
   }
   .weapon-unlock-rating{
     font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dimmer);
@@ -71,7 +71,7 @@
   .weapon-caret{
     flex-shrink:0; width:18px; height:18px; margin-top:19px;
     display:flex; align-items:center; justify-content:center;
-    color:var(--accent); transition: transform 0.18s ease;
+    color:var(--accent-text); transition: transform 0.18s ease;
   }
   .weapon-caret svg{ width:11px; height:11px; }
   .weapon-card.expanded .weapon-caret{ transform:rotate(90deg); }
@@ -99,7 +99,7 @@
     padding:5px 12px; cursor:pointer; margin-top:10px; transition: all 0.15s ease;
   }
   .alt-roll-btn:hover{ color:var(--accent-bright); border-color:var(--accent); }
-  .alt-roll-btn.showing-alt{ color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright); }
+  .alt-roll-btn.showing-alt{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); }
   .element-badge{
     width:18px; height:18px; border-radius:50%; flex-shrink:0;
     background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center;
@@ -118,7 +118,7 @@
   .perk-section{ margin-top:16px; padding-top:16px; border-top:1px solid var(--panel-border); }
   .perk-section-label{
     font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.08em;
-    text-transform:uppercase; color:var(--accent); margin-bottom:10px;
+    text-transform:uppercase; color:var(--accent-text); margin-bottom:10px;
   }
   .perk-grid{ display:flex; flex-wrap:wrap; gap:8px; }
   .perk-chip{
@@ -140,7 +140,7 @@
   .pairing-section{ margin-top:16px; padding-top:16px; border-top:1px solid var(--panel-border); }
   .pairing-label{
     font-family:'JetBrains Mono', monospace; font-size:10px; letter-spacing:0.08em;
-    text-transform:uppercase; color:var(--accent); margin-bottom:8px;
+    text-transform:uppercase; color:var(--accent-text); margin-bottom:8px;
   }
   .pairing-note{ font-size:13px; color:var(--text-dim); line-height:1.55; }
   .pairing-armor-link{
@@ -206,7 +206,7 @@
     transition: all 0.15s ease; user-select:none;
   }
   .chip:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
-  .chip.on{ color:#0b0700; background:var(--accent-bright); border-color:var(--accent-bright); font-weight:600; }
+  .chip.on{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
   .clear-btn{
     font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer);
     background:none; border:none; cursor:pointer; text-decoration:underline;
