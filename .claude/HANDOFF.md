@@ -33,14 +33,16 @@ the `.claude` / `skills-lock.json` / `.gitignore` excludes).
 5. Done — see table above.
 6. Done — see table above.
 7. Done — see table above.
-8. **Design direction — next; owner decision, not a bug.** The taste inspector
-   fails every page on monospace labels, eyebrow labels, card shadows,
-   outlines, hairlines, three typefaces, no motion, no pictures, no focal
-   point. Options: keep the HUD look (mark those rules allowed), or restyle
-   toward a `typeui-*` direction (closest: cosmic, fantasy, futuristic, mono)
-   — offer 2–3 side-by-side mock-ups first. Strongest single idea from the
-   critique: Bungie's API serves official art for every raid/dungeon/weapon;
-   the site currently shows zero pictures.
+8. **Design direction — mock-ups on dev (`7d1bec3`), waiting for the owner's pick.**
+   `design-preview.html` (dev-only, never promote) shows this week's
+   featured raid, the featured strip, the raid list and one encounter in
+   three switchable directions (`#hud`, `#cosmic`, `#fantasy`):
+   A **HUD refined** — current fonts/themes/light mode + official activity
+   art (pgcrImage from the manifest; map is in the page), one focal point,
+   hover motion. B **Cosmic** and C **Fantasy** — full restyles from the
+   typeui briefs, fixed palette, dark only. Pantheon has no official art
+   (initials fallback). Once the owner picks, roll it out page by page on
+   dev, moving the art map into `raids-data.js` / `dungeons-data.js`.
 
 ## Workflow the owner expects
 
