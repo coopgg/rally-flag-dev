@@ -2,6 +2,8 @@
 # with every session (see .claude/skills/ and skills-lock.json).
 .claude/*
 !.claude/skills/
+!.claude/CLAUDE.md
+!.claude/HANDOFF.md
 .taste-skill/
 
 discord-bot/node_modules/
