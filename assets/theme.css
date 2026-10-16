@@ -9,7 +9,7 @@
   --panel-border: rgba(255,255,255,0.09);
   --text:#eef1f5;
   --text-dim:#8b93a1;
-  --text-dimmer:#5b6270;
+  --text-dimmer:#7a8395; /* >=4.6:1 on page, cards, nested cards */
   /* --accent-text: accent used as a text color. --accent-fill: solid
      accent behind text (active pills/tabs). Both match the regular accent
      tokens in dark mode; light mode overrides them below. */
@@ -36,7 +36,7 @@
   --panel-border: rgba(0,0,0,0.12);
   --text:#15171c;
   --text-dim:#42485a;
-  --text-dimmer:#767c8f;
+  --text-dimmer:#5e6373; /* >=4.6:1 on page, cards, nested cards */
 }
 /* Light mode: the bright accents are tuned for the dark background and
    drop to ~1.5-3:1 as text on light surfaces. Text uses a darkened shade
@@ -83,7 +83,7 @@ nav.site-nav{
 .brand{
   display:flex; align-items:center; gap:10px;
   font-family:'Oswald', sans-serif; font-weight:600; letter-spacing:0.04em;
-  font-size:15px; text-decoration:none;
+  font-size:15px; text-decoration:none; min-height:24px;
 }
 .brand-mark{
   width:10px; height:10px; background:var(--accent);
@@ -197,7 +197,7 @@ nav.site-nav{
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
 }
 .nav-auth-signout{
-  font-family:'JetBrains Mono', monospace; font-size:10.5px; color:var(--text-dimmer);
+  font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dimmer);
   background:none; border:none; cursor:pointer; padding:0; flex-shrink:0;
 }
 .nav-auth-signout:hover{ color:var(--accent-bright); }

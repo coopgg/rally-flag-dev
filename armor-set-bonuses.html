@@ -33,8 +33,8 @@
   .mixer-slots{ display:flex; flex-wrap:wrap; gap:16px; margin-bottom:18px; }
   .mixer-slot{ flex:1 1 260px; min-width:240px; }
   .mixer-slot-label{
-    font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.08em;
-    color:var(--text-dimmer); text-transform:uppercase; margin-bottom:8px;
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
+    display:block; color:var(--text-dimmer); text-transform:uppercase; margin-bottom:8px;
   }
   .mixer-select{
     width:100%; background:var(--panel); border:1px solid var(--panel-border);
@@ -66,7 +66,7 @@
     margin-top:14px; padding-top:14px; border-top:1px solid var(--panel-border);
   }
   .mixer-keywords-label{
-    font-family:'JetBrains Mono', monospace; font-size:10.5px; letter-spacing:0.08em;
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
     color:var(--accent-text); text-transform:uppercase; margin-bottom:8px;
   }
   .mixer-keyword-row{ font-size:12.5px; color:var(--text-dim); line-height:1.5; margin-bottom:6px; }
@@ -76,7 +76,7 @@
 
   .mixer-suggestions-card{ margin-top:16px; padding:22px 26px; }
   .mixer-suggestions-summary{
-    display:flex; align-items:center; justify-content:space-between;
+    display:flex; align-items:center; justify-content:space-between; min-height:24px;
     cursor:pointer; list-style:none; user-select:none;
   }
   .mixer-suggestions-summary::-webkit-details-marker{ display:none; }
@@ -163,7 +163,7 @@
   }
   .clear-btn{
     font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer);
-    background:none; border:none; cursor:pointer; text-decoration:underline;
+    background:none; border:none; cursor:pointer; min-height:24px; padding:4px 6px; text-decoration:underline;
     text-underline-offset:2px; margin-left:auto;
   }
   .clear-btn:hover{ color:var(--accent-bright); }
@@ -212,7 +212,7 @@
   .perk-badge{
     flex-shrink:0; width:22px; height:22px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
-    font-family:'JetBrains Mono', monospace; font-size:10px; font-weight:700;
+    font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700;
     background:#68a0b7; color:#fff; border:2px solid #fff;
     margin-top:2px; overflow:hidden;
   }
@@ -225,7 +225,7 @@
     margin-top:14px; padding-top:14px; border-top:1px solid var(--panel-border);
     display:flex; flex-wrap:wrap; gap:6px; align-items:center;
   }
-  .pairs-label{ font-family:'JetBrains Mono', monospace; font-size:10px; color:var(--text-dimmer); text-transform:uppercase; letter-spacing:0.08em; margin-right:4px; }
+  .pairs-label{ font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dimmer); text-transform:uppercase; letter-spacing:0.08em; margin-right:4px; }
   .pair-tag{
     font-size:11px; font-family:'JetBrains Mono', monospace; color:var(--accent-bright);
     background:var(--accent-dim); border:1px solid var(--panel-border);
@@ -294,11 +294,11 @@
     <div class="mixer-sub">Pick two 2-piece bonuses from different sets (4 of your 5 armor slots) to see them side by side, plus any keyword overlap between them.</div>
     <div class="mixer-slots">
       <div class="mixer-slot">
-        <div class="mixer-slot-label">Piece 1</div>
+        <label class="mixer-slot-label" for="mixer-slot-1">Piece 1</label>
         <select class="mixer-select" id="mixer-slot-1"></select>
       </div>
       <div class="mixer-slot">
-        <div class="mixer-slot-label">Piece 2</div>
+        <label class="mixer-slot-label" for="mixer-slot-2">Piece 2</label>
         <select class="mixer-select" id="mixer-slot-2"></select>
         <div class="mixer-slot-note" id="mixer-slot-2-note"></div>
       </div>
