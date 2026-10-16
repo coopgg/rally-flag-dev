@@ -66,10 +66,13 @@
   .unlock-legend .weapon-unlock-badge{ flex-shrink:0; }
 
   section{ max-width:1000px; margin:40px auto 0; padding:0 24px 90px; }
+  /* Same width as the filter area above (was a ~700px centered column of
+     two 340px cards); align-items:start so a collapsed card isn't
+     stretched to match an expanded neighbor. */
   .weapon-grid{
-    display:flex; flex-wrap:wrap; justify-content:center; gap:16px;
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:16px; align-items:start;
   }
-  .weapon-card{ flex:0 1 340px; padding:24px; }
+  .weapon-card{ padding:24px; min-width:0; }
   .weapon-head{
     display:flex; gap:16px; align-items:flex-start; margin-bottom:16px;
     cursor:pointer; user-select:none;
@@ -83,6 +86,8 @@
   .weapon-card.expanded .weapon-caret{ transform:rotate(90deg); }
   .weapon-body{ display:none; }
   .weapon-card.expanded .weapon-body{ display:block; }
+  /* Collapsed cards: no gap reserved for the hidden body below the head. */
+  .weapon-card:not(.expanded) .weapon-head{ margin-bottom:0; }
   .weapon-icon{
     position:relative; flex-shrink:0; width:56px; height:56px;
     display:flex; align-items:center; justify-content:center;
@@ -119,6 +124,7 @@
   .ammo-badge img{ width:12px; height:12px; object-fit:contain; }
   .weapon-meta{ font-size:11.5px; font-family:'JetBrains Mono', monospace; color:var(--text-dimmer); }
   .weapon-unlock-row{ margin-top:8px; min-height:20px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
+  .weapon-unlock-row:empty{ display:none; } /* only filled when signed in */
   .weapon-flavor{ font-size:12.5px; color:var(--text-dim); font-style:italic; margin-top:8px; line-height:1.5; }
 
   .perk-section{ margin-top:16px; padding-top:16px; border-top:1px solid var(--panel-border); }
@@ -237,8 +243,10 @@
     font-family:'JetBrains Mono', monospace; font-size:14px;
   }
   @media (max-width:640px){
-    .search-row{ flex-direction:column; align-items:stretch; }
-    .result-count{ text-align:center; }
+    /* Search box on its own row, then count and Expand all side by side. */
+    .search-row{ flex-wrap:wrap; gap:12px; }
+    .search-box{ flex:1 0 100%; }
+    .result-count{ margin-right:auto; }
     .filter-label{ min-width:100%; margin-bottom:2px; }
   }
 </style>

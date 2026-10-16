@@ -38,15 +38,25 @@
 
   .tw-collapsible{ margin:44px 0 0; }
   .tw-collapsible summary{
-    display:flex; align-items:baseline; justify-content:flex-start; gap:8px;
+    display:flex; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:8px 12px;
     margin:0 0 16px; cursor:pointer; list-style:none;
   }
   .tw-collapsible summary::-webkit-details-marker{ display:none; }
-  .tw-collapse-chevron{
-    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer);
-    transition:transform 0.15s ease;
+  /* Pill-shaped Show/Hide control: the old lone 12px chevron didn't read
+     as clickable. The whole summary row stays the click target. */
+  .tw-collapse-toggle{
+    display:inline-flex; align-items:center; gap:6px; min-height:28px;
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dim);
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:999px;
+    padding:4px 12px; transition: color 0.15s ease, border-color 0.15s ease;
   }
-  .tw-collapsible[open] .tw-collapse-chevron{ transform:rotate(90deg); }
+  .tw-collapsible summary:hover .tw-collapse-toggle,
+  .tw-collapsible summary:focus-visible .tw-collapse-toggle{ color:var(--accent-text); border-color:var(--accent); }
+  .tw-collapse-chevron{ display:inline-block; transition:transform 0.15s ease; }
+  .tw-collapsible[open] .tw-collapse-chevron{ transform:rotate(180deg); }
+  .tw-collapsible .when-open{ display:none; }
+  .tw-collapsible[open] .when-open{ display:inline; }
+  .tw-collapsible[open] .when-closed{ display:none; }
 
   .tw-status{
     text-align:center; padding:30px 20px; color:var(--text-dimmer);
@@ -138,7 +148,7 @@
   <details class="tw-collapsible">
     <summary>
       <span class="tw-section-title">Next Week<span class="tw-predicted-badge">Predicted</span></span>
-      <span class="tw-collapse-chevron">&#9656;</span>
+      <span class="tw-collapse-toggle"><span class="when-closed">Show predicted lineup</span><span class="when-open">Hide</span><span class="tw-collapse-chevron" aria-hidden="true">&#9662;</span></span>
     </summary>
     <div class="tw-subsection-label">Raids</div>
     <div id="next-week-raids-content"></div>

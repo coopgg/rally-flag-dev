@@ -199,8 +199,11 @@
   }
 
   @media (max-width:640px){
-    .search-row{ flex-direction:column; align-items:stretch; }
-    .build-count{ text-align:center; }
+    /* Search box on its own row, then count and Expand all side by side
+       (was three stacked rows with a full-width Expand all bar). */
+    .search-row{ flex-wrap:wrap; gap:12px; }
+    .search-box{ flex:1 0 100%; }
+    .build-count{ margin-right:auto; }
     .filter-label{ min-width:100%; margin-bottom:2px; }
   }
 </style>
