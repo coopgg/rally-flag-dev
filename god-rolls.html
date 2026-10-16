@@ -164,6 +164,18 @@
   .light-gg-link:hover{ color:var(--text-dim); }
 
   .load-error{ font-size:12px; color:var(--text-dimmer); font-style:italic; }
+  .live-data-notice{
+    display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:10px 14px;
+    margin:0 0 18px; padding:12px 16px; border:1px solid var(--panel-border); border-radius:10px;
+    background:var(--panel); color:var(--text-dim); font-size:13px; text-align:center;
+  }
+  .live-data-notice[hidden]{ display:none; }
+  .live-data-notice button{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--accent-text);
+    background:var(--accent-dim); border:1px solid var(--panel-border); border-radius:999px;
+    padding:6px 14px; cursor:pointer;
+  }
+  .live-data-notice button:hover, .live-data-notice button:focus-visible{ border-color:var(--accent-text); }
 
   /* ---------- Search / filter toolbar ---------- */
   .controls{ max-width:1000px; margin:40px auto 0; padding:0 24px; }
@@ -193,6 +205,7 @@
     display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 14px;
     padding:12px 0; border-top:1px solid var(--panel-border);
   }
+  .filter-row[hidden]{ display:none; }
   .filter-row:last-child{ border-bottom:1px solid var(--panel-border); margin-bottom:30px; }
   .filter-label{
     font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.1em;
@@ -246,6 +259,10 @@
 </div>
 
 <div class="controls">
+  <div class="live-data-notice" id="live-data-notice" role="status" hidden>
+    <span>Bungie's API didn't respond, so some weapon details and perk names couldn't load. Our notes and pairings below are still available.</span>
+    <button type="button" id="live-data-retry">Try again</button>
+  </div>
   <div class="search-row">
     <div class="search-box">
       <input type="text" id="search-input" placeholder="Search weapons or perks…" autocomplete="off">
@@ -561,8 +578,11 @@
     if (btn) btn.textContent = anyCollapsed ? "Expand all" : "Collapse all";
   }
 
+  // Returns false if any live lookup for this weapon failed, so render()
+  // can show one page-level notice instead of per-card error text.
   async function hydrateWeapon(weapon, roll){
     roll = roll || { itemHash: weapon.itemHash, perkHashes: weapon.perkHashes };
+    let ok = true;
     const card = document.getElementById("weapon-" + weapon.slug);
 
     const lightGgEl = document.getElementById("lightgg-" + weapon.slug);
@@ -645,7 +665,8 @@
       }
     } catch (err){
       console.warn("Weapon fetch failed for " + weapon.name + ":", err.message);
-      document.getElementById("meta-" + weapon.slug).innerHTML = '<span class="load-error">Live data unavailable, check console</span>';
+      document.getElementById("meta-" + weapon.slug).innerHTML = '<span class="load-error">Details unavailable right now</span>';
+      ok = false;
     }
 
     // Perks, fetched independently so one bad hash doesn't hide the rest
@@ -660,9 +681,11 @@
         '</div>';
       }
       console.warn("Perk fetch failed for " + weapon.name + " (hash " + roll.perkHashes[i] + "):", r.reason.message);
-      return '<div class="perk-chip"><div class="perk-chip-name">Hash ' + roll.perkHashes[i] + ' failed, check console</div></div>';
+      ok = false;
+      return '<div class="perk-chip"><div class="perk-chip-icon">?</div><div class="perk-chip-name">Perk name unavailable</div></div>';
     }).join("");
     perksEl.innerHTML = chipsHtml;
+    return ok;
   }
 
   function wireAltRollToggle(weapon){
@@ -694,11 +717,13 @@
       return { unlockedHashes: new Set(), instancesByHash: new Map(), socketsByInstanceId: {}, reusablePlugsByInstanceId: {} };
     }) : null;
 
+    // Every card and the static filters (search, playstyle, builds) come
+    // straight from god-rolls-data.js, so show them immediately. Only the
+    // icons/perks and the ammo/type/affinity chips wait on Bungie's API.
     const grid = document.getElementById("weapon-grid");
     grid.innerHTML = "";
     for (const weapon of window.GodRollsData.WEAPONS){
       grid.appendChild(renderShell(weapon));
-      await hydrateWeapon(weapon); // one weapon (and its perks) at a time, not all at once
       wireAltRollToggle(weapon);
     }
     initFilters();
@@ -710,13 +735,43 @@
       cards.forEach(c => c.classList.toggle("expanded", anyCollapsed));
       updateExpandAllLabel();
     });
+    document.getElementById("live-data-retry").addEventListener("click", hydrateAll);
+
+    await hydrateAll();
+  }
+
+  // A few weapons at a time (each one is ~7 API calls: the weapon, its
+  // element, and its perks) rather than strictly one-by-one, which took
+  // 30+ seconds for the full list, or all at once, which would fire
+  // 200+ simultaneous requests at Bungie.
+  const HYDRATE_CONCURRENCY = 3;
+  let hydrating = false;
+
+  async function hydrateAll(){
+    if (hydrating) return;
+    hydrating = true;
+    const notice = document.getElementById("live-data-notice");
+    notice.hidden = true;
+    let anyFailed = false;
+    const queue = window.GodRollsData.WEAPONS.slice();
+    async function worker(){
+      while (queue.length){
+        const weapon = queue.shift();
+        const ok = await hydrateWeapon(weapon);
+        if (!ok) anyFailed = true;
+        refreshLiveFilters(false);
+      }
+    }
+    await Promise.all(Array.from({ length: HYDRATE_CONCURRENCY }, worker));
+    refreshLiveFilters(true);
+    notice.hidden = !anyFailed;
+    hydrating = false;
   }
 
   // ---------------------------------------------------------------
-  // Filtering: ammo/type/element come from live-fetched data, so
-  // these chip groups are only built after every weapon has finished
-  // loading. Build tags are static (from god-rolls-data.js) and are
-  // available immediately, but built here too for one consistent pass.
+  // Filtering: playstyle/build tags are static (god-rolls-data.js) and
+  // built once up front. Ammo/type/element come from live-fetched data,
+  // so refreshLiveFilters() rebuilds those rows as each weapon loads.
   // ---------------------------------------------------------------
   const filterState = { search: "", ammo: new Set(), type: new Set(), element: new Set(), build: new Set(), buildRef: new Set() };
 
@@ -733,6 +788,7 @@
       const chip = document.createElement("div");
       chip.className = "chip";
       chip.textContent = labelFor ? labelFor(value) : value;
+      if (stateSet.has(value)) chip.classList.add("on");
       chip.addEventListener("click", () => {
         if (stateSet.has(value)) stateSet.delete(value); else stateSet.add(value);
         chip.classList.toggle("on");
@@ -742,19 +798,35 @@
     });
   }
 
-  function initFilters(){
+  const LIVE_FILTERS = [
+    { containerId: "ammo-chips", key: "ammo" },
+    { containerId: "type-chips", key: "type" },
+    { containerId: "element-chips", key: "element" }
+  ];
+
+  // done=false while weapons are still loading: an empty row shows
+  // "Loading…". done=true: a row that's still empty (Bungie's API was
+  // down) is hidden instead of sitting there as a bare label.
+  function refreshLiveFilters(done){
     const cards = Array.from(document.querySelectorAll(".weapon-card"));
-    const ammoValues = [...new Set(cards.map(c => c.dataset.ammo).filter(Boolean))].sort();
-    const typeValues = [...new Set(cards.map(c => c.dataset.type).filter(Boolean))].sort();
-    const elementValues = [...new Set(cards.map(c => c.dataset.element).filter(Boolean))].sort();
+    for (const { containerId, key } of LIVE_FILTERS){
+      const values = [...new Set(cards.map(c => c.dataset[key]).filter(Boolean))].sort();
+      const container = document.getElementById(containerId);
+      const row = container.closest(".filter-row");
+      row.hidden = done && !values.length;
+      if (values.length) buildChipGroup(containerId, values, filterState[key]);
+      else container.innerHTML = done ? "" : '<span class="load-error">Loading\u2026</span>';
+    }
+    applyFilters();
+  }
+
+  function initFilters(){
     const allBuildTags = [...new Set(window.GodRollsData.WEAPONS.flatMap(w => w.buildTags || []))];
     const buildValues = allBuildTags.filter(t => !isBuildSlug(t)).sort();
     const buildRefValues = allBuildTags.filter(isBuildSlug)
       .sort((a, b) => BUILD_TITLES.get(a).localeCompare(BUILD_TITLES.get(b)));
 
-    buildChipGroup("ammo-chips", ammoValues, filterState.ammo);
-    buildChipGroup("type-chips", typeValues, filterState.type);
-    buildChipGroup("element-chips", elementValues, filterState.element);
+    refreshLiveFilters(false);
     buildChipGroup("build-chips", buildValues, filterState.build);
     buildChipGroup("buildref-chips", buildRefValues, filterState.buildRef, slug => BUILD_TITLES.get(slug));
 
