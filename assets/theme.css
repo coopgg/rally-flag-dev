@@ -96,7 +96,7 @@ nav.site-nav{
 .nav-links-panel a:hover, .nav-links-panel a:focus-visible{ background:var(--panel); color:var(--text); }
 .nav-links-panel a.active{ color:var(--accent-bright); font-weight:600; }
 
-.nav-right-wrap{ display:flex; align-items:center; gap:10px; }
+.nav-right-wrap{ display:flex; align-items:center; gap:10px; margin-left:auto; }
 .nav-icon-btn{
   display:flex; align-items:center; justify-content:center;
   background:none; border:1px solid var(--panel-border); border-radius:6px;
@@ -123,7 +123,7 @@ nav.site-nav{
 
 .nav-menu-panel{
   position:absolute; top:calc(100% + 10px); right:0; z-index:50;
-  width:220px; padding:16px;
+  width:220px; max-width:calc(100vw - 32px); padding:16px;
   background:var(--bg); border:1px solid var(--panel-border); border-radius:10px;
   box-shadow: 0 12px 40px -12px rgba(0,0,0,0.5);
   display:none;
@@ -266,5 +266,13 @@ footer{
 footer a{ color:var(--text-dim); text-decoration:underline; text-underline-offset:2px; }
 footer p{ max-width:560px; margin:10px auto 0; }
 
+/* ---------- Phone widths ---------- */
 @media (max-width:640px){
+  /* Tighter spacing so the brand and the right-hand buttons fit on
+     one row at common phone widths. If the nav still wraps (very narrow
+     screens), .nav-right-wrap's margin-left:auto keeps it pinned right,
+     so the right-anchored Appearance panel opens inward instead of
+     running off the left edge of the screen. */
+  nav.site-nav{ padding:20px 24px; gap:8px; }
+  .nav-links-wrap, .nav-right-wrap{ gap:8px; }
 }
