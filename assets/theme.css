@@ -223,10 +223,11 @@ main:focus{ outline:none; }
 /* Load-time layout shift guard. Most pages fill their content from script
    at the end of <body>, and the browser can paint once before that runs,
    so content jumped as lists, chips and cards arrived. Each page's <head>
-   script sets .rf-boot and clears it one frame after DOMContentLoaded
-   (2.5s fallback), keeping <main> laid out but invisible until then. Set
+   script sets .rf-boot and clears it one frame after DOMContentLoaded and
+   web fonts (fonts wait capped at 400ms; 2.5s overall fallback), keeping
+   <main> and the footer below it laid out but invisible until then. Set
    by script only, so pages without JavaScript never hide anything. */
-.rf-boot main{ visibility:hidden; }
+.rf-boot main, .rf-boot footer{ visibility:hidden; }
 
 /* ---------- Keyboard focus for custom controls ----------
    Filter chips (<button class="chip">) and expandable card headers
