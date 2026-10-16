@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<script>/* GitHub Pages serves this page for any missing path, at any depth
+   (e.g. /raids/old-page), so relative asset links need the site root:
+   /rally-flag-dev/ on the dev site, / on rallyflag.gg. */(function(){var r=location.pathname.indexOf("/rally-flag-dev/")===0?"/rally-flag-dev/":"/";document.write('<base href="'+r+'">');})();</script>
+<link rel="icon" href="favicon.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* Apply the saved theme + mode before first paint; nav.js does the rest. Keep in sync with getStoredTheme/getStoredModePref/resolveMode there. */(function(){var d=document.documentElement,T=["solar","void","arc","stasis","strand","prismatic"],t=null,p=null,o=null;try{t=localStorage.getItem("rallyflag_theme");if(T.indexOf(t)<0){t=T[Math.floor(Math.random()*T.length)];localStorage.setItem("rallyflag_theme",t);}p=localStorage.getItem("rallyflag_mode_pref");o=localStorage.getItem("rallyflag_mode");}catch(e){}if(T.indexOf(t)<0)t=T[Math.floor(Math.random()*T.length)];if(p!=="light"&&p!=="dark")p=o==="light"?"light":(window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");d.setAttribute("data-theme",t);d.setAttribute("data-mode",p);d.classList.add("rf-boot");var u=function(){d.classList.remove("rf-boot")};document.addEventListener("DOMContentLoaded",function(){Promise.race([document.fonts?document.fonts.ready:0,new Promise(function(r){setTimeout(r,400)})]).then(function(){requestAnimationFrame(u)})});setTimeout(u,2500);})();</script>
+<title>Page not found - Rally Flag</title>
+<meta name="robots" content="noindex">
+<meta name="description" content="That page doesn't exist on Rally Flag. Find raid and dungeon guides, god rolls, builds and live trackers from here.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<script>/* Written from script so the browser's preloader resolves it against <base>, not the missing path. */document.write('<link rel="stylesheet" href="assets/theme.css">');</script>
+<noscript><link rel="stylesheet" href="/assets/theme.css"></noscript>
+<style>
+  .hero{ margin-top:72px; }
+  .nf-path{ font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--text-dim); word-break:break-all; margin-top:14px; }
+  .nf-links{ max-width:640px; margin:40px auto 0; padding:0 24px 90px; text-align:center; }
+  .nf-links .subnav{ margin-top:16px; }
+  .nf-home{
+    display:inline-block; margin-top:28px; padding:12px 24px; border-radius:999px;
+    background:var(--accent-fill); color:var(--on-accent); font-weight:600; text-decoration:none;
+  }
+  .nf-home:hover, .nf-home:focus-visible{ filter:brightness(1.1); }
+  .nf-home:focus-visible{ outline:2px solid var(--text); outline-offset:3px; }
+</style>
+</head>
+<body data-nav-group="">
+
+<div id="site-nav"></div>
+
+<main id="main-content" tabindex="-1">
+
+<div class="hero">
+  <div class="eyebrow">Error 404</div>
+  <h1 class="title">Page not found</h1>
+  <p class="subtitle">There's nothing at this address. It may have moved, or the link has a typo. Everything on Rally Flag is one tap away from here.</p>
+  <p class="nf-path" id="nf-path"></p>
+</div>
+
+<div class="nf-links">
+  <div class="section-label">Popular pages</div>
+  <nav class="subnav" aria-label="Popular pages">
+    <a href="this-week.html">This Week</a>
+    <a href="raids.html">Raid Guides</a>
+    <a href="dungeons.html">Dungeon Guides</a>
+    <a href="god-rolls.html">God Rolls</a>
+    <a href="builds.html">Builds</a>
+    <a href="vendors.html">Vendors</a>
+  </nav>
+  <a class="nf-home" href="index.html">Back to the homepage</a>
+</div>
+
+</main>
+
+<footer>
+  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
+</footer>
+
+<script>document.write('<script src="assets/nav.js"><\/script>');</script>
+<script>
+  // Show which address failed, so a mistyped link is easy to spot.
+  document.getElementById("nf-path").textContent = location.pathname + location.search;
+</script>
+</body>
+</html>

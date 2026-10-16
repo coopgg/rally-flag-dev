@@ -12,11 +12,14 @@
 <meta property="og:title" content="Raid Guide">
 <meta property="og:description" content="Destiny 2 raid guides: encounter breakdowns, armor set bonuses, and puzzle solvers for every raid.">
 <meta property="og:url" content="https://rallyflag.gg/raid-guide.html">
-<meta property="og:image" content="https://rallyflag.gg/assets/icon-512.png">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="https://rallyflag.gg/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Rally Flag: Destiny 2 raid and dungeon guides, weapon god rolls, builds and live trackers">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Raid Guide">
 <meta name="twitter:description" content="Destiny 2 raid guides: encounter breakdowns, armor set bonuses, and puzzle solvers for every raid.">
-<meta name="twitter:image" content="https://rallyflag.gg/assets/icon-512.png">
+<meta name="twitter:image" content="https://rallyflag.gg/assets/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -200,6 +203,11 @@
   setMeta('meta[property="og:title"]', "content", raid.name);
   setMeta('meta[property="og:description"]', "content", raidDesc);
   setMeta('meta[property="og:url"]', "content", "https://rallyflag.gg/raid-guide.html?slug=" + raid.slug);
+  // No static canonical on this page: one shared URL for every raid would
+  // tell search engines all guides are the same page. Set per raid instead.
+  let canonical = document.querySelector('link[rel="canonical"]');
+  if (!canonical){ canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.appendChild(canonical); }
+  canonical.href = "https://rallyflag.gg/raid-guide.html?slug=" + raid.slug;
   setMeta('meta[name="twitter:title"]', "content", raid.name);
   setMeta('meta[name="twitter:description"]', "content", raidDesc);
 
