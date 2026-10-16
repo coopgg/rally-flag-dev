@@ -28,31 +28,36 @@
 <style>
   section{ max-width:760px; margin:44px auto 0; padding:0 24px 90px; }
   .block{ padding:26px 28px; margin-bottom:16px; }
+  /* Phones: less side padding so 16px guide text keeps a usable line length. */
+  @media (max-width:560px){
+    section{ padding-left:16px; padding-right:16px; }
+    .block{ padding:22px 18px; }
+  }
   .block-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.14em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.14em;
     color:var(--accent-text); text-transform:uppercase; margin-bottom:14px;
   }
   .block-empty{ font-size:14px; color:var(--text-dimmer); font-style:italic; }
-  .block p{ font-size:14px; color:var(--text-dim); line-height:1.6; }
+  .block p{ font-size:16px; max-width:62ch; color:var(--text-dim); line-height:1.6; }
 
   .encounter-block{ padding:18px 0; border-top:1px solid var(--panel-border); }
   .encounter-block:first-child{ border-top:none; padding-top:0; }
   .encounter-head{ display:flex; align-items:center; gap:12px; margin-bottom:12px; }
   .encounter-title{ font-family:'Oswald', sans-serif; font-weight:600; font-size:16px; color:var(--text); }
-  .encounter-field{ margin-bottom:10px; font-size:13.5px; color:var(--text-dim); line-height:1.55; }
+  .encounter-field{ margin-bottom:10px; font-size:16px; max-width:62ch; color:var(--text-dim); line-height:1.55; }
   .encounter-field-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em;
     color:var(--accent-text); text-transform:uppercase; margin-right:6px;
   }
   .encounter-steps{ margin:8px 0 12px; padding-left:20px; }
-  .encounter-steps li{ font-size:13.5px; color:var(--text-dim); line-height:1.55; margin-bottom:6px; }
+  .encounter-steps li{ font-size:16px; max-width:62ch; color:var(--text-dim); line-height:1.55; margin-bottom:6px; }
   .encounter-wipe{
     margin-top:12px; padding:12px 14px;
     background:var(--accent-dim); border-left:3px solid var(--accent);
-    font-size:13px; color:var(--text-dim); line-height:1.55;
+    font-size:15px; color:var(--text-dim); line-height:1.55;
   }
   .encounter-wipe-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em;
     color:var(--accent-bright); text-transform:uppercase; display:block; margin-bottom:4px;
   }
 
@@ -64,7 +69,7 @@
     flex-shrink:0; width:26px; height:26px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
     background:var(--accent-dim); color:var(--accent-bright); border:1px solid var(--panel-border);
-    font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700;
+    font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:700;
   }
   .encounter-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:14px; color:var(--text); margin-bottom:4px; }
   .encounter-notes{ font-size:13px; color:var(--text-dim); }

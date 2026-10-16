@@ -28,19 +28,24 @@
 <style>
   section{ max-width:760px; margin:44px auto 0; padding:0 24px 90px; }
   .block{ padding:26px 28px; margin-bottom:16px; }
+  /* Phones: less side padding so 16px guide text keeps a usable line length. */
+  @media (max-width:560px){
+    section{ padding-left:16px; padding-right:16px; }
+    .block{ padding:22px 18px; }
+  }
   .block-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.14em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.14em;
     color:var(--accent-text); text-transform:uppercase; margin-bottom:14px;
   }
   .block-empty{ font-size:14px; color:var(--text-dimmer); font-style:italic; }
   .raid-difficulty{ font-size:12px; font-family:'JetBrains Mono', monospace; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); margin-top:-4px; margin-bottom:4px; }
-  .block p{ font-size:14px; color:var(--text-dim); line-height:1.6; }
+  .block p{ font-size:16px; max-width:62ch; color:var(--text-dim); line-height:1.6; }
 
   .block-label-row{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
   .block-label-row .block-label{ margin-bottom:0; }
   .difficulty-toggle{ display:flex; gap:6px; }
   .difficulty-toggle-btn{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.06em; text-transform:uppercase;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.06em; text-transform:uppercase;
     color:var(--text-dim); background:none; border:1px solid var(--panel-border); cursor:pointer;
     padding:6px 14px; border-radius:999px; transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   }
@@ -51,29 +56,29 @@
   .encounter-block:first-child{ border-top:none; padding-top:0; }
   .encounter-head{ display:flex; align-items:center; gap:12px; margin-bottom:12px; }
   .encounter-title{ font-family:'Oswald', sans-serif; font-weight:600; font-size:16px; color:var(--text); }
-  .encounter-field{ margin-bottom:10px; font-size:13.5px; color:var(--text-dim); line-height:1.55; }
+  .encounter-field{ margin-bottom:10px; font-size:16px; max-width:62ch; color:var(--text-dim); line-height:1.55; }
   .encounter-field-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em;
     color:var(--accent-text); text-transform:uppercase; margin-right:6px;
   }
   .encounter-steps{ margin:8px 0 12px; padding-left:20px; }
-  .encounter-steps li{ font-size:13.5px; color:var(--text-dim); line-height:1.55; margin-bottom:6px; }
+  .encounter-steps li{ font-size:16px; max-width:62ch; color:var(--text-dim); line-height:1.55; margin-bottom:6px; }
   .encounter-wipe{
     margin-top:12px; padding:12px 14px;
     background:var(--accent-dim); border-left:3px solid var(--accent);
-    font-size:13px; color:var(--text-dim); line-height:1.55;
+    font-size:15px; color:var(--text-dim); line-height:1.55;
   }
   .encounter-wipe-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em;
     color:var(--accent-bright); text-transform:uppercase; display:block; margin-bottom:4px;
   }
   .encounter-master, .raid-master-note{
     margin-top:12px; padding:12px 14px;
     background:var(--panel); border-left:3px solid var(--text-dimmer);
-    font-size:13px; color:var(--text-dim); line-height:1.55;
+    font-size:15px; color:var(--text-dim); line-height:1.55;
   }
   .encounter-master-label, .raid-master-note-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em;
     color:var(--text); text-transform:uppercase; display:block; margin-bottom:4px;
   }
   em.term-buff{ font-style:italic; color:#7fd8a8; }
@@ -85,7 +90,7 @@
   .encounter-advanced{ margin-top:12px; }
   .encounter-advanced-toggle{
     display:inline-flex; align-items:center; gap:6px; cursor:pointer; user-select:none;
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.06em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.06em;
     color:var(--text-dim); background:none; border:1px dashed var(--panel-border);
     padding:6px 12px; border-radius:999px; text-transform:uppercase;
     transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
@@ -95,16 +100,16 @@
   .encounter-advanced.open .encounter-advanced-toggle .caret{ transform:rotate(90deg); }
   .encounter-advanced-body{ display:none; margin-top:10px; padding:12px 14px; background:var(--panel); border-left:3px solid var(--text-dimmer); }
   .encounter-advanced.open .encounter-advanced-body{ display:block; }
-  .encounter-advanced-body p{ font-size:13px; color:var(--text-dim); line-height:1.55; margin:0 0 8px; }
+  .encounter-advanced-body p{ font-size:15px; max-width:62ch; color:var(--text-dim); line-height:1.55; margin:0 0 8px; }
   .encounter-advanced-body p:last-child{ margin-bottom:0; }
   .encounter-map-credit{
-    margin-top:6px; font-size:11.5px; font-family:'JetBrains Mono', monospace;
+    margin-top:6px; font-size:12px; font-family:'JetBrains Mono', monospace;
     color:var(--text-dimmer);
   }
   .encounter-map-credit a{ color:var(--text-dim); }
   .encounter-map-credit a:hover{ color:var(--accent-bright); }
   .encounter-map-label{
-    margin-top:6px; font-size:11.5px; font-family:'JetBrains Mono', monospace;
+    margin-top:6px; font-size:12px; font-family:'JetBrains Mono', monospace;
     color:var(--accent-text); text-transform:uppercase; letter-spacing:0.06em;
   }
 
@@ -127,7 +132,7 @@
     flex-shrink:0; width:26px; height:26px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
     background:var(--accent-dim); color:var(--accent-bright); border:1px solid var(--panel-border);
-    font-family:'JetBrains Mono', monospace; font-size:11px; font-weight:700;
+    font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:700;
   }
   .encounter-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:14px; color:var(--text); margin-bottom:4px; }
   .encounter-notes{ font-size:13px; color:var(--text-dim); }

@@ -30,7 +30,7 @@
 <style>
   .disclosure{
     max-width:720px; margin:32px auto 0; padding:16px 20px;
-    font-size:13px; color:var(--text-dim); line-height:1.6;
+    font-size:14px; color:var(--text-dim); line-height:1.6;
     text-align:center;
   }
   .disclosure strong{ color:var(--accent-bright); }
@@ -43,7 +43,7 @@
   .owned-auth-row a:hover{ text-decoration:underline; }
   .owned-auth-row .signed-in-text{ color:var(--text-dimmer); }
   .weapon-unlock-badge{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.04em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.04em;
     text-transform:uppercase; padding:3px 8px; border-radius:999px;
     background:var(--accent-fill-deep); color:var(--on-accent);
   }
@@ -59,7 +59,7 @@
     background:var(--accent-fill); color:var(--on-accent);
   }
   .weapon-unlock-rating{
-    font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dimmer);
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer);
   }
   .unlock-legend{
     max-width:1000px; margin:14px auto 0; padding:0 24px;
@@ -111,7 +111,7 @@
   .weapon-name.tier-legendary{ color:#a892d1; }
   .weapon-badges{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
   .alt-roll-btn{
-    font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dim);
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dim);
     background:var(--panel); border:1px solid var(--panel-border); border-radius:999px;
     padding:5px 12px; cursor:pointer; margin-top:10px; transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease, opacity 0.15s ease;
   }
@@ -128,14 +128,14 @@
     background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center;
   }
   .ammo-badge img{ width:12px; height:12px; object-fit:contain; }
-  .weapon-meta{ font-size:11.5px; font-family:'JetBrains Mono', monospace; color:var(--text-dimmer); }
+  .weapon-meta{ font-size:12px; font-family:'JetBrains Mono', monospace; color:var(--text-dimmer); }
   .weapon-unlock-row{ margin-top:8px; min-height:20px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
   .weapon-unlock-row:empty{ display:none; } /* only filled when signed in */
-  .weapon-flavor{ font-size:12.5px; color:var(--text-dim); font-style:italic; margin-top:8px; line-height:1.5; }
+  .weapon-flavor{ font-size:14px; color:var(--text-dim); font-style:italic; margin-top:8px; line-height:1.5; }
 
   .perk-section{ margin-top:16px; padding-top:16px; border-top:1px solid var(--panel-border); }
   .perk-section-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em;
     text-transform:uppercase; color:var(--accent-text); margin-bottom:10px;
   }
   .perk-grid{ display:flex; flex-wrap:wrap; gap:8px; }
@@ -148,19 +148,19 @@
     width:22px; height:22px; border-radius:50%; overflow:hidden;
     background:rgba(0,0,0,0.55); flex-shrink:0;
     display:flex; align-items:center; justify-content:center;
-    font-family:'JetBrains Mono', monospace; font-size:11px; color:#fff;
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:#fff;
   }
   .perk-chip-icon img{ width:100%; height:100%; object-fit:cover; }
   .perk-chip-name{ font-size:12px; font-family:'Inter', sans-serif; font-weight:500; color:var(--accent-bright); }
 
-  .weapon-note{ margin-top:14px; font-size:13px; color:var(--text-dim); line-height:1.55; }
+  .weapon-note{ margin-top:14px; font-size:15px; max-width:62ch; color:var(--text-dim); line-height:1.55; }
 
   .pairing-section{ margin-top:16px; padding-top:16px; border-top:1px solid var(--panel-border); }
   .pairing-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.08em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em;
     text-transform:uppercase; color:var(--accent-text); margin-bottom:8px;
   }
-  .pairing-note{ font-size:13px; color:var(--text-dim); line-height:1.55; }
+  .pairing-note{ font-size:15px; color:var(--text-dim); line-height:1.55; }
   .pairing-armor-link{
     display:inline-block; margin-top:8px; font-size:12px; font-family:'JetBrains Mono', monospace;
     color:var(--accent-bright); text-decoration:none; border-bottom:1px solid transparent;
@@ -176,7 +176,7 @@
   .cross-link:hover, .cross-link:focus-visible{ color:var(--accent-bright); border-color:var(--accent-bright); }
 
   .light-gg-link{
-    display:block; margin-top:12px; font-size:11px; font-family:'JetBrains Mono', monospace;
+    display:block; margin-top:12px; font-size:12px; font-family:'JetBrains Mono', monospace;
     color:var(--text-dimmer); text-decoration:none;
   }
   .light-gg-link:hover{ color:var(--text-dim); }
@@ -226,7 +226,7 @@
   .filter-row[hidden]{ display:none; }
   .filter-row:last-child{ border-bottom:1px solid var(--panel-border); margin-bottom:30px; }
   .filter-label{
-    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.1em;
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
     color:var(--text-dimmer); text-transform:uppercase; min-width:78px;
   }
   .chip-group{ display:flex; flex-wrap:wrap; gap:8px; }
