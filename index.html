@@ -61,6 +61,33 @@
     margin-bottom:9px; text-transform:uppercase; letter-spacing:0.02em;
   }
   .faq-a{ font-size:13.5px; color:var(--text-dim); line-height:1.6; }
+
+  /* ---------- Explore grid: one card per tool, grouped like the nav menu ---------- */
+  .explore-group + .explore-group{ margin-top:22px; }
+  .explore-group-label{
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:0.12em;
+    color:var(--text-dim); text-transform:uppercase; margin-bottom:10px;
+  }
+  .explore-grid{ display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; }
+  @media (max-width:760px){ .explore-grid{ grid-template-columns:repeat(2, 1fr); gap:10px; } }
+  .explore-card{
+    display:flex; flex-direction:column; gap:6px; padding:16px;
+    text-decoration:none; transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .explore-card:hover, .explore-card:focus-visible{ border-color:var(--accent); transform:translateY(-2px); }
+  .explore-card:focus-visible{ outline:2px solid var(--accent-text); outline-offset:2px; }
+  .explore-name{
+    font-family:'Oswald', sans-serif; font-weight:600; font-size:16px; color:var(--text);
+    text-transform:uppercase; letter-spacing:0.02em;
+  }
+  .explore-name::after{ content:" \2192"; color:var(--accent-text); }
+  .explore-desc{ font-size:13px; color:var(--text-dim); line-height:1.45; }
+  .nowrap{ white-space:nowrap; }
+  @media (max-width:640px){
+    .explore-card{ padding:14px; }
+    .explore-name{ font-size:15px; }
+    .explore-desc{ font-size:12.5px; }
+  }
 </style>
 </head>
 <body data-nav-group="">
@@ -75,10 +102,40 @@
 <section>
 
   <div class="info-block">
+    <div class="info-label">Explore</div>
+    <div class="explore-group">
+      <div class="explore-group-label">Live</div>
+      <div class="explore-grid">
+        <a class="explore-card panel-card" href="this-week.html"><span class="explore-name">This Week</span><span class="explore-desc">Featured raid and dungeon, plus the reset timer</span></a>
+        <a class="explore-card panel-card" href="tracker.html"><span class="explore-name">Tracker</span><span class="explore-desc">Daily rotations like World Lost Sectors</span></a>
+        <a class="explore-card panel-card" href="vendors.html"><span class="explore-name">Vendors</span><span class="explore-desc">Live Xûr, Ada-1, Vanguard and Eververse stock</span></a>
+        <a class="explore-card panel-card" href="distortions.html"><span class="explore-name">Distortions</span><span class="explore-desc">What's open right now and what's up next</span></a>
+      </div>
+    </div>
+    <div class="explore-group">
+      <div class="explore-group-label">Loadouts</div>
+      <div class="explore-grid">
+        <a class="explore-card panel-card" href="builds.html"><span class="explore-name">Builds</span><span class="explore-desc">Full loadouts built around one synergy</span></a>
+        <a class="explore-card panel-card" href="god-rolls.html"><span class="explore-name">God Rolls</span><span class="explore-desc">The weapon rolls we actually run, and why</span></a>
+        <a class="explore-card panel-card" href="armor-set-bonuses.html"><span class="explore-name">Armor Sets</span><span class="explore-desc">Every <span class="nowrap">2-piece</span> and <span class="nowrap">4-piece</span> set bonus</span></a>
+        <a class="explore-card panel-card" href="artifacts.html"><span class="explore-name">Artifacts</span><span class="explore-desc">What each seasonal artifact mod does</span></a>
+      </div>
+    </div>
+    <div class="explore-group">
+      <div class="explore-group-label">Reference</div>
+      <div class="explore-grid">
+        <a class="explore-card panel-card" href="guides.html"><span class="explore-name">Guides</span><span class="explore-desc">Raid and dungeon walkthroughs</span></a>
+        <a class="explore-card panel-card" href="public-events.html"><span class="explore-name">Public Events</span><span class="explore-desc">How to flip each event to Heroic</span></a>
+        <a class="explore-card panel-card" href="puzzle-helper.html"><span class="explore-name">Puzzle Helper</span><span class="explore-desc">Solvers for raid and dungeon puzzles</span></a>
+        <a class="explore-card panel-card" href="codes.html"><span class="explore-name">Codes</span><span class="explore-desc">Active Bungie.net redemption codes</span></a>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-block">
     <div class="info-label">Overview</div>
     <div class="info-body">
       <p>Rally Flag pulls together everything we keep looking up while playing and streaming Destiny 2, so it lives in one place instead of a dozen scattered tabs.</p>
-      <p>Use the menu at the top to get to any of it: raid and dungeon guides, armor set bonuses, artifact perks, weapon god rolls, ready-to-run builds, puzzle solvers, live vendor inventories, live Distortion tracking, redemption codes, and what's active this week.</p>
     </div>
   </div>
 
