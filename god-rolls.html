@@ -267,8 +267,12 @@
     <div class="chip-group" id="element-chips"></div>
   </div>
   <div class="filter-row">
-    <div class="filter-label">Build</div>
+    <div class="filter-label">Playstyle</div>
     <div class="chip-group" id="build-chips"></div>
+  </div>
+  <div class="filter-row">
+    <div class="filter-label">Our Builds</div>
+    <div class="chip-group" id="buildref-chips"></div>
     <button class="clear-btn" id="clear-btn">Clear filters</button>
   </div>
 </div>
@@ -283,6 +287,7 @@
 
 <script src="assets/nav.js"></script>
 <script src="assets/god-rolls-data.js"></script>
+<script src="assets/builds-data.js"></script>
 <script src="assets/api-keys.js"></script>
 <script src="assets/oauth.js"></script>
 <script>
@@ -713,15 +718,21 @@
   // loading. Build tags are static (from god-rolls-data.js) and are
   // available immediately, but built here too for one consistent pass.
   // ---------------------------------------------------------------
-  const filterState = { search: "", ammo: new Set(), type: new Set(), element: new Set(), build: new Set() };
+  const filterState = { search: "", ammo: new Set(), type: new Set(), element: new Set(), build: new Set(), buildRef: new Set() };
 
-  function buildChipGroup(containerId, values, stateSet){
+  // buildTags mixes two kinds of value: free-form playstyle tags ("Add
+  // Clear") and slugs of builds on builds.html ("biotic-storm"). Slugs
+  // get their own filter row, labeled with the build's real title.
+  const BUILD_TITLES = new Map(((window.BuildsData && window.BuildsData.BUILDS) || []).map(b => [b.slug, b.title]));
+  const isBuildSlug = tag => BUILD_TITLES.has(tag);
+
+  function buildChipGroup(containerId, values, stateSet, labelFor){
     const container = document.getElementById(containerId);
     container.innerHTML = "";
     values.forEach(value => {
       const chip = document.createElement("div");
       chip.className = "chip";
-      chip.textContent = value;
+      chip.textContent = labelFor ? labelFor(value) : value;
       chip.addEventListener("click", () => {
         if (stateSet.has(value)) stateSet.delete(value); else stateSet.add(value);
         chip.classList.toggle("on");
@@ -736,12 +747,16 @@
     const ammoValues = [...new Set(cards.map(c => c.dataset.ammo).filter(Boolean))].sort();
     const typeValues = [...new Set(cards.map(c => c.dataset.type).filter(Boolean))].sort();
     const elementValues = [...new Set(cards.map(c => c.dataset.element).filter(Boolean))].sort();
-    const buildValues = [...new Set(window.GodRollsData.WEAPONS.flatMap(w => w.buildTags || []))].sort();
+    const allBuildTags = [...new Set(window.GodRollsData.WEAPONS.flatMap(w => w.buildTags || []))];
+    const buildValues = allBuildTags.filter(t => !isBuildSlug(t)).sort();
+    const buildRefValues = allBuildTags.filter(isBuildSlug)
+      .sort((a, b) => BUILD_TITLES.get(a).localeCompare(BUILD_TITLES.get(b)));
 
     buildChipGroup("ammo-chips", ammoValues, filterState.ammo);
     buildChipGroup("type-chips", typeValues, filterState.type);
     buildChipGroup("element-chips", elementValues, filterState.element);
     buildChipGroup("build-chips", buildValues, filterState.build);
+    buildChipGroup("buildref-chips", buildRefValues, filterState.buildRef, slug => BUILD_TITLES.get(slug));
 
     document.getElementById("search-input").addEventListener("input", e => {
       filterState.search = e.target.value.trim().toLowerCase();
@@ -753,6 +768,7 @@
       filterState.type.clear();
       filterState.element.clear();
       filterState.build.clear();
+      filterState.buildRef.clear();
       document.getElementById("search-input").value = "";
       document.querySelectorAll(".chip.on").forEach(c => c.classList.remove("on"));
       applyFilters();
@@ -768,6 +784,10 @@
     if (filterState.build.size){
       const builds = (card.dataset.builds || "").split("|");
       if (![...filterState.build].some(b => builds.includes(b))) return false;
+    }
+    if (filterState.buildRef.size){
+      const builds = (card.dataset.builds || "").split("|");
+      if (![...filterState.buildRef].some(b => builds.includes(b))) return false;
     }
     if (filterState.search && !card.textContent.toLowerCase().includes(filterState.search)) return false;
     return true;
