@@ -30,7 +30,7 @@
   .vend-signin-card p{ color:var(--text-dim); font-size:14px; line-height:1.6; margin-bottom:18px; }
   .vend-signin-btn{
     font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:700;
-    color:#0b0700; background:var(--accent-fill); border:1px solid var(--accent-fill);
+    color:var(--on-accent); background:var(--accent-fill); border:1px solid var(--accent-fill);
     padding:10px 22px; border-radius:999px; cursor:pointer; text-decoration:none; display:inline-block;
   }
   .vend-signin-btn:hover{ opacity:0.9; }
@@ -90,7 +90,7 @@
   .vend-owned-badge{
     display:inline-block; font-family:'JetBrains Mono', monospace; font-size:9.5px;
     letter-spacing:0.04em; text-transform:uppercase; padding:3px 8px; border-radius:999px;
-    background:var(--accent); color:var(--bg);
+    background:var(--accent-fill-deep); color:var(--on-accent);
   }
 
   .vend-perks-row{ display:flex; flex-wrap:wrap; gap:5px; margin-top:8px; }
@@ -113,7 +113,7 @@
     cursor:pointer; transition: all 0.15s ease;
   }
   .vend-roll-tab:hover{ color:var(--text); }
-  .vend-roll-tab.active{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); font-weight:700; }
+  .vend-roll-tab.active{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:700; }
   .vend-roll-tab-panel{ display:none; margin-top:10px; }
   .vend-roll-tab-panel.active{ display:block; }
   .vend-stat-bar-row{ margin-bottom:6px; }

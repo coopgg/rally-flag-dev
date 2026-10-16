@@ -32,7 +32,7 @@
     transition: all 0.15s ease; -webkit-appearance:none; appearance:none; margin:0;
   }
   .tool-chip:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
-  .tool-chip.active{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
+  .tool-chip.active{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
 
   .tool-section{ max-width:1000px; margin:0 auto; padding:0 24px 90px; }
   .tool-head{ margin-bottom:14px; }
@@ -126,7 +126,7 @@
   .rune-row-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:15px; color:var(--text); flex:1; }
   .rune-row-name b{ color:var(--accent-text); margin-right:6px; }
   .rune-next-btn{
-    font-family:'JetBrains Mono', monospace; font-size:12px; color:#0b0700;
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--on-accent);
     background:var(--accent-fill); border:none; border-radius:4px; padding:8px 16px;
     cursor:pointer; flex-shrink:0;
   }
@@ -161,7 +161,7 @@
     transition: all 0.15s ease;
   }
   .verity-subtab:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
-  .verity-subtab.active{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); }
+  .verity-subtab.active{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
 
   .ft-panel{ max-width:900px; margin:0 auto; }
   .ft-disclosure{
@@ -178,7 +178,7 @@
   }
   .ft-search-row input:focus{ border-color:var(--accent); }
   .ft-search-row button{
-    font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:600; color:#0b0700;
+    font-family:'JetBrains Mono', monospace; font-size:13px; font-weight:600; color:var(--on-accent);
     background:var(--accent-fill); border:none; border-radius:4px; padding:0 20px;
     cursor:pointer; -webkit-appearance:none;
   }
@@ -276,7 +276,7 @@
   .verity-ogre-step{
     background:var(--accent-dim); border-color:var(--accent);
   }
-  .verity-ogre-step .step-num{ background:var(--accent); color:#0b0700; border-color:var(--accent); }
+  .verity-ogre-step .step-num{ background:var(--accent-fill-deep); color:var(--on-accent); border-color:var(--accent-fill-deep); }
   .verity-solution-step-icon{
     width:22px; height:22px; border-radius:50%; overflow:hidden; flex-shrink:0;
     background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center;
@@ -333,7 +333,7 @@
     -webkit-appearance:none; appearance:none;
   }
   .lr-btn:hover{ color:var(--text); border-color:rgba(255,255,255,0.25); }
-  .lr-btn.selected{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); }
+  .lr-btn.selected{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
 
   /* ---------- Light/Dark flower wall (Root of Nightmares) ---------- */
   .ld-tool-wrap{ max-width:640px; margin:0 auto; }

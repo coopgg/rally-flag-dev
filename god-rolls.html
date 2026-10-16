@@ -39,13 +39,18 @@
   .weapon-unlock-badge{
     font-family:'JetBrains Mono', monospace; font-size:9.5px; letter-spacing:0.04em;
     text-transform:uppercase; padding:3px 8px; border-radius:999px;
-    background:var(--accent); color:var(--bg);
+    background:var(--accent-fill-deep); color:var(--on-accent);
+  }
+  /* Light mode gives Owned and Unlocked the same deep fill, so Unlocked
+     switches to a tinted outline to stay distinguishable. */
+  [data-mode="light"] .weapon-unlock-badge:not(.missing):not(.exact-roll){
+    background:var(--accent-dim); color:var(--accent-text); box-shadow:inset 0 0 0 1px var(--accent-text);
   }
   .weapon-unlock-badge.missing{
     background:none; border:1px solid var(--panel-border); color:var(--text-dimmer);
   }
   .weapon-unlock-badge.exact-roll{
-    background:var(--accent-fill); color:#0b0700;
+    background:var(--accent-fill); color:var(--on-accent);
   }
   .weapon-unlock-rating{
     font-family:'JetBrains Mono', monospace; font-size:11px; color:var(--text-dimmer);
@@ -100,7 +105,7 @@
     padding:5px 12px; cursor:pointer; margin-top:10px; transition: all 0.15s ease;
   }
   .alt-roll-btn:hover{ color:var(--accent-bright); border-color:var(--accent); }
-  .alt-roll-btn.showing-alt{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); }
+  .alt-roll-btn.showing-alt{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
   .element-badge{
     width:18px; height:18px; border-radius:50%; flex-shrink:0;
     background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center;
@@ -220,7 +225,7 @@
     transition: all 0.15s ease; user-select:none;
   }
   .chip:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
-  .chip.on{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
+  .chip.on{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
   .clear-btn{
     font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer);
     background:none; border:none; cursor:pointer; text-decoration:underline;

@@ -15,6 +15,11 @@
      tokens in dark mode; light mode overrides them below. */
   --accent-text: var(--accent);
   --accent-fill: var(--accent-bright);
+  /* --accent-fill-deep: the base-accent fill (badges, gradient ends).
+     --on-accent: text on either fill. Dark mode: dark text on bright
+     fills. Light mode overrides both below: white on deep shades. */
+  --accent-fill-deep: var(--accent);
+  --on-accent: #0b0700;
 }
 
 [data-theme="solar"]{ --accent:#ff8f3f; --accent-bright:#ffd27a; --accent-dim: rgba(255,143,63,0.14); --glow: rgba(255,143,63,0.4); }
@@ -36,14 +41,16 @@
 /* Light mode: the bright accents are tuned for the dark background and
    drop to ~1.5-3:1 as text on light surfaces. Text uses a darkened shade
    per theme, checked at >=4.7:1 against the page, cards, and accent-dim
-   pills. --accent-fill keeps the lighter shade so filled chips/tabs stay
-   recognizably colored. */
-[data-mode="light"][data-theme="solar"]{     --accent-text:#994908; --accent-bright:#994908; --accent-fill:#c9600a; }
-[data-mode="light"][data-theme="void"]{      --accent-text:#733bc9; --accent-bright:#733bc9; --accent-fill:#7a3fd6; }
-[data-mode="light"][data-theme="arc"]{       --accent-text:#0b6b88; --accent-bright:#0b6b88; --accent-fill:#0d84a8; }
-[data-mode="light"][data-theme="stasis"]{    --accent-text:#2b65a1; --accent-bright:#2b65a1; --accent-fill:#2f6fb0; }
-[data-mode="light"][data-theme="strand"]{    --accent-text:#177242; --accent-bright:#177242; --accent-fill:#1f9a5a; }
-[data-mode="light"][data-theme="prismatic"]{ --accent-text:#a23485; --accent-bright:#a23485; --accent-fill:#c23fa0; }
+   pills. Solid fills (active chips/tabs, badges) use the same shade with
+   white --on-accent text, >=5.9:1 (dark text on the old lighter fills
+   was 3.4-4.9:1). */
+[data-mode="light"][data-theme="solar"]{    --accent-text:#994908; --accent-bright:#994908; --accent-fill:#994908; --accent-fill-deep:#994908; }
+[data-mode="light"][data-theme="void"]{     --accent-text:#733bc9; --accent-bright:#733bc9; --accent-fill:#733bc9; --accent-fill-deep:#733bc9; }
+[data-mode="light"][data-theme="arc"]{      --accent-text:#0b6b88; --accent-bright:#0b6b88; --accent-fill:#0b6b88; --accent-fill-deep:#0b6b88; }
+[data-mode="light"][data-theme="stasis"]{   --accent-text:#2b65a1; --accent-bright:#2b65a1; --accent-fill:#2b65a1; --accent-fill-deep:#2b65a1; }
+[data-mode="light"][data-theme="strand"]{   --accent-text:#177242; --accent-bright:#177242; --accent-fill:#177242; --accent-fill-deep:#177242; }
+[data-mode="light"][data-theme="prismatic"]{ --accent-text:#a23485; --accent-bright:#a23485; --accent-fill:#a23485; --accent-fill-deep:#a23485; }
+[data-mode="light"]{ --on-accent:#ffffff; }
 
 *{ box-sizing:border-box; }
 html,body{ margin:0; padding:0; }
@@ -212,7 +219,7 @@ nav.site-nav{
   padding:8px 16px; border-radius:999px; transition: all 0.15s ease;
 }
 .subnav a:hover{ color:var(--text); border-color:rgba(255,255,255,0.2); }
-.subnav a.active{ color:#0b0700; background:var(--accent-fill); border-color:var(--accent-fill); font-weight:700; }
+.subnav a.active{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:700; }
 
 /* ---------- Hero (shared shape, page-specific size/copy) ---------- */
 .hero{ max-width:760px; margin:32px auto 0; padding:0 24px; text-align:center; }
