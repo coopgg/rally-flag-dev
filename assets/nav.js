@@ -258,20 +258,17 @@
     const container = document.getElementById("site-nav");
     if (!container) return;
 
-    // Each section is a <details>, all sharing one `name` — browsers
-    // auto-collapse the others whenever one opens, so the menu can't
-    // stack up into a long scroll of every link at once. The section
-    // holding the current page starts open; everything else starts
-    // collapsed to just its label.
+    // Every section is rendered expanded (no collapsing) so any page is
+    // a single tap from the menu button; theme.css lays the sections out
+    // as columns on wide screens and stacks them on phones.
     const linksHtml = NAV_SECTIONS.map(section => {
-      const hasActive = section.items.some(item => item.group === activeGroup);
       return (
-        '<details class="nav-menu-section" name="nav-links-accordion"' + (hasActive ? " open" : "") + '>' +
-          '<summary class="nav-menu-section-label">' + section.label + '</summary>' +
+        '<div class="nav-menu-section">' +
+          '<div class="nav-menu-section-label">' + section.label + '</div>' +
           section.items.map(item =>
-            '<a href="' + item.href + '"' + (item.group === activeGroup ? ' class="active"' : '') + '>' + item.label + '</a>'
+            '<a href="' + item.href + '"' + (item.group === activeGroup ? ' class="active" aria-current="page"' : '') + '>' + item.label + '</a>'
           ).join("") +
-        '</details>'
+        '</div>'
       );
     }).join("");
 
@@ -280,7 +277,7 @@
         '<div class="nav-links-wrap">' +
           '<button class="nav-links-btn" id="nav-links-btn" title="Menu" aria-label="Site menu">\u2630</button>' +
           '<a href="index.html" class="brand"><span class="brand-mark"></span>RALLY FLAG</a>' +
-          '<div class="nav-links-panel" id="nav-links-panel">' + linksHtml + '</div>' +
+          '<div class="nav-links-panel" id="nav-links-panel" style="--nav-cols:' + NAV_SECTIONS.length + '">' + linksHtml + '</div>' +
         '</div>' +
         '<div class="nav-right-wrap">' +
           '<a class="nav-icon-btn" href="' + DISCORD_INVITE_URL + '" target="_blank" rel="noopener" title="Join the Discord">' + DISCORD_ICON_SVG + '</a>' +
