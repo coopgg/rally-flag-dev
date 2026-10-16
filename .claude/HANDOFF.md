@@ -10,8 +10,8 @@ first round of work: the original 14-item design review, the cache fix, both
 Bungie sign-in fixes, Auto/Light/Dark mode, and the iPhone `minimal-ui`
 change. That round was promoted from dev up to `5750a98`.
 
-**Dev (`coopgg/rally-flag-dev`, `main`) is ahead of prod.** Reviewed by the
-owner on dev but NOT yet promoted to prod — wait for the owner's go-ahead:
+**Dev (`coopgg/rally-flag-dev`, `main`) is ahead of prod.** These are on dev
+waiting for the owner's review; NOT promoted to prod — wait for the go-ahead:
 
 | Item | Dev commit(s) | What |
 |---|---|---|
