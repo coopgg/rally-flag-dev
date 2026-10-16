@@ -74,6 +74,11 @@
   // reproduction of their actual brand mark.
   const KOFI_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/><path d="M17 9.5h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 4.5c-.6.6-.6 1.4 0 2s.6 1.4 0 2"/><path d="M12 4.5c-.6.6-.6 1.4 0 2s.6 1.4 0 2"/></svg>';
 
+  // Gear outline (same 16px stroke style as the Ko-fi glyph) for the
+  // settings button — a second ☰ here read as a duplicate of the site
+  // menu button on the left.
+  const SETTINGS_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>';
+
   const BUNGIE_ROOT = "https://www.bungie.net";
 
   // Real subclass icons, sourced directly from Bungie's CDN (via Destiny
@@ -273,7 +278,7 @@
     container.innerHTML =
       '<nav class="site-nav">' +
         '<div class="nav-links-wrap">' +
-          '<button class="nav-links-btn" id="nav-links-btn" title="Menu">\u2630</button>' +
+          '<button class="nav-links-btn" id="nav-links-btn" title="Menu" aria-label="Site menu">\u2630</button>' +
           '<a href="index.html" class="brand"><span class="brand-mark"></span>RALLY FLAG</a>' +
           '<div class="nav-links-panel" id="nav-links-panel">' + linksHtml + '</div>' +
         '</div>' +
@@ -281,8 +286,8 @@
           '<a class="nav-icon-btn" href="' + DISCORD_INVITE_URL + '" target="_blank" rel="noopener" title="Join the Discord">' + DISCORD_ICON_SVG + '</a>' +
           '<a class="nav-icon-btn" href="' + KOFI_URL + '" target="_blank" rel="noopener" title="Support us on Ko-fi">' + KOFI_ICON_SVG + '</a>' +
           '<div class="nav-menu-wrap">' +
-            '<button class="nav-menu-btn" id="nav-menu-btn" title="Appearance settings">' +
-              '<span class="nav-menu-burger">\u2630</span>' +
+            '<button class="nav-menu-btn" id="nav-menu-btn" title="Settings" aria-label="Settings">' +
+              '<span class="nav-menu-gear">' + SETTINGS_ICON_SVG + '</span>' +
               '<span class="nav-menu-icon" id="nav-menu-icon"></span>' +
             '</button>' +
             buildMenuPanel() +

@@ -122,7 +122,7 @@ nav.site-nav{
   transition: border-color 0.2s ease, color 0.2s ease;
 }
 .nav-menu-btn:hover, .nav-menu-btn:focus-visible{ border-color:var(--accent); color:var(--accent-bright); }
-.nav-menu-burger{ font-size:14px; line-height:1; }
+.nav-menu-gear{ display:flex; line-height:1; }
 .nav-menu-icon{
   width:20px; height:20px; border-radius:50%; flex-shrink:0;
   background:var(--accent); display:flex; align-items:center; justify-content:center;
