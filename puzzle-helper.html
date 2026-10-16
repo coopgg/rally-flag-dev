@@ -512,7 +512,7 @@
 
   function renderWishTool(tool){
     const wishesHtml = tool.wishes.map(w =>
-      '<div class="wish-card" data-num="' + w.number + '">' +
+      '<div class="wish-card" data-num="' + w.number + '" role="button" tabindex="0" aria-pressed="false">' +
         '<div class="wish-card-head"><span class="wish-card-num">Wish ' + w.number + '</span>' +
         (w.theme ? '<span class="wish-card-sep">|</span><span class="wish-card-theme">' + w.theme + '</span>' : '') +
         '</div>' +
@@ -531,17 +531,22 @@
 
     const allCards = section.querySelectorAll(".wish-card");
     allCards.forEach(card => {
-      card.addEventListener("click", () => {
+      const pick = () => {
         const wasActive = card.classList.contains("active");
-        allCards.forEach(c => c.classList.remove("active"));
+        allCards.forEach(c => { c.classList.remove("active"); c.setAttribute("aria-pressed", "false"); });
         if (!wasActive){
           card.classList.add("active");
+          card.setAttribute("aria-pressed", "true");
           const w = tool.wishes.find(x => x.number == card.getAttribute("data-num"));
           updateWallStage(w.grid);
           document.getElementById("wall-stage").scrollIntoView({ behavior: "smooth", block: "nearest" });
         } else {
           updateWallStage(null);
         }
+      };
+      card.addEventListener("click", pick);
+      card.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " "){ e.preventDefault(); pick(); }
       });
     });
   }
@@ -585,9 +590,16 @@
     tool.runes.forEach(r => {
       const cell = document.createElement("div");
       cell.className = "rune-picker-cell";
+      cell.setAttribute("role", "button");
+      cell.setAttribute("tabindex", "0");
+      cell.setAttribute("aria-pressed", "false");
+      cell.setAttribute("aria-label", "Rune " + r.number + (r.simpleLocation ? ": " + r.simpleLocation : ""));
       cell.dataset.num = r.number;
       cell.innerHTML = iconHtml(r) + '<span class="rune-picker-num">' + r.number + '</span>';
       cell.addEventListener("click", () => toggleRune(r.number, cell));
+      cell.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " "){ e.preventDefault(); toggleRune(r.number, cell); }
+      });
       grid.appendChild(cell);
     });
 
@@ -611,6 +623,8 @@
       cells.forEach(c => {
         const isSelected = c.classList.contains("selected");
         c.classList.toggle("disabled", selected.length >= 3 && !isSelected);
+        c.setAttribute("aria-pressed", String(isSelected));
+        c.setAttribute("aria-disabled", String(selected.length >= 3 && !isSelected));
       });
       hint.textContent = selected.length === 3
         ? "3 selected, locked in below."
@@ -657,7 +671,11 @@
 
     document.getElementById("rune-reset-btn").addEventListener("click", () => {
       selected = [];
-      grid.querySelectorAll(".rune-picker-cell").forEach(c => c.classList.remove("selected", "disabled"));
+      grid.querySelectorAll(".rune-picker-cell").forEach(c => {
+        c.classList.remove("selected", "disabled");
+        c.setAttribute("aria-pressed", "false");
+        c.setAttribute("aria-disabled", "false");
+      });
       hint.textContent = "Pick exactly 3 runes.";
       clearStage();
     });

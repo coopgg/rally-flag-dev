@@ -537,12 +537,15 @@
   function buildChips(container, values, set, labelFn){
     container.innerHTML = "";
     values.forEach(v => {
-      const chip = document.createElement("div");
+      const chip = document.createElement("button");
+      chip.type = "button";
       chip.className = "chip";
       chip.textContent = labelFn ? labelFn(v) : v;
+      chip.setAttribute("aria-pressed", "false");
       chip.addEventListener("click", () => {
         if (set.has(v)) set.delete(v); else set.add(v);
         chip.classList.toggle("on");
+        chip.setAttribute("aria-pressed", String(chip.classList.contains("on")));
         render();
       });
       container.appendChild(chip);
@@ -567,7 +570,7 @@
     state.subclasses.clear();
     state.keywords.clear();
     document.getElementById("search-input").value = "";
-    document.querySelectorAll(".chip.on").forEach(c => c.classList.remove("on"));
+    document.querySelectorAll(".chip.on").forEach(c => { c.classList.remove("on"); c.setAttribute("aria-pressed", "false"); });
     render();
   });
 
@@ -634,7 +637,7 @@
         : "";
 
       card.innerHTML =
-        '<div class="set-card-head">' +
+        '<div class="set-card-head" role="button" tabindex="0" aria-expanded="false">' +
           '<span class="set-caret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></span>' +
           '<div class="set-monogram" id="icon-' + set.slug + '">' + monogram(set.name) + '</div>' +
           '<div><div class="set-name">' + set.name + '</div><div class="set-source">' + set.source + ' \u00b7 ' + set.sourceDetail + '</div></div>' +
@@ -649,9 +652,14 @@
 
       if (set.slug === highlightSlug) card.classList.add("expanded");
 
-      card.querySelector(".set-card-head").addEventListener("click", () => {
+      const head = card.querySelector(".set-card-head");
+      const toggle = () => {
         card.classList.toggle("expanded");
         updateExpandAllLabel();
+      };
+      head.addEventListener("click", toggle);
+      head.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " "){ e.preventDefault(); toggle(); }
       });
 
       grid.appendChild(card);
@@ -667,6 +675,8 @@
   }
 
   function updateExpandAllLabel(){
+    // Every expand/collapse path ends here, so this keeps screen readers' view of each header in sync.
+    document.querySelectorAll(".set-card").forEach(c => { const h = c.querySelector(".set-card-head"); if (h) h.setAttribute("aria-expanded", String(c.classList.contains("expanded"))); });
     const cards = Array.from(document.querySelectorAll(".set-card")).filter(c => c.style.display !== "none");
     const anyCollapsed = cards.some(c => !c.classList.contains("expanded"));
     const btn = document.getElementById("expand-all-btn");

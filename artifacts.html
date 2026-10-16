@@ -280,12 +280,15 @@
   function buildChips(container, values, set){
     container.innerHTML = "";
     values.forEach(v => {
-      const chip = document.createElement("div");
+      const chip = document.createElement("button");
+      chip.type = "button";
       chip.className = "chip";
       chip.textContent = v;
+      chip.setAttribute("aria-pressed", "false");
       chip.addEventListener("click", () => {
         if (set.has(v)) set.delete(v); else set.add(v);
         chip.classList.toggle("on");
+        chip.setAttribute("aria-pressed", String(chip.classList.contains("on")));
         render();
       });
       container.appendChild(chip);
@@ -304,7 +307,7 @@
     state.elements.clear();
     state.weapons.clear();
     document.getElementById("search-input").value = "";
-    document.querySelectorAll(".chip.on").forEach(c => c.classList.remove("on"));
+    document.querySelectorAll(".chip.on").forEach(c => { c.classList.remove("on"); c.setAttribute("aria-pressed", "false"); });
     render();
   });
 
@@ -321,6 +324,8 @@
 
   function setCardExpanded(card, expanded){
     card.classList.toggle("expanded", expanded);
+    const head = card.querySelector(".artifact-head");
+    if (head) head.setAttribute("aria-expanded", String(expanded));
     if (expanded) expandedSlugs.add(card.dataset.slug); else expandedSlugs.delete(card.dataset.slug);
   }
 
@@ -360,7 +365,7 @@
       card.dataset.slug = artifact.slug;
 
       card.innerHTML =
-        '<div class="artifact-head">' +
+        '<div class="artifact-head" role="button" tabindex="0" aria-expanded="false">' +
           '<div class="artifact-head-left">' +
             '<span class="artifact-caret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></span>' +
             (artifact.iconUrl ? '<div class="artifact-icon"><img src="' + artifact.iconUrl + '" alt=""></div>' : '') +
@@ -375,9 +380,13 @@
         '</div>';
 
       const head = card.querySelector(".artifact-head");
-      head.addEventListener("click", () => {
+      const toggle = () => {
         setCardExpanded(card, !card.classList.contains("expanded"));
         updateExpandAllLabel();
+      };
+      head.addEventListener("click", toggle);
+      head.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " "){ e.preventDefault(); toggle(); }
       });
       if (expandedSlugs.has(artifact.slug)) setCardExpanded(card, true);
 

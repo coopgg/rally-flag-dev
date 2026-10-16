@@ -369,12 +369,15 @@
   function buildChips(container, values, set){
     container.innerHTML = "";
     values.forEach(v => {
-      const chip = document.createElement("div");
+      const chip = document.createElement("button");
+      chip.type = "button";
       chip.className = "chip";
       chip.textContent = v;
+      chip.setAttribute("aria-pressed", "false");
       chip.addEventListener("click", () => {
         if (set.has(v)) set.delete(v); else set.add(v);
         chip.classList.toggle("on");
+        chip.setAttribute("aria-pressed", String(chip.classList.contains("on")));
         render();
       });
       container.appendChild(chip);
@@ -393,7 +396,7 @@
     state.classes.clear();
     state.subclasses.clear();
     document.getElementById("search-input").value = "";
-    document.querySelectorAll(".chip.on").forEach(c => c.classList.remove("on"));
+    document.querySelectorAll(".chip.on").forEach(c => { c.classList.remove("on"); c.setAttribute("aria-pressed", "false"); });
     render();
   });
 

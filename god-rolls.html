@@ -547,7 +547,7 @@
     card.dataset.builds = (weapon.buildTags || []).join("|");
 
     card.innerHTML =
-      '<div class="weapon-head">' +
+      '<div class="weapon-head" role="button" tabindex="0" aria-expanded="false">' +
         '<span class="weapon-caret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></span>' +
         '<div class="weapon-icon" id="icon-' + weapon.slug + '">' + monogram(weapon.name) + '</div>' +
         '<div>' +
@@ -576,9 +576,13 @@
       '</div>';
 
     const head = card.querySelector(".weapon-head");
-    head.addEventListener("click", () => {
+    const toggle = () => {
       card.classList.toggle("expanded");
       updateExpandAllLabel();
+    };
+    head.addEventListener("click", toggle);
+    head.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " "){ e.preventDefault(); toggle(); }
     });
 
     return card;
@@ -588,6 +592,8 @@
     const cards = Array.from(document.querySelectorAll(".weapon-card"));
     const visibleCards = cards.filter(c => c.style.display !== "none");
     const anyCollapsed = visibleCards.some(c => !c.classList.contains("expanded"));
+    // Every expand/collapse path ends here, so this keeps screen readers' view of each header in sync.
+    cards.forEach(c => { const h = c.querySelector(".weapon-head"); if (h) h.setAttribute("aria-expanded", String(c.classList.contains("expanded"))); });
     const btn = document.getElementById("expand-all-btn");
     if (btn) btn.textContent = anyCollapsed ? "Expand all" : "Collapse all";
   }
@@ -799,13 +805,16 @@
     const container = document.getElementById(containerId);
     container.innerHTML = "";
     values.forEach(value => {
-      const chip = document.createElement("div");
+      const chip = document.createElement("button");
+      chip.type = "button";
       chip.className = "chip";
       chip.textContent = labelFor ? labelFor(value) : value;
       if (stateSet.has(value)) chip.classList.add("on");
+      chip.setAttribute("aria-pressed", String(chip.classList.contains("on")));
       chip.addEventListener("click", () => {
         if (stateSet.has(value)) stateSet.delete(value); else stateSet.add(value);
         chip.classList.toggle("on");
+        chip.setAttribute("aria-pressed", String(chip.classList.contains("on")));
         applyFilters();
       });
       container.appendChild(chip);
@@ -856,7 +865,7 @@
       filterState.build.clear();
       filterState.buildRef.clear();
       document.getElementById("search-input").value = "";
-      document.querySelectorAll(".chip.on").forEach(c => c.classList.remove("on"));
+      document.querySelectorAll(".chip.on").forEach(c => { c.classList.remove("on"); c.setAttribute("aria-pressed", "false"); });
       applyFilters();
     });
 

@@ -202,6 +202,16 @@ nav.site-nav{
 }
 .nav-auth-signout:hover{ color:var(--accent-bright); }
 
+/* ---------- Keyboard focus for custom controls ----------
+   Filter chips (<button class="chip">) and expandable card headers
+   ([role="button"]) on God Rolls, Builds, Armor Sets and Artifacts. */
+.chip:focus-visible, [role="button"]:focus-visible{
+  outline:2px solid var(--accent-text); outline-offset:2px;
+}
+/* Buttons default to line-height:normal; the chips were divs inheriting
+   the page's 1.5, so keep that to stay pixel-identical. */
+button.chip{ line-height:inherit; }
+
 /* ---------- Dev/test-environment banner (dev branch only) ---------- */
 .dev-banner{
   max-width:800px; margin:32px auto 0; padding:12px 20px;
