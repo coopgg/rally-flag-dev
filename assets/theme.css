@@ -76,6 +76,11 @@ body{
 a{ color:inherit; }
 
 /* ---------- Top nav (injected by nav.js) ---------- */
+/* Reserve the nav's height before nav.js fills #site-nav. Without it the
+   browser can paint once with an empty placeholder: the page jumps down
+   when the nav arrives, and the first content block's top margin
+   collapses up through <body> (measured as a whole-page layout shift). */
+#site-nav{ min-height:86px; }
 nav.site-nav{
   display:flex; align-items:center; justify-content:space-between;
   max-width:1180px; margin:0 auto; padding:26px 24px; flex-wrap:wrap; gap:16px;
@@ -215,6 +220,14 @@ nav.site-nav{
 .skip-link:focus{ top:12px; outline:2px solid var(--text); outline-offset:2px; }
 main:focus{ outline:none; }
 
+/* Load-time layout shift guard. Most pages fill their content from script
+   at the end of <body>, and the browser can paint once before that runs,
+   so content jumped as lists, chips and cards arrived. Each page's <head>
+   script sets .rf-boot and clears it one frame after DOMContentLoaded
+   (2.5s fallback), keeping <main> laid out but invisible until then. Set
+   by script only, so pages without JavaScript never hide anything. */
+.rf-boot main{ visibility:hidden; }
+
 /* ---------- Keyboard focus for custom controls ----------
    Filter chips (<button class="chip">) and expandable card headers
    ([role="button"]) on God Rolls, Builds, Armor Sets and Artifacts. */
@@ -295,6 +308,7 @@ footer p{ max-width:560px; margin:10px auto 0; }
      screens), .nav-right-wrap's margin-left:auto keeps it pinned right,
      so the right-anchored Appearance panel opens inward instead of
      running off the left edge of the screen. */
+  #site-nav{ min-height:74px; }
   nav.site-nav{ padding:20px 24px; gap:8px; }
   .nav-links-panel.open{ grid-template-columns:1fr; width:calc(100vw - 48px); max-width:320px; }
   .nav-links-panel .nav-menu-section + .nav-menu-section{ margin-top:8px; }
