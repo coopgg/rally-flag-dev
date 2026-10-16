@@ -120,9 +120,10 @@ nav.site-nav{
 }
 .nav-links-wrap{ position:relative; display:flex; align-items:center; gap:12px; }
 .nav-links-btn{
+  display:flex; align-items:center; justify-content:center;
   background:none; border:1px solid var(--panel-border); border-radius:6px;
-  color:var(--text-dim); font-size:14px; line-height:1; cursor:pointer;
-  padding:7px 10px; transition: border-color 0.2s ease, color 0.2s ease;
+  color:var(--text-dim); line-height:1; cursor:pointer;
+  padding:8px; transition: border-color 0.2s ease, color 0.2s ease;
 }
 .nav-links-btn:hover, .nav-links-btn:focus-visible{ border-color:var(--accent); color:var(--accent-bright); }
 .nav-links-panel{

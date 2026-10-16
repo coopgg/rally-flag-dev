@@ -82,6 +82,9 @@
   // reproduction of their actual brand mark.
   const KOFI_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/><path d="M17 9.5h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8 4.5c-.6.6-.6 1.4 0 2s.6 1.4 0 2"/><path d="M12 4.5c-.6.6-.6 1.4 0 2s.6 1.4 0 2"/></svg>';
 
+  // Site-menu button. Was the ☰ text glyph, which renders as an emoji on
+  // some platforms and at a different weight per font; drawn to match the gear.
+  const MENU_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
   // Gear outline (same 16px stroke style as the Ko-fi glyph) for the
   // settings button — a second ☰ here read as a duplicate of the site
   // menu button on the left.
@@ -333,7 +336,7 @@
     container.innerHTML = skipLink +
       '<nav class="site-nav">' +
         '<div class="nav-links-wrap">' +
-          '<button class="nav-links-btn" id="nav-links-btn" title="Menu" aria-label="Site menu">\u2630</button>' +
+          '<button class="nav-links-btn" id="nav-links-btn" title="Menu" aria-label="Site menu">' + MENU_ICON_SVG + '</button>' +
           // Panel sits right after its button (it's absolutely positioned,
           // so this doesn't move it) so Tab goes from the button into the links.
           '<div class="nav-links-panel" id="nav-links-panel" style="--nav-cols:' + NAV_SECTIONS.length + '">' + linksHtml + '</div>' +
