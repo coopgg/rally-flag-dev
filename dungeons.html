@@ -79,7 +79,7 @@
   window.DungeonsData.DUNGEONS.forEach(dungeon => {
     const card = document.createElement("a");
     card.className = "activity-card panel-card";
-    card.href = "dungeon-guide.html?slug=" + dungeon.slug;
+    card.href = window.rallyFlagGuideHref("dungeon", dungeon.slug);
     card.innerHTML =
       window.rallyFlagArtThumb(dungeon) +
       '<div class="activity-name">' + dungeon.name + '</div>' +

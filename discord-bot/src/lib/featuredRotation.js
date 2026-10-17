@@ -8,7 +8,7 @@ function armorSetLink(slug, setsBySlug){
   return `[${name}](https://rallyflag.gg/armor-set-bonuses.html?highlight=${slug}#set-${slug})`;
 }
 
-function describeEntries(slugs, list, hrefBase, alwaysFeaturedSlug, setsBySlug){
+function describeEntries(slugs, list, guideKind, alwaysFeaturedSlug, setsBySlug){
   const bySlug = {};
   list.forEach(item => { bySlug[item.slug] = item; });
 
@@ -16,7 +16,9 @@ function describeEntries(slugs, list, hrefBase, alwaysFeaturedSlug, setsBySlug){
     const item = bySlug[slug];
     if (!item) return slug; // rotation slug didn't match raids-data.js/dungeons-data.js — surface the raw slug rather than hiding the mismatch
 
-    const title = `[${item.name}](https://rallyflag.gg/${hrefBase}?slug=${slug})`;
+    // One static page per raid/dungeon (tools/build-guide-pages.js), so the
+    // link preview shows that activity's name, summary and art.
+    const title = `[${item.name}](https://rallyflag.gg/${guideKind}-${slug}.html)`;
     const armorNames = (item.armorSlugs || []).map(s => armorSetLink(s, setsBySlug));
     const armorSuffix = armorNames.length ? ` (${armorNames.join(", ")})` : "";
     const alwaysSuffix = slug === alwaysFeaturedSlug ? " — Always Featured" : "";
@@ -51,8 +53,8 @@ function getFeaturedUpdate(now = Date.now()){
     ironBannerActive,
     ironBannerArmor: IRON_BANNER_ARMOR_SLUGS.map(slug => armorSetLink(slug, setsBySlug)),
     thisWeek: {
-      raids: describeEntries(thisWeek.raids, RaidsData.RAIDS, "raid-guide.html", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug),
-      dungeons: describeEntries(thisWeek.dungeons, DungeonsData.DUNGEONS, "dungeon-guide.html", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug)
+      raids: describeEntries(thisWeek.raids, RaidsData.RAIDS, "raid", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug),
+      dungeons: describeEntries(thisWeek.dungeons, DungeonsData.DUNGEONS, "dungeon", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug)
     }
   };
 }

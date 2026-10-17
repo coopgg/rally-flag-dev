@@ -580,8 +580,8 @@
           '<div class="pairing-note">' + weapon.pairing.note + '</div>' +
           (weapon.pairing.armorSlug ? '<a class="pairing-armor-link" href="armor-set-bonuses.html?highlight=' + weapon.pairing.armorSlug + '">View armor set \u2192</a>' : '') +
         '</div>' : '') +
-        (weapon.raidSlug ? '<a class="cross-link" href="raid-guide.html?slug=' + weapon.raidSlug + '">View the raid guide it drops from \u2192</a>' : '') +
-        (weapon.dungeonSlug ? '<a class="cross-link" href="dungeon-guide.html?slug=' + weapon.dungeonSlug + '">View the dungeon guide it drops from \u2192</a>' : '') +
+        (weapon.raidSlug ? '<a class="cross-link" href="' + window.rallyFlagGuideHref("raid", weapon.raidSlug) + '">View the raid guide it drops from \u2192</a>' : '') +
+        (weapon.dungeonSlug ? '<a class="cross-link" href="' + window.rallyFlagGuideHref("dungeon", weapon.dungeonSlug) + '">View the dungeon guide it drops from \u2192</a>' : '') +
         '<a class="light-gg-link" id="lightgg-' + weapon.slug + '" href="https://www.light.gg/db/items/' + weapon.itemHash + '/" target="_blank" rel="noopener">View on light.gg \u2192</a>' +
       '</div>';
 

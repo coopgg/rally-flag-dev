@@ -117,8 +117,15 @@
 <script src="assets/sets-data.js"></script>
 <script>
 (function(){
-  const slug = new URLSearchParams(window.location.search).get("slug");
+  // Generated per-dungeon pages (dungeon-<slug>.html, tools/build-guide-pages.js)
+  // set GUIDE_SLUG. On this template page, an old ?slug= link forwards to
+  // the dungeon's own page, whose static tags give proper link previews.
+  const slug = window.GUIDE_SLUG || new URLSearchParams(window.location.search).get("slug");
   const dungeon = window.DungeonsData.DUNGEONS.find(d => d.slug === slug);
+  if (dungeon && !window.GUIDE_SLUG){
+    location.replace(window.rallyFlagGuideHref("dungeon", dungeon.slug) + location.hash);
+    return;
+  }
   const content = document.getElementById("content");
 
   if (!dungeon){
@@ -127,7 +134,7 @@
     return;
   }
 
-  document.title = dungeon.name + " - Rally Flag";
+  document.title = dungeon.name + " Dungeon Guide - Rally Flag";
   document.getElementById("dungeon-title").textContent = dungeon.name;
   // Header sits over the dungeon's official art.
   if (dungeon.art){
@@ -136,27 +143,6 @@
     hero.insertAdjacentHTML("afterbegin", '<div class="hero-art"><img src="' + window.rallyFlagArtUrl(dungeon.art) + '" alt="" fetchpriority="high"></div>');
   }
 
-  // Updates the static fallback meta/OG tags with the actual dungeon once
-  // it's known — helps crawlers that execute JS (Google) and keeps the
-  // tags consistent with the page if someone deep-links here. Non-JS
-  // social unfurl bots (Discord, etc.) still see the static generic
-  // fallback already in the <head>, since they never run this script.
-  function setMeta(selector, attr, value){
-    const el = document.querySelector(selector);
-    if (el) el.setAttribute(attr, value);
-  }
-  const dungeonDesc = dungeon.summary ? (dungeon.summary.length > 160 ? dungeon.summary.slice(0, 157) + "…" : dungeon.summary) : ("Everything you need for the " + dungeon.name + " dungeon: encounters, armor set bonus, and puzzle solvers.");
-  setMeta('meta[name="description"]', "content", dungeonDesc);
-  setMeta('meta[property="og:title"]', "content", dungeon.name);
-  setMeta('meta[property="og:description"]', "content", dungeonDesc);
-  setMeta('meta[property="og:url"]', "content", "https://rallyflag.gg/dungeon-guide.html?slug=" + dungeon.slug);
-  // No static canonical on this page: one shared URL for every dungeon would
-  // tell search engines all guides are the same page. Set per dungeon instead.
-  let canonical = document.querySelector('link[rel="canonical"]');
-  if (!canonical){ canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.appendChild(canonical); }
-  canonical.href = "https://rallyflag.gg/dungeon-guide.html?slug=" + dungeon.slug;
-  setMeta('meta[name="twitter:title"]', "content", dungeon.name);
-  setMeta('meta[name="twitter:description"]', "content", dungeonDesc);
 
   function slugify(name){
     return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");

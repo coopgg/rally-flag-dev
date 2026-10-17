@@ -24,7 +24,17 @@ starts at `92e56cd`.
 | — | `92e56cd` | Pantheon key art (manifest only has a placeholder) saved as `assets/art/pantheon.jpg`; `rallyFlagArtUrl` accepts local paths. Live on prod (`3d2bdbd`). |
 | — | `471a9d4` | Xûr "Predicted Next Drop" preview removed from dev's `vendors.html` (it shows his next stock ~a day early); lives only in dev-only `xur-debug.html` now. Dev and prod `vendors.html` are identical, so promotions should apply with no rejects. Dev-only, nothing to promote. |
 
+| next-1 | (see git log: "Static page per raid and dungeon") | **On dev, awaiting review.** Discord/link previews: one generated static page per raid/dungeon (`tools/build-guide-pages.js`), all site links + sitemap + discord-bot pointed at them, old `?slug=` links forward. Bot needs a redeploy to post the new links. |
+
 `fc35fa6` (skills) and the `.claude/*.md` docs are dev-only; never promote them.
+
+## Next up (owner-approved order)
+
+1. Discord link previews — on dev, see table.
+2. Commit the Playwright/axe/CLS checks to the repo + run them on every dev push (also run `tools/build-guide-pages.js --check`).
+3. Home page loads ~180KB of guide data for the featured banner — give it a small summary file.
+4. Official art for Distortions, Tracker, Public Events, Guides overview.
+5. Consider moving the duplicated inline boot script into one file (costs a request).
 
 ## Rescan items (all done and live)
 

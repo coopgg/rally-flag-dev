@@ -181,8 +181,15 @@
 <script src="assets/sets-data.js"></script>
 <script>
 (function(){
-  const slug = new URLSearchParams(window.location.search).get("slug");
+  // Generated per-raid pages (raid-<slug>.html, tools/build-guide-pages.js)
+  // set GUIDE_SLUG. On this template page, an old ?slug= link forwards to
+  // the raid's own page, whose static tags give proper link previews.
+  const slug = window.GUIDE_SLUG || new URLSearchParams(window.location.search).get("slug");
   const raid = window.RaidsData.RAIDS.find(r => r.slug === slug);
+  if (raid && !window.GUIDE_SLUG){
+    location.replace(window.rallyFlagGuideHref("raid", raid.slug) + location.hash);
+    return;
+  }
   const content = document.getElementById("content");
 
   if (!raid){
@@ -191,7 +198,7 @@
     return;
   }
 
-  document.title = raid.name + " - Rally Flag";
+  document.title = raid.name + " Raid Guide - Rally Flag";
   document.getElementById("raid-title").textContent = raid.name;
   // Header sits over the raid's official art.
   if (raid.art){
@@ -200,28 +207,6 @@
     hero.insertAdjacentHTML("afterbegin", '<div class="hero-art"><img src="' + window.rallyFlagArtUrl(raid.art) + '" alt="" fetchpriority="high"></div>');
   }
   document.getElementById("raid-difficulty").textContent = raid.difficulties ? raid.difficulties.join(" · ") : "";
-
-  // Updates the static fallback meta/OG tags with the actual raid once it's
-  // known — helps crawlers that execute JS (Google) and keeps the tags
-  // consistent with the page if someone deep-links here. Non-JS social
-  // unfurl bots (Discord, etc.) still see the static generic fallback
-  // already in the <head>, since they never run this script.
-  function setMeta(selector, attr, value){
-    const el = document.querySelector(selector);
-    if (el) el.setAttribute(attr, value);
-  }
-  const raidDesc = raid.summary ? (raid.summary.length > 160 ? raid.summary.slice(0, 157) + "…" : raid.summary) : ("Everything you need for the " + raid.name + " raid: encounters, armor set bonus, and puzzle solvers.");
-  setMeta('meta[name="description"]', "content", raidDesc);
-  setMeta('meta[property="og:title"]', "content", raid.name);
-  setMeta('meta[property="og:description"]', "content", raidDesc);
-  setMeta('meta[property="og:url"]', "content", "https://rallyflag.gg/raid-guide.html?slug=" + raid.slug);
-  // No static canonical on this page: one shared URL for every raid would
-  // tell search engines all guides are the same page. Set per raid instead.
-  let canonical = document.querySelector('link[rel="canonical"]');
-  if (!canonical){ canonical = document.createElement("link"); canonical.rel = "canonical"; document.head.appendChild(canonical); }
-  canonical.href = "https://rallyflag.gg/raid-guide.html?slug=" + raid.slug;
-  setMeta('meta[name="twitter:title"]', "content", raid.name);
-  setMeta('meta[name="twitter:description"]', "content", raidDesc);
 
   function slugify(name){
     return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");

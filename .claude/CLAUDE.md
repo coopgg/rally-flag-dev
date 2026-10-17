@@ -18,7 +18,7 @@ dev-only files, so apply only the reviewed commit range:
 git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)debug.html' ':(exclude)clan-admin.html' ':(exclude)discord-bot' \
   ':(exclude)api-debug.html' ':(exclude)xur-debug.html' ':(exclude).claude' \
-  ':(exclude)skills-lock.json' ':(exclude).gitignore' > /tmp/promote.patch
+  ':(exclude)skills-lock.json' ':(exclude).gitignore' ':(exclude)tools' > /tmp/promote.patch
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
@@ -60,8 +60,17 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
 - **Light mode colours:** use `--accent-text` for accent-coloured text and
   `--accent-fill` / `--accent-fill-deep` with `--on-accent` for solid fills.
   Raw `--accent` fails contrast on light backgrounds.
-- **Canonical tags** match each page's `og:url`. Raid/dungeon guide pages
-  have no static canonical; script sets one per `?slug=`.
+- **Raid/dungeon guides are generated pages.** `raid-<slug>.html` /
+  `dungeon-<slug>.html` (22 files) are built by `node tools/build-guide-pages.js`
+  from the templates `raid-guide.html` / `dungeon-guide.html` plus the data
+  files, so each has its own title, description, canonical and og/twitter
+  tags with the activity's art (link previews never run JS). After editing a
+  template or raids-/dungeons-data.js, re-run it; `--check` exits 1 if any
+  page is stale. Never hand-edit the generated files. The templates forward
+  old `?slug=` links to the generated page. Link with
+  `rallyFlagGuideHref(kind, slug)` (nav.js). `tools/` is dev-only.
+- **Canonical tags** match each page's `og:url` (the generated guide pages
+  set their own).
 - **Cosmic layer + official art.** `theme.css` ("Cosmic layer") draws the
   starfield (`body::before`), panel edge/glow and art styles from the theme
   tokens. Raids/dungeons carry `art` (pgcrImage path from Bungie's

@@ -290,20 +290,20 @@
   const raid = RAIDS.find(r => r.slug === featured.raids[1]) || RAIDS.find(r => r.slug === featured.raids[0]);
   if (!raid) return;
   const tiles = [
-    ...featured.raids.filter(s => s !== raid.slug).map(s => ["Featured raid", RAIDS.find(r => r.slug === s), "raid-guide.html?slug="]),
-    ...featured.dungeons.slice(0, 2).map(s => ["Featured dungeon", DUNGEONS.find(d => d.slug === s), "dungeon-guide.html?slug="])
+    ...featured.raids.filter(s => s !== raid.slug).map(s => ["Featured raid", RAIDS.find(r => r.slug === s), "raid"]),
+    ...featured.dungeons.slice(0, 2).map(s => ["Featured dungeon", DUNGEONS.find(d => d.slug === s), "dungeon"])
   ].filter(t => t[1]);
   const ms = F.msUntilNextReset(), days = Math.floor(ms / 864e5), hours = Math.floor(ms / 36e5) % 24;
   const art = window.rallyFlagArtUrl;
   document.getElementById("feature").innerHTML =
-    '<a class="feature-main" href="raid-guide.html?slug=' + raid.slug + '">' +
+    '<a class="feature-main" href="' + window.rallyFlagGuideHref("raid", raid.slug) + '">' +
       (raid.art ? '<div class="feature-art"><img src="' + art(raid.art) + '" alt="" fetchpriority="high"></div>' : '') +
       '<div class="feature-body"><div class="feature-kicker">Featured raid this week</div>' +
       '<div class="feature-name">' + raid.name + '</div>' +
       '<div class="feature-meta">' + raid.encounters.length + ' encounters · rotates in ' + days + 'd ' + hours + 'h</div>' +
       '<span class="feature-cta">Open the guide&nbsp;<span aria-hidden="true">\u2192</span></span></div></a>' +
-    '<div class="feature-tiles">' + tiles.map(([kind, a, base]) =>
-      '<a class="feature-tile" href="' + base + a.slug + '">' + (a.art ? '<img src="' + art(a.art) + '" alt="" loading="lazy">' : '') +
+    '<div class="feature-tiles">' + tiles.map(([kind, a, guideKind]) =>
+      '<a class="feature-tile" href="' + window.rallyFlagGuideHref(guideKind, a.slug) + '">' + (a.art ? '<img src="' + art(a.art) + '" alt="" loading="lazy">' : '') +
       '<span><span class="feature-tile-kind">' + kind + '</span><span class="feature-tile-name">' + a.name + '</span></span></a>').join("") +
     '</div>';
 })();

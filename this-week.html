@@ -232,7 +232,7 @@
   // One row per category (raids / dungeons) instead of one mixed grid —
   // each row is always exactly 3: the always-featured newest activity
   // plus the 2 rotating picks, which fits the 3-per-row card layout.
-  function renderCategoryCards(containerId, kind, items, hrefPrefix, isPrediction, alwaysFeaturedSlug){
+  function renderCategoryCards(containerId, kind, items, guideKind, isPrediction, alwaysFeaturedSlug){
     const contentEl = document.getElementById(containerId);
 
     const setsBySlug = {};
@@ -249,7 +249,7 @@
       kind: kind,
       name: item.name,
       art: item.art,
-      href: hrefPrefix + item.slug,
+      href: window.rallyFlagGuideHref(guideKind, item.slug),
       armorSlugs: item.armorSlugs || [],
       alwaysFeatured: item.slug === alwaysFeaturedSlug
     }));
@@ -312,10 +312,10 @@
     const dungeonList = window.DungeonsData ? window.DungeonsData.DUNGEONS : [];
 
     renderIronBanner();
-    renderCategoryCards("featured-raids-content", "Raid", toEntries(FEATURED_THIS_WEEK.raids, raidList), "raid-guide.html?slug=", false, ALWAYS_FEATURED_RAID_SLUG);
-    renderCategoryCards("featured-dungeons-content", "Dungeon", toEntries(FEATURED_THIS_WEEK.dungeons, dungeonList), "dungeon-guide.html?slug=", false, ALWAYS_FEATURED_DUNGEON_SLUG);
-    renderCategoryCards("next-week-raids-content", "Raid", toEntries(FEATURED_NEXT_WEEK.raids, raidList), "raid-guide.html?slug=", true, ALWAYS_FEATURED_RAID_SLUG);
-    renderCategoryCards("next-week-dungeons-content", "Dungeon", toEntries(FEATURED_NEXT_WEEK.dungeons, dungeonList), "dungeon-guide.html?slug=", true, ALWAYS_FEATURED_DUNGEON_SLUG);
+    renderCategoryCards("featured-raids-content", "Raid", toEntries(FEATURED_THIS_WEEK.raids, raidList), "raid", false, ALWAYS_FEATURED_RAID_SLUG);
+    renderCategoryCards("featured-dungeons-content", "Dungeon", toEntries(FEATURED_THIS_WEEK.dungeons, dungeonList), "dungeon", false, ALWAYS_FEATURED_DUNGEON_SLUG);
+    renderCategoryCards("next-week-raids-content", "Raid", toEntries(FEATURED_NEXT_WEEK.raids, raidList), "raid", true, ALWAYS_FEATURED_RAID_SLUG);
+    renderCategoryCards("next-week-dungeons-content", "Dungeon", toEntries(FEATURED_NEXT_WEEK.dungeons, dungeonList), "dungeon", true, ALWAYS_FEATURED_DUNGEON_SLUG);
   }
 
   renderFeatured();

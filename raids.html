@@ -80,7 +80,7 @@
   window.RaidsData.RAIDS.forEach(raid => {
     const card = document.createElement("a");
     card.className = "activity-card panel-card";
-    card.href = "raid-guide.html?slug=" + raid.slug;
+    card.href = window.rallyFlagGuideHref("raid", raid.slug);
     const difficultyHtml = raid.difficulties
       ? '<div class="activity-difficulty">' + raid.difficulties.join(" \u00b7 ") + '</div>'
       : '';
