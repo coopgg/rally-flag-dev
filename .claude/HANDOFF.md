@@ -5,11 +5,11 @@ Written 2026-10-16 (updated 2026-10-17) by a Claude Code cloud session for the n
 
 ## Where things stand
 
-**Production (`coopgg/rally-flag`, rallyflag.gg) is at `3d2bdbd`, synced
-with dev up to `92e56cd` (Pantheon key art).** That includes everything below: the first round
+**Production (`coopgg/rally-flag`, rallyflag.gg) is at `f6fbab8`, synced
+with dev up to `6681030` (link previews + encounter cards).** That includes everything below: the first round
 (14-item review, cache fix, sign-in fixes, Auto/Light/Dark, iPhone
 `minimal-ui`) and the whole skills rescan, items 1–8. Next promotion range
-starts at `92e56cd`.
+starts at `6681030`. (That range no longer spans the Xûr removal, so vendors.html won't reject again.)
 
 | Item | Dev commit(s) | What |
 |---|---|---|
@@ -24,14 +24,14 @@ starts at `92e56cd`.
 | — | `92e56cd` | Pantheon key art (manifest only has a placeholder) saved as `assets/art/pantheon.jpg`; `rallyFlagArtUrl` accepts local paths. Live on prod (`3d2bdbd`). |
 | — | `471a9d4` | Xûr "Predicted Next Drop" preview removed from dev's `vendors.html` (it shows his next stock ~a day early); lives only in dev-only `xur-debug.html` now. Dev and prod `vendors.html` are identical, so promotions should apply with no rejects. Dev-only, nothing to promote. |
 
-| next-1 | `b6044b3` | **On dev, awaiting review.** Discord/link previews: one generated static page per raid/dungeon (`tools/build-guide-pages.js`), all site links + sitemap + discord-bot pointed at them, old `?slug=` links forward. Bot needs a redeploy to post the new links. |
-| next-2 | `6681030` | **On dev, awaiting review.** Guides: one card per encounter (h2 "Encounters" heading + toggle, h3 encounter titles, bigger badge), jump links land 16px above the card. |
+| next-1 | `b6044b3` | **Live on prod (`f6fbab8`).** Discord/link previews: one generated static page per raid/dungeon (`tools/build-guide-pages.js`), all site links + sitemap + discord-bot pointed at them, old `?slug=` links forward. Bot needs a redeploy to post the new links. |
+| next-2 | `6681030` | **Live on prod (`f6fbab8`).** Guides: one card per encounter (h2 "Encounters" heading + toggle, h3 encounter titles, bigger badge), jump links land 16px above the card. |
 
 `fc35fa6` (skills) and the `.claude/*.md` docs are dev-only; never promote them.
 
 ## Next up (owner-approved order)
 
-1. Discord link previews — on dev, see table.
+1. Discord link previews — done and live; bot redeploy still needed for its links.
 2. Commit the Playwright/axe/CLS checks to the repo + run them on every dev push (also run `tools/build-guide-pages.js --check`).
 3. Home page loads ~180KB of guide data for the featured banner — give it a small summary file.
 4. Official art for Distortions, Tracker, Public Events, Guides overview.
