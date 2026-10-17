@@ -12,7 +12,8 @@
        that fails to decode)
      - no visible text under 12px
      - layout shift (CLS) under 0.1 (dark mode, desktop + phone)
-   all with the Arc theme; then every other theme × dark/light (desktop):
+   all with the Arc theme; with THEMES=1, also every other theme ×
+   dark/light (desktop):
      - no colour-contrast problems (axe color-contrast + link-in-text-block)
    plus, once:
      - generated guide pages are up to date (tools/build-guide-pages.js --check)
@@ -23,25 +24,47 @@
      - every internal .html link on every page points at a real file
 
    Usage (from tests/):  npm ci && npm run check
+   THEMES=1 adds the theme pass (~6 more minutes).
+   LIVE_URL=https://rallyflag.gg/ checks the live site instead of this
+   working tree: pages come from its sitemap, links are checked over
+   HTTP, and the file-only checks (generated pages, boot script) are
+   skipped. The daily workflow runs LIVE_URL + THEMES.
    Exit code 1 on any failure. Writes a summary to $GITHUB_STEP_SUMMARY
    when set (GitHub Actions).
    ============================================================ */
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const { chromium } = require("playwright");
+const { chromium, request } = require("playwright");
 
 // SITE_ROOT=/path/to/rally-flag checks the prod clone before a promotion.
 const ROOT = path.resolve(process.env.SITE_ROOT || path.join(__dirname, ".."));
-const BASE = "https://coopgg.github.io/rally-flag-dev/";
+const LIVE = process.env.LIVE_URL ? process.env.LIVE_URL.replace(/\/?$/, "/") : null;
+const BASE = LIVE || "https://coopgg.github.io/rally-flag-dev/";
 const AXE = fs.readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
 const TYPES = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".json": "application/json",
   ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".xml": "application/xml", ".txt": "text/plain" };
 
 // Dev-only tools and pages that need OAuth parameters aren't public pages.
 const SKIP = new Set(["debug.html", "api-debug.html", "xur-debug.html", "clan-admin.html", "oauth-callback.html"]);
-const pages = fs.readdirSync(ROOT).filter(f => f.endsWith(".html") && !SKIP.has(f)).sort();
+let pages = fs.readdirSync(ROOT).filter(f => f.endsWith(".html") && !SKIP.has(f)).sort();
 pages.push("no/such/page"); // served by 404.html, like GitHub Pages
+
+// Live-mode HTTP requests (honours HTTPS_PROXY, unlike Node's fetch).
+let http = null;
+async function httpGet(url, method = "get"){
+  if (!http) http = await request.newContext(process.env.HTTPS_PROXY ? { proxy: { server: process.env.HTTPS_PROXY } } : {});
+  return http[method](url, { failOnStatusCode: false });
+}
+
+// The live site's own page list: its sitemap (the root URL is index.html).
+async function livePages(){
+  const res = await httpGet(BASE + "sitemap.xml");
+  if (!res.ok()) throw new Error("sitemap.xml: HTTP " + res.status());
+  const urls = [...(await res.text()).matchAll(/<loc>([^<]*)<\/loc>/g)].map(m => m[1]);
+  const list = urls.map(u => u.replace(/^https?:\/\/[^/]+\//, "") || "index.html");
+  return [...new Set(list)].sort().concat("no/such/page");
+}
 const GUIDE_RE = /^(raid|dungeon)-(?!guide\.html$).+\.html$/;
 
 const COMBOS = [
@@ -86,7 +109,7 @@ async function newContext(browser, combo, opts = {}){
     } catch (e) {}
   }, [combo.mode, combo.theme || "arc"]);
   await context.route(/twitch\.tv|twitch\.com/, r => r.abort());
-  await serveFrom(context);
+  if (!LIVE) await serveFrom(context);
   return context;
 }
 
@@ -166,7 +189,7 @@ async function checkCombo(browser, combo, linkSink){
 // Theme colours only change colour, so this pass runs just axe's two colour
 // rules, desktop only, four themes at a time.
 async function checkThemes(browser){
-  const navJs = fs.readFileSync(path.join(ROOT, "assets", "nav.js"), "utf8");
+  const navJs = LIVE ? await (await httpGet(BASE + "assets/nav.js")).text() : fs.readFileSync(path.join(ROOT, "assets", "nav.js"), "utf8");
   const declared = [];
   for (const m of navJs.matchAll(/const (?:SUBCLASS_)?THEMES = (?:SUBCLASS_THEMES\.concat\()?\[([^\]]*)\]/g))
     declared.push(...[...m[1].matchAll(/"([a-z]+)"/g)].map(x => x[1]));
@@ -249,16 +272,23 @@ async function checkRedirects(browser){
   record("old ?slug= guide links forward to the right page", !bad.length, bad.join("; "));
 }
 
-function checkLinks(links){
-  const missing = new Set(), oldStyle = new Set();
+async function checkLinks(links){
+  const missing = new Set(), oldStyle = new Set(), status = new Map();
   for (const [from, href] of links){
     if (/^(https?:|mailto:|#|javascript:)/.test(href) || !/\.html/.test(href)) continue;
     const file = href.split("#")[0].split("?")[0];
+    if (/(raid|dungeon)-guide\.html\?slug=/.test(href)) oldStyle.add(from + " → " + href);
+    if (LIVE){
+      // Every page lives at the root (404.html sets <base> to it).
+      const url = new URL(file, BASE).href;
+      if (!status.has(url)) status.set(url, await httpGet(url, "head").then(r => r.status(), e => e.message.split("\n")[0]));
+      if (status.get(url) !== 200) missing.add(from + " → " + href + " (" + status.get(url) + ")");
+      continue;
+    }
     // On the prod clone, nav.js's Debug entry still renders (we serve it at
     // the dev host); on rallyflag.gg it's hidden, so dev-only pages are fine.
     if (process.env.SITE_ROOT && SKIP.has(file)) continue;
     if (!fs.existsSync(path.join(ROOT, file))) missing.add(from + " → " + href);
-    if (/(raid|dungeon)-guide\.html\?slug=/.test(href)) oldStyle.add(from + " → " + href);
   }
   record(`internal links point at real pages (${links.length} links checked)`, !missing.size, [...missing].slice(0, 10).join("; "));
   record("no internal links use the old ?slug= guide URLs", !oldStyle.size, [...oldStyle].slice(0, 10).join("; "));
@@ -266,22 +296,23 @@ function checkLinks(links){
 
 (async () => {
   const started = Date.now();
-  console.log(`Checking ${pages.length} pages × ${COMBOS.length} views…`);
-  checkGeneratedPages();
+  if (LIVE) pages = await livePages();
+  console.log(`Checking ${LIVE || ROOT}: ${pages.length} pages × ${COMBOS.length} views…`);
+  if (!LIVE) checkGeneratedPages();
   const browser = await chromium.launch();
   const links = [];
   await Promise.all(COMBOS.map((combo, i) => checkCombo(browser, combo, i === 0 ? links : null)));
-  if (process.env.SKIP_THEMES) console.log("·  theme pass skipped (SKIP_THEMES)");
-  else await checkThemes(browser);
+  if (process.env.THEMES) await checkThemes(browser);
+  else console.log("·  theme pass skipped (THEMES=1 runs it; the daily live check does)");
   await checkRedirects(browser);
-  checkLinks(links);
+  await checkLinks(links);
   await browser.close();
 
   const secs = Math.round((Date.now() - started) / 1000);
   const summary = `${results.length - failures.length}/${results.length} checks passed in ${secs}s`;
   console.log("\n" + summary);
   if (process.env.GITHUB_STEP_SUMMARY){
-    const md = ["## Rally Flag site checks", "", summary, "", "| | Check | Details |", "|---|---|---|",
+    const md = ["## Rally Flag site checks" + (LIVE ? " (live: " + LIVE + ")" : ""), "", summary, "", "| | Check | Details |", "|---|---|---|",
       ...results.map(r => `| ${r.ok ? "✅" : "❌"} | ${r.check} | ${(r.detail || "").replace(/\|/g, "\\|").slice(0, 600)} |`)].join("\n");
     fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, md + "\n");
   }

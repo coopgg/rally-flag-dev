@@ -11,11 +11,23 @@ there), at desktop/phone × dark/light, and fails if any page has:
 - visible text under 12px
 - layout shift (CLS) of 0.1 or more (dark mode, desktop + phone)
 
-Those run with the Arc theme. A second pass loads every page in each of the
-other 8 themes, dark and light, at desktop width, and fails on any axe
-colour-contrast or link-in-text-block problem. A theme added to `THEMES` in
-`assets/nav.js` but not to `OTHER_THEMES` in `site-check.js` fails the run.
-`SKIP_THEMES=1 npm run check` skips this pass for a quicker local run.
+Those run with the Arc theme. `THEMES=1` adds a second pass that loads
+every page in each of the other 8 themes, dark and light, at desktop width,
+and fails on any axe colour-contrast or link-in-text-block problem. A theme
+added to `THEMES` in `assets/nav.js` but not to `OTHER_THEMES` in
+`site-check.js` fails that pass. It adds about 6 minutes.
+
+## The live site, daily
+
+`.github/workflows/live-check.yml` runs the checks against
+https://rallyflag.gg once a day (13:07 UTC) with the theme pass, and can be
+started by hand from the Actions tab ("Live site check" → Run workflow).
+`LIVE_URL` switches the script to a live site: pages come from its
+`sitemap.xml` (plus a missing path for the 404 page), links are checked
+over HTTP, and the file-only checks (generated pages, boot scripts) are
+skipped. A failed scheduled run emails the repo owner.
+
+Locally: `LIVE_URL=https://rallyflag.gg/ THEMES=1 npm run check`.
 
 It also checks that the generated guide pages are up to date
 (`tools/build-guide-pages.js --check`), that every page's inline boot
@@ -40,8 +52,8 @@ Before a promotion, check the prod clone the same way:
 check is skipped there; it runs on dev).
 
 GitHub runs the same thing on every push (`.github/workflows/site-checks.yml`);
-the run's summary page lists every check. Takes about 9 minutes (3 without
-the theme pass).
+the run's summary page lists every check. Takes about 3 minutes; the theme
+pass is left to the daily live check.
 
 Live Bungie data is fetched during the run, so a Bungie outage can show up
 as a failure; re-run before digging in.
