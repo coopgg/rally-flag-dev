@@ -57,6 +57,8 @@
     display:flex; flex-direction:column;
   }
   .sector-card .loot-pill{ margin-top:auto; }
+  .sector-card{ overflow:hidden; }
+  .sector-card .art-thumb{ margin:-22px -20px 14px; }
   .sector-planet{
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
     text-transform:uppercase; color:var(--text-dimmer); margin-bottom:8px;
@@ -112,6 +114,37 @@
   // Master-difficulty Lost Sectors drop that planet's Tier 5 "Destination"
   // armor set (same sets tracked in armor-set-bonuses.html) — the set is
   // fixed per planet, not per individual sector.
+  // Each Lost Sector's official image (its pgcrImage in Bungie's
+  // DestinyActivityDefinition).
+  const LOST_SECTOR_ART = {
+    "Veles Labyrinth": "/img/destiny_content/pgcr/cosmodrome-lost-sector-dry-sea.jpg",
+    "Exodus Garden 2A": "/img/destiny_content/pgcr/cosmodrome-lost-sector-graveyard.jpg",
+    "Aphelion's Rest": "/img/destiny_content/pgcr/dreaming_city_aphelions_rest.jpg",
+    "Bay of Drowned Wishes": "/img/destiny_content/pgcr/dreaming_city_bay_of_drowned_wishes.jpg",
+    "Chamber of Starlight": "/img/destiny_content/pgcr/dreaming_city_chamber_of_starlight.jpg",
+    "Scavenger's Den": "/img/destiny_content/pgcr/edz_lost_sector_scavengers_den.jpg",
+    "Excavation Site XII": "/img/destiny_content/pgcr/edz_lost_sector_excavation_site_xii.jpg",
+    "Skydock IV": "/img/destiny_content/pgcr/skydock_iv.jpg",
+    "The Quarry": "/img/destiny_content/pgcr/edz_lost_sector_the_quarry.jpg",
+    "Concealed Void": "/img/destiny_content/pgcr/europa-lost-sector-frost.jpg",
+    "Bunker E15": "/img/destiny_content/pgcr/europa-lost-sector-overhang.jpg",
+    "Perdition": "/img/destiny_content/pgcr/europa-lost-sector-shear.jpg",
+    "K1 Revelation": "/img/destiny_content/pgcr/moon_k1_revelation.jpg",
+    "K1 Crew Quarters": "/img/destiny_content/pgcr/moon_k1_crew_quarters.jpg",
+    "K1 Logistics": "/img/destiny_content/pgcr/moon_k1_logistics.jpg",
+    "K1 Communion": "/img/destiny_content/pgcr/moon_k1_communion.jpg",
+    "Thrilladrome": "/img/destiny_content/pgcr/neomuna_lost_sector_thrilladrome.jpg",
+    "Hydroponics Delta": "/img/destiny_content/pgcr/neomuna_lost_sector_hydroponics_delta.jpg",
+    "Gilded Precept": "/img/destiny_content/pgcr/neomuna_lost_sector_gilded_precept.jpg",
+    "The Conflux": "/img/destiny_content/pgcr/nessus_the_conflux.jpg",
+    "The Broken Deep": "/img/destiny_content/pgcr/barrens.jpg",
+    "The Blooming Deep": "/img/destiny_content/pgcr/lotus.jpg",
+    "The Forgotten Deep": "/img/destiny_content/pgcr/shire.jpg",
+    "Metamorphosis": "/img/destiny_content/pgcr/bayou_ls.jpg",
+    "Sepulcher": "/img/destiny_content/pgcr/canal_ls.jpg",
+    "Extraction": "/img/destiny_content/pgcr/gateway_ls.jpg"
+  };
+
   const LOST_SECTOR_CYCLES = [
     { planet: "Cosmodrome",   sectors: ["Veles Labyrinth", "Exodus Garden 2A"], armorName: "Seventh Seraph", armorSlug: "seventh-seraph" },
     { planet: "Dreaming City", sectors: ["Aphelion's Rest", "Bay of Drowned Wishes", "Chamber of Starlight"], armorName: "Reverie Dawn", armorSlug: "reverie-dawn" },
@@ -165,6 +198,7 @@
     const grid = document.getElementById("sector-grid");
     grid.innerHTML = todaysSectors().map(entry =>
       '<div class="sector-card panel-card">' +
+        window.rallyFlagArtThumb({ name: entry.sector, art: LOST_SECTOR_ART[entry.sector] }) +
         '<div class="sector-planet">' + entry.planet + '</div>' +
         '<div class="sector-name">' + entry.sector + '</div>' +
         '<a class="loot-pill" href="armor-set-bonuses.html?highlight=' + entry.armorSlug + '">Tier 5 → ' + entry.armorName + '</a>' +

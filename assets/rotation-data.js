@@ -2,17 +2,19 @@
    Distortion rotation data — single source of truth.
    Both distortions.html and rotation.html read from this file,
    so recalibrating the anchor only ever needs to happen in one place.
+   `art` is the destination's official image (pgcrImage of its patrol /
+   free-roam activity in Bungie's DestinyActivityDefinition).
    ============================================================ */
 window.DistortionData = (function(){
 
   const ROTATION = [
-    { name: "Cosmodrome",              loot: "Seventh Seraph", slug: "seventh-seraph" },
-    { name: "EDZ",                     loot: "Wildwood",       slug: "wildwood" },
-    { name: "Dreaming City",           loot: "Reverie Dawn",   slug: "reverie-dawn" },
-    { name: "Savath\u00fbn's Throne World", loot: "Veritas",   slug: "veritas" },
-    { name: "Moon",                    loot: "Dreambane",      slug: "dreambane" },
-    { name: "Europa",                  loot: "Crystocrene",    slug: "crystocrene" },
-    { name: "Nessus",                  loot: "Exodus Down",    slug: "exodus-down" }
+    { name: "Cosmodrome",              loot: "Seventh Seraph", slug: "seventh-seraph", art: "/img/destiny_content/pgcr/cosmodrome-explore.jpg" },
+    { name: "EDZ",                     loot: "Wildwood",       slug: "wildwood", art: "/img/destiny_content/pgcr/patrol_edz.jpg" },
+    { name: "Dreaming City",           loot: "Reverie Dawn",   slug: "reverie-dawn", art: "/img/destiny_content/pgcr/free_roam_dreaming_city.jpg" },
+    { name: "Savath\u00fbn's Throne World", loot: "Veritas",   slug: "veritas", art: "/img/destiny_content/pgcr/throneworld_freeroam.jpg" },
+    { name: "Moon",                    loot: "Dreambane",      slug: "dreambane", art: "/img/destiny_content/pgcr/patrol_moon.jpg" },
+    { name: "Europa",                  loot: "Crystocrene",    slug: "crystocrene", art: "/img/destiny_content/pgcr/europa-mission-club.jpg" },
+    { name: "Nessus",                  loot: "Exodus Down",    slug: "exodus-down", art: "/img/destiny_content/pgcr/patrol_nessus.jpg" }
   ];
 
   // Anchor point: a UTC hour boundary confirmed live in-game, paired with

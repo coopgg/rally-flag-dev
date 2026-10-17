@@ -30,7 +30,7 @@
   /* ---------- HUD card ---------- */
   .hud-wrap{ max-width:640px; margin:40px auto 0; padding:0 24px; position:relative; }
   .hud-card{
-    position:relative; padding:44px 40px 38px; overflow:hidden; text-align:center;
+    position:relative; isolation:isolate; padding:44px 40px 38px; overflow:hidden; text-align:center;
     background: linear-gradient(180deg, var(--panel), rgba(255,255,255,0.01));
   }
   .hud-card::before{
@@ -40,6 +40,14 @@
     opacity:0.35;
     animation: sweep 5s ease-in-out infinite;
     pointer-events:none;
+  }
+  /* The distorted destination's official art, fading into the card so the
+     text over it stays readable (theme bg, so it works in light mode too). */
+  .hud-art{ position:absolute; inset:0; z-index:-1; }
+  .hud-art img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .hud-art::after{
+    content:""; position:absolute; inset:0;
+    background:linear-gradient(180deg, color-mix(in srgb, var(--bg) 55%, transparent) 0%, color-mix(in srgb, var(--bg) 82%, transparent) 40%, var(--bg) 78%);
   }
   @keyframes sweep{
     0%{ transform: translateX(-120%); }
@@ -103,6 +111,8 @@
     display:flex; flex-direction:column;
   }
   .next-card .loot-pill{ margin-top:auto; }
+  .next-card{ overflow:hidden; }
+  .next-card .art-thumb{ margin:-22px -20px 14px; }
   .next-time{ font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer); margin-bottom:10px; }
   .next-dest{ font-family:'Oswald', sans-serif; font-weight:600; font-size:19px; color:var(--text); margin-bottom:14px; }
 </style>
@@ -126,6 +136,7 @@
 
 <div class="hud-wrap">
   <div class="hud-card panel-card">
+    <div class="hud-art"><img id="hud-art-img" alt="" hidden></div>
     <div class="hud-label">Distorted Right Now</div>
     <h2 class="hud-dest" id="current-dest">…</h2>
     <div class="hud-countdown"><span class="clock" id="countdown">--:--</span> until the shift</div>
@@ -178,6 +189,9 @@
     const current = D.destinationAt(hourStart);
 
     document.getElementById("current-dest").textContent = current.name;
+    const hudArt = document.getElementById("hud-art-img");
+    hudArt.hidden = !current.art;
+    if (current.art) hudArt.src = window.rallyFlagArtUrl(current.art);
     document.getElementById("cta-btn").textContent = "Farm " + current.loot + " at higher tier";
 
     const nineTouchedBox = document.getElementById("nine-touched-box");
@@ -199,6 +213,7 @@
       const card = document.createElement("div");
       card.className = "next-card panel-card";
       card.innerHTML =
+        window.rallyFlagArtThumb(dest) +
         '<div class="next-time">' + D.fmtTime(slotStart) + '</div>' +
         '<div class="next-dest">' + dest.name + '</div>' +
         '<a class="loot-pill" href="armor-set-bonuses.html?highlight=' + dest.slug + '">' + dest.loot + '</a>';

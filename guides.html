@@ -36,7 +36,9 @@
     position:relative; display:block; text-decoration:none;
     flex:0 1 240px; padding:32px 28px; text-align:center;
     transition: border-color 0.2s ease, background 0.2s ease;
+    overflow:hidden;
   }
+  .link-card .art-thumb{ margin:-32px -28px 22px; }
   .link-card:hover, .link-card:focus-visible{ border-color:var(--accent); background:var(--accent-dim); }
   .link-eyebrow{
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.14em;
@@ -66,16 +68,19 @@
 
 <div class="link-grid">
   <a href="raids.html" class="link-card panel-card">
+    <div class="art-thumb"><img src="https://www.bungie.net/img/destiny_content/pgcr/raid_splinter.jpg" alt="" loading="lazy"></div>
     <div class="link-eyebrow">11 Raids</div>
     <div class="link-title">Raids</div>
     <div class="link-desc">Every raid in the game, one pick away from its own guide.</div>
   </a>
   <a href="dungeons.html" class="link-card panel-card">
+    <div class="art-thumb"><img src="https://www.bungie.net/img/destiny_content/pgcr/dungeon_prophecy.jpg" alt="" loading="lazy"></div>
     <div class="link-eyebrow">11 Dungeons</div>
     <div class="link-title">Dungeons</div>
     <div class="link-desc">Every dungeon in the game, one pick away from its own guide.</div>
   </a>
   <a href="public-events.html" class="link-card panel-card">
+    <div class="art-thumb"><img src="https://www.bungie.net/img/destiny_content/pgcr/patrol_edz.jpg" alt="" loading="lazy"></div>
     <div class="link-eyebrow">Patrol</div>
     <div class="link-title">Public Events</div>
     <div class="link-desc">The hidden trigger to flip every public event Heroic for better loot.</div>
