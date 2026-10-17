@@ -66,7 +66,9 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   tokens. Raids/dungeons carry `art` (pgcrImage path from Bungie's
   DestinyActivityDefinition) in their data files; `rallyFlagArtUrl()` /
   `rallyFlagArtThumb()` in `nav.js` build the URL / card thumbnail. New raid
-  or dungeon → look up its pgcrImage in the manifest and add `art`.
+  or dungeon → look up its pgcrImage in the manifest and add `art`. If the
+  manifest only has a placeholder (Pantheon), save key art as a 1280×720 JPG
+  in `assets/art/` and use that relative path.
 - **`404.html`** is served for any missing path at any depth; it sets `<base>`
   to the site root and writes its asset tags from script. Keep that pattern.
 

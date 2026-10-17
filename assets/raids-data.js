@@ -6,6 +6,8 @@
    write them the same way you did the FAQ, in your own words.
    `art` is the raid's official image path (pgcrImage from Bungie's
    DestinyActivityDefinition); window.rallyFlagArtUrl() turns it into a URL.
+   Pantheon's pgcrImage is a placeholder, so it uses Bungie's key art
+   saved locally in assets/art/.
    ============================================================ */
 window.RaidsData = (function(){
   const RAIDS = [
@@ -786,7 +788,7 @@ window.RaidsData = (function(){
           ],
           wipe:"Sending a Banishment pair through the portal separately locks the second player out. Damaging an echo with the wrong boss's Undoing wastes the kill, and shooting a Locus's outer shell while buffed — instead of the inner core while unbuffed — does nothing, so burning too much time on any of it lets the loop reset before the room or Locus is finished." }
       ] },
-    { name:"Pantheon", slug:"pantheon", armorSlugs:["pantheos-resplendent"],
+    { name:"Pantheon", slug:"pantheon", art:"assets/art/pantheon.jpg", armorSlugs:["pantheos-resplendent"],
       summary:"Pantheon isn't a traditional raid — it's three ways to fight vaulted raid bosses without running the full raids. Calus Resplendent runs the three Leviathan-era bosses (Argos, Gahlran, Emperor Calus) close to their originals. Morgeth Surpassing takes three bosses from three different raids — Warpriest (King's Fall), Consecrated Mind (Garden of Salvation), Morgeth (Last Wish) — each merged with the non-boss encounter that originally preceded it. The Gauntlet strings all six together and adds a seventh: Insurrection Prime, the returning final boss of the vaulted Scourge of the Past raid.",
       encounters:[
         { name:"Argos, Planetary Core (Calus Resplendent)",

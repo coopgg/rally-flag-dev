@@ -118,8 +118,9 @@
   // nav must still render, just without remembering the choice.
   // Official activity art. raids-data.js / dungeons-data.js store each
   // activity's pgcrImage path (`art`); these turn it into a URL and into
-  // the 16:9 card thumbnail. No art (Pantheon) → the name's initials.
-  window.rallyFlagArtUrl = path => path ? "https://www.bungie.net" + path : "";
+  // the 16:9 card thumbnail. A path without a leading "/" is a local file
+  // (assets/art/). No art → the name's initials.
+  window.rallyFlagArtUrl = path => !path ? "" : path.charAt(0) === "/" ? "https://www.bungie.net" + path : path;
   window.rallyFlagArtThumb = (item, eager) => {
     const url = window.rallyFlagArtUrl(item.art);
     const initials = item.name.replace(/^The /, "").split(/\s+/).map(w => w[0]).join("").slice(0, 2);
