@@ -11,11 +11,11 @@
    remembers it from then on until changed via the menu.
    ============================================================ */
 (function(){
-  // Cosmic isn't a subclass, so first-time visitors still get a random
-  // subclass theme (SUBCLASS_THEMES); Cosmic is there to pick.
+  // Cosmic / Aurora / Eclipse aren't subclasses, so first-time visitors
+  // still get a random subclass theme (SUBCLASS_THEMES); those are there to pick.
   const SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
-  const THEMES = SUBCLASS_THEMES.concat(["cosmic"]);
-  const THEME_LABELS = { solar: "Solar", void: "Void", arc: "Arc", stasis: "Stasis", strand: "Strand", prismatic: "Prismatic", cosmic: "Cosmic" };
+  const THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
+  const THEME_LABELS = { solar: "Solar", void: "Void", arc: "Arc", stasis: "Stasis", strand: "Strand", prismatic: "Prismatic", cosmic: "Cosmic", aurora: "Aurora", eclipse: "Eclipse" };
   const STORAGE_THEME_KEY = "rallyflag_theme";
   // Mode preference: "light" or "dark" when the visitor picked one; no
   // value means Auto (follow the device's prefers-color-scheme).
@@ -115,9 +115,11 @@
     stasis: "#7fb9ff",
     strand: "#3ddc84",
     prismatic: "#ff6fd5",
-    cosmic: "linear-gradient(135deg, #3b82f6, #8b5cf6)"
+    cosmic: "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+    aurora: "linear-gradient(135deg, #2dd4bf, #ec4899)",
+    eclipse: "linear-gradient(135deg, #fbbf24, #dc2626)"
   };
-  // Cosmic has no Bungie subclass icon; a small four-point star instead.
+  // The non-subclass themes have no Bungie icon; a small four-point star instead.
   const COSMIC_ICON_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff" aria-hidden="true"><path d="M12 1.5l2.6 7.9 7.9 2.6-7.9 2.6L12 22.5l-2.6-7.9L1.5 12l7.9-2.6z"/></svg>';
   function themeIconHtml(theme){
     return THEME_ICON_PATHS[theme] ? '<img src="' + BUNGIE_ROOT + THEME_ICON_PATHS[theme] + '" alt="">' : COSMIC_ICON_SVG;

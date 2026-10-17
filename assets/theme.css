@@ -31,6 +31,12 @@
    mock-up (blue accent, violet glow and nebula, deep-space background). */
 [data-theme="cosmic"]{ --accent:#7aa2ff; --accent-bright:#c4b5fd; --accent-dim: rgba(139,92,246,0.16); --glow: rgba(139,92,246,0.5); }
 [data-mode="dark"][data-theme="cosmic"]{ --bg:#05060f; }
+/* Aurora: teal accent, magenta nebula, deep teal-black. */
+[data-theme="aurora"]{ --accent:#3ee6c1; --accent-bright:#b8fff0; --accent-dim: rgba(236,72,153,0.15); --glow: rgba(62,230,193,0.42); }
+[data-mode="dark"][data-theme="aurora"]{ --bg:#04100f; }
+/* Eclipse: gold accent, crimson nebula, warm black. */
+[data-theme="eclipse"]{ --accent:#ffb347; --accent-bright:#ffe0a3; --accent-dim: rgba(220,38,38,0.16); --glow: rgba(255,120,60,0.45); }
+[data-mode="dark"][data-theme="eclipse"]{ --bg:#0c0505; }
 [data-theme="prismatic"]{ --accent:#ff6fd5; --accent-bright:#ffd6f5; --accent-dim: rgba(255,111,213,0.14); --glow: rgba(255,111,213,0.4); }
 
 /* ---------- Light mode ---------- */
@@ -53,6 +59,8 @@
 [data-mode="light"][data-theme="arc"]{      --accent-text:#0b6b88; --accent-bright:#0b6b88; --accent-fill:#0b6b88; --accent-fill-deep:#0b6b88; }
 [data-mode="light"][data-theme="stasis"]{   --accent-text:#2b65a1; --accent-bright:#2b65a1; --accent-fill:#2b65a1; --accent-fill-deep:#2b65a1; }
 [data-mode="light"][data-theme="strand"]{   --accent-text:#177242; --accent-bright:#177242; --accent-fill:#177242; --accent-fill-deep:#177242; }
+[data-mode="light"][data-theme="aurora"]{    --accent-text:#0b6a63; --accent-bright:#0b6a63; --accent-fill:#0b6a63; --accent-fill-deep:#0b6a63; }
+[data-mode="light"][data-theme="eclipse"]{   --accent-text:#9a3412; --accent-bright:#9a3412; --accent-fill:#9a3412; --accent-fill-deep:#9a3412; }
 [data-mode="light"][data-theme="cosmic"]{    --accent-text:#5040c8; --accent-bright:#5040c8; --accent-fill:#5040c8; --accent-fill-deep:#5040c8; }
 [data-mode="light"][data-theme="prismatic"]{ --accent-text:#a23485; --accent-bright:#a23485; --accent-fill:#a23485; --accent-fill-deep:#a23485; }
 [data-mode="light"]{ --on-accent:#ffffff; }
@@ -89,11 +97,9 @@ html :is(input, select, textarea):focus-visible{ outline:2px solid var(--accent-
 }
 body{
   min-height:100vh;
-  /* Nebula in the subclass colour; the starfield is body::before (Cosmic layer below). */
-  background:
-    radial-gradient(ellipse 1100px 620px at 85% -15%, var(--accent-dim), transparent 62%),
-    radial-gradient(ellipse 900px 700px at -10% 35%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
-    var(--bg);
+  /* The nebula (body::after) and starfield (body::before) are fixed layers
+     behind the page; see the Cosmic layer below. */
+  background:var(--bg);
   color:var(--text);
   font-family:'Inter', sans-serif;
   line-height:1.5;
@@ -358,6 +364,15 @@ body::before{
   body::before{ animation: star-twinkle 7s ease-in-out infinite alternate; }
 }
 @keyframes star-twinkle{ from{ opacity:0.65; } to{ opacity:1; } }
+/* Nebula in the theme colours, fixed like the stars so the page scrolls
+   over it (a pseudo-element, since background-attachment:fixed is ignored
+   on iOS). Below the stars, no twinkle. */
+body::after{
+  content:""; position:fixed; inset:0; z-index:-2; pointer-events:none;
+  background:
+    radial-gradient(ellipse 1100px 620px at 85% -15%, var(--accent-dim), transparent 62%),
+    radial-gradient(ellipse 900px 700px at -10% 35%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%);
+}
 
 /* No backdrop blur: over the fixed starfield it repaints on every scroll,
    which stutters on long card pages on phones. */

@@ -40,6 +40,7 @@ starts at `5053304`. Before promoting, run `SITE_ROOT=<prod clone> npm run check
 7. Builds loadout names wrap instead of "…"; bracketed perks on their own line — `6391db7`, live on prod.
 8. Uniform card sizes — `5053304`, live on prod: one width + one height per card grid at 1280/900/390 (grid + auto-rows 1fr for static cards; reserved lines/rows for the closed state of cards that open).
 9. "Cosmic" seventh theme (blue/violet, pickable in the gear menu; never the random first-visit pick) — `f326235` on dev, owner testing.
+10. "Aurora" (teal/magenta) and "Eclipse" (gold/crimson) themes, same rules as Cosmic; the nebula moved from `body`'s background to a fixed `body::after` so it stays put like the stars while the page scrolls. With a solid body background axe can now measure contrast it used to skip, which turned up 4 old failures, fixed in the same commit: light-mode God Rolls exotic/legendary names, light-mode raid buff/debuff terms, and underlined links on Terms/Privacy. On dev, owner testing.
 
 ## Rescan items (all done and live)
 

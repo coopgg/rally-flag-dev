@@ -9,7 +9,7 @@
   var d = document.documentElement;
   // Valid saved themes; a first visit gets a random subclass (not Cosmic).
   var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
-  var THEMES = SUBCLASS_THEMES.concat(["cosmic"]);
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
   var theme = null, modePref = null, legacyMode = null;
   try {
     theme = localStorage.getItem("rallyflag_theme");
@@ -143,6 +143,8 @@
   .weapon-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:19px; color:var(--text); margin-bottom:4px; }
   .weapon-name.tier-exotic{ color:#ceae33; }
   .weapon-name.tier-legendary{ color:#a892d1; }
+  [data-mode="light"] .weapon-name.tier-exotic{ color:#7a5c00; }
+  [data-mode="light"] .weapon-name.tier-legendary{ color:#6b4fa0; }
   /* min-height: the badges arrive with Bungie's live data; keep the row's
      space so cards don't change height (or differ) while it loads. */
   .weapon-badges{ display:flex; align-items:center; gap:6px; margin-bottom:6px; min-height:18px; }

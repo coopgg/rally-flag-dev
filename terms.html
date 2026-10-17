@@ -9,7 +9,7 @@
   var d = document.documentElement;
   // Valid saved themes; a first visit gets a random subclass (not Cosmic).
   var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
-  var THEMES = SUBCLASS_THEMES.concat(["cosmic"]);
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
   var theme = null, modePref = null, legacyMode = null;
   try {
     theme = localStorage.getItem("rallyflag_theme");
@@ -74,8 +74,8 @@
   .legal p, .legal li{ font-size:16px; line-height:1.7; color:var(--text-dim); }
   .legal ul{ margin:0 0 12px; padding-left:20px; }
   .legal li{ margin-bottom:6px; }
-  .legal a{ color:var(--accent-bright); text-decoration:none; }
-  .legal a:hover{ text-decoration:underline; }
+  .legal a{ color:var(--accent-bright); text-decoration:underline; text-underline-offset:3px; text-decoration-thickness:1px; }
+  .legal a:hover{ text-decoration-thickness:2px; }
 </style>
 </head>
 <body>

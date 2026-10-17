@@ -10,7 +10,7 @@
   var d = document.documentElement;
   // Valid saved themes; a first visit gets a random subclass (not Cosmic).
   var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
-  var THEMES = SUBCLASS_THEMES.concat(["cosmic"]);
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
   var theme = null, modePref = null, legacyMode = null;
   try {
     theme = localStorage.getItem("rallyflag_theme");
@@ -124,6 +124,8 @@
   }
   em.term-buff{ font-style:italic; color:#7fd8a8; }
   em.term-debuff{ font-style:italic; color:#e88a95; }
+  [data-mode="light"] em.term-buff{ color:#166b42; }
+  [data-mode="light"] em.term-debuff{ color:#b42335; }
   .encounter-map{ margin:14px 0; }
   .encounter-map img{
     width:100%; display:block; border-radius:4px; border:1px solid var(--panel-border);

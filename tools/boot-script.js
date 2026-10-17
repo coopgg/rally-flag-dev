@@ -16,7 +16,7 @@
   var d = document.documentElement;
   // Valid saved themes; a first visit gets a random subclass (not Cosmic).
   var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
-  var THEMES = SUBCLASS_THEMES.concat(["cosmic"]);
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
   var theme = null, modePref = null, legacyMode = null;
   try {
     theme = localStorage.getItem("rallyflag_theme");
