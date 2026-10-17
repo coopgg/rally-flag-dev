@@ -28,7 +28,8 @@ const path = require("path");
 const { execFileSync } = require("child_process");
 const { chromium } = require("playwright");
 
-const ROOT = path.resolve(__dirname, "..");
+// SITE_ROOT=/path/to/rally-flag checks the prod clone before a promotion.
+const ROOT = path.resolve(process.env.SITE_ROOT || path.join(__dirname, ".."));
 const BASE = "https://coopgg.github.io/rally-flag-dev/";
 const AXE = fs.readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
 const TYPES = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".json": "application/json",
@@ -146,7 +147,9 @@ async function checkCombo(browser, combo, linkSink){
 }
 
 function checkGeneratedPages(){
-  try {
+  if (!fs.existsSync(path.join(ROOT, "tools", "build-guide-pages.js"))){
+    console.log("·  generated-pages freshness skipped (no tools/ here; checked on dev)");
+  } else try {
     execFileSync(process.execPath, [path.join(ROOT, "tools", "build-guide-pages.js"), "--check"], { stdio: "pipe" });
     record("generated guide pages are up to date", true);
   } catch (e){
@@ -191,6 +194,9 @@ function checkLinks(links){
   for (const [from, href] of links){
     if (/^(https?:|mailto:|#|javascript:)/.test(href) || !/\.html/.test(href)) continue;
     const file = href.split("#")[0].split("?")[0];
+    // On the prod clone, nav.js's Debug entry still renders (we serve it at
+    // the dev host); on rallyflag.gg it's hidden, so dev-only pages are fine.
+    if (process.env.SITE_ROOT && SKIP.has(file)) continue;
     if (!fs.existsSync(path.join(ROOT, file))) missing.add(from + " → " + href);
     if (/(raid|dungeon)-guide\.html\?slug=/.test(href)) oldStyle.add(from + " → " + href);
   }

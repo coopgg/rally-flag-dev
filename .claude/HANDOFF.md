@@ -5,11 +5,11 @@ Written 2026-10-16 (updated 2026-10-17) by a Claude Code cloud session for the n
 
 ## Where things stand
 
-**Production (`coopgg/rally-flag`, rallyflag.gg) is at `f6fbab8`, synced
-with dev up to `6681030` (link previews + encounter cards).** That includes everything below: the first round
+**Production (`coopgg/rally-flag`, rallyflag.gg) is at `fda71bd`, synced
+with dev up to `2a89b9d` (lighter listing pages).** That includes everything below: the first round
 (14-item review, cache fix, sign-in fixes, Auto/Light/Dark, iPhone
 `minimal-ui`) and the whole skills rescan, items 1–8. Next promotion range
-starts at `6681030`. (That range no longer spans the Xûr removal, so vendors.html won't reject again.)
+starts at `2a89b9d`. Before promoting, run `SITE_ROOT=<prod clone> npm run check` in tests/.
 
 | Item | Dev commit(s) | What |
 |---|---|---|
@@ -33,7 +33,7 @@ starts at `6681030`. (That range no longer spans the Xûr removal, so vendors.ht
 
 1. Discord link previews — done and live; bot redeploy still needed for its links.
 2. Automated checks — `tests/site-check.js` + `.github/workflows/site-checks.yml` (`7763d11`), green on GitHub; awaiting owner review. Dev-only, nothing to promote.
-3. Lighter listing pages — `2a89b9d` on dev, awaiting review: generated `assets/activity-index.js` (4KB) replaces the 180KB guide data on Home, This Week, Raids, Dungeons.
+3. Lighter listing pages — `2a89b9d` live on prod: generated `assets/activity-index.js` (4KB) replaces the 180KB guide data on Home, This Week, Raids, Dungeons.
 4. Official art for Distortions, Tracker, Public Events, Guides overview.
 5. Consider moving the duplicated inline boot script into one file (costs a request).
 

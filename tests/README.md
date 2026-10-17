@@ -28,6 +28,10 @@ npx playwright install chromium   # first time only
 npm run check
 ```
 
+Before a promotion, check the prod clone the same way:
+`SITE_ROOT=../../rally-flag npm run check` (the generated-pages freshness
+check is skipped there; it runs on dev).
+
 GitHub runs the same thing on every push (`.github/workflows/site-checks.yml`);
 the run's summary page lists every check. Takes about 3 minutes.
 
