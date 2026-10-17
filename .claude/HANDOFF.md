@@ -34,8 +34,9 @@ starts at `4d7000a`. Before promoting, run `SITE_ROOT=<prod clone> npm run check
 1. Discord link previews — done and live; bot redeploy still needed for its links.
 2. Automated checks — `tests/site-check.js` + `.github/workflows/site-checks.yml` (`7763d11`), green on GitHub; awaiting owner review. Dev-only, nothing to promote.
 3. Lighter listing pages — `2a89b9d` live on prod: generated `assets/activity-index.js` (4KB) replaces the 180KB guide data on Home, This Week, Raids, Dungeons.
-4. Official art for Distortions, Tracker, Public Events, Guides overview — `c12a8c6`, live on prod. (Rotation page not done; could reuse rotation-data.js `art`.)
+4. Official art for Distortions, Tracker, Public Events, Guides overview — `c12a8c6`, live on prod. (Rotation page done in item 6.)
 5. Boot script single source — `4d7000a`, live on prod: `tools/boot-script.js` + `tools/sync-boot-script.js` (stays inline; no extra request).
+6. Small items — `3f12dec` on dev, awaiting review: Armor Sets source label de-duplicated (+ body font), God Rolls drops "Legendary", Rotation page thumbnails. Discord bot redeploy is the owner's.
 
 ## Rescan items (all done and live)
 
