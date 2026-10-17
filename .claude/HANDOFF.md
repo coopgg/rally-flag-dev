@@ -33,16 +33,18 @@ the `.claude` / `skills-lock.json` / `.gitignore` excludes).
 5. Done — see table above.
 6. Done — see table above.
 7. Done — see table above.
-8. **Design direction — mock-ups on dev (`7d1bec3`), waiting for the owner's pick.**
-   `design-preview.html` (dev-only, never promote) shows this week's
-   featured raid, the featured strip, the raid list and one encounter in
-   three switchable directions (`#hud`, `#cosmic`, `#fantasy`):
-   A **HUD refined** — current fonts/themes/light mode + official activity
-   art (pgcrImage from the manifest; map is in the page), one focal point,
-   hover motion. B **Cosmic** and C **Fantasy** — full restyles from the
-   typeui briefs, fixed palette, dark only. Pantheon has no official art
-   (initials fallback). Once the owner picks, roll it out page by page on
-   dev, moving the art map into `raids-data.js` / `dungeons-data.js`.
+8. **Design direction — owner picked A, wants it mixed with Cosmic (B).**
+   Mock-ups: `design-preview.html` (A/B/C side by side) and, since `050a2b0`,
+   an "A + Cosmic" layer over the real pages: open any dev page with
+   `?look=mix` (`?look=off` or the pill to leave). Files: `assets/look-mix.css`,
+   `assets/look-mix.js`, plus `setupLookPreview()` in `nav.js` (dev-host only).
+   What it adds: starfield, glass panels with subclass-coloured edge + glow,
+   official art (pgcrImage map in look-mix.js) on raid/dungeon/This Week
+   cards, art banner on raid/dungeon guide headers, featured-raid banner on
+   home. Keeps A's fonts, 6 themes, light mode. Waiting on the owner's
+   verdict; if approved, fold the CSS into `theme.css`, move the art map
+   into `raids-data.js`/`dungeons-data.js`, render the art in each page's
+   own script, and delete the preview hook and files.
 
 ## Workflow the owner expects
 
