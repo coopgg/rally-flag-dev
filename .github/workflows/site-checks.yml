@@ -1,0 +1,36 @@
+# Runs tests/site-check.js on every push and pull request: every public
+# page at desktop/phone × dark/light in headless Chromium (script errors,
+# axe accessibility, sideways scroll, broken images, text under 12px,
+# layout shift), plus generated guide pages, old-link forwarding and
+# internal links. Dev-only: .github/ and tests/ are never promoted to prod.
+name: Site checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: tests/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check

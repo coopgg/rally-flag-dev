@@ -18,7 +18,8 @@ dev-only files, so apply only the reviewed commit range:
 git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)debug.html' ':(exclude)clan-admin.html' ':(exclude)discord-bot' \
   ':(exclude)api-debug.html' ':(exclude)xur-debug.html' ':(exclude).claude' \
-  ':(exclude)skills-lock.json' ':(exclude).gitignore' ':(exclude)tools' > /tmp/promote.patch
+  ':(exclude)skills-lock.json' ':(exclude).gitignore' ':(exclude)tools' \
+  ':(exclude)tests' ':(exclude).github' > /tmp/promote.patch
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
@@ -83,6 +84,16 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   to the site root and writes its asset tags from script. Keep that pattern.
 
 ## Testing approach that worked
+
+**Automated:** `tests/site-check.js` (see `tests/README.md`) runs on every
+push via GitHub Actions (`.github/workflows/site-checks.yml`) and covers
+script errors, axe, sideways scroll, broken images, text <12px, CLS,
+generated guide pages, old-link forwarding and internal links for every
+public page at desktop/phone × dark/light. Run it locally before pushing:
+`cd tests && npm ci && npm run check`. A red run on dev means don't promote.
+`tests/` and `.github/` are dev-only.
+
+**By hand, for anything visual or new:**
 
 Headless Chromium is the test bench (Playwright; in containers running as
 root, Chrome needs `--no-sandbox` — the taste-skill inspector takes a

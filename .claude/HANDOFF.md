@@ -32,7 +32,7 @@ starts at `6681030`. (That range no longer spans the Xûr removal, so vendors.ht
 ## Next up (owner-approved order)
 
 1. Discord link previews — done and live; bot redeploy still needed for its links.
-2. Commit the Playwright/axe/CLS checks to the repo + run them on every dev push (also run `tools/build-guide-pages.js --check`).
+2. Automated checks — `tests/site-check.js` + `.github/workflows/site-checks.yml` on dev, awaiting review.
 3. Home page loads ~180KB of guide data for the featured banner — give it a small summary file.
 4. Official art for Distortions, Tracker, Public Events, Guides overview.
 5. Consider moving the duplicated inline boot script into one file (costs a request).

@@ -9,3 +9,4 @@
 discord-bot/node_modules/
 discord-bot/.env
 discord-bot/state.json
+tests/node_modules/

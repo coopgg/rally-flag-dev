@@ -1,0 +1,12 @@
+{
+  "name": "rally-flag-site-checks",
+  "private": true,
+  "description": "Dev-only browser checks for the Rally Flag site (see tests/README.md).",
+  "scripts": {
+    "check": "node site-check.js"
+  },
+  "devDependencies": {
+    "axe-core": "4.10.2",
+    "playwright": "1.56.1"
+  }
+}
