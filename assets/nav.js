@@ -11,8 +11,11 @@
    remembers it from then on until changed via the menu.
    ============================================================ */
 (function(){
-  const THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
-  const THEME_LABELS = { solar: "Solar", void: "Void", arc: "Arc", stasis: "Stasis", strand: "Strand", prismatic: "Prismatic" };
+  // Cosmic isn't a subclass, so first-time visitors still get a random
+  // subclass theme (SUBCLASS_THEMES); Cosmic is there to pick.
+  const SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
+  const THEMES = SUBCLASS_THEMES.concat(["cosmic"]);
+  const THEME_LABELS = { solar: "Solar", void: "Void", arc: "Arc", stasis: "Stasis", strand: "Strand", prismatic: "Prismatic", cosmic: "Cosmic" };
   const STORAGE_THEME_KEY = "rallyflag_theme";
   // Mode preference: "light" or "dark" when the visitor picked one; no
   // value means Auto (follow the device's prefers-color-scheme).
@@ -111,8 +114,14 @@
     arc: "#3fd6ff",
     stasis: "#7fb9ff",
     strand: "#3ddc84",
-    prismatic: "#ff6fd5"
+    prismatic: "#ff6fd5",
+    cosmic: "linear-gradient(135deg, #3b82f6, #8b5cf6)"
   };
+  // Cosmic has no Bungie subclass icon; a small four-point star instead.
+  const COSMIC_ICON_SVG = '<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff" aria-hidden="true"><path d="M12 1.5l2.6 7.9 7.9 2.6-7.9 2.6L12 22.5l-2.6-7.9L1.5 12l7.9-2.6z"/></svg>';
+  function themeIconHtml(theme){
+    return THEME_ICON_PATHS[theme] ? '<img src="' + BUNGIE_ROOT + THEME_ICON_PATHS[theme] + '" alt="">' : COSMIC_ICON_SVG;
+  }
 
   // localStorage can throw (blocked site data, some private modes); the
   // nav must still render, just without remembering the choice.
@@ -146,7 +155,7 @@
     let theme = storageGet(STORAGE_THEME_KEY);
     if (!theme || !THEMES.includes(theme)){
       theme = document.documentElement.getAttribute("data-theme");
-      if (!THEMES.includes(theme)) theme = THEMES[Math.floor(Math.random() * THEMES.length)];
+      if (!THEMES.includes(theme)) theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
       storageSet(STORAGE_THEME_KEY, theme);
     }
     return theme;
@@ -178,7 +187,7 @@
     document.documentElement.setAttribute("data-theme", theme);
     storageSet(STORAGE_THEME_KEY, theme);
     const btnIcon = document.getElementById("nav-menu-icon");
-    if (btnIcon) btnIcon.innerHTML = '<img src="' + BUNGIE_ROOT + THEME_ICON_PATHS[theme] + '" alt="">';
+    if (btnIcon) btnIcon.innerHTML = themeIconHtml(theme);
     document.querySelectorAll(".element-swatch").forEach(el => {
       const isActive = el.dataset.theme === theme;
       el.classList.toggle("active", isActive);
@@ -207,7 +216,7 @@
       // and pickable with Enter/Space; aria-pressed marks the current one.
       '<button type="button" class="element-swatch" data-theme="' + theme + '" title="' + THEME_LABELS[theme] + '"' +
         ' aria-label="' + THEME_LABELS[theme] + ' theme" aria-pressed="false" style="background:' + THEME_ACCENT_COLORS[theme] + '">' +
-        '<img src="' + BUNGIE_ROOT + THEME_ICON_PATHS[theme] + '" alt="">' +
+        themeIconHtml(theme) +
       '</button>'
     ).join("");
 
@@ -223,8 +232,8 @@
           '</div>' +
         '</div>' +
         '<div class="nav-menu-section">' +
-          '<div class="nav-menu-section-label">Subclass Theme</div>' +
-          '<div class="element-grid" role="group" aria-label="Subclass theme">' + swatchesHtml + '</div>' +
+          '<div class="nav-menu-section-label">Theme</div>' +
+          '<div class="element-grid" role="group" aria-label="Theme">' + swatchesHtml + '</div>' +
         '</div>' +
         '<div class="nav-menu-section" id="nav-auth-section"></div>' +
       '</div>'

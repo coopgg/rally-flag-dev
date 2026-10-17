@@ -27,6 +27,10 @@
 [data-theme="arc"]{ --accent:#3fd6ff; --accent-bright:#bff2ff; --accent-dim: rgba(63,214,255,0.14); --glow: rgba(63,214,255,0.4); }
 [data-theme="stasis"]{ --accent:#7fb9ff; --accent-bright:#e4f1ff; --accent-dim: rgba(127,185,255,0.14); --glow: rgba(127,185,255,0.4); }
 [data-theme="strand"]{ --accent:#3ddc84; --accent-bright:#b3ffd6; --accent-dim: rgba(61,220,132,0.14); --glow: rgba(61,220,132,0.4); }
+/* Cosmic: not a subclass; the blue/violet palette from the item 8 "Cosmic"
+   mock-up (blue accent, violet glow and nebula, deep-space background). */
+[data-theme="cosmic"]{ --accent:#7aa2ff; --accent-bright:#c4b5fd; --accent-dim: rgba(139,92,246,0.16); --glow: rgba(139,92,246,0.5); }
+[data-mode="dark"][data-theme="cosmic"]{ --bg:#05060f; }
 [data-theme="prismatic"]{ --accent:#ff6fd5; --accent-bright:#ffd6f5; --accent-dim: rgba(255,111,213,0.14); --glow: rgba(255,111,213,0.4); }
 
 /* ---------- Light mode ---------- */
@@ -49,6 +53,7 @@
 [data-mode="light"][data-theme="arc"]{      --accent-text:#0b6b88; --accent-bright:#0b6b88; --accent-fill:#0b6b88; --accent-fill-deep:#0b6b88; }
 [data-mode="light"][data-theme="stasis"]{   --accent-text:#2b65a1; --accent-bright:#2b65a1; --accent-fill:#2b65a1; --accent-fill-deep:#2b65a1; }
 [data-mode="light"][data-theme="strand"]{   --accent-text:#177242; --accent-bright:#177242; --accent-fill:#177242; --accent-fill-deep:#177242; }
+[data-mode="light"][data-theme="cosmic"]{    --accent-text:#5040c8; --accent-bright:#5040c8; --accent-fill:#5040c8; --accent-fill-deep:#5040c8; }
 [data-mode="light"][data-theme="prismatic"]{ --accent-text:#a23485; --accent-bright:#a23485; --accent-fill:#a23485; --accent-fill-deep:#a23485; }
 [data-mode="light"]{ --on-accent:#ffffff; }
 
@@ -171,6 +176,7 @@ nav.site-nav{
   overflow:hidden;
 }
 .nav-menu-icon img{ width:14px; height:14px; object-fit:contain; }
+.nav-menu-icon svg{ width:12px; height:12px; }
 
 .nav-menu-panel{
   position:absolute; top:calc(100% + 10px); right:0; z-index:50;

@@ -7,18 +7,20 @@
 <script>/* Boot script: theme, light/dark mode, load guard. Generated from tools/boot-script.js; edit there and run node tools/sync-boot-script.js. */
 (function(){
   var d = document.documentElement;
-  var THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
+  // Valid saved themes; a first visit gets a random subclass (not Cosmic).
+  var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic"]);
   var theme = null, modePref = null, legacyMode = null;
   try {
     theme = localStorage.getItem("rallyflag_theme");
     if (THEMES.indexOf(theme) < 0){
-      theme = THEMES[Math.floor(Math.random() * THEMES.length)];
+      theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
       localStorage.setItem("rallyflag_theme", theme);
     }
     modePref = localStorage.getItem("rallyflag_mode_pref");
     legacyMode = localStorage.getItem("rallyflag_mode");
   } catch (e) {}
-  if (THEMES.indexOf(theme) < 0) theme = THEMES[Math.floor(Math.random() * THEMES.length)];
+  if (THEMES.indexOf(theme) < 0) theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
   if (modePref !== "light" && modePref !== "dark"){
     modePref = legacyMode === "light" ? "light"
       : (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
