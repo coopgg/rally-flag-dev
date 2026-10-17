@@ -1,4 +1,4 @@
-# Runs tests/site-check.js on every push and pull request: every public
+# Runs tests/site-check.js on every push to main and every pull request: every public
 # page at desktop/phone × dark/light in headless Chromium (script errors,
 # axe accessibility, sideways scroll, broken images, text under 12px,
 # layout shift), plus generated guide pages, old-link forwarding and
@@ -6,7 +6,10 @@
 name: Site checks
 
 on:
+  # main is what dev deploys from; the claude/* work branch gets the same
+  # commits, so running there too would just double every run.
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
