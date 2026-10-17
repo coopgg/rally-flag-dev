@@ -22,11 +22,12 @@ git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
-Expected rejects: hunks touching the Xûr "Predicted" preview in
-`vendors.html` (dev-only, unreleased). Anything else rejecting means prod and
-dev drifted — stop and look. After applying, `diff -rq` the two trees: the
-only differences should be `CNAME`, `.gitignore`, the dev-only files above,
-and the Xûr preview in `vendors.html`. (`design-preview.html` and
+Nothing should reject; a reject means prod and dev drifted — stop and look.
+After applying, `diff -rq` the two trees: the only differences should be
+`CNAME`, `.gitignore` and the dev-only files above. (Until 2026-10-17,
+dev's `vendors.html` carried a Xûr "Predicted Next Drop" preview that
+always rejected; it now lives only in `xur-debug.html`. Keep unreleased
+experiments in the debug pages, not in public pages.) (`design-preview.html` and
 `assets/look-mix.*` existed on dev for a while as item 8 mock-ups and were
 deleted again; if a promotion range spans them, their add+delete cancels out.)
 
