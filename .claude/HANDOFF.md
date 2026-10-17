@@ -6,10 +6,10 @@ Written 2026-10-16 (updated 2026-10-17) by a Claude Code cloud session for the n
 ## Where things stand
 
 **Production (`coopgg/rally-flag`, rallyflag.gg) is at `80653d3`, synced
-with dev up to `f50d094` (This Week predicted cards).** That includes everything below: the first round
+with dev up to `f9c0c1d` (Twitch rename, nav wordmark).** That includes everything below: the first round
 (14-item review, cache fix, sign-in fixes, Auto/Light/Dark, iPhone
 `minimal-ui`) and the whole skills rescan, items 1–8. Next promotion range
-starts at `f50d094`. Before promoting, run `SITE_ROOT=<prod clone> npm run check` in tests/.
+starts at `f9c0c1d`. Before promoting, run `SITE_ROOT=<prod clone> npm run check` in tests/.
 
 | Item | Dev commit(s) | What |
 |---|---|---|
@@ -43,7 +43,8 @@ starts at `f50d094`. Before promoting, run `SITE_ROOT=<prod clone> npm run check
 10. "Aurora" (teal/magenta) and "Eclipse" (gold/crimson) themes, same rules as Cosmic; the nebula moved from `body`'s background to a fixed `body::after` so it stays put like the stars while the page scrolls. With a solid body background axe can now measure contrast it used to skip, which turned up 4 old failures, fixed in the same commit: light-mode God Rolls exotic/legendary names, light-mode raid buff/debuff terms, and underlined links on Terms/Privacy. Live on prod (`b604f8d`). Owner: leave the nebula as it is.
 11. Armor Sets: closed cards show a short source tag ("Gambit", "Vanguard Ops", "Crucible"); open cards have a "How to get it" line (raid/dungeon sets link to their guide). `d5cc040`, live on prod (`80653d3`).
 12. Theme contrast pass (`69af994`): every page × 8 non-Arc themes × dark/light (axe found nothing new; a deliberately faint Aurora proved it catches problems). 13. Daily live-site check (`.github/workflows/live-check.yml`): checks rallyflag.gg itself at 13:07 UTC with the theme pass; push runs are back to ~3 min (`024d2b4`). 14. Checks open every collapsed card/section before testing; theme pass also at phone width. Found and fixed: This Week's predicted next-week cards were faded (opacity .82) below 4.5:1 contrast. Live on prod (`60294b8`). Note: one prod-clone run showed Artifacts phone CLS 0.106 (identical file; passed on re-run), traced to late web fonts, see 15.
-15. Late-font layout shift: until Oswald loads, the fallback "RALLY FLAG" wordmark (~99px vs 75px) wrapped the nav onto two rows at 360px, so the whole page jumped when the font arrived. `.brand-name` is now a fixed 5.1em box. Slow-font CLS at 360px: Artifacts 0.19→0, God Rolls 0.078→0.032, every tested page <0.035. Wordmark pixel-identical once fonts load. On dev, owner reviewing.
+15. Late-font layout shift: until Oswald loads, the fallback "RALLY FLAG" wordmark (~99px vs 75px) wrapped the nav onto two rows at 360px, so the whole page jumped when the font arrived. `.brand-name` is now a fixed 5.1em box. Slow-font CLS at 360px: Artifacts 0.19→0, God Rolls 0.078→0.032, every tested page <0.035. Wordmark pixel-identical once fonts load. Live on prod (`85e2ee2`).
+16. Twitch channel renamed coopgg__ → CoopGG_ (login `coopgg_`): Home embed + links updated (`f9c0c1d`), live on prod (`85e2ee2`).
 
 ## Rescan items (all done and live)
 
