@@ -35,7 +35,7 @@ starts at `c12a8c6`. Before promoting, run `SITE_ROOT=<prod clone> npm run check
 2. Automated checks — `tests/site-check.js` + `.github/workflows/site-checks.yml` (`7763d11`), green on GitHub; awaiting owner review. Dev-only, nothing to promote.
 3. Lighter listing pages — `2a89b9d` live on prod: generated `assets/activity-index.js` (4KB) replaces the 180KB guide data on Home, This Week, Raids, Dungeons.
 4. Official art for Distortions, Tracker, Public Events, Guides overview — `c12a8c6`, live on prod. (Rotation page not done; could reuse rotation-data.js `art`.)
-5. Consider moving the duplicated inline boot script into one file (costs a request).
+5. Boot script single source — `4d7000a` on dev, awaiting review: `tools/boot-script.js` + `tools/sync-boot-script.js` (stays inline; no extra request).
 
 ## Rescan items (all done and live)
 
