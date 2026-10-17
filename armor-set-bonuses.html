@@ -212,7 +212,7 @@
   .grid-section{ max-width:1180px; margin:36px auto 0; padding:0 24px 90px; }
   /* Even columns that fill the row. Cards top-align so opening one doesn't
      stretch its neighbours; closed cards match because the source line
-     always takes exactly 2 lines (full text once the card is open). */
+     always takes exactly 2 lines (the full "how to get it" is inside). */
   .card-grid{
     display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:14px; align-items:start;
   }
@@ -268,6 +268,10 @@
     margin-top:14px; padding-top:14px; border-top:1px solid var(--panel-border);
     display:flex; flex-wrap:wrap; gap:6px; align-items:center;
   }
+  .how-row{ margin-top:14px; padding-top:14px; border-top:1px solid var(--panel-border); }
+  .how-row .pairs-label{ display:block; margin-bottom:4px; }
+  .how-text{ font-size:14px; line-height:1.5; color:var(--text-dim); }
+  .how-link{ color:var(--accent-text); white-space:nowrap; }
   .pairs-label{ font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer); text-transform:uppercase; letter-spacing:0.08em; margin-right:4px; }
   .pair-tag{
     font-size:12px; font-family:'JetBrains Mono', monospace; color:var(--accent-bright);
@@ -631,9 +635,59 @@
   // sets-data.js details often repeat the category ("“Vault of Glass” Raid"
   // under "Raid", "Iron Banner" under "Iron Banner", "Trials of Osiris
   // Challenges" under "Trials"); say it once.
+  // Long details get a short tag on the closed card; the full "how to
+  // get it" line is in the open card (howToGet).
+  const SHORT_SOURCE = {
+    "Complete Gambit matches and earn rank-up packages from the Drifter": "Gambit",
+    "Rank up the Vanguard playlist and focus at Zavala": "Vanguard Ops",
+    "Portal Activities (also obtainable via Vanguard Ops/Zavala focusing)": "Portal Activities",
+    "Crucible Ciphers (Shaxx) or Crucible rank-up packages": "Crucible",
+    "Glory Matches in Crucible": "Crucible \u00b7 Competitive",
+    "Trials of Osiris Challenges": "Trials of Osiris",
+    "Tenet of Bravery Vendor, The Tower": "World \u00b7 Tower vendor",
+    "Lawless Frontier Activities": "Lawless Frontier",
+    "Savathûn's Throne World": "Destination \u00b7 Throne World"
+  };
   function sourceLabel(set){
+    if (SHORT_SOURCE[set.sourceDetail]) return SHORT_SOURCE[set.sourceDetail];
     const detail = set.sourceDetail.replace(/^“(.+)” (Epic )?(Raid|Dungeon)$/, (m, name, epic) => name + (epic ? " (Epic)" : ""));
     return detail.startsWith(set.source) ? detail : set.source + " \u00b7 " + detail;
+  }
+  const HOW_TO_GET = {
+    "Exploring Kepler": "Earned from activities on Kepler.",
+    "Pinnacle Activities": "A reward from pinnacle activities.",
+    "Sparrow Racing League": "Earned in Sparrow Racing League.",
+    "Trials of Osiris Challenges": "Complete Trials of Osiris challenges.",
+    "Complete Gambit matches and earn rank-up packages from the Drifter": "Complete Gambit matches and earn rank-up packages from the Drifter.",
+    "Rewards Pass": "Unlocked on the season's Rewards Pass.",
+    "Rank up the Vanguard playlist and focus at Zavala": "Rank up the Vanguard Ops playlist and focus engrams at Zavala.",
+    "Iron Banner": "Earned in Iron Banner.",
+    "Portal Activities": "Earned from activities in the Portal.",
+    "Portal Activities (also obtainable via Vanguard Ops/Zavala focusing)": "Earned from activities in the Portal; also from Vanguard Ops and focusing at Zavala.",
+    "Tenet of Bravery Vendor, The Tower": "Sold by the Tenet of Bravery vendor in the Tower.",
+    "Glory Matches in Crucible": "Earned in Crucible Competitive (Glory) matches.",
+    "Lawless Frontier Activities": "Earned from Lawless Frontier activities.",
+    "Crucible Ciphers (Shaxx) or Crucible rank-up packages": "Crucible Ciphers from Shaxx, or Crucible rank-up packages.",
+    "Europa": "Earned from activities on Europa.",
+    "The Moon": "Earned from activities on the Moon.",
+    "Nessus": "Earned from activities on Nessus.",
+    "The Pale Heart": "Earned from activities in the Pale Heart.",
+    "Dreaming City": "Earned from activities in the Dreaming City.",
+    "Cosmodrome": "Earned from activities in the Cosmodrome.",
+    "Neomuna, Neptune": "Earned from activities on Neomuna, Neptune.",
+    "Savathûn's Throne World": "Earned from activities in Savathûn's Throne World.",
+    "EDZ": "Earned from activities in the EDZ."
+  };
+  // Raid and dungeon sets link to their guide.
+  function howToGet(set){
+    if (set.source === "Raid" || set.source === "Dungeon"){
+      const m = set.sourceDetail.match(/^“(.+)” (Epic )?(?:Raid|Dungeon)$/);
+      const name = m ? m[1] : set.sourceDetail;
+      const kind = set.source.toLowerCase();
+      const slug = name.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+      return "Drops from the " + name + " " + kind + (m && m[2] ? " on Epic difficulty" : "") + '. <a class="how-link" href="' + rallyFlagGuideHref(kind, slug) + '">Open the guide &rarr;</a>';
+    }
+    return HOW_TO_GET[set.sourceDetail] || set.sourceDetail;
   }
   function matches(set){
     if (state.sources.size && !state.sources.has(set.source)) return false;
@@ -700,6 +754,7 @@
         '<div class="set-card-body">' +
           '<div class="perk"><div class="perk-badge" id="two-badge-' + set.slug + '">2</div><div class="perk-body"><div class="perk-name">2 Piece | ' + set.two[0] + '</div><div class="perk-desc">' + set.two[1] + '</div></div></div>' +
           '<div class="perk"><div class="perk-badge" id="four-badge-' + set.slug + '">4</div><div class="perk-body"><div class="perk-name">4 Piece | ' + set.four[0] + '</div><div class="perk-desc">' + set.four[1] + '</div></div></div>' +
+          '<div class="how-row"><span class="pairs-label">How to get it</span><span class="how-text">' + howToGet(set) + '</span></div>' +
           subclassPairsHtml +
           pairsHtml +
           artifactPairsHtml +

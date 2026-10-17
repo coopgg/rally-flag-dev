@@ -5,11 +5,11 @@ Written 2026-10-16 (updated 2026-10-17) by a Claude Code cloud session for the n
 
 ## Where things stand
 
-**Production (`coopgg/rally-flag`, rallyflag.gg) is at `c4a1f4b`, synced
-with dev up to `5053304` (uniform card sizes).** That includes everything below: the first round
+**Production (`coopgg/rally-flag`, rallyflag.gg) is at `b604f8d`, synced
+with dev up to `9054eaf` (Cosmic/Aurora/Eclipse themes, fixed nebula).** That includes everything below: the first round
 (14-item review, cache fix, sign-in fixes, Auto/Light/Dark, iPhone
 `minimal-ui`) and the whole skills rescan, items 1–8. Next promotion range
-starts at `5053304`. Before promoting, run `SITE_ROOT=<prod clone> npm run check` in tests/.
+starts at `9054eaf`. Before promoting, run `SITE_ROOT=<prod clone> npm run check` in tests/.
 
 | Item | Dev commit(s) | What |
 |---|---|---|
@@ -39,8 +39,9 @@ starts at `5053304`. Before promoting, run `SITE_ROOT=<prod clone> npm run check
 6. Small items — `3f12dec`, live on prod: Armor Sets source label de-duplicated (+ body font), God Rolls drops "Legendary", Rotation page thumbnails. Discord bot redeploy is the owner's.
 7. Builds loadout names wrap instead of "…"; bracketed perks on their own line — `6391db7`, live on prod.
 8. Uniform card sizes — `5053304`, live on prod: one width + one height per card grid at 1280/900/390 (grid + auto-rows 1fr for static cards; reserved lines/rows for the closed state of cards that open).
-9. "Cosmic" seventh theme (blue/violet, pickable in the gear menu; never the random first-visit pick) — `f326235` on dev, owner testing.
-10. "Aurora" (teal/magenta) and "Eclipse" (gold/crimson) themes, same rules as Cosmic; the nebula moved from `body`'s background to a fixed `body::after` so it stays put like the stars while the page scrolls. With a solid body background axe can now measure contrast it used to skip, which turned up 4 old failures, fixed in the same commit: light-mode God Rolls exotic/legendary names, light-mode raid buff/debuff terms, and underlined links on Terms/Privacy. On dev, owner testing.
+9. "Cosmic" seventh theme (blue/violet, pickable in the gear menu; never the random first-visit pick) — `f326235`, live on prod.
+10. "Aurora" (teal/magenta) and "Eclipse" (gold/crimson) themes, same rules as Cosmic; the nebula moved from `body`'s background to a fixed `body::after` so it stays put like the stars while the page scrolls. With a solid body background axe can now measure contrast it used to skip, which turned up 4 old failures, fixed in the same commit: light-mode God Rolls exotic/legendary names, light-mode raid buff/debuff terms, and underlined links on Terms/Privacy. Live on prod (`b604f8d`). Owner: leave the nebula as it is.
+11. Armor Sets: closed cards show a short source tag ("Gambit", "Vanguard Ops", "Crucible"); open cards have a "How to get it" line (raid/dungeon sets link to their guide). On dev, owner reviewing.
 
 ## Rescan items (all done and live)
 
