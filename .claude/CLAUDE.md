@@ -42,9 +42,13 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
 - **Per-host credentials** in `assets/api-keys.js` (dev vs `rallyflag.gg`).
   `www.rallyflag.gg` would fall back to dev credentials.
 - **Every page's `<head>` has an inline boot script** (theme, light/dark/auto
-  mode, and the `.rf-boot` load-shift guard). It is duplicated in ~24 pages
-  and must stay in sync with `getStoredTheme` / `getStoredModePref` /
-  `resolveMode` in `assets/nav.js`. Change all copies together.
+  mode, and the `.rf-boot` load-shift guard). Its single source is
+  `tools/boot-script.js`; `node tools/sync-boot-script.js` stamps it into
+  every page (and rebuilds the guide pages). Never edit a page's copy; the
+  site checks fail if one differs. It stays inline on purpose (an external
+  file would block first paint on a request). Keep its logic in sync with
+  `getStoredTheme` / `getStoredModePref` / `resolveMode` in `assets/nav.js`.
+  New page: copy the boot `<script>` block from any page, then run the sync.
 - **Pages fill content from script at the end of `<body>`.** `.rf-boot` keeps
   `<main>` and `<footer>` laid out but invisible until DOMContentLoaded +
   web fonts (fonts capped at 400ms; 2.5s fallback). New pages need: the boot

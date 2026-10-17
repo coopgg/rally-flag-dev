@@ -12,7 +12,8 @@ there), at desktop/phone × dark/light, and fails if any page has:
 - layout shift (CLS) of 0.1 or more (dark mode, desktop + phone)
 
 It also checks that the generated guide pages are up to date
-(`tools/build-guide-pages.js --check`), that each guide page's raw HTML has
+(`tools/build-guide-pages.js --check`), that every page's inline boot
+script matches `tools/boot-script.js`, that each guide page's raw HTML has
 its own preview tags, that old `?slug=` guide links forward, and that every
 internal `.html` link points at a real file.
 

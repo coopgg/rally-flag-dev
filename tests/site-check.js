@@ -14,6 +14,7 @@
      - layout shift (CLS) under 0.1 (dark mode, desktop + phone)
    plus, once:
      - generated guide pages are up to date (tools/build-guide-pages.js --check)
+     - every page's inline boot script matches tools/boot-script.js
      - each guide page's raw HTML (what link previews see) has its own
        title, image and canonical
      - old raid-guide.html?slug= / dungeon-guide.html?slug= links forward
@@ -154,6 +155,12 @@ function checkGeneratedPages(){
     record("generated guide pages are up to date", true);
   } catch (e){
     record("generated guide pages are up to date", false, String(e.stderr || e.message).trim().replace(/\s*\n\s*/g, "; "));
+  }
+  if (fs.existsSync(path.join(ROOT, "tools", "sync-boot-script.js"))) try {
+    execFileSync(process.execPath, [path.join(ROOT, "tools", "sync-boot-script.js"), "--check"], { stdio: "pipe" });
+    record("every page's boot script matches tools/boot-script.js", true);
+  } catch (e){
+    record("every page's boot script matches tools/boot-script.js", false, String(e.stderr || e.message).trim().replace(/\s*\n\s*/g, "; "));
   }
   // What a link-preview bot sees: the raw HTML, no JavaScript.
   const bad = [];
