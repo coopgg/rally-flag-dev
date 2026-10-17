@@ -87,6 +87,12 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   or dungeon → look up its pgcrImage in the manifest and add `art`. If the
   manifest only has a placeholder (Pantheon), save key art as a 1280×720 JPG
   in `assets/art/` and use that relative path.
+- **Card grids keep every card the same size.** Static card grids use CSS
+  grid with `repeat(auto-fit|auto-fill, minmax(N, 1fr))` + `grid-auto-rows:
+  1fr`. Grids of cards that open (God Rolls, Armor Sets, Artifacts, Builds)
+  stay `align-items:start` and reserve the variable bits instead (fixed line
+  counts / min-heights). New card content that can vary in length needs the
+  same treatment or the grid stops matching.
 - **`404.html`** is served for any missing path at any depth; it sets `<base>`
   to the site root and writes its asset tags from script. Keep that pattern.
 
