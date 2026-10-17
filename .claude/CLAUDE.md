@@ -19,7 +19,8 @@ git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)debug.html' ':(exclude)clan-admin.html' ':(exclude)discord-bot' \
   ':(exclude)api-debug.html' ':(exclude)xur-debug.html' ':(exclude).claude' \
   ':(exclude)skills-lock.json' ':(exclude).gitignore' \
-  ':(exclude)design-preview.html' > /tmp/promote.patch
+  ':(exclude)design-preview.html' ':(exclude)assets/look-mix.css' \
+  ':(exclude)assets/look-mix.js' > /tmp/promote.patch
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
@@ -27,7 +28,7 @@ Expected rejects: hunks touching the Xûr "Predicted" preview in
 `vendors.html` (dev-only, unreleased). Anything else rejecting means prod and
 dev drifted — stop and look. After applying, `diff -rq` the two trees: the
 only differences should be `CNAME`, `.gitignore`, the dev-only files above
-(including `design-preview.html`, the item 8 mock-up),
+(including `design-preview.html` and `assets/look-mix.*`, the item 8 mock-ups),
 and the Xûr preview in `vendors.html`.
 
 ## Things that bite
@@ -61,6 +62,10 @@ and the Xûr preview in `vendors.html`.
   Raw `--accent` fails contrast on light backgrounds.
 - **Canonical tags** match each page's `og:url`. Raid/dungeon guide pages
   have no static canonical; script sets one per `?slug=`.
+- **`?look=mix` preview (dev only).** `setupLookPreview()` in `nav.js`
+  loads `assets/look-mix.css/.js` ("A + Cosmic") when the flag is set. It
+  returns early on any host but `coopgg.github.io`, so it is inert on prod;
+  remove it once the look is adopted for real or dropped.
 - **`404.html`** is served for any missing path at any depth; it sets `<base>`
   to the site root and writes its asset tags from script. Keep that pattern.
 

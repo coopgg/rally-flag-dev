@@ -417,6 +417,23 @@
   }
 
   setupPWA();
+  // Dev-only design preview (item 8): ?look=mix turns on the "A + Cosmic"
+  // layer (assets/look-mix.*) across the site, ?look=off turns it off.
+  // Inert anywhere but the dev host, so it never shows on rallyflag.gg.
+  function setupLookPreview(){
+    if (location.hostname !== "coopgg.github.io") return;
+    const q = new URLSearchParams(location.search).get("look");
+    if (q === "mix") storageSet("rallyflag_look", "mix");
+    else if (q === "off") storageRemove("rallyflag_look");
+    if (storageGet("rallyflag_look") !== "mix") return;
+    document.documentElement.setAttribute("data-look", "mix");
+    const css = document.createElement("link");
+    css.rel = "stylesheet"; css.href = "assets/look-mix.css";
+    document.head.appendChild(css);
+    loadScript("assets/look-mix.js").catch(() => {});
+  }
+
+  setupLookPreview();
   setupAnalytics();
   buildNav();
   applyTheme(getStoredTheme());
