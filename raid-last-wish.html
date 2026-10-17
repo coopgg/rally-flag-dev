@@ -55,10 +55,14 @@
   .difficulty-toggle-btn:hover{ color:var(--accent-bright); border-color:var(--accent); }
   .difficulty-toggle-btn.active{ color:var(--accent-bright); border-color:var(--accent); background:var(--accent-dim); }
 
-  .encounter-block{ padding:18px 0; border-top:1px solid var(--panel-border); }
-  .encounter-block:first-child{ border-top:none; padding-top:0; }
-  .encounter-head{ display:flex; align-items:center; gap:12px; margin-bottom:12px; }
-  .encounter-title{ font-family:'Oswald', sans-serif; font-weight:600; font-size:16px; color:var(--text); }
+  /* Each encounter is its own card under an "Encounters" heading, so a
+     long guide scans as steps and a jump link lands on a card's top edge. */
+  h2.block-label{ font-weight:400; margin:0; }
+  h2.encounters-head, div.encounters-head{ margin:30px 4px 12px; }
+  .encounter-card{ scroll-margin-top:16px; }
+  .encounter-head{ display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+  .encounter-head .encounter-num{ width:32px; height:32px; font-size:13px; }
+  .encounter-title{ font-family:'Oswald', sans-serif; font-weight:600; font-size:21px; line-height:1.2; color:var(--text); margin:0; }
   .encounter-field{ margin-bottom:10px; font-size:16px; max-width:62ch; color:var(--text-dim); line-height:1.55; }
   .encounter-field-label{
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em;
@@ -127,10 +131,7 @@
   .puzzle-helper-link-arrow{ font-family:'JetBrains Mono', monospace; color:var(--accent-bright); flex-shrink:0; }
   .encounter-puzzle-helper-link{ margin-top:14px; }
 
-  .encounter-row{
-    display:flex; gap:14px; padding:14px 0; border-top:1px solid var(--panel-border);
-  }
-  .encounter-row:first-child{ border-top:none; }
+  .encounter-row{ display:flex; gap:14px; }
   .encounter-num{
     flex-shrink:0; width:26px; height:26px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
@@ -295,8 +296,8 @@
                 '<div class="puzzle-helper-link-arrow">Open tool &rarr;</div>' +
               '</a>'
             : '';
-          return '<div class="encounter-block" id="' + encounterAnchorId(e, i) + '">' +
-            '<div class="encounter-head"><div class="encounter-num">' + (i + 1) + '</div><div class="encounter-title">' + e.name + '</div></div>' +
+          return '<div class="block panel-card encounter-card" id="' + encounterAnchorId(e, i) + '">' +
+            '<div class="encounter-head"><div class="encounter-num">' + (i + 1) + '</div><h3 class="encounter-title">' + e.name + '</h3></div>' +
             (e.objective ? '<div class="encounter-field"><span class="encounter-field-label">Objective</span>' + hl(e.objective) + '</div>' : '') +
             (e.roles ? '<div class="encounter-field"><span class="encounter-field-label">Roles</span>' + hl(e.roles) + '</div>' : '') +
             mapHtml +
@@ -310,10 +311,10 @@
           '</div>';
         }
         // Fallback for older, simpler encounter entries
-        return '<div class="encounter-row" id="' + encounterAnchorId(e, i) + '"><div class="encounter-num">' + (i + 1) + '</div>' +
+        return '<div class="block panel-card encounter-card encounter-row" id="' + encounterAnchorId(e, i) + '"><div class="encounter-num">' + (i + 1) + '</div>' +
           '<div><div class="encounter-name">' + e.name + '</div><div class="encounter-notes">' + (e.notes || "") + '</div></div></div>';
       }).join("")
-    : '<div class="block-empty">Encounter notes coming soon.</div>';
+    : '<div class="block panel-card"><div class="block-empty">Encounter notes coming soon.</div></div>';
   }
 
   const difficultyToggleHtml = raid.epicEncounters
@@ -345,10 +346,8 @@
       (raid.summary ? '<p>' + raid.summary + '</p>' : '<div class="block-empty">Overview coming soon.</div>') +
       raidMasterNoteHtml +
     '</div>' +
-    '<div class="block panel-card">' +
-      '<div class="block-label-row"><div class="block-label">Encounters</div>' + difficultyToggleHtml + '</div>' +
-      '<div id="encounters-body">' + buildEncountersHtml(currentEncounters()) + '</div>' +
-    '</div>' +
+    '<div class="block-label-row encounters-head"><h2 class="block-label">Encounters</h2>' + difficultyToggleHtml + '</div>' +
+    '<div id="encounters-body">' + buildEncountersHtml(currentEncounters()) + '</div>' +
     puzzleHelperHtml +
     '<div class="block panel-card">' +
       '<div class="block-label">Armor Sets From This Raid</div>' +
