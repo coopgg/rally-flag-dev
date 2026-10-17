@@ -25,6 +25,7 @@ starts at `92e56cd`.
 | — | `471a9d4` | Xûr "Predicted Next Drop" preview removed from dev's `vendors.html` (it shows his next stock ~a day early); lives only in dev-only `xur-debug.html` now. Dev and prod `vendors.html` are identical, so promotions should apply with no rejects. Dev-only, nothing to promote. |
 
 | next-1 | `b6044b3` | **On dev, awaiting review.** Discord/link previews: one generated static page per raid/dungeon (`tools/build-guide-pages.js`), all site links + sitemap + discord-bot pointed at them, old `?slug=` links forward. Bot needs a redeploy to post the new links. |
+| next-2 | `6681030` | **On dev, awaiting review.** Guides: one card per encounter (h2 "Encounters" heading + toggle, h3 encounter titles, bigger badge), jump links land 16px above the card. |
 
 `fc35fa6` (skills) and the `.claude/*.md` docs are dev-only; never promote them.
 
