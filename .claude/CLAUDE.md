@@ -69,7 +69,10 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   template or raids-/dungeons-data.js, re-run it; `--check` exits 1 if any
   page is stale. Never hand-edit the generated files. The templates forward
   old `?slug=` links to the generated page. Link with
-  `rallyFlagGuideHref(kind, slug)` (nav.js). `tools/` is dev-only.
+  `rallyFlagGuideHref(kind, slug)` (nav.js). `tools/` is dev-only. The same
+  run writes `assets/activity-index.js`, a 4KB summary (name, slug, art,
+  difficulties, armorSlugs, encounterCount) that listing pages (Home, This
+  Week, Raids, Dungeons) load instead of the full ~180KB guide data.
 - **Canonical tags** match each page's `og:url` (the generated guide pages
   set their own).
 - **Cosmic layer + official art.** `theme.css` ("Cosmic layer") draws the

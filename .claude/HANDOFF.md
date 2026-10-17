@@ -33,7 +33,7 @@ starts at `6681030`. (That range no longer spans the Xûr removal, so vendors.ht
 
 1. Discord link previews — done and live; bot redeploy still needed for its links.
 2. Automated checks — `tests/site-check.js` + `.github/workflows/site-checks.yml` (`7763d11`), green on GitHub; awaiting owner review. Dev-only, nothing to promote.
-3. Home page loads ~180KB of guide data for the featured banner — give it a small summary file.
+3. Lighter listing pages — `2a89b9d` on dev, awaiting review: generated `assets/activity-index.js` (4KB) replaces the 180KB guide data on Home, This Week, Raids, Dungeons.
 4. Official art for Distortions, Tracker, Public Events, Guides overview.
 5. Consider moving the duplicated inline boot script into one file (costs a request).
 
