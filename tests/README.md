@@ -11,6 +11,12 @@ there), at desktop/phone × dark/light, and fails if any page has:
 - visible text under 12px
 - layout shift (CLS) of 0.1 or more (dark mode, desktop + phone)
 
+Those run with the Arc theme. A second pass loads every page in each of the
+other 8 themes, dark and light, at desktop width, and fails on any axe
+colour-contrast or link-in-text-block problem. A theme added to `THEMES` in
+`assets/nav.js` but not to `OTHER_THEMES` in `site-check.js` fails the run.
+`SKIP_THEMES=1 npm run check` skips this pass for a quicker local run.
+
 It also checks that the generated guide pages are up to date
 (`tools/build-guide-pages.js --check`), that every page's inline boot
 script matches `tools/boot-script.js`, that each guide page's raw HTML has
@@ -34,7 +40,8 @@ Before a promotion, check the prod clone the same way:
 check is skipped there; it runs on dev).
 
 GitHub runs the same thing on every push (`.github/workflows/site-checks.yml`);
-the run's summary page lists every check. Takes about 3 minutes.
+the run's summary page lists every check. Takes about 9 minutes (3 without
+the theme pass).
 
 Live Bungie data is fetched during the run, so a Bungie outage can show up
 as a failure; re-run before digging in.

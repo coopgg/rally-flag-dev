@@ -12,6 +12,8 @@
        that fails to decode)
      - no visible text under 12px
      - layout shift (CLS) under 0.1 (dark mode, desktop + phone)
+   all with the Arc theme; then every other theme × dark/light (desktop):
+     - no colour-contrast problems (axe color-contrast + link-in-text-block)
    plus, once:
      - generated guide pages are up to date (tools/build-guide-pages.js --check)
      - every page's inline boot script matches tools/boot-script.js
@@ -49,6 +51,10 @@ const COMBOS = [
   { name: "phone light", width: 390, height: 844, mode: "light" }
 ];
 
+// Arc gets the full check above; the theme pass covers the rest. Keep in
+// sync with THEMES in assets/nav.js (the run fails if a theme is missing).
+const OTHER_THEMES = ["solar", "void", "stasis", "strand", "prismatic", "cosmic", "aurora", "eclipse"];
+
 const failures = [];
 const results = [];
 function record(check, ok, detail){
@@ -70,15 +76,15 @@ function serveFrom(context){
 
 async function newContext(browser, combo, opts = {}){
   const context = await browser.newContext({ viewport: { width: combo.width, height: combo.height }, serviceWorkers: "block", ...opts });
-  await context.addInitScript(mode => {
-    try { localStorage.setItem("rallyflag_theme", "arc"); localStorage.setItem("rallyflag_mode_pref", mode); } catch (e) {}
+  await context.addInitScript(([mode, theme]) => {
+    try { localStorage.setItem("rallyflag_theme", theme); localStorage.setItem("rallyflag_mode_pref", mode); } catch (e) {}
     // Layout shift since navigation start, read back after the page settles.
     window.__cls = 0;
     try {
       new PerformanceObserver(list => { for (const e of list.getEntries()) if (!e.hadRecentInput) window.__cls += e.value; })
         .observe({ type: "layout-shift", buffered: true });
     } catch (e) {}
-  }, combo.mode);
+  }, [combo.mode, combo.theme || "arc"]);
   await context.route(/twitch\.tv|twitch\.com/, r => r.abort());
   await serveFrom(context);
   return context;
@@ -157,6 +163,43 @@ async function checkCombo(browser, combo, linkSink){
   if (combo.mode === "dark") record(`[${combo.name}] layout shift under 0.1`, !problems.cls.length, problems.cls.join("; "));
 }
 
+// Theme colours only change colour, so this pass runs just axe's two colour
+// rules, desktop only, four themes at a time.
+async function checkThemes(browser){
+  const navJs = fs.readFileSync(path.join(ROOT, "assets", "nav.js"), "utf8");
+  const declared = [];
+  for (const m of navJs.matchAll(/const (?:SUBCLASS_)?THEMES = (?:SUBCLASS_THEMES\.concat\()?\[([^\]]*)\]/g))
+    declared.push(...[...m[1].matchAll(/"([a-z]+)"/g)].map(x => x[1]));
+  const untested = declared.filter(t => t !== "arc" && !OTHER_THEMES.includes(t));
+  record(`every theme is covered (${declared.length} in nav.js)`, declared.length > 0 && !untested.length, untested.length ? "add to OTHER_THEMES: " + untested.join(", ") : "");
+
+  const jobs = [];
+  for (const theme of OTHER_THEMES) for (const mode of ["dark", "light"]) jobs.push({ theme, mode });
+  const found = {};
+  const worker = async () => {
+    for (let job; (job = jobs.shift());){
+      const context = await newContext(browser, { width: 1280, height: 900, mode: job.mode, theme: job.theme });
+      const page = await context.newPage();
+      for (const pg of pages){
+        try { await page.goto(BASE + pg, { waitUntil: "domcontentloaded", timeout: 30000 }); }
+        catch (e){ continue; } // load failures are reported by the main pass
+        await settle(page);
+        await page.addScriptTag({ content: AXE });
+        const v = await page.evaluate(async () =>
+          (await axe.run(document, { runOnly: ["color-contrast", "link-in-text-block"] }))
+            .violations.map(v => v.id + "×" + v.nodes.length + " (" + v.nodes.slice(0, 2).map(n => n.target.join(" ")).join("; ") + ")"));
+        if (v.length) (found[job.theme + " " + job.mode] ||= []).push(pg + ": " + v.join(", "));
+      }
+      await context.close();
+    }
+  };
+  await Promise.all([worker(), worker(), worker(), worker()]);
+  for (const theme of OTHER_THEMES) for (const mode of ["dark", "light"]){
+    const list = found[theme + " " + mode] || [];
+    record(`[${theme} ${mode}] no colour-contrast problems`, !list.length, list.join("; "));
+  }
+}
+
 function checkGeneratedPages(){
   if (!fs.existsSync(path.join(ROOT, "tools", "build-guide-pages.js"))){
     console.log("·  generated-pages freshness skipped (no tools/ here; checked on dev)");
@@ -228,6 +271,8 @@ function checkLinks(links){
   const browser = await chromium.launch();
   const links = [];
   await Promise.all(COMBOS.map((combo, i) => checkCombo(browser, combo, i === 0 ? links : null)));
+  if (process.env.SKIP_THEMES) console.log("·  theme pass skipped (SKIP_THEMES)");
+  else await checkThemes(browser);
   await checkRedirects(browser);
   checkLinks(links);
   await browser.close();

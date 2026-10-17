@@ -102,7 +102,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
 push via GitHub Actions (`.github/workflows/site-checks.yml`) and covers
 script errors, axe, sideways scroll, broken images, text <12px, CLS,
 generated guide pages, old-link forwarding and internal links for every
-public page at desktop/phone × dark/light. Run it locally before pushing:
+public page at desktop/phone × dark/light. A second pass checks colour contrast for every
+page in every other theme × dark/light (new theme → add it to `OTHER_THEMES`). Run it locally before pushing:
 `cd tests && npm ci && npm run check`. A red run on dev means don't promote.
 `tests/` and `.github/` are dev-only.
 
