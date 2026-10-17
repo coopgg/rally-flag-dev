@@ -5,11 +5,11 @@ Written 2026-10-16 by a Claude Code cloud session for the next session
 
 ## Where things stand
 
-**Production (`coopgg/rally-flag`, rallyflag.gg) is at `20c0b9f`, synced
-with dev up to `73a0c4f`.** That includes everything below: the first round
+**Production (`coopgg/rally-flag`, rallyflag.gg) is at `3d2bdbd`, synced
+with dev up to `92e56cd` (Pantheon key art).** That includes everything below: the first round
 (14-item review, cache fix, sign-in fixes, Auto/Light/Dark, iPhone
 `minimal-ui`) and the whole skills rescan, items 1–8. Next promotion range
-starts at `73a0c4f`.
+starts at `92e56cd`.
 
 | Item | Dev commit(s) | What |
 |---|---|---|
