@@ -11,8 +11,13 @@ there), at desktop/phone × dark/light, and fails if any page has:
 - visible text under 12px
 - layout shift (CLS) of 0.1 or more (dark mode, desktop + phone)
 
+Before measuring, it opens everything that starts closed (cards behind
+"Expand all", `<details>` sections, the guides' advanced notes), so text
+inside them is checked too.
+
 Those run with the Arc theme. `THEMES=1` adds a second pass that loads
-every page in each of the other 8 themes, dark and light, at desktop width,
+every page in each of the other 8 themes, dark and light, at desktop and
+phone width,
 and fails on any axe colour-contrast or link-in-text-block problem. A theme
 added to `THEMES` in `assets/nav.js` but not to `OTHER_THEMES` in
 `site-check.js` fails that pass. It adds about 6 minutes.

@@ -12,8 +12,8 @@
        that fails to decode)
      - no visible text under 12px
      - layout shift (CLS) under 0.1 (dark mode, desktop + phone)
-   all with the Arc theme; with THEMES=1, also every other theme ×
-   dark/light (desktop):
+   all with the Arc theme and every collapsed card/section opened; with
+   THEMES=1, also every other theme × dark/light × desktop/phone:
      - no colour-contrast problems (axe color-contrast + link-in-text-block)
    plus, once:
      - generated guide pages are up to date (tools/build-guide-pages.js --check)
@@ -118,6 +118,18 @@ async function settle(page){
   await page.waitForTimeout(1200);
 }
 
+// Open everything that starts closed (cards behind "Expand all", <details>,
+// the guides' advanced notes) so its text is checked too.
+async function expandAll(page){
+  await page.evaluate(() => {
+    document.querySelectorAll("main details").forEach(d => { d.open = true; });
+    const all = document.getElementById("expand-all-btn");
+    if (all && /expand/i.test(all.textContent)) all.click();
+    document.querySelectorAll(".encounter-advanced:not(.open) .encounter-advanced-toggle").forEach(b => b.click());
+  });
+  await page.waitForTimeout(500);
+}
+
 async function checkCombo(browser, combo, linkSink){
   const context = await newContext(browser, combo);
   const page = await context.newPage();
@@ -141,6 +153,7 @@ async function checkCombo(browser, combo, linkSink){
     if (!loaded) continue;
     await settle(page);
     const cls = await page.evaluate(() => window.__cls);
+    await expandAll(page);
     // Scroll through so lazy images load, then come back.
     await page.evaluate(async () => {
       for (let y = 0; y < document.body.scrollHeight; y += innerHeight) { scrollTo(0, y); await new Promise(r => setTimeout(r, 60)); }
@@ -187,7 +200,7 @@ async function checkCombo(browser, combo, linkSink){
 }
 
 // Theme colours only change colour, so this pass runs just axe's two colour
-// rules, desktop only, four themes at a time.
+// rules (desktop and phone, everything expanded), four at a time.
 async function checkThemes(browser){
   const navJs = LIVE ? await (await httpGet(BASE + "assets/nav.js")).text() : fs.readFileSync(path.join(ROOT, "assets", "nav.js"), "utf8");
   const declared = [];
@@ -197,21 +210,23 @@ async function checkThemes(browser){
   record(`every theme is covered (${declared.length} in nav.js)`, declared.length > 0 && !untested.length, untested.length ? "add to OTHER_THEMES: " + untested.join(", ") : "");
 
   const jobs = [];
-  for (const theme of OTHER_THEMES) for (const mode of ["dark", "light"]) jobs.push({ theme, mode });
+  for (const theme of OTHER_THEMES) for (const mode of ["dark", "light"]) for (const [width, height] of [[1280, 900], [390, 844]])
+    jobs.push({ theme, mode, width, height });
   const found = {};
   const worker = async () => {
     for (let job; (job = jobs.shift());){
-      const context = await newContext(browser, { width: 1280, height: 900, mode: job.mode, theme: job.theme });
+      const context = await newContext(browser, { width: job.width, height: job.height, mode: job.mode, theme: job.theme });
       const page = await context.newPage();
       for (const pg of pages){
         try { await page.goto(BASE + pg, { waitUntil: "domcontentloaded", timeout: 30000 }); }
         catch (e){ continue; } // load failures are reported by the main pass
         await settle(page);
+        await expandAll(page);
         await page.addScriptTag({ content: AXE });
         const v = await page.evaluate(async () =>
           (await axe.run(document, { runOnly: ["color-contrast", "link-in-text-block"] }))
             .violations.map(v => v.id + "×" + v.nodes.length + " (" + v.nodes.slice(0, 2).map(n => n.target.join(" ")).join("; ") + ")"));
-        if (v.length) (found[job.theme + " " + job.mode] ||= []).push(pg + ": " + v.join(", "));
+        if (v.length) (found[job.theme + " " + job.mode] ||= []).push(pg + (job.width < 600 ? " (phone)" : "") + ": " + v.join(", "));
       }
       await context.close();
     }
