@@ -190,7 +190,9 @@
   }
   .loadout-body{ min-width:0; }
   .loadout-role{ font-size:12px; font-family:'JetBrains Mono', monospace; color:var(--text-dimmer); text-transform:uppercase; letter-spacing:0.02em; }
-  .loadout-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:14px; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  /* Names wrap rather than end in "…" (long exotics and artifacts were cut off). */
+  .loadout-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:14px; line-height:1.25; color:var(--text); overflow-wrap:anywhere; }
+  .loadout-perks{ font-size:12px; line-height:1.35; color:var(--text-dim); margin-top:2px; }
   .loadout-sub{ font-size:12px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
   .loop-list{ max-width:66ch; margin:0 auto 20px; padding:0; list-style:none; counter-reset:loop; }
@@ -463,6 +465,15 @@
     return '<span class="subclass-badge subclass-' + key + '">' + icon + subclass + '</span>';
   }
 
+  // "Stoicism (Spirit of Severance + Spirit of Contact)": the bracketed
+  // perks go on their own smaller line under the item name.
+  function loadoutNameHtml(name){
+    const m = /^(.+?)\s*\((.+)\)$/.exec(name);
+    return m
+      ? '<div class="loadout-name">' + m[1] + '</div><div class="loadout-perks">' + m[2] + '</div>'
+      : '<div class="loadout-name">' + name + '</div>';
+  }
+
   function loadoutPieceHtml(opts){
     // opts: { href, iconId, monogramText, iconUrl, role, name, sub }
     const tag = opts.href ? "a" : "div";
@@ -473,7 +484,7 @@
         '<div class="loadout-icon" id="' + opts.iconId + '">' + iconInner + '</div>' +
         '<div class="loadout-body">' +
           '<div class="loadout-role">' + opts.role + '</div>' +
-          '<div class="loadout-name">' + opts.name + '</div>' +
+          loadoutNameHtml(opts.name) +
           (opts.sub ? '<div class="loadout-sub">' + opts.sub + '</div>' : "") +
         '</div>' +
       '</' + tag + '>'
