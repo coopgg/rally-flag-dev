@@ -4,10 +4,12 @@
    `armorSlugs` link back to the matching entries in sets-data.js.
    `summary` and `encounters` are left blank for you to fill in —
    write them the same way you did the FAQ, in your own words.
+   `art` is the dungeon's official image path (pgcrImage from Bungie's
+   DestinyActivityDefinition); window.rallyFlagArtUrl() turns it into a URL.
    ============================================================ */
 window.DungeonsData = (function(){
   const DUNGEONS = [
-    { name:"Shattered Throne", slug:"shattered-throne", armorSlugs:["techeuns-regalia"],
+    { name:"Shattered Throne", slug:"shattered-throne", art:"/img/destiny_content/pgcr/mission_labyrinth.jpg", armorSlugs:["techeuns-regalia"],
       summary:"Shattered Throne was Destiny 2's first dungeon, and it plays like a compact, three-player raid: no elaborate mechanics, but tight arenas, real add pressure, and bosses that punish sloppy positioning. Strong players can solo it, but going in as a full three-person team is the sane way to learn it.",
       encounters:[
         { name:"Erebus",
@@ -44,7 +46,7 @@ window.DungeonsData = (function(){
           ],
           wipe:"Letting the damage buff's timer run out kills whoever's holding it, so always know where the cleansing point is before you commit to a big damage push." }
       ] },
-    { name:"Pit of Heresy", slug:"pit-of-heresy", armorSlugs:["apostates-blade"],
+    { name:"Pit of Heresy", slug:"pit-of-heresy", art:"/img/destiny_content/pgcr/dungeon_pit_of_heresy.jpg", armorSlugs:["apostates-blade"],
       summary:"Pit of Heresy leans hard on one recurring idea: pick up a Hive relic sword, then use its light attack, heavy attack, or block to match whichever miniboss type you're facing. Learn that pattern once and most of the dungeon's puzzle rooms fall into place.",
       encounters:[
         { name:"Necropolis",
@@ -100,7 +102,7 @@ window.DungeonsData = (function(){
           ],
           wipe:"Staying inside the arena when Zulmak's charged crystal goes off kills anyone still standing there, so always confirm everyone's clear before it detonates." }
       ] },
-    { name:"Prophecy", slug:"prophecy", armorSlugs:["coda"],
+    { name:"Prophecy", slug:"prophecy", art:"/img/destiny_content/pgcr/dungeon_prophecy.jpg", armorSlugs:["coda"],
       summary:"Prophecy is built around one core mechanic repeated three times: kill specific enemies while standing in light or shadow to collect Light or Dark motes, then use those motes to cleanse matching plates. Once you understand mote collection, every encounter in this dungeon is a variation on the same idea.",
       encounters:[
         { name:"Phalanx Echo",
@@ -138,7 +140,7 @@ window.DungeonsData = (function(){
           ],
           wipe:"A stacking debuff builds if you're caught outside the boss's safe zone during the chase, and it kills you at max stacks, so stay in the marked area as you push down the hallway." }
       ] },
-    { name:"Grasp of Avarice", slug:"grasp-of-avarice", armorSlugs:["yearning-echo"],
+    { name:"Grasp of Avarice", slug:"grasp-of-avarice", art:"/img/destiny_content/pgcr/30th-anniversary-grasp-of-avarice.jpg", armorSlugs:["yearning-echo"],
       summary:"Grasp of Avarice takes place in the Cosmodrome's old loot cave, and it's built around one repeating idea: kill enemies for a stacking buff called Burdened by Riches, then carry it to a crystal to drain it before the timer kills you. That same loop shows up again and again, layered with traps, a vehicle chase, and a couple of proper boss fights.",
       encounters:[
         { name:"Skywatch",
@@ -206,7 +208,7 @@ window.DungeonsData = (function(){
           ],
           wipe:"There's no instant wipe here either, but letting your own Burdened by Riches timer expire mid-run still kills you, so don't hoard more than you can deliver in time." }
       ] },
-    { name:"Duality", slug:"duality", armorSlugs:["deep-explorer"],
+    { name:"Duality", slug:"duality", art:"/img/destiny_content/pgcr/dungeon_duality.jpg", armorSlugs:["deep-explorer"],
       summary:"Duality takes place inside Calus's memories, and it runs on one shared idea: shoot a Bell of Conquest to flip between reality and a nightmare version of the same room, collect motes and essences on one side, then bring them back to progress on the other. Once that flip mechanic clicks, most of this dungeon explains itself.",
       encounters:[
         { name:"Navigate the Mindscape",
@@ -255,7 +257,7 @@ window.DungeonsData = (function(){
           ],
           wipe:"There's no instant team wipe in this fight, but the damage phase ends early if Caiatl reaches a bell before you do. Missing a bell just means a longer fight, not a reset, so stay calm and keep chasing." }
       ] },
-    { name:"Spire of the Watcher", slug:"spire-of-the-watcher", armorSlugs:["tm-custom"],
+    { name:"Spire of the Watcher", slug:"spire-of-the-watcher", art:"/img/destiny_content/pgcr/dungeon_spire_of_the_watcher.jpg", armorSlugs:["tm-custom"],
       summary:"Spire of the Watcher runs on a single mechanic the whole way through: kill Conduit Minotaurs for a buff called Arctrician, then use it to power nodes in the correct sequence along a cable. Once you're comfortable tracing cables and chaining nodes, the whole dungeon opens up.",
       encounters:[
         { name:"Reestablish Power",
@@ -304,7 +306,7 @@ window.DungeonsData = (function(){
           ],
           wipe:"If the boss isn't actually inside the reactor room when the purge finishes, its shield won't drop and you'll need to reset the whole sequence, so always confirm it followed you in before sealing that door." }
       ] },
-    { name:"Ghosts of the Deep", slug:"ghosts-of-the-deep", armorSlugs:["taken-king"],
+    { name:"Ghosts of the Deep", slug:"ghosts-of-the-deep", art:"/img/destiny_content/pgcr/dungeon_ghosts_of_the_deep.jpg", armorSlugs:["taken-king"],
       summary:"Ghosts of the Deep leans on one repeating idea: track down a Hive rune symbol, defeat a Lightbearer to claim a Vestige of Light buff, then imbue the correct matching statue before the buff's timer runs out. Every encounter builds on that same rune-and-imbue loop.",
       encounters:[
         { name:"Hive Ritual Disrupted",
@@ -349,7 +351,7 @@ window.DungeonsData = (function(){
           ],
           wipe:"Letting a Vestige of Light buff's 60-second timer expire before you imbue the correct location kills whoever's holding it, so always confirm the symbol match through Deepsight before committing to the run back." }
       ] },
-    { name:"Warlord's Ruin", slug:"warlords-ruin", armorSlugs:["dark-age"],
+    { name:"Warlord's Ruin", slug:"warlords-ruin", art:"/img/destiny_content/pgcr/dungeon_ridgeline.jpg", armorSlugs:["dark-age"],
       summary:"Warlord's Ruin repeats one core idea across all three boss fights: stand near Taken totems to turn them into Stasis totems, which builds toward a damage phase timer called Naeem's Wish Empowerment. Once you understand that loop, each boss just adds one new wrinkle on top of it.",
       encounters:[
         { name:"Rathil, First Broken Knight of Fikrul",
@@ -399,7 +401,7 @@ window.DungeonsData = (function(){
           ],
           wipe:"Letting the Hex of Vengeful Corruption debuff run out on you is a personal death sentence, not a team wipe, so pass it off to a Hex-Drinker quickly and don't let one melee you back to reclaim it." }
       ] },
-    { name:"Vesper's Host", slug:"vespers-host", armorSlugs:["spacewalk"],
+    { name:"Vesper's Host", slug:"vespers-host", art:"/img/destiny_content/pgcr/vespers_host.jpg", armorSlugs:["spacewalk"],
       summary:"Vesper's Host reuses the Scanner and Operator buffs from Deep Stone Crypt and adds a new one, Suppressor, layered with a nuke-carrying mechanic. If you already know Scanner-finds-it, Operator-shoots-it, you're most of the way to understanding this dungeon.",
       encounters:[
         { name:"Activation",
@@ -458,7 +460,7 @@ window.DungeonsData = (function(){
           ],
           wipe:"Radiation stacks and the boss's lightning damage both punish standing still too long, so keep moving between panel duties instead of camping one spot." }
       ] },
-    { name:"Sundered Doctrine", slug:"sundered-doctrine", armorSlugs:["flain"],
+    { name:"Sundered Doctrine", slug:"sundered-doctrine", art:"/img/destiny_content/pgcr/dungeon_delver.jpg", armorSlugs:["flain"],
       summary:"Sundered Doctrine takes place in Rhulk's pyramid, and it runs on symbols and light beams: using lenses to redirect Darkness beams onto the correct wall symbol shows up in every encounter. The mechanics get layered with new twists each time, but the beam-and-symbol foundation never changes.",
       encounters:[
         { name:"Riddle",
@@ -496,7 +498,7 @@ window.DungeonsData = (function(){
           ],
           wipe:"Lighting up a Truth symbol undoes your progress on that round rather than wiping the team outright. It costs time, not lives, so it's worth double-checking the correct set before committing to a full relight." }
       ] },
-    { name:"Equilibrium", slug:"equilibrium", armorSlugs:["sage-protector"],
+    { name:"Equilibrium", slug:"equilibrium", art:"/img/destiny_content/pgcr/dungeon_equilibrium.jpg", armorSlugs:["sage-protector"],
       summary:"Equilibrium is Renegades' launch dungeon, and it's built almost entirely around one mechanic, Gathering Shadow, that keeps getting more demanding as you go. You'll spend the whole run picking up Darkness pools to build a stacking buff, then spending that buff on doors, shields, and eventually the final boss's own throne world. Learn the buff economy in the first encounter and the rest of the dungeon is the same idea with more steps bolted on.",
       encounters:[
         { name:"Barant Imperium Forces",

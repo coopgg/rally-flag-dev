@@ -116,6 +116,18 @@
 
   // localStorage can throw (blocked site data, some private modes); the
   // nav must still render, just without remembering the choice.
+  // Official activity art. raids-data.js / dungeons-data.js store each
+  // activity's pgcrImage path (`art`); these turn it into a URL and into
+  // the 16:9 card thumbnail. No art (Pantheon) → the name's initials.
+  window.rallyFlagArtUrl = path => path ? "https://www.bungie.net" + path : "";
+  window.rallyFlagArtThumb = (item, eager) => {
+    const url = window.rallyFlagArtUrl(item.art);
+    const initials = item.name.replace(/^The /, "").split(/\s+/).map(w => w[0]).join("").slice(0, 2);
+    return '<div class="art-thumb">' + (url
+      ? '<img src="' + url + '" alt=""' + (eager ? '' : ' loading="lazy"') + '>'
+      : '<div class="art-fallback" aria-hidden="true">' + initials + '</div>') + '</div>';
+  };
+
   function storageGet(key){ try { return localStorage.getItem(key); } catch (e) { return null; } }
   function storageSet(key, value){ try { localStorage.setItem(key, value); } catch (e) {} }
   function storageRemove(key){ try { localStorage.removeItem(key); } catch (e) {} }
@@ -417,23 +429,6 @@
   }
 
   setupPWA();
-  // Dev-only design preview (item 8): ?look=mix turns on the "A + Cosmic"
-  // layer (assets/look-mix.*) across the site, ?look=off turns it off.
-  // Inert anywhere but the dev host, so it never shows on rallyflag.gg.
-  function setupLookPreview(){
-    if (location.hostname !== "coopgg.github.io") return;
-    const q = new URLSearchParams(location.search).get("look");
-    if (q === "mix") storageSet("rallyflag_look", "mix");
-    else if (q === "off") storageRemove("rallyflag_look");
-    if (storageGet("rallyflag_look") !== "mix") return;
-    document.documentElement.setAttribute("data-look", "mix");
-    const css = document.createElement("link");
-    css.rel = "stylesheet"; css.href = "assets/look-mix.css";
-    document.head.appendChild(css);
-    loadScript("assets/look-mix.js").catch(() => {});
-  }
-
-  setupLookPreview();
   setupAnalytics();
   buildNav();
   applyTheme(getStoredTheme());

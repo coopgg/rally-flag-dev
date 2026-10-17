@@ -79,7 +79,8 @@
     display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
     gap:12px;
   }
-  .featured-card{ padding:16px 18px; }
+  .featured-card{ padding:16px 18px; overflow:hidden; }
+  .featured-card .art-thumb{ margin:-16px -18px 14px; aspect-ratio:21/9; }
   .featured-kind{
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
     color:var(--accent-text); text-transform:uppercase; margin-bottom:6px;
@@ -247,6 +248,7 @@
     const cards = items.map(item => ({
       kind: kind,
       name: item.name,
+      art: item.art,
       href: hrefPrefix + item.slug,
       armorSlugs: item.armorSlugs || [],
       alwaysFeatured: item.slug === alwaysFeaturedSlug
@@ -266,6 +268,7 @@
         }).join("");
         const alwaysBadge = c.alwaysFeatured ? '<span class="featured-always-badge">Always Featured</span>' : '';
         return '<div class="featured-card panel-card' + (isPrediction ? ' predicted' : '') + '">' +
+          window.rallyFlagArtThumb(c) +
           '<div class="featured-kind">' + c.kind + alwaysBadge + '</div>' +
           '<div class="featured-name">' + c.name + '</div>' +
           (armorLinksHtml ? '<div class="featured-set-label">Armor Set</div><div class="set-links">' + armorLinksHtml + '</div>' : '') +

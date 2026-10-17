@@ -193,6 +193,12 @@
 
   document.title = raid.name + " - Rally Flag";
   document.getElementById("raid-title").textContent = raid.name;
+  // Header sits over the raid's official art.
+  if (raid.art){
+    const hero = document.getElementById("hero");
+    hero.classList.add("has-art");
+    hero.insertAdjacentHTML("afterbegin", '<div class="hero-art"><img src="' + window.rallyFlagArtUrl(raid.art) + '" alt="" fetchpriority="high"></div>');
+  }
   document.getElementById("raid-difficulty").textContent = raid.difficulties ? raid.difficulties.join(" · ") : "";
 
   // Updates the static fallback meta/OG tags with the actual raid once it's

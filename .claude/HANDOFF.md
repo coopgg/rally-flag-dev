@@ -33,18 +33,14 @@ the `.claude` / `skills-lock.json` / `.gitignore` excludes).
 5. Done — see table above.
 6. Done — see table above.
 7. Done — see table above.
-8. **Design direction — owner picked A, wants it mixed with Cosmic (B).**
-   Mock-ups: `design-preview.html` (A/B/C side by side) and, since `050a2b0`,
-   an "A + Cosmic" layer over the real pages: open any dev page with
-   `?look=mix` (`?look=off` or the pill to leave). Files: `assets/look-mix.css`,
-   `assets/look-mix.js`, plus `setupLookPreview()` in `nav.js` (dev-host only).
-   What it adds: starfield, glass panels with subclass-coloured edge + glow,
-   official art (pgcrImage map in look-mix.js) on raid/dungeon/This Week
-   cards, art banner on raid/dungeon guide headers, featured-raid banner on
-   home. Keeps A's fonts, 6 themes, light mode. Waiting on the owner's
-   verdict; if approved, fold the CSS into `theme.css`, move the art map
-   into `raids-data.js`/`dungeons-data.js`, render the art in each page's
-   own script, and delete the preview hook and files.
+8. **Design direction — owner chose "A + Cosmic"; built in for real (see table).**
+   The mock-ups (`design-preview.html`, `?look=mix`) are gone. What shipped
+   to dev: starfield + nebula, see-through panels with a subclass-coloured
+   edge and glow (theme.css "Cosmic layer"), official activity art (`art`
+   in raids-data.js / dungeons-data.js, helpers in nav.js) on Raids,
+   Dungeons, This Week, the guide headers, and a featured-raid banner on
+   Home. A's fonts, 6 themes and light mode unchanged. Dropped the
+   preview's backdrop blur on panels (scroll performance on phones).
 
 ## Workflow the owner expects
 

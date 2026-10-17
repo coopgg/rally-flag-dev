@@ -129,6 +129,12 @@
 
   document.title = dungeon.name + " - Rally Flag";
   document.getElementById("dungeon-title").textContent = dungeon.name;
+  // Header sits over the dungeon's official art.
+  if (dungeon.art){
+    const hero = document.getElementById("hero");
+    hero.classList.add("has-art");
+    hero.insertAdjacentHTML("afterbegin", '<div class="hero-art"><img src="' + window.rallyFlagArtUrl(dungeon.art) + '" alt="" fetchpriority="high"></div>');
+  }
 
   // Updates the static fallback meta/OG tags with the actual dungeon once
   // it's known — helps crawlers that execute JS (Google) and keeps the

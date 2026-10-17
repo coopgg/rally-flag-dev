@@ -18,18 +18,17 @@ dev-only files, so apply only the reviewed commit range:
 git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)debug.html' ':(exclude)clan-admin.html' ':(exclude)discord-bot' \
   ':(exclude)api-debug.html' ':(exclude)xur-debug.html' ':(exclude).claude' \
-  ':(exclude)skills-lock.json' ':(exclude).gitignore' \
-  ':(exclude)design-preview.html' ':(exclude)assets/look-mix.css' \
-  ':(exclude)assets/look-mix.js' > /tmp/promote.patch
+  ':(exclude)skills-lock.json' ':(exclude).gitignore' > /tmp/promote.patch
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
 Expected rejects: hunks touching the Xûr "Predicted" preview in
 `vendors.html` (dev-only, unreleased). Anything else rejecting means prod and
 dev drifted — stop and look. After applying, `diff -rq` the two trees: the
-only differences should be `CNAME`, `.gitignore`, the dev-only files above
-(including `design-preview.html` and `assets/look-mix.*`, the item 8 mock-ups),
-and the Xûr preview in `vendors.html`.
+only differences should be `CNAME`, `.gitignore`, the dev-only files above,
+and the Xûr preview in `vendors.html`. (`design-preview.html` and
+`assets/look-mix.*` existed on dev for a while as item 8 mock-ups and were
+deleted again; if a promotion range spans them, their add+delete cancels out.)
 
 ## Things that bite
 
@@ -62,10 +61,12 @@ and the Xûr preview in `vendors.html`.
   Raw `--accent` fails contrast on light backgrounds.
 - **Canonical tags** match each page's `og:url`. Raid/dungeon guide pages
   have no static canonical; script sets one per `?slug=`.
-- **`?look=mix` preview (dev only).** `setupLookPreview()` in `nav.js`
-  loads `assets/look-mix.css/.js` ("A + Cosmic") when the flag is set. It
-  returns early on any host but `coopgg.github.io`, so it is inert on prod;
-  remove it once the look is adopted for real or dropped.
+- **Cosmic layer + official art.** `theme.css` ("Cosmic layer") draws the
+  starfield (`body::before`), panel edge/glow and art styles from the theme
+  tokens. Raids/dungeons carry `art` (pgcrImage path from Bungie's
+  DestinyActivityDefinition) in their data files; `rallyFlagArtUrl()` /
+  `rallyFlagArtThumb()` in `nav.js` build the URL / card thumbnail. New raid
+  or dungeon → look up its pgcrImage in the manifest and add `art`.
 - **`404.html`** is served for any missing path at any depth; it sets `<base>`
   to the site root and writes its asset tags from script. Keep that pattern.
 
