@@ -126,6 +126,10 @@ nav.site-nav{
   font-family:'Oswald', sans-serif; font-weight:600; letter-spacing:0.04em;
   font-size:15px; text-decoration:none; min-height:24px;
 }
+/* Fixed to Oswald's width (75px at 15px): until the web font arrives the
+   fallback is ~99px, which wrapped the nav onto two rows at 360px and
+   shifted the whole page when Oswald loaded. The fallback is clipped. */
+.brand-name{ display:inline-block; width:5.1em; white-space:nowrap; overflow:hidden; }
 .brand-mark{
   width:10px; height:10px; background:var(--accent);
   clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);

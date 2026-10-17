@@ -369,7 +369,7 @@
           // Panel sits right after its button (it's absolutely positioned,
           // so this doesn't move it) so Tab goes from the button into the links.
           '<div class="nav-links-panel" id="nav-links-panel" style="--nav-cols:' + NAV_SECTIONS.length + '">' + linksHtml + '</div>' +
-          '<a href="index.html" class="brand"><span class="brand-mark"></span>RALLY FLAG</a>' +
+          '<a href="index.html" class="brand"><span class="brand-mark"></span><span class="brand-name">RALLY FLAG</span></a>' +
         '</div>' +
         '<div class="nav-right-wrap">' +
           '<a class="nav-icon-btn" href="' + DISCORD_INVITE_URL + '" target="_blank" rel="noopener" title="Join the Discord">' + DISCORD_ICON_SVG + '</a>' +
