@@ -37,6 +37,7 @@ starts at `3f12dec`. Before promoting, run `SITE_ROOT=<prod clone> npm run check
 4. Official art for Distortions, Tracker, Public Events, Guides overview — `c12a8c6`, live on prod. (Rotation page done in item 6.)
 5. Boot script single source — `4d7000a`, live on prod: `tools/boot-script.js` + `tools/sync-boot-script.js` (stays inline; no extra request).
 6. Small items — `3f12dec`, live on prod: Armor Sets source label de-duplicated (+ body font), God Rolls drops "Legendary", Rotation page thumbnails. Discord bot redeploy is the owner's.
+7. Builds loadout names wrap instead of "…"; bracketed perks on their own line — `6391db7` on dev, awaiting review.
 
 ## Rescan items (all done and live)
 
