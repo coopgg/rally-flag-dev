@@ -5,11 +5,11 @@ Written 2026-10-16 (updated 2026-10-17) by a Claude Code cloud session for the n
 
 ## Where things stand
 
-**Production (`coopgg/rally-flag`, rallyflag.gg) is at `77274fa`, synced
-with dev up to `c12a8c6` (art on remaining pages).** That includes everything below: the first round
+**Production (`coopgg/rally-flag`, rallyflag.gg) is at `71ad3b3`, synced
+with dev up to `4d7000a` (boot script single source).** That includes everything below: the first round
 (14-item review, cache fix, sign-in fixes, Auto/Light/Dark, iPhone
 `minimal-ui`) and the whole skills rescan, items 1–8. Next promotion range
-starts at `c12a8c6`. Before promoting, run `SITE_ROOT=<prod clone> npm run check` in tests/.
+starts at `4d7000a`. Before promoting, run `SITE_ROOT=<prod clone> npm run check` in tests/.
 
 | Item | Dev commit(s) | What |
 |---|---|---|
@@ -35,7 +35,7 @@ starts at `c12a8c6`. Before promoting, run `SITE_ROOT=<prod clone> npm run check
 2. Automated checks — `tests/site-check.js` + `.github/workflows/site-checks.yml` (`7763d11`), green on GitHub; awaiting owner review. Dev-only, nothing to promote.
 3. Lighter listing pages — `2a89b9d` live on prod: generated `assets/activity-index.js` (4KB) replaces the 180KB guide data on Home, This Week, Raids, Dungeons.
 4. Official art for Distortions, Tracker, Public Events, Guides overview — `c12a8c6`, live on prod. (Rotation page not done; could reuse rotation-data.js `art`.)
-5. Boot script single source — `4d7000a` on dev, awaiting review: `tools/boot-script.js` + `tools/sync-boot-script.js` (stays inline; no extra request).
+5. Boot script single source — `4d7000a`, live on prod: `tools/boot-script.js` + `tools/sync-boot-script.js` (stays inline; no extra request).
 
 ## Rescan items (all done and live)
 

@@ -244,7 +244,7 @@
     object-fit:contain; pointer-events:none;
   }
   .set-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:18px; color:var(--text); }
-  .set-source{ font-size:12px; color:var(--text-dimmer); font-family:'JetBrains Mono', monospace; margin-top:2px; }
+  .set-source{ font-size:12.5px; color:var(--text-dimmer); margin-top:2px; }
 
   .perk{ display:flex; gap:10px; margin-bottom:14px; }
   .perk-badge{
@@ -622,6 +622,14 @@
     return (words[0][0] + words[1][0]).toUpperCase();
   }
 
+
+  // sets-data.js details often repeat the category ("“Vault of Glass” Raid"
+  // under "Raid", "Iron Banner" under "Iron Banner", "Trials of Osiris
+  // Challenges" under "Trials"); say it once.
+  function sourceLabel(set){
+    const detail = set.sourceDetail.replace(/^“(.+)” (Epic )?(Raid|Dungeon)$/, (m, name, epic) => name + (epic ? " (Epic)" : ""));
+    return detail.startsWith(set.source) ? detail : set.source + " \u00b7 " + detail;
+  }
   function matches(set){
     if (state.sources.size && !state.sources.has(set.source)) return false;
     if (state.weapons.size && !set.pairs.some(p => state.weapons.has(p))) return false;
@@ -682,7 +690,7 @@
         '<div class="set-card-head" role="button" tabindex="0" aria-expanded="false">' +
           '<span class="set-caret"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 6 15 12 9 18"></polyline></svg></span>' +
           '<div class="set-monogram" id="icon-' + set.slug + '">' + monogram(set.name) + '</div>' +
-          '<div><div class="set-name">' + set.name + '</div><div class="set-source">' + set.source + ' \u00b7 ' + set.sourceDetail + '</div></div>' +
+          '<div><div class="set-name">' + set.name + '</div><div class="set-source">' + sourceLabel(set) + '</div></div>' +
         '</div>' +
         '<div class="set-card-body">' +
           '<div class="perk"><div class="perk-badge" id="two-badge-' + set.slug + '">2</div><div class="perk-body"><div class="perk-name">2 Piece | ' + set.two[0] + '</div><div class="perk-desc">' + set.two[1] + '</div></div></div>' +

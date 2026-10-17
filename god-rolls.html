@@ -659,8 +659,10 @@
       if (item.tierName === "Exotic") nameEl.classList.add("tier-exotic");
       else if (item.tierName === "Legendary") nameEl.classList.add("tier-legendary");
 
+      // Nearly every roll here is Legendary (the name colour shows tier), so
+      // only call out Exotic; "Legendary Grenade Launcher" wrapped in the card.
       document.getElementById("meta-" + weapon.slug).textContent =
-        (item.tierName ? item.tierName + " " : "") + item.typeName;
+        (item.tierName === "Exotic" ? "Exotic " : "") + item.typeName;
       card.dataset.type = item.typeName || "";
       card.dataset.ammo = item.ammoTypeName || "";
       if (item.flavorText){

@@ -74,7 +74,9 @@
   .rotation-when{ font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer); line-height:1.4; }
   .rotation-when .day{ display:block; font-size:12px; text-transform:uppercase; letter-spacing:0.05em; }
   .rotation-row.active .rotation-when{ color:var(--accent-bright); font-weight:700; }
-  .rotation-dest{ font-family:'Oswald', sans-serif; font-weight:600; font-size:16px; color:var(--text); }
+  .rotation-dest{ display:flex; align-items:center; gap:12px; font-family:'Oswald', sans-serif; font-weight:600; font-size:16px; color:var(--text); }
+  /* The destination's official art (rotation-data.js `art`), same as Distortions. */
+  .rotation-thumb{ flex-shrink:0; width:64px; height:36px; object-fit:cover; border-radius:6px; border:1px solid var(--edge); background:var(--accent-dim); }
   .rotation-loot{ display:inline-flex; align-items:center; min-height:24px; font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--accent-bright); text-decoration:none; border-bottom:1px solid transparent; transition: border-color 0.2s ease; }
   .rotation-loot:hover, .rotation-loot:focus-visible{ border-color:var(--accent-bright); }
 
@@ -155,7 +157,7 @@
           (showDay ? '<span class="day">' + day + '</span>' : '') +
           (i === 0 ? "Now" : D.fmtTime(slotStart)) +
         '</div>' +
-        '<div class="rotation-dest">' + dest.name + '</div>' +
+        '<div class="rotation-dest">' + (dest.art ? '<img class="rotation-thumb" src="' + window.rallyFlagArtUrl(dest.art) + '" alt="" loading="lazy">' : '') + '<span>' + dest.name + '</span></div>' +
         '<a class="rotation-loot" href="armor-set-bonuses.html?highlight=' + dest.slug + '">' + dest.loot + '</a>';
       list.appendChild(row);
     }
