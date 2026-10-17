@@ -1,5 +1,8 @@
 /* ============================================================
-   Dungeon data — single source of truth for dungeons.html and dungeon-guide.html.
+   Dungeon data — single source of truth for the dungeon guides and lists.
+   The guide pages and the small assets/activity-index.js that listing
+   pages read are generated from it: run node tools/build-guide-pages.js
+   after editing.
    Add a new dungeon by adding an entry here — no new HTML page needed.
    `armorSlugs` link back to the matching entries in sets-data.js.
    `summary` and `encounters` are left blank for you to fill in —

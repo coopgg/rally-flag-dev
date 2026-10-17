@@ -279,12 +279,11 @@
 </footer>
 
 <script src="assets/nav.js"></script>
-<script src="assets/raids-data.js"></script>
-<script src="assets/dungeons-data.js"></script>
+<script src="assets/activity-index.js"></script>
 <script src="assets/featured-rotation-data.js"></script>
 <script>
 (function(){
-  const F = window.FeaturedRotationData, RAIDS = window.RaidsData.RAIDS, DUNGEONS = window.DungeonsData.DUNGEONS;
+  const F = window.FeaturedRotationData, RAIDS = window.ActivityIndex.raids, DUNGEONS = window.ActivityIndex.dungeons;
   const featured = F.featuredForWeek(F.currentWeekIndex());
   // Lead with a rotating raid; the always-featured one goes in the tiles.
   const raid = RAIDS.find(r => r.slug === featured.raids[1]) || RAIDS.find(r => r.slug === featured.raids[0]);
@@ -300,7 +299,7 @@
       (raid.art ? '<div class="feature-art"><img src="' + art(raid.art) + '" alt="" fetchpriority="high"></div>' : '') +
       '<div class="feature-body"><div class="feature-kicker">Featured raid this week</div>' +
       '<div class="feature-name">' + raid.name + '</div>' +
-      '<div class="feature-meta">' + raid.encounters.length + ' encounters · rotates in ' + days + 'd ' + hours + 'h</div>' +
+      '<div class="feature-meta">' + raid.encounterCount + ' encounters · rotates in ' + days + 'd ' + hours + 'h</div>' +
       '<span class="feature-cta">Open the guide&nbsp;<span aria-hidden="true">\u2192</span></span></div></a>' +
     '<div class="feature-tiles">' + tiles.map(([kind, a, guideKind]) =>
       '<a class="feature-tile" href="' + window.rallyFlagGuideHref(guideKind, a.slug) + '">' + (a.art ? '<img src="' + art(a.art) + '" alt="" loading="lazy">' : '') +

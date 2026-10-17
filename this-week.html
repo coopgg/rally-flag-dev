@@ -174,8 +174,7 @@
 </footer>
 
 <script src="assets/nav.js"></script>
-<script src="assets/raids-data.js"></script>
-<script src="assets/dungeons-data.js"></script>
+<script src="assets/activity-index.js"></script>
 <script src="assets/sets-data.js"></script>
 <script src="assets/featured-rotation-data.js"></script>
 <script>
@@ -308,8 +307,8 @@
   }
 
   function renderFeatured(){
-    const raidList = window.RaidsData ? window.RaidsData.RAIDS : [];
-    const dungeonList = window.DungeonsData ? window.DungeonsData.DUNGEONS : [];
+    const raidList = window.ActivityIndex ? window.ActivityIndex.raids : [];
+    const dungeonList = window.ActivityIndex ? window.ActivityIndex.dungeons : [];
 
     renderIronBanner();
     renderCategoryCards("featured-raids-content", "Raid", toEntries(FEATURED_THIS_WEEK.raids, raidList), "raid", false, ALWAYS_FEATURED_RAID_SLUG);

@@ -1,5 +1,8 @@
 /* ============================================================
-   Raid data — single source of truth for raids.html and raid-guide.html.
+   Raid data — single source of truth for the raid guides and lists.
+   The guide pages and the small assets/activity-index.js that listing
+   pages read are generated from it: run node tools/build-guide-pages.js
+   after editing.
    Add a new raid by adding an entry here — no new HTML page needed.
    `armorSlugs` link back to the matching entries in sets-data.js.
    `summary` and `encounters` are left blank for you to fill in —

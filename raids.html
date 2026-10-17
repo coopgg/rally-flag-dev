@@ -73,11 +73,11 @@
 </footer>
 
 <script src="assets/nav.js"></script>
-<script src="assets/raids-data.js"></script>
+<script src="assets/activity-index.js"></script>
 <script>
 (function(){
   const grid = document.getElementById("activity-grid");
-  window.RaidsData.RAIDS.forEach(raid => {
+  window.ActivityIndex.raids.forEach(raid => {
     const card = document.createElement("a");
     card.className = "activity-card panel-card";
     card.href = window.rallyFlagGuideHref("raid", raid.slug);
