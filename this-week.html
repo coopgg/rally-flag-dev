@@ -109,7 +109,7 @@
   .tw-subsection-label:first-of-type{ margin-top:0; }
   .featured-grid{
     display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
-    gap:12px;
+    grid-auto-rows:1fr; gap:12px;
   }
   .featured-card{ padding:16px 18px; overflow:hidden; }
   .featured-card .art-thumb{ margin:-16px -18px 14px; aspect-ratio:21/9; }
@@ -128,7 +128,9 @@
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
     color:var(--text-dimmer); text-transform:uppercase; margin-top:14px; margin-bottom:8px;
   }
-  .set-links{ display:flex; flex-wrap:wrap; gap:8px; }
+  /* Room for two rows of set pills (The Desert Perpetual has two sets) so
+     every featured card, raid or dungeon, is the same height. */
+  .set-links{ display:flex; flex-wrap:wrap; align-content:flex-start; gap:8px; min-height:82px; }
   .set-link{
     font-size:12.5px; font-family:'JetBrains Mono', monospace; color:var(--accent-bright);
     text-decoration:none; background:var(--accent-dim); border:1px solid var(--panel-border);

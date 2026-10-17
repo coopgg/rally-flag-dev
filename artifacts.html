@@ -122,10 +122,12 @@
   }
 
   section{ max-width:1100px; margin:0 auto; padding:0 24px 90px; }
+  /* Even columns that fill the row; cards top-align so opening one doesn't
+     stretch its neighbour. */
   .artifact-grid{
-    display:flex; flex-wrap:wrap; justify-content:center; gap:16px;
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(min(340px, 100%), 1fr)); gap:16px; align-items:start;
   }
-  .artifact-card{ flex:0 1 420px; padding:24px; }
+  .artifact-card{ padding:24px; min-width:0; }
   .artifact-head{
     margin-bottom:6px; display:flex; align-items:flex-start; justify-content:space-between;
     gap:12px; cursor:pointer; user-select:none;
@@ -143,10 +145,13 @@
   }
   .artifact-caret svg{ width:11px; height:11px; }
   .artifact-card.expanded .artifact-caret{ transform:rotate(90deg); }
-  .artifact-name{ font-family:'Oswald', sans-serif; font-weight:700; font-size:19px; color:var(--text); }
+  /* Two lines of room for the name ("Slayer Baron Apothecary Satchel" wraps) so
+     closed cards match; a one-line name sits just above its season. */
+  .artifact-name{ font-family:'Oswald', sans-serif; font-weight:700; font-size:19px; color:var(--text); line-height:1.2; min-height:2.4em; display:flex; align-items:flex-end; }
   .artifact-season{ font-size:12px; font-family:'JetBrains Mono', monospace; color:var(--text-dimmer); margin-top:2px; }
 
-  .tag-row{ display:flex; flex-wrap:wrap; gap:6px; margin:12px 0 0; }
+  /* Room for 3 rows of tags (the most any artifact has) so closed cards match. */
+  .tag-row{ display:flex; flex-wrap:wrap; align-content:flex-start; gap:6px; margin:12px 0 0; min-height:90px; }
   .artifact-card.expanded .tag-row{ margin-bottom:16px; }
   .tag{
     font-size:12px; font-family:'JetBrains Mono', monospace; font-weight:500;

@@ -138,6 +138,9 @@
   .build-card.expanded .build-caret{ transform:rotate(90deg); }
   .build-title{ font-family:'Oswald', sans-serif; font-weight:700; font-size:21px; color:var(--text); }
   .build-badges{ display:flex; gap:6px; flex-shrink:0; }
+  /* Phones: badges always on their own line (long titles pushed some there
+     anyway), so closed cards all match. */
+  @media (max-width:560px){ .build-badges{ flex-basis:100%; } }
   .class-badge{
     font-size:12px; font-family:'JetBrains Mono', monospace; font-weight:600;
     color:var(--text-dim); background:var(--panel); border:1px solid var(--panel-border);
@@ -159,6 +162,9 @@
 
   .build-tagline{ font-size:15px; max-width:62ch; color:var(--text-dim); line-height:1.5; }
   .build-card.expanded .build-tagline{ margin-bottom:20px; }
+  /* Closed cards all match: the tagline takes exactly 2 lines (full text
+     once the card is open). */
+  .build-card:not(.expanded) .build-tagline{ min-height:3em; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden; }
   .build-body{ display:none; }
   .build-card.expanded .build-body{ display:block; }
 

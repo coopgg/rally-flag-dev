@@ -135,11 +135,13 @@
 
   /* ---------- Up next ---------- */
   section{ max-width:1000px; margin:80px auto 0; padding:0 24px 90px; }
+  /* Even columns that fill the row; every card as tall as the tallest. */
   .next-grid{
-    display:flex; flex-wrap:wrap; justify-content:center; gap:14px;
+    display:grid; grid-template-columns:repeat(3, 1fr); grid-auto-rows:1fr; gap:14px;
   }
+  @media (max-width:560px){ .next-grid{ grid-template-columns:1fr; } }
   .next-card{
-    flex:0 1 190px; padding:22px 20px; text-align:center;
+    padding:22px 20px; text-align:center;
     display:flex; flex-direction:column;
   }
   .next-card .loot-pill{ margin-top:auto; }

@@ -141,7 +141,9 @@
   .weapon-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:19px; color:var(--text); margin-bottom:4px; }
   .weapon-name.tier-exotic{ color:#ceae33; }
   .weapon-name.tier-legendary{ color:#a892d1; }
-  .weapon-badges{ display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+  /* min-height: the badges arrive with Bungie's live data; keep the row's
+     space so cards don't change height (or differ) while it loads. */
+  .weapon-badges{ display:flex; align-items:center; gap:6px; margin-bottom:6px; min-height:18px; }
   .alt-roll-btn{
     font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dim);
     background:var(--panel); border:1px solid var(--panel-border); border-radius:999px;
@@ -160,7 +162,9 @@
     background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center;
   }
   .ammo-badge img{ width:12px; height:12px; object-fit:contain; }
-  .weapon-meta{ font-size:12px; font-family:'JetBrains Mono', monospace; color:var(--text-dimmer); }
+  /* Body font, not mono: "Exotic Grenade Launcher" fits on one line, so
+     closed cards all match. */
+  .weapon-meta{ font-size:12.5px; color:var(--text-dimmer); }
   .weapon-unlock-row{ margin-top:8px; min-height:20px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
   .weapon-unlock-row:empty{ display:none; } /* only filled when signed in */
   .weapon-flavor{ font-size:14px; color:var(--text-dim); font-style:italic; margin-top:8px; line-height:1.5; }
