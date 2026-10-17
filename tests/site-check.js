@@ -99,7 +99,17 @@ async function checkCombo(browser, combo, linkSink){
   const problems = { errors: [], axe: [], hscroll: [], images: [], small: [], cls: [] };
   for (const pg of pages){
     errors = []; badImages = [];
-    await page.goto(BASE + pg, { waitUntil: "load" });
+    // Don't wait on the full "load" event: one slow third-party image or
+    // font (Bungie, Google Fonts) can stall it past the timeout on a CI
+    // runner. The page's own content is ready at DOMContentLoaded plus the
+    // .rf-boot reveal; retry once, and report a page that still won't load
+    // instead of aborting the whole run.
+    let loaded = false;
+    for (let attempt = 0; attempt < 2 && !loaded; attempt++){
+      try { await page.goto(BASE + pg, { waitUntil: "domcontentloaded", timeout: 30000 }); loaded = true; }
+      catch (e){ if (attempt) problems.errors.push(pg + ": didn't load (" + e.message.split("\n")[0] + ")"); }
+    }
+    if (!loaded) continue;
     await settle(page);
     const cls = await page.evaluate(() => window.__cls);
     // Scroll through so lazy images load, then come back.
@@ -186,10 +196,10 @@ async function checkRedirects(browser){
   ];
   const bad = [];
   for (const [from, to] of cases){
-    await page.goto(BASE + from); await page.waitForTimeout(1000);
+    await page.goto(BASE + from, { waitUntil: "domcontentloaded" }); await page.waitForTimeout(1000);
     if (page.url() !== BASE + to) bad.push(from + " → " + page.url().replace(BASE, "") + " (expected " + to + ")");
   }
-  await page.goto(BASE + "raid-guide.html?slug=no-such-raid"); await settle(page);
+  await page.goto(BASE + "raid-guide.html?slug=no-such-raid", { waitUntil: "domcontentloaded" }); await settle(page);
   const h1 = await page.textContent("h1");
   if (!/not found/i.test(h1)) bad.push("unknown slug shows \"" + h1 + "\" instead of \"Raid not found\"");
   await context.close();
