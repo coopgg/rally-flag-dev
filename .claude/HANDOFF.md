@@ -22,9 +22,10 @@ waiting for the owner's review; NOT promoted to prod — wait for the go-ahead:
 | 5 | `987a5ba` | 22 `transition: all` → explicit colour/opacity properties; `prefers-reduced-motion` (CSS + smooth-scroll JS); `color-scheme` per mode; `text-wrap: balance` on headings; `touch-action: manipulation`; `aria-label` on 4 search inputs + Bungie-name input; `aria-live` on filter counts, `role=status` on sign-in callback; `tabular-nums` on Distortions clock; preconnect to www.bungie.net; `:focus-visible` ring on inputs. axe 0 on 21 pages; pixel-identical at rest apart from countdowns and sub-pixel heading glyph shifts. |
 | 6 | `5e41c2e` | Site-menu button: ☰ text glyph → inline SVG in the gear's stroke style; button 34×34 (was 34.6×30) so it lines up with the settings button. Keyboard open/Escape unchanged. |
 | 7 | `2fff29f` | Readability: long-form text 16px capped ~62ch; card descriptions 14–15px; 12px label floor (100 declarations); Builds reading column centred; Codes cards 300px; guides less phone padding. Visible change: pages 1–35% taller. axe 0 (dark+light), CLS 0 on all 21 pages. Known: 4 god-roll / 3 armor-set meta labels now wrap to 2 lines in narrow cards. |
+| 8 | `e3395fd` | "A + Cosmic": starfield, accent-edged see-through panels + glow, official activity art on Raids/Dungeons/This Week cards, guide-header art banners, featured-raid banner on Home. axe 0 on 22 pages × desktop/phone × dark/light; CLS unchanged (21/21 good). |
 
 `fc35fa6` (skills) and the `.claude/*.md` docs are dev-only; never promote
-them. When promoting items 1–7, use the patch recipe in `.claude/CLAUDE.md`
+them. When promoting items 1–8, use the patch recipe in `.claude/CLAUDE.md`
 with the range `fc35fa6..<last reviewed dev sha>` (skills commit excluded by
 the `.claude` / `skills-lock.json` / `.gitignore` excludes).
 
