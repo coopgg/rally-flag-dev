@@ -19,7 +19,7 @@
    ============================================================ */
 (function(){
   const BUNGIE = "https://www.bungie.net";
-  const COMPONENTS = "100,102,200,201,205,300,304,305,310";
+  const COMPONENTS = "100,102,103,200,201,205,300,304,305,310";
   const DEMO = new URLSearchParams(location.search).has("demo");
 
   const CLASS_NAMES = ["Titan", "Hunter", "Warlock"];
@@ -37,6 +37,10 @@
   const ARMOR_SLOTS = BUCKETS.filter(b => b.kind === "armor").map(b => b.hash);
   const STATE_LOCKED = 1, STATE_MASTERWORK = 4;
   const POSTMASTER_BUCKET = 215593132, POSTMASTER_CAP = 21;
+  // Banner: armor stat totals per character (game order) and the vault's
+  // space, as DIM shows them. Capacities come from Bungie's bucket table.
+  const ARMOR_STATS = [2996146975, 392767087, 1943323491, 1735777505, 144602215, 4244567218];
+  const VAULT_SPACE = [[138197802, "Vault", "Vault"], [1469714392, "Consumables", "Cons"], [3313201758, "Modifications", "Mods"]];
   // Plugs worth showing in the perk columns; cosmetics, trackers and
   // empty sockets are left out.
   const SHOW_PLUG = /trait|intrinsic|magazine|barrel|battery|sight|scope|haft|stock|bowstring|arrow|blade|guard|grip|frame|archetype|armor perk|mod$|tuning/i;
@@ -197,7 +201,7 @@
   function buildModel(){
     const chars = data(PROFILE, "characters");
     const order = (PROFILE.profile && PROFILE.profile.data && PROFILE.profile.data.characterIds) || Object.keys(chars);
-    OWNERS = order.filter(id => chars[id]).map(id => ({ id, played: Date.parse(chars[id].dateLastPlayed) || 0, cls: chars[id].classType, name: CLASS_NAMES[chars[id].classType] || "Guardian", light: chars[id].light, bg: chars[id].emblemBackgroundPath, emblem: chars[id].emblemPath }));
+    OWNERS = order.filter(id => chars[id]).map(id => ({ id, played: Date.parse(chars[id].dateLastPlayed) || 0, cls: chars[id].classType, name: CLASS_NAMES[chars[id].classType] || "Guardian", light: chars[id].light, stats: chars[id].stats || {}, bg: chars[id].emblemBackgroundPath, emblem: chars[id].emblemPath }));
     const user = (PROFILE.profile && PROFILE.profile.data && PROFILE.profile.data.userInfo) || {};
     MEMBERSHIP_TYPE = user.membershipType || (chars[OWNERS[0] && OWNERS[0].id] || {}).membershipType || 0;
 
@@ -308,11 +312,30 @@
     const wide = isWide();
     const open = (cls, id) => wide ? '<div class="owner-card' + cls + '" data-owner="' + id + '"' : '<button type="button" class="owner-card' + cls + '" data-owner="' + id + '" aria-pressed="' + (id === state.focus) + '"';
     const close = wide ? "</div>" : "</button>";
+    const icon = (path, alt) => path ? '<img src="' + esc(img(path)) + '" alt="' + esc(alt) + '" width="14" height="14">' : esc(alt) + " ";
+    const statRow = o => {
+      const hs = ARMOR_STATS.filter(h => o.stats[h] != null);
+      return hs.length ? '<span class="owner-stats">' + hs.map(h => '<span class="ostat">' + icon((DB.statIcons || {})[h], DB.stats[h] || "") + o.stats[h] + "</span>").join("") + "</span>" : "";
+    };
+    // Vault space: Bungie's counts for everything that isn't gear, plus the
+    // Locker's own gear count (which already includes this session's moves).
+    const raw = data(PROFILE, "profileInventory").items || [], gearIds = new Set(ITEMS.map(i => i.id));
+    const space = VAULT_SPACE.map(([h, label, short]) => {
+      const cap = DB.buckets && DB.buckets[h] && DB.buckets[h].c;
+      const n = raw.filter(i => i.bucketHash === h && !gearIds.has(i.itemInstanceId)).length + (h === 138197802 ? counts("vault") : 0);
+      return cap ? { label, short, n, cap } : null;
+    }).filter(Boolean);
+    const money = (data(PROFILE, "profileCurrencies").items || []).filter(c => DB.items[c.itemHash])
+      .map(c => '<span class="ostat">' + icon(DB.items[c.itemHash].i, DB.items[c.itemHash].n) + c.quantity.toLocaleString() + "</span>").join("");
+    const vaultMeta = space.length
+      ? space.map((x, k) => '<span class="' + (k ? "vs-more" : "vs") + '">' + (k ? " · " : "") + '<span class="owner-pw">' + (x.short === x.label ? x.label : '<span aria-hidden="true">' + x.short + '</span><span class="sr-only">' + x.label + "</span>") + " </span>" + x.n + "/" + x.cap + "</span>").join("")
+      : counts("vault") + " items";
     const cards = OWNERS.map(o =>
       open("", o.id) + ' style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
-        '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta"><span class="owner-pw">Power </span>' + esc(o.light) + '<span class="owner-items"> · ' + counts(o.id) + " items</span></span>" + close
+        '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta"><span class="owner-pw">Power </span>' + esc(o.light) + '<span class="owner-items"> · ' + counts(o.id) + " items</span></span>" + statRow(o) + close
     ).concat([
-      open(" vault", "vault") + '><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span>" + close
+      open(" vault", "vault") + '><span class="owner-name">Vault</span><span class="owner-meta">' + vaultMeta + "</span>" +
+        (money ? '<span class="owner-stats">' + money + "</span>" : "") + close
     ]);
     $("owner-grid").setAttribute("aria-label", wide ? "Your characters and vault" : "Show gear for");
     pinWatch();

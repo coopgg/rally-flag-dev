@@ -106,6 +106,10 @@
   .owner-card .owner-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:20px; letter-spacing:0.04em; text-transform:uppercase; }
   .owner-card .owner-meta{ font-size:13px; color:rgba(255,255,255,0.85); }
   .owner-card.vault{ background-image:none; background:linear-gradient(135deg, #0d1424, #1b2236); }
+  /* Armor stat totals / currencies, with Bungie's icons, as in DIM's header */
+  .owner-stats{ display:flex; flex-wrap:wrap; gap:2px 10px; margin-top:5px; font-family:'JetBrains Mono', monospace; font-size:12px; color:rgba(255,255,255,0.9); }
+  .ostat{ display:inline-flex; align-items:center; gap:3px; }
+  .ostat img{ width:14px; height:14px; }
 
   /* Filters */
   .locker-controls{ margin-top:22px; display:flex; flex-direction:column; gap:12px; }
@@ -384,7 +388,7 @@
     .owner-card{ min-height:54px; padding:7px 8px; border-radius:10px; }
     .owner-card .owner-name{ font-size:14px; letter-spacing:0.02em; }
     .owner-card .owner-meta{ font-size:12px; }
-    .owner-card:not(.vault) .owner-items{ display:none; }
+    .owner-card:not(.vault) .owner-items, .owner-stats, .vs-more{ display:none; }
     /* "◆ 451" on phones; "Power" stays for screen readers */
     .owner-pw{ position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
     .owner-card:not(.vault) .owner-meta::before{ content:"◆ "; color:var(--accent); }

@@ -2,22 +2,25 @@
    Locker item database (dev-only, used by locker.html).
 
    Downloads Bungie's DestinyInventoryItemLiteDefinition (~3MB over the
-   wire, ~61MB of JSON) plus the small stat, damage-type and armor-set
-   tables, keeps only what the Locker shows (~6MB) and stores that in
+   wire, ~61MB of JSON) plus the small stat, damage-type, armor-set and
+   inventory-bucket tables, keeps only what the Locker shows (~6MB) and stores that in
    IndexedDB under the manifest version. Later visits make one small
    request to check the version and read the rest from IndexedDB.
    Runs in a Worker so parsing 61MB of JSON never blocks the page.
 
    Message in:  { apiKey }
    Messages out: { type:"progress", step } … then
-                 { type:"done", db:{ version, items, stats, damage, sets } }
+                 { type:"done", db:{ schema, version, items, stats, statIcons, damage, sets, buckets } }
                  or { type:"error", message }
    items: hash -> { n name, i icon, w watermark, t itemType, s subType,
      r tierType, b bucketHash, c classType, d damageTypeHash,
-     y itemTypeDisplayName, x description (plugs) }
+     y itemTypeDisplayName, x description (plugs) }; currencies keep n, i.
+   buckets: hash -> { n name, c capacity } (vault space in the banner).
    ============================================================ */
 const BUNGIE = "https://www.bungie.net";
 const DB_NAME = "rallyflag-locker", STORE = "manifest", KEY = "lite";
+// Bump when the stored shape changes, so cached copies are rebuilt.
+const SCHEMA = 2;
 
 function idb(){
   return new Promise((resolve, reject) => {
@@ -54,8 +57,9 @@ async function getJson(url, headers){
   return res.json();
 }
 
-// Weapons, armor and the plugs (perks, mods, intrinsics) they carry.
-const KEEP_TYPES = new Set([0, 2, 3, 19]);
+// Weapons, armor, the plugs (perks, mods, intrinsics) they carry, and
+// currencies (Glimmer, Bright Dust, Silver) for the vault card.
+const KEEP_TYPES = new Set([0, 1, 2, 3, 19]);
 function trimItems(lite){
   const out = {};
   for (const hash in lite){
@@ -86,24 +90,31 @@ self.onmessage = async (msg) => {
     const manifest = (await getJson(BUNGIE + "/Platform/Destiny2/Manifest/", headers)).Response;
     const version = manifest.version;
     const cached = await idbGet();
-    if (cached && cached.version === version){ self.postMessage({ type: "done", db: cached, cached: true }); return; }
+    if (cached && cached.version === version && cached.schema === SCHEMA){ self.postMessage({ type: "done", db: cached, cached: true }); return; }
 
     const paths = manifest.jsonWorldComponentContentPaths.en;
     self.postMessage({ type: "progress", step: "Downloading Bungie's item database (first visit or after a game update, about 3MB)…" });
-    const [lite, statDefs, damageDefs, setDefs] = await Promise.all([
+    const [lite, statDefs, damageDefs, setDefs, bucketDefs] = await Promise.all([
       getJson(BUNGIE + paths.DestinyInventoryItemLiteDefinition),
       getJson(BUNGIE + paths.DestinyStatDefinition),
       getJson(BUNGIE + paths.DestinyDamageTypeDefinition),
-      getJson(BUNGIE + paths.DestinyEquipableItemSetDefinition)
+      getJson(BUNGIE + paths.DestinyEquipableItemSetDefinition),
+      getJson(BUNGIE + paths.DestinyInventoryBucketDefinition)
     ]);
     self.postMessage({ type: "progress", step: "Preparing the item database…" });
-    const stats = {};
-    for (const h in statDefs){ const n = statDefs[h].displayProperties && statDefs[h].displayProperties.name; if (n) stats[h] = n; }
+    const stats = {}, statIcons = {};
+    for (const h in statDefs){
+      const dp = statDefs[h].displayProperties || {};
+      if (dp.name) stats[h] = dp.name;
+      if (dp.icon) statIcons[h] = dp.icon;
+    }
+    const buckets = {};
+    for (const h in bucketDefs){ const b = bucketDefs[h]; if (b.itemCount) buckets[h] = { n: (b.displayProperties && b.displayProperties.name) || "", c: b.itemCount }; }
     const damage = {};
     for (const h in damageDefs){ const dp = damageDefs[h].displayProperties || {}; if (dp.name) damage[h] = { n: dp.name, i: dp.icon || "" }; }
     const sets = {};
     for (const h in setDefs){ const s = setDefs[h]; if (s.setItems && s.setItems.length) sets[h] = { n: (s.displayProperties && s.displayProperties.name) || "", items: s.setItems }; }
-    const db = { version, items: trimItems(lite), stats, damage, sets };
+    const db = { schema: SCHEMA, version, items: trimItems(lite), stats, statIcons, damage, sets, buckets };
     await idbPut(db);
     self.postMessage({ type: "done", db, cached: false });
   } catch (e){
