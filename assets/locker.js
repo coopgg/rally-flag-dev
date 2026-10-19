@@ -98,14 +98,10 @@
     return applied;
   }
   // owners: the character/vault cards toggled on; none means everyone.
-  // layout: "slot" (every character side by side, one slot at a time) or
-  // "char" (one character, focus, beside the vault items it can use).
-  const LAYOUT_KEY = "rallyflag_locker_layout";
+  // focus: whose gear is shown, one character or the vault (like DIM on a
+  // phone); remembered per browser, first time the last-played character.
   const FOCUS_KEY = "rallyflag_locker_focus";
-  const state = { owners: new Set(), type: null, flags: new Set(), q: "", focus: (() => { try { return localStorage.getItem(FOCUS_KEY); } catch (e){ return null; } })(),
-    layout: (() => { try { return localStorage.getItem(LAYOUT_KEY) === "char" ? "char" : "slot"; } catch (e){ return "slot"; } })() };
-  const byChar = () => state.layout === "char";
-  const showsOwner = id => byChar() ? id === state.focus || id === "vault" : !state.owners.size || state.owners.has(id);
+  const state = { type: null, flags: new Set(), q: "", focus: (() => { try { return localStorage.getItem(FOCUS_KEY); } catch (e){ return null; } })() };
   // Folded slots and opened vault lists, remembered per browser.
   const FOLD_KEY = "rallyflag_locker_folds";
   const folds = (() => { try { const f = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}"); return { slots: new Set(f.slots || []), vaults: new Set(f.vaults || []), pmOpen: !!f.pmOpen }; } catch (e){ return { slots: new Set(), vaults: new Set(), pmOpen: false }; } })();
@@ -287,21 +283,15 @@
   const ownerLabel = id => id === "vault" ? "Vault" : ((OWNERS.find(o => o.id === id) || {}).name || "");
   const tierClass = def => "tier-" + (def.r === 6 ? 6 : 5);
 
-  const picked = id => byChar() ? id === state.focus : state.owners.has(id);
   function renderOwners(){
     const counts = id => ITEMS.filter(i => i.owner === id).length;
     const cards = OWNERS.map(o =>
-      '<button type="button" class="owner-card" data-owner="' + o.id + '" aria-pressed="' + picked(o.id) + '" style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
+      '<button type="button" class="owner-card" data-owner="' + o.id + '" aria-pressed="' + (o.id === state.focus) + '" style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
         '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta">Power ' + esc(o.light) + " · " + counts(o.id) + " items</span></button>"
     ).concat([
-      '<button type="button" class="owner-card vault" data-owner="vault" aria-pressed="' + picked("vault") + '"><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span></button>"
+      '<button type="button" class="owner-card vault" data-owner="vault" aria-pressed="' + (state.focus === "vault") + '"><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span></button>"
     ]);
     $("owner-grid").innerHTML = cards.join("");
-    $("owner-grid").setAttribute("aria-label", byChar() ? "Show gear for" : "Show only gear from (tap again to show everything)");
-    document.querySelectorAll("[data-layout]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layout === state.layout)));
-    const who = ownerLabel(state.focus);
-    $("layout-note").textContent = !byChar() ? "Every character side by side, one slot at a time." :
-      state.focus === "vault" ? "Everything in your vault, slot by slot." : "Your " + who + "'s gear beside the vault items a " + who + " can use. Tap a card to switch.";
     renderFarm();
     renderJunk();
   }
@@ -398,9 +388,8 @@
   function setHref(p){ return p.set.ours ? "armor-set-bonuses.html?highlight=" + p.set.ours.slug : null; }
 
   function renderSets(){
-    // Sets follow the selected characters' classes (all of them when no
-    // character is selected).
-    const chosen = OWNERS.filter(o => byChar() ? o.id === state.focus : state.owners.has(o.id));
+    // Sets follow the chosen character's class (every class for the vault).
+    const chosen = OWNERS.filter(o => o.id === state.focus);
     const list = chosen.length ? SETS.filter(p => chosen.some(o => o.cls === p.cls)) : SETS;
     $("sets-count").textContent = list.length;
     $("sets-hint").textContent = list.length
@@ -419,9 +408,7 @@
   }
 
   function matches(item){
-    if (!showsOwner(item.owner)) return false;
-    // One character: the vault side only offers what that class can use.
-    if (byChar() && item.owner === "vault" && state.focus !== "vault" && !classOk(item, state.focus)) return false;
+    if (item.owner !== state.focus) return false;
     const bucket = BUCKET_BY_HASH.get(item.def.b);
     if (state.type && bucket.kind !== state.type) return false;
     if (state.flags.has("exotic") && item.def.r !== 6) return false;
@@ -453,47 +440,46 @@
   // Each slot is split by who holds the item: one group per character
   // (equipped first), then the vault. Wide screens lay the groups out as
   // aligned columns (like DIM); phones stack them under small labels.
+  // One owner at a time. A character's slot is DIM-like: the equipped item
+  // on the left, the inventory beside it, n/9 in the heading. The vault is
+  // one grid per slot (long lists show a preview). On wide screens weapons
+  // and armor sit side by side, so a whole loadout fits on screen.
   function renderItems(){
-    const shown = ITEMS.filter(matches);
-    const groups = OWNERS.map(o => o.id).concat("vault").filter(showsOwner);
-    // Character columns share the width; the vault gets a double column.
-    const colsTemplate = groups.map(g => g === "vault" ? "minmax(0, 2fr)" : "minmax(0, 1fr)").join(" ");
+    const shown = ITEMS.filter(matches), owner = state.focus, vault = owner === "vault";
     const isJunk = i => TAGS[i.id] === "junk" ? 1 : 0;
     const byPower = (x, y) => (y.equipped - x.equipped) || (isJunk(x) - isJunk(y)) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
     // Long vault lists show a preview, but never while searching or
     // filtering, so a match can't end up hidden.
     const filtering = !!(state.q || state.type || state.flags.size);
-    const html = BUCKETS.map(b => {
-      const inSlot = shown.filter(i => i.def.b === b.hash);
-      if (!inSlot.length) return "";
-      const cols = groups.map(g => {
-        const items = inSlot.filter(i => i.owner === g).sort(byPower);
-        const long = g === "vault" && !filtering && items.length > VAULT_PREVIEW;
-        const open = folds.vaults.has(b.hash);
-        // Characters: the equipped item on its own row, then the inventory
-        // with its count against Bungie's 9-per-slot limit. Vault: one grid.
-        let body;
-        if (g === "vault") body = items.length ? '<div class="item-grid" id="vg-' + b.hash + "-" + g + '">' + items.map(tileHtml).join("") + "</div>" : '<div class="group-empty">—</div>';
-        else {
-          const eq = items.filter(i => i.equipped), inv = items.filter(i => !i.equipped);
-          const invTotal = ITEMS.filter(i => i.owner === g && !i.equipped && i.def.b === b.hash).length; // filters don't change how full it is
-          body = (eq.length ? '<div class="equip-row"><div class="item-grid">' + eq.map(tileHtml).join("") + '</div><span class="equip-label">Equipped</span></div>' : "") +
-            '<div class="inv-label' + (invTotal >= INVENTORY_CAP ? " full" : "") + '">Inventory ' + invTotal + "/" + INVENTORY_CAP + "</div>" +
-            (inv.length ? '<div class="item-grid">' + inv.map(tileHtml).join("") + "</div>" : "");
-        }
-        return '<div class="owner-group' + (g === "vault" ? " vault" : "") + (items.length ? "" : " empty") + (long && !open ? " clipped" : "") + '" data-owner="' + g + '">' +
-          '<div class="group-label">' + esc(ownerLabel(g)) + (g === "vault" ? " · " + items.length : "") + "</div>" + body +
-          (long ? '<button type="button" class="vault-more" data-slot="' + b.hash + '" aria-expanded="' + open + '" aria-controls="vg-' + b.hash + "-" + g + '">' + (open ? "Show less" : "Show all " + items.length) + "</button>" : "") +
-          "</div>";
-      }).join("");
+    const slot = b => {
+      const items = shown.filter(i => i.def.b === b.hash).sort(byPower);
+      if (filtering && !items.length) return "";
+      let count, full = false, body;
+      if (vault){
+        const long = !filtering && items.length > VAULT_PREVIEW, open = folds.vaults.has(b.hash);
+        count = items.length;
+        body = '<div class="owner-group vault' + (long && !open ? " clipped" : "") + '" data-owner="vault">' +
+          (items.length ? '<div class="item-grid" id="vg-' + b.hash + '">' + items.map(tileHtml).join("") + "</div>" : '<div class="group-empty">Nothing here.</div>') +
+          (long ? '<button type="button" class="vault-more" data-slot="' + b.hash + '" aria-expanded="' + open + '" aria-controls="vg-' + b.hash + '">' + (open ? "Show less" : "Show all " + items.length) + "</button>" : "") + "</div>";
+      } else {
+        const eq = items.filter(i => i.equipped), inv = items.filter(i => !i.equipped);
+        const invTotal = ITEMS.filter(i => i.owner === owner && !i.equipped && i.def.b === b.hash).length; // filters don't change how full it is
+        count = invTotal + "/" + INVENTORY_CAP; full = invTotal >= INVENTORY_CAP;
+        body = '<div class="owner-group char-slot" data-owner="' + owner + '">' +
+          '<div class="slot-equipped">' + (eq.length ? eq.map(tileHtml).join("") : '<span class="tile-empty" aria-hidden="true"></span>') + "</div>" +
+          '<div class="item-grid slot-inv">' + inv.map(tileHtml).join("") + "</div></div>";
+      }
       const folded = folds.slots.has(b.hash);
       return '<section class="bucket' + (folded ? " folded" : "") + '" aria-labelledby="b-' + b.hash + '">' +
         '<h2 id="b-' + b.hash + '"><button type="button" class="bucket-toggle" data-slot="' + b.hash + '" aria-expanded="' + !folded + '" aria-controls="bb-' + b.hash + '">' +
-          '<span class="chev" aria-hidden="true"></span>' + b.label + " <span>" + inSlot.length + "</span></button></h2>" +
-        '<div class="owner-groups' + (groups.length > 1 ? " multi" : "") + '" id="bb-' + b.hash + '" style="--cols:' + colsTemplate + '"' + (folded ? " hidden" : "") + ">" + cols + "</div></section>";
-    }).join("");
-    $("buckets").innerHTML = postmasterHtml() + (html || '<p class="locker-empty">Nothing matches these filters.</p>');
-    $("locker-count").textContent = "Showing " + shown.length + " of " + ITEMS.length + " items";
+          '<span class="chev" aria-hidden="true"></span>' + b.label + ' <span class="slot-count' + (full ? " full" : "") + '">' + count + (vault ? "" : '<span class="sr-only"> in inventory</span>') + "</span></button></h2>" +
+        '<div class="slot-body" id="bb-' + b.hash + '"' + (folded ? " hidden" : "") + ">" + body + "</div></section>";
+    };
+    const cols = ["weapons", "armor"].filter(k => !state.type || state.type === k)
+      .map(k => BUCKETS.filter(b => b.kind === k).map(slot).join("")).filter(Boolean)
+      .map(h => '<div class="slot-col">' + h + "</div>").join("");
+    $("buckets").innerHTML = postmasterHtml() + (cols ? '<div class="slot-cols">' + cols + "</div>" : '<p class="locker-empty">Nothing matches these filters.</p>');
+    $("locker-count").textContent = "Showing " + shown.length + " of " + ITEMS.filter(i => i.owner === owner).length + " items";
     $("fold-all").textContent = BUCKETS.every(b => folds.slots.has(b.hash)) ? "Expand all" : "Collapse all";
   }
 
@@ -501,7 +487,7 @@
   // "Pull all" per character, red as it nears Bungie's 21-item limit
   // (after that, new items are lost). Open, it shows small tiles.
   function postmasterHtml(){
-    const groups = OWNERS.filter(o => showsOwner(o.id)).map(o => ({ o, items: POSTMASTER.filter(p => p.owner === o.id) })).filter(g => g.items.length);
+    const groups = OWNERS.map(o => ({ o, items: POSTMASTER.filter(p => p.owner === o.id) })).filter(g => g.items.length);
     if (!groups.length) return "";
     const open = folds.pmOpen, total = groups.reduce((n, g) => n + g.items.length, 0);
     const chips = groups.map(g => {
@@ -897,18 +883,8 @@
     $("owner-grid").addEventListener("click", e => {
       const b = e.target.closest("[data-owner]");
       if (!b) return;
-      // By character: tap picks whose gear to show. By slot: tap to show
-      // only this (plus any others on), tap again to undo.
-      const id = b.dataset.owner;
-      if (byChar()){ state.focus = id; try { localStorage.setItem(FOCUS_KEY, id); } catch (e){} }
-      else state.owners.has(id) ? state.owners.delete(id) : state.owners.add(id);
-      render();
-    });
-    $("layout-switch").addEventListener("click", e => {
-      const b = e.target.closest("[data-layout]");
-      if (!b || b.dataset.layout === state.layout) return;
-      state.layout = b.dataset.layout;
-      try { localStorage.setItem(LAYOUT_KEY, state.layout); } catch (e){}
+      state.focus = b.dataset.owner;
+      try { localStorage.setItem(FOCUS_KEY, state.focus); } catch (e){}
       render();
     });
     $("locker-chips").addEventListener("click", e => {
@@ -952,32 +928,47 @@
       const again = document.querySelector((slot ? ".bucket-toggle" : ".vault-more") + '[data-slot="' + h + '"]');
       if (again) again.focus(); // keep keyboard focus on the toggle
     });
-    // Drag a tile onto another character's or the vault's column (pointer
-    // devices; the popup's Move buttons do the same everywhere).
+    // Drag a tile onto a character or vault card, or onto the "Move to" bar
+    // pinned to the top of the screen while dragging, to move it there
+    // (pointer devices; the popup's Move buttons do the same everywhere).
     let dragId = null;
+    const dropOn = e => {
+      const t = e.target.closest("[data-drop], .owner-card[data-owner]");
+      const item = dragId && ITEMS.find(i => i.id === dragId);
+      const to = t && (t.dataset.drop || t.dataset.owner);
+      return t && item && to !== item.owner ? { t, item, to } : null;
+    };
+    const clearDrop = () => document.querySelectorAll(".drop-target").forEach(x => x.classList.remove("drop-target"));
     $("buckets").addEventListener("dragstart", e => {
       const tile = e.target.closest(".item-tile[data-id]");
       if (!tile){ e.preventDefault(); return; }
       dragId = tile.dataset.id;
       e.dataTransfer.effectAllowed = "move";
       e.dataTransfer.setData("text/plain", dragId);
+      const from = (ITEMS.find(i => i.id === dragId) || {}).owner;
+      // Shown a tick later: changing the page inside dragstart can cancel the drag.
+      setTimeout(() => {
+        if (!dragId) return;
+        $("drop-bar").innerHTML = '<span class="drop-label">Move to</span>' + OWNERS.map(o => o.id).concat("vault").filter(id => id !== from)
+          .map(id => '<div class="drop-slot" data-drop="' + id + '">' + esc(ownerLabel(id)) + "</div>").join("");
+        $("drop-bar").hidden = false;
+      });
     });
-    $("buckets").addEventListener("dragover", e => {
-      const g = e.target.closest(".owner-group[data-owner]");
-      const item = dragId && ITEMS.find(i => i.id === dragId);
-      if (!g || !item || g.dataset.owner === item.owner || !g.closest("#bb-" + item.def.b)) return;
+    document.addEventListener("dragover", e => {
+      const d = dropOn(e);
+      if (!d) return;
       e.preventDefault();
-      document.querySelectorAll(".drop-target").forEach(x => x !== g && x.classList.remove("drop-target"));
-      g.classList.add("drop-target");
+      if (!d.t.classList.contains("drop-target")){ clearDrop(); d.t.classList.add("drop-target"); }
     });
-    $("buckets").addEventListener("dragleave", e => { const g = e.target.closest(".owner-group"); if (g && !g.contains(e.relatedTarget)) g.classList.remove("drop-target"); });
-    $("buckets").addEventListener("dragend", () => { dragId = null; document.querySelectorAll(".drop-target").forEach(x => x.classList.remove("drop-target")); });
-    $("buckets").addEventListener("drop", e => {
-      const g = e.target.closest(".owner-group[data-owner]");
-      const item = dragId && ITEMS.find(i => i.id === dragId);
-      if (!g || !item) return;
+    document.addEventListener("dragleave", e => { const t = e.target.closest && e.target.closest(".drop-target"); if (t && !t.contains(e.relatedTarget)) t.classList.remove("drop-target"); });
+    document.addEventListener("dragend", () => { dragId = null; clearDrop(); $("drop-bar").hidden = true; });
+    document.addEventListener("drop", e => {
+      const d = dropOn(e);
+      if (!d) return;
       e.preventDefault();
-      const to = g.dataset.owner, where = to === "vault" ? "the vault" : "your " + ownerLabel(to);
+      clearDrop();
+      $("drop-bar").hidden = true;
+      const item = d.item, to = d.to, where = to === "vault" ? "the vault" : "your " + ownerLabel(to);
       if (!busyNotice()) run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to), null, item);
     });
     $("farm-row").addEventListener("click", e => {
