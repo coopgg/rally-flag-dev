@@ -124,6 +124,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   tab is visible: inventory over 7 per slot and postmaster gear go to the vault.
   Junk cleanup sends vault Junk to a character's free spaces (and turns that
   character's farming off).
+  "Arrange" switches By slot (all characters side by side) / By character
+  (one character beside the vault items its class can use; `state.focus`).
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

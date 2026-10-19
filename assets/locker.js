@@ -98,8 +98,14 @@
     return applied;
   }
   // owners: the character/vault cards toggled on; none means everyone.
-  const state = { owners: new Set(), type: null, flags: new Set(), q: "" };
-  const showsOwner = id => !state.owners.size || state.owners.has(id);
+  // layout: "slot" (every character side by side, one slot at a time) or
+  // "char" (one character, focus, beside the vault items it can use).
+  const LAYOUT_KEY = "rallyflag_locker_layout";
+  const FOCUS_KEY = "rallyflag_locker_focus";
+  const state = { owners: new Set(), type: null, flags: new Set(), q: "", focus: (() => { try { return localStorage.getItem(FOCUS_KEY); } catch (e){ return null; } })(),
+    layout: (() => { try { return localStorage.getItem(LAYOUT_KEY) === "char" ? "char" : "slot"; } catch (e){ return "slot"; } })() };
+  const byChar = () => state.layout === "char";
+  const showsOwner = id => byChar() ? id === state.focus || id === "vault" : !state.owners.size || state.owners.has(id);
   // Folded slots and opened vault lists, remembered per browser.
   const FOLD_KEY = "rallyflag_locker_folds";
   const folds = (() => { try { const f = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}"); return { slots: new Set(f.slots || []), vaults: new Set(f.vaults || []), pmOpen: !!f.pmOpen }; } catch (e){ return { slots: new Set(), vaults: new Set(), pmOpen: false }; } })();
@@ -255,6 +261,8 @@
       });
       for (const it of ((eqs[o.id] && eqs[o.id].items) || [])) add(it, o.id, true);
     }
+    if (!OWNERS.some(o => o.id === state.focus) && state.focus !== "vault")
+      state.focus = (OWNERS.slice().sort((a, b) => b.played - a.played)[0] || {}).id || "vault";
     JOURNAL_APPLIED = applyJournal();
     computeSets();
   }
@@ -279,15 +287,21 @@
   const ownerLabel = id => id === "vault" ? "Vault" : ((OWNERS.find(o => o.id === id) || {}).name || "");
   const tierClass = def => "tier-" + (def.r === 6 ? 6 : 5);
 
+  const picked = id => byChar() ? id === state.focus : state.owners.has(id);
   function renderOwners(){
     const counts = id => ITEMS.filter(i => i.owner === id).length;
     const cards = OWNERS.map(o =>
-      '<button type="button" class="owner-card" data-owner="' + o.id + '" aria-pressed="' + state.owners.has(o.id) + '" style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
+      '<button type="button" class="owner-card" data-owner="' + o.id + '" aria-pressed="' + picked(o.id) + '" style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
         '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta">Power ' + esc(o.light) + " · " + counts(o.id) + " items</span></button>"
     ).concat([
-      '<button type="button" class="owner-card vault" data-owner="vault" aria-pressed="' + state.owners.has("vault") + '"><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span></button>"
+      '<button type="button" class="owner-card vault" data-owner="vault" aria-pressed="' + picked("vault") + '"><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span></button>"
     ]);
     $("owner-grid").innerHTML = cards.join("");
+    $("owner-grid").setAttribute("aria-label", byChar() ? "Show gear for" : "Show only gear from (tap again to show everything)");
+    document.querySelectorAll("[data-layout]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.layout === state.layout)));
+    const who = ownerLabel(state.focus);
+    $("layout-note").textContent = !byChar() ? "Every character side by side, one slot at a time." :
+      state.focus === "vault" ? "Everything in your vault, slot by slot." : "Your " + who + "'s gear beside the vault items a " + who + " can use. Tap a card to switch.";
     renderFarm();
     renderJunk();
   }
@@ -386,7 +400,7 @@
   function renderSets(){
     // Sets follow the selected characters' classes (all of them when no
     // character is selected).
-    const chosen = OWNERS.filter(o => state.owners.has(o.id));
+    const chosen = OWNERS.filter(o => byChar() ? o.id === state.focus : state.owners.has(o.id));
     const list = chosen.length ? SETS.filter(p => chosen.some(o => o.cls === p.cls)) : SETS;
     $("sets-count").textContent = list.length;
     $("sets-hint").textContent = list.length
@@ -406,6 +420,8 @@
 
   function matches(item){
     if (!showsOwner(item.owner)) return false;
+    // One character: the vault side only offers what that class can use.
+    if (byChar() && item.owner === "vault" && state.focus !== "vault" && !classOk(item, state.focus)) return false;
     const bucket = BUCKET_BY_HASH.get(item.def.b);
     if (state.type && bucket.kind !== state.type) return false;
     if (state.flags.has("exotic") && item.def.r !== 6) return false;
@@ -881,9 +897,18 @@
     $("owner-grid").addEventListener("click", e => {
       const b = e.target.closest("[data-owner]");
       if (!b) return;
-      // Toggle: tap to show only this (plus any others on), tap again to undo.
+      // By character: tap picks whose gear to show. By slot: tap to show
+      // only this (plus any others on), tap again to undo.
       const id = b.dataset.owner;
-      state.owners.has(id) ? state.owners.delete(id) : state.owners.add(id);
+      if (byChar()){ state.focus = id; try { localStorage.setItem(FOCUS_KEY, id); } catch (e){} }
+      else state.owners.has(id) ? state.owners.delete(id) : state.owners.add(id);
+      render();
+    });
+    $("layout-switch").addEventListener("click", e => {
+      const b = e.target.closest("[data-layout]");
+      if (!b || b.dataset.layout === state.layout) return;
+      state.layout = b.dataset.layout;
+      try { localStorage.setItem(LAYOUT_KEY, state.layout); } catch (e){}
       render();
     });
     $("locker-chips").addEventListener("click", e => {

@@ -324,11 +324,13 @@
   .act-btn .ico{ width:16px; height:16px; }
   .act-btn.icon-only{ width:36px; padding:0; justify-content:center; }
   /* Farming mode */
+  .layout-switch{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; margin-top:28px; }
+  .layout-switch + .owner-grid{ margin-top:12px; }
   .farm-row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; margin-top:12px; }
   .farm-label{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
   .farm-btn{ padding:5px 12px; border-radius:999px; border:1px solid var(--panel-border); background:var(--panel); color:var(--text-dim); font:inherit; font-size:13px; cursor:pointer; }
   .farm-btn[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; box-shadow:0 0 14px -4px var(--glow); }
-  .farm-btn[aria-pressed="true"]::before{ content:""; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:currentColor; animation:toast-pulse 0.9s ease-in-out infinite alternate; }
+  .farm-row .farm-btn[aria-pressed="true"]::before{ content:""; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:currentColor; animation:toast-pulse 0.9s ease-in-out infinite alternate; }
   .farm-note{ font-size:13px; color:var(--text-dim); }
   #junk-row{ margin-top:8px; }
   .junk-btn{ display:inline-flex; align-items:center; gap:6px; color:var(--text); }
@@ -378,6 +380,12 @@
   <div id="locker-status" role="status"></div>
   <div id="locker-app" hidden>
     <div id="demo-banner"></div>
+    <div class="layout-switch" id="layout-switch" role="group" aria-label="Arrange gear">
+      <span class="farm-label">Arrange</span>
+      <button type="button" class="farm-btn" data-layout="slot" aria-pressed="true">By slot</button>
+      <button type="button" class="farm-btn" data-layout="char" aria-pressed="false">By character</button>
+      <span class="farm-note" id="layout-note"></span>
+    </div>
     <div class="owner-grid" id="owner-grid" role="group" aria-label="Show only gear from (tap again to show everything)"></div>
     <div class="farm-row" id="farm-row" role="group" aria-label="Farming mode"></div>
     <div class="farm-row" id="junk-row" role="group" aria-label="Junk cleanup"></div>
