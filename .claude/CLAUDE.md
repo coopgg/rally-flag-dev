@@ -128,7 +128,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   DIM desktop (`renderAll`): per slot, character cells aligned under their
   cards (equipped | inventory, n/9 under the equipped item), then that
   slot's vault items full width, armor one row per class; cards are plain
-  divs. Narrower = DIM mobile (`renderOne`): the cards pick `state.focus`
+  divs, pinned (sticky) so they stay over their columns while scrolling.
+  Narrower = DIM mobile (`renderOne`): the cards pick `state.focus`
   (localStorage `rallyflag_locker_focus`), one owner shown. Drag a tile
   onto a card, a character cell (wide) or the
   "Move to" bar (shown a tick after dragstart; changing the DOM inside

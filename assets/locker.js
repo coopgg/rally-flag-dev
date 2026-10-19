@@ -290,6 +290,17 @@
   const ownerLabel = id => id === "vault" ? "Vault" : ((OWNERS.find(o => o.id === id) || {}).name || "");
   const tierClass = def => "tier-" + (def.r === 6 ? 6 : 5);
 
+  // The cards stay pinned to the top while scrolling (lined up with the
+  // character columns on wide screens); a shadow shows once they're pinned.
+  let pinObserver = null;
+  function pinWatch(){
+    if (pinObserver || !window.IntersectionObserver) return;
+    const mark = document.createElement("div");
+    mark.className = "pin-mark";
+    $("owner-grid").before(mark);
+    pinObserver = new IntersectionObserver(([e]) => $("owner-grid").classList.toggle("pinned", !e.isIntersecting));
+    pinObserver.observe(mark);
+  }
   function renderOwners(){
     const counts = id => ITEMS.filter(i => i.owner === id).length;
     // Phones and tablets: the cards pick whose gear shows. Wide screens show
@@ -299,11 +310,12 @@
     const close = wide ? "</div>" : "</button>";
     const cards = OWNERS.map(o =>
       open("", o.id) + ' style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
-        '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta">Power ' + esc(o.light) + " · " + counts(o.id) + " items</span>" + close
+        '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta"><span class="owner-pw">Power </span>' + esc(o.light) + '<span class="owner-items"> · ' + counts(o.id) + " items</span></span>" + close
     ).concat([
       open(" vault", "vault") + '><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span>" + close
     ]);
     $("owner-grid").setAttribute("aria-label", wide ? "Your characters and vault" : "Show gear for");
+    pinWatch();
     $("owner-grid").innerHTML = cards.join("");
     renderFarm();
     renderJunk();
