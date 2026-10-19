@@ -135,6 +135,7 @@
     $("tab-sets").tabIndex = sets ? 0 : -1;
     $("view-gear").hidden = sets;
     $("view-sets").hidden = !sets;
+    $("locker-search").parentElement.hidden = sets; // search is for gear
     if (focus) $(sets ? "tab-sets" : "tab-gear").focus();
     history.replaceState(null, "", location.pathname + location.search + (sets ? "#sets" : ""));
   }
@@ -294,16 +295,13 @@
   const ownerLabel = id => id === "vault" ? "Vault" : ((OWNERS.find(o => o.id === id) || {}).name || "");
   const tierClass = def => "tier-" + (def.r === 6 ? 6 : 5);
 
-  // The cards stay pinned to the top while scrolling (lined up with the
-  // character columns on wide screens); a shadow shows once they're pinned.
-  let pinObserver = null;
+  // The header (search + cards) stays pinned to the top while scrolling.
+  // Its height feeds scroll-padding-top, so focus never hides under it.
+  let headWatched = false;
   function pinWatch(){
-    if (pinObserver || !window.IntersectionObserver) return;
-    const mark = document.createElement("div");
-    mark.className = "pin-mark";
-    $("owner-grid").before(mark);
-    pinObserver = new IntersectionObserver(([e]) => $("owner-grid").classList.toggle("pinned", !e.isIntersecting));
-    pinObserver.observe(mark);
+    if (headWatched || !window.ResizeObserver) return;
+    headWatched = true;
+    new ResizeObserver(([e]) => document.documentElement.style.setProperty("--head-h", Math.round(e.target.getBoundingClientRect().height) + "px")).observe($("locker-head"));
   }
   function renderOwners(){
     const counts = id => ITEMS.filter(i => i.owner === id).length;

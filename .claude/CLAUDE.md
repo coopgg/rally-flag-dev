@@ -128,7 +128,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   DIM desktop (`renderAll`): per slot, character cells aligned under their
   cards (equipped | inventory, n/9 under the equipped item), then that
   slot's vault items full width, armor one row per class; cards are plain
-  divs, pinned (sticky) so they stay over their columns while scrolling,
+  divs, pinned with the search box in `#locker-head` (sticky, solid, full
+  width) so they stay over their columns while scrolling,
   with armor stat totals / vault space + currencies (worker DB `schema`:
   bump SCHEMA in locker-worker.js whenever the stored shape changes).
   Narrower = DIM mobile (`renderOne`): the cards pick `state.focus`
