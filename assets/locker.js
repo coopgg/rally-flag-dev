@@ -274,15 +274,29 @@
   function render(){ renderOwners(); renderSets(); renderItems(); }
 
   // ---------------- item details ----------------
-  function plugHtml(hash, cls, ours){
-    const p = DB.items[hash];
-    if (!p) return "";
-    return '<div class="plug ' + cls + (ours ? " ours" : "") + '">' + (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="26" height="26">' : "") +
-      "<span>" + esc(p.n) + "</span>" + (ours ? '<span class="ours-mark" title="In our God Roll">★</span>' : "") + "</div>";
-  }
+  // Laid out like DIM's item popup: rarity header, owner line, stats,
+  // the frame/archetype on one line, perks as icon columns (rolled perk
+  // filled, free-swap options under it), mods as squares. Tapping a perk
+  // or mod shows its name and description underneath.
   function showPlug(hash){
     const p = DB.items[hash];
     return p && p.n && !/^(empty|locked) /i.test(p.n) && !HIDE_PLUG.test(p.y || "") && SHOW_PLUG.test(p.y || "");
+  }
+  const isIntrinsic = p => /intrinsic|frame|archetype/i.test(p.y || "");
+  const isMod = p => /mod$/i.test(p.y || "");
+
+  // DIM's stat order, with its short labels.
+  const STAT_ORDER = ["Rounds Per Minute", "Charge Time", "Draw Time", "Impact", "Blast Radius", "Velocity", "Range", "Stability",
+    "Handling", "Reload Speed", "Aim Assistance", "Airborne Effectiveness", "Zoom", "Ammo Generation", "Recoil Direction", "Magazine",
+    "Weapons", "Health", "Class", "Grenade", "Super", "Melee"];
+  const STAT_SHORT = { "Rounds Per Minute": "RPM", "Aim Assistance": "Aim Assist", "Airborne Effectiveness": "Airborne", "Ammo Generation": "Ammo Gen" };
+  const NO_BAR = /per minute|magazine|charge time|draw time|recoil direction/i;
+
+  function dotHtml(hash, cls, ours){
+    const p = DB.items[hash];
+    return '<button type="button" class="perk-dot ' + cls + '" data-plug="' + hash + '" aria-pressed="false" title="' + esc(p.n) + '" aria-label="' +
+      esc(p.n + (cls === "sel" ? " (on this copy)" : " (can swap to)") + (ours ? ", in our God Roll" : "")) + '">' +
+      (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="44" height="44">' : "") + (ours ? '<span class="ours" aria-hidden="true">★</span>' : "") + "</button>";
   }
 
   function openItem(id){
@@ -290,57 +304,77 @@
     if (!item) return;
     const d = item.def, dmg = DB.damage[item.damage];
     const ourPerks = new Set(item.roll ? item.roll.weapon.perkHashes : []);
-    const typeLine = [d.r === 6 ? "Exotic" : "Legendary", d.y].filter(Boolean).join(" ") + (d.t === 3 && dmg ? " · " + dmg.n : "");
-    const tags = ['<span class="tag power">' + (item.power || "–") + "</span>",
-      '<span class="tag">' + esc(ownerLabel(item.owner)) + (item.equipped ? " · equipped" : "") + "</span>"]
-      .concat(item.state & STATE_MASTERWORK ? ['<span class="tag">Masterworked</span>'] : [])
-      .concat(item.state & STATE_LOCKED ? ['<span class="tag">Locked</span>'] : []);
+    const typeLine = (d.y || "") + (d.t === 3 && dmg ? " · " + dmg.n : "");
+    const meta = [esc(ownerLabel(item.owner)) + (item.equipped ? " · equipped" : "")]
+      .concat(item.state & STATE_MASTERWORK ? ["Masterworked"] : [])
+      .concat(item.state & STATE_LOCKED ? ["🔒 Locked"] : []);
 
-    let rollHtml = "";
+    // Rally Flag's own notes first: our God Roll and armor set progress.
+    let notes = "";
     if (item.roll){
-      const r = item.roll, w = r.weapon;
-      rollHtml = '<div class="dlg-section"><div class="callout">' +
-        (r.full ? "<strong>★ This is our God Roll</strong>: all " + r.total + " perks we run are on this copy."
-                : "<strong>" + r.matched + " of " + r.total + "</strong> perks from our God Roll are on this copy" + ' <span class="muted">(★ marks them below)</span>.') +
-        ' <a href="god-rolls.html#weapon-' + esc(w.slug) + '">See our roll →</a></div></div>';
+      const r = item.roll;
+      notes += '<div class="callout"><span><strong>★ ' + (r.full ? "Our God Roll" : r.matched + "/" + r.total + " of our God Roll") + "</strong>" +
+        (r.full ? "" : ' <span class="muted">(★ on the perks)</span>') + '</span><a href="god-rolls.html#weapon-' + esc(r.weapon.slug) + '">See our roll →</a></div>';
     }
-
-    // One column per socket that has something worth showing: the
-    // selected plug first, then any alternatives you can swap to for free.
-    const cols = [];
-    item.plugs.forEach((h, idx) => {
-      if (!showPlug(h)) return;
-      // Mod slots list every mod you own as an option, so show only the
-      // one that's in it; perk columns list what this copy rolled.
-      const isMod = /mod$/i.test(DB.items[h].y || "");
-      const alts = isMod ? [] : (item.alts[idx] || []).map(p => p.plugItemHash).filter(a => a !== h && showPlug(a));
-      cols.push('<div class="perk-col">' + plugHtml(h, "", ourPerks.has(h)) + alts.map(a => plugHtml(a, "alt", ourPerks.has(a))).join("") + "</div>");
-    });
-    const perksHtml = cols.length ? '<div class="dlg-section"><div class="dlg-label">' + (d.t === 3 ? "Perks" : "Perks &amp; mods") + '</div><div class="perk-cols">' + cols.join("") + "</div></div>" : "";
-
-    const statRows = Object.values(item.stats)
-      .map(s => ({ name: DB.stats[s.statHash], value: s.value }))
-      .filter(s => s.name && s.value != null && s.name !== "Power")
-      .sort((a, b) => a.name.localeCompare(b.name));
-    const bar = s => /per minute|magazine|charge time|draw time|reload time|ammo/i.test(s.name) ? "" : '<span class="stat-bar"><i style="width:' + Math.max(0, Math.min(100, s.value)) + '%"></i></span>';
-    const statsHtml = statRows.length ? '<div class="dlg-section"><div class="dlg-label">Stats</div>' +
-      statRows.map(s => '<div class="stat-row"><span>' + esc(s.name) + "</span>" + (bar(s) || "<span></span>") + "<b>" + s.value + "</b></div>").join("") + "</div>" : "";
-
-    let setHtml = "";
     if (item.set){
       const p = item.setProgress, ours = item.set.ours;
-      setHtml = '<div class="dlg-section"><div class="callout"><strong>' + esc(ours ? ours.name : item.set.name) + "</strong> set · you own " + p.slots.size + " of 5 " + esc(CLASS_NAMES[p.cls] || "") + " slots. " + esc(setStatus(p)) + "." +
-        (ours ? '<br><span class="muted">2-piece: ' + esc(ours.two[0]) + " · 4-piece: " + esc(ours.four[0]) + '</span> <a href="' + setHref(p) + '">Set bonuses →</a>' : "") +
-        "</div></div>";
+      notes += '<div class="callout"><span><strong>' + esc(ours ? ours.name : item.set.name) + "</strong> " + p.slots.size + '/5 · <span class="muted">' + esc(setStatus(p)) + "</span></span>" +
+        (ours ? '<a href="' + setHref(p) + '">Set bonuses →</a>' : "") + "</div>";
     }
+
+    const statRows = Object.values(item.stats)
+      .map(st => ({ name: DB.stats[st.statHash], value: st.value }))
+      .filter(st => st.name && st.value != null && st.name !== "Power")
+      .sort((a, b) => {
+        const ia = STAT_ORDER.indexOf(a.name), ib = STAT_ORDER.indexOf(b.name);
+        return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.name.localeCompare(b.name);
+      });
+    const barMax = d.t === 2 ? 42 : 100;
+    const stats = statRows.map(st => '<div class="stat-row"><span>' + esc(STAT_SHORT[st.name] || st.name) + "</span><b>" + st.value + "</b>" +
+      (NO_BAR.test(st.name) ? "<i></i>" : '<span class="stat-bar"><i style="width:' + Math.max(0, Math.min(100, st.value / barMax * 100)) + '%"></i></span>') + "</div>").join("");
+
+    // Sort sockets into the frame line, perk columns and mod squares.
+    let intrinsic = "";
+    const cols = [], mods = [];
+    item.plugs.forEach((h, idx) => {
+      if (!showPlug(h)) return;
+      const p = DB.items[h];
+      if (isIntrinsic(p) && !intrinsic){
+        const rpm = statRows.find(st => st.name === "Rounds Per Minute"), impact = statRows.find(st => st.name === "Impact");
+        const sub = rpm && impact ? rpm.value + " rpm / " + impact.value + " impact" : (p.y || "");
+        intrinsic = '<div class="intrinsic">' + (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="40" height="40">' : "") + "<div><b>" + esc(p.n) + "</b><small>" + esc(sub) + "</small></div></div>";
+      } else if (isMod(p)){
+        // Mod slots list every mod you own as an option; show only the one in it.
+        mods.push('<button type="button" class="mod-sq" data-plug="' + h + '" aria-pressed="false" title="' + esc(p.n) + '" aria-label="' + esc(p.n) + '">' +
+          (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="44" height="44">' : "") + "</button>");
+      } else {
+        const alts = (item.alts[idx] || []).map(a => a.plugItemHash).filter(a => a !== h && showPlug(a));
+        cols.push('<div class="perk-col">' + dotHtml(h, "sel", ourPerks.has(h)) + alts.map(a => dotHtml(a, "alt", ourPerks.has(a))).join("") + "</div>");
+      }
+    });
+
+    const blocks = [notes, stats, intrinsic,
+      cols.length ? '<div class="perk-cols" role="group" aria-label="Perks">' + cols.join("") + "</div>" : "",
+      mods.length ? '<div class="mod-row" role="group" aria-label="Mods">' + mods.join("") + "</div>" : ""
+    ].filter(Boolean).map(b => '<div class="dlg-block">' + b + "</div>");
+    const hasPlugs = cols.length || mods.length;
 
     const dlg = $("item-dialog");
     dlg.innerHTML =
-      '<div class="dlg-head"><div class="dlg-icon ' + tierClass(d) + '"><img src="' + esc(img(d.i)) + '" alt="">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="">' : "") + "</div>" +
-        '<div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-type">' + esc(typeLine) + '</div><div class="dlg-meta">' + tags.join("") + "</div></div>" +
+      '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-icon"><img src="' + esc(img(d.i)) + '" alt="">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="">' : "") + "</div>" +
+        '<div class="dlg-title"><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-type">' + esc(typeLine) + "</div></div>" +
+        '<div class="dlg-power">' + (d.t === 3 && dmg && dmg.i ? '<img src="' + esc(img(dmg.i)) + '" alt="">' : "") + (item.power || "") + "</div>" +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
-      '<div class="dlg-body">' + rollHtml + setHtml + perksHtml + statsHtml + "</div>";
+      '<div class="dlg-meta">' + meta.map(m => "<span>" + m + "</span>").join("") + "</div>" +
+      '<div class="dlg-body">' + blocks.join("") +
+        (hasPlugs ? '<div class="plug-info" id="plug-info" aria-live="polite">Tap a perk or mod to see what it does.</div>' : "") + "</div>";
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
+    dlg.querySelectorAll("[data-plug]").forEach(b => b.addEventListener("click", () => {
+      dlg.querySelectorAll("[data-plug]").forEach(o => o.setAttribute("aria-pressed", String(o === b)));
+      const p = DB.items[b.dataset.plug];
+      $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(+b.dataset.plug) ? " · ★ in our God Roll" : "") +
+        (p.x ? "<br>" + esc(p.x) : "");
+    }));
     dlg.showModal();
   }
 
