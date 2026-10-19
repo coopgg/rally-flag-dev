@@ -126,13 +126,16 @@ async function settle(page){
 }
 
 // Open everything that starts closed (cards behind "Expand all", <details>,
-// the guides' advanced notes) so its text is checked too.
+// the guides' advanced notes, the Locker's folded slots and vault lists)
+// so its text is checked too.
 async function expandAll(page){
   await page.evaluate(() => {
     document.querySelectorAll("main details").forEach(d => { d.open = true; });
     const all = document.getElementById("expand-all-btn");
     if (all && /expand/i.test(all.textContent)) all.click();
     document.querySelectorAll(".encounter-advanced:not(.open) .encounter-advanced-toggle").forEach(b => b.click());
+    // Locker: folded slots and clipped vault lists (each click re-renders).
+    for (let i = 0, b; i < 50 && (b = document.querySelector('.bucket-toggle[aria-expanded="false"], .vault-more[aria-expanded="false"]')); i++) b.click();
   });
   await page.waitForTimeout(500);
 }

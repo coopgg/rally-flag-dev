@@ -166,6 +166,18 @@
   .owner-groups{ display:flex; flex-direction:column; gap:14px; }
   .group-label{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); margin-bottom:6px; }
   .owner-group.empty{ display:none; }
+  .owner-groups[hidden]{ display:none !important; } /* a folded slot */
+  /* Folding: slot headings are toggles; long vault lists show two rows */
+  .bucket h2{ margin:0 0 12px; }
+  .bucket.folded h2{ margin-bottom:0; }
+  .bucket-toggle{ display:flex; align-items:baseline; gap:10px; padding:0; border:0; background:none; color:inherit; font:inherit; letter-spacing:inherit; text-transform:inherit; cursor:pointer; }
+  .bucket-toggle span:not(.chev){ font-family:'Inter', sans-serif; font-weight:500; font-size:13px; letter-spacing:0; text-transform:none; color:var(--text-dim); }
+  .bucket-toggle .chev{ width:8px; height:8px; border-right:2px solid var(--accent-text); border-bottom:2px solid var(--accent-text); transform:rotate(45deg) translate(-2px, -2px); transition:transform 0.15s ease; align-self:center; }
+  .bucket.folded .bucket-toggle .chev{ transform:rotate(-45deg); }
+  .bucket-toggle:hover{ color:var(--accent-text); }
+  .owner-group.clipped .item-tile:nth-child(n+13){ display:none; }
+  .vault-more, .fold-all{ margin-top:8px; padding:4px 0; border:0; background:none; color:var(--accent-text); font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+  .fold-all{ margin-top:0; }
   .group-empty{ color:var(--text-dim); font-size:13px; }
   @media (min-width:900px){
     .owner-groups.multi{ display:grid; grid-template-columns:repeat(var(--chars), minmax(0, 1fr)) minmax(0, 2fr); gap:0; }
@@ -259,7 +271,8 @@
     .owner-card .owner-name{ font-size:17px; }
     .item-grid{ grid-template-columns:repeat(auto-fill, 60px); gap:7px; }
     .item-tile{ width:60px; height:60px; }
-    .locker-count{ margin-left:0; width:100%; }
+    .locker-count{ margin-left:0; width:auto; flex:1; }
+    .owner-group.clipped .item-tile:nth-child(n+11){ display:none; }
     /* Bottom sheet on phones, like DIM */
     dialog.item-dialog{ width:100%; max-width:100%; max-height:88vh; margin:auto 0 0; border-radius:14px 14px 0 0; border-bottom:0; }
     .stat-row{ grid-template-columns:100px 32px 1fr; }
@@ -301,6 +314,7 @@
         <button class="chip" type="button" data-kind="flag" data-value="set" aria-pressed="false">Set pieces</button>
         <button class="chip" type="button" data-kind="flag" data-value="equipped" aria-pressed="false">Equipped</button>
         <span class="locker-count" id="locker-count" aria-live="polite"></span>
+        <button type="button" class="fold-all" id="fold-all">Collapse all</button>
       </div>
     </div>
 

@@ -44,6 +44,11 @@
 
   let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [];
   const state = { owner: "all", type: null, flags: new Set(), q: "" };
+  // Folded slots and opened vault lists, remembered per browser.
+  const FOLD_KEY = "rallyflag_locker_folds";
+  const folds = (() => { try { const f = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}"); return { slots: new Set(f.slots || []), vaults: new Set(f.vaults || []) }; } catch (e){ return { slots: new Set(), vaults: new Set() }; } })();
+  function saveFolds(){ try { localStorage.setItem(FOLD_KEY, JSON.stringify({ slots: [...folds.slots], vaults: [...folds.vaults] })); } catch (e){} }
+  const VAULT_PREVIEW = 12; // two rows of the vault column; phones show 10 (CSS)
   // Which view is open: gear (default) or armor sets (#sets).
   function showView(name, focus){
     const sets = name === "sets";
@@ -264,20 +269,31 @@
     const shown = ITEMS.filter(matches);
     const groups = state.owner === "all" ? OWNERS.map(o => o.id).concat("vault") : [state.owner];
     const byPower = (x, y) => (y.equipped - x.equipped) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
+    // Long vault lists show a preview, but never while searching or
+    // filtering, so a match can't end up hidden.
+    const filtering = !!(state.q || state.type || state.flags.size);
     const html = BUCKETS.map(b => {
       const inSlot = shown.filter(i => i.def.b === b.hash);
       if (!inSlot.length) return "";
       const cols = groups.map(g => {
         const items = inSlot.filter(i => i.owner === g).sort(byPower);
-        return '<div class="owner-group' + (g === "vault" ? " vault" : "") + (items.length ? "" : " empty") + '">' +
+        const long = g === "vault" && !filtering && items.length > VAULT_PREVIEW;
+        const open = folds.vaults.has(b.hash);
+        return '<div class="owner-group' + (g === "vault" ? " vault" : "") + (items.length ? "" : " empty") + (long && !open ? " clipped" : "") + '">' +
           '<div class="group-label">' + esc(ownerLabel(g)) + " · " + items.length + "</div>" +
-          (items.length ? '<div class="item-grid">' + items.map(tileHtml).join("") + "</div>" : '<div class="group-empty">—</div>') + "</div>";
+          (items.length ? '<div class="item-grid" id="vg-' + b.hash + "-" + g + '">' + items.map(tileHtml).join("") + "</div>" : '<div class="group-empty">—</div>') +
+          (long ? '<button type="button" class="vault-more" data-slot="' + b.hash + '" aria-expanded="' + open + '" aria-controls="vg-' + b.hash + "-" + g + '">' + (open ? "Show less" : "Show all " + items.length) + "</button>" : "") +
+          "</div>";
       }).join("");
-      return '<section class="bucket" aria-labelledby="b-' + b.hash + '"><h2 id="b-' + b.hash + '">' + b.label + " <span>" + inSlot.length + "</span></h2>" +
-        '<div class="owner-groups' + (groups.length > 1 ? " multi" : "") + '" style="--chars:' + (groups.length - 1) + '">' + cols + "</div></section>";
+      const folded = folds.slots.has(b.hash);
+      return '<section class="bucket' + (folded ? " folded" : "") + '" aria-labelledby="b-' + b.hash + '">' +
+        '<h2 id="b-' + b.hash + '"><button type="button" class="bucket-toggle" data-slot="' + b.hash + '" aria-expanded="' + !folded + '" aria-controls="bb-' + b.hash + '">' +
+          '<span class="chev" aria-hidden="true"></span>' + b.label + " <span>" + inSlot.length + "</span></button></h2>" +
+        '<div class="owner-groups' + (groups.length > 1 ? " multi" : "") + '" id="bb-' + b.hash + '" style="--chars:' + (groups.length - 1) + '"' + (folded ? " hidden" : "") + ">" + cols + "</div></section>";
     }).join("");
     $("buckets").innerHTML = html || '<p class="locker-empty">Nothing matches these filters.</p>';
     $("locker-count").textContent = "Showing " + shown.length + " of " + ITEMS.length + " items";
+    $("fold-all").textContent = BUCKETS.every(b => folds.slots.has(b.hash)) ? "Expand all" : "Collapse all";
   }
 
   function render(){ renderOwners(); renderSets(); renderItems(); }
@@ -439,7 +455,23 @@
     });
     $("buckets").addEventListener("click", e => {
       const tile = e.target.closest(".item-tile");
-      if (tile) openItem(tile.dataset.id);
+      if (tile) return openItem(tile.dataset.id);
+      const slot = e.target.closest(".bucket-toggle");
+      const more = e.target.closest(".vault-more");
+      const btn = slot || more;
+      if (!btn) return;
+      const set = slot ? folds.slots : folds.vaults, h = +btn.dataset.slot;
+      set.has(h) ? set.delete(h) : set.add(h);
+      saveFolds();
+      renderItems();
+      const again = document.querySelector((slot ? ".bucket-toggle" : ".vault-more") + '[data-slot="' + h + '"]');
+      if (again) again.focus(); // keep keyboard focus on the toggle
+    });
+    $("fold-all").addEventListener("click", () => {
+      const all = BUCKETS.every(b => folds.slots.has(b.hash));
+      BUCKETS.forEach(b => all ? folds.slots.delete(b.hash) : folds.slots.add(b.hash));
+      saveFolds();
+      renderItems();
     });
     document.querySelector(".view-tabs").addEventListener("click", e => {
       const t = e.target.closest(".view-tab");
