@@ -96,8 +96,16 @@
   const showsOwner = id => !state.owners.size || state.owners.has(id);
   // Folded slots and opened vault lists, remembered per browser.
   const FOLD_KEY = "rallyflag_locker_folds";
-  const folds = (() => { try { const f = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}"); return { slots: new Set(f.slots || []), vaults: new Set(f.vaults || []) }; } catch (e){ return { slots: new Set(), vaults: new Set() }; } })();
-  function saveFolds(){ try { localStorage.setItem(FOLD_KEY, JSON.stringify({ slots: [...folds.slots], vaults: [...folds.vaults] })); } catch (e){} }
+  const folds = (() => { try { const f = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}"); return { slots: new Set(f.slots || []), vaults: new Set(f.vaults || []), pmOpen: !!f.pmOpen }; } catch (e){ return { slots: new Set(), vaults: new Set(), pmOpen: false }; } })();
+  function saveFolds(){ try { localStorage.setItem(FOLD_KEY, JSON.stringify({ slots: [...folds.slots], vaults: [...folds.vaults], pmOpen: folds.pmOpen })); } catch (e){} }
+
+  // Favorite / Junk tags, per item, kept in this browser (no server to sync them).
+  const TAG_KEY = "rallyflag_locker_tags";
+  const TAGS = (() => { try { return JSON.parse(localStorage.getItem(TAG_KEY) || "{}"); } catch (e){ return {}; } })();
+  function toggleTag(id, tag){
+    TAGS[id] === tag ? delete TAGS[id] : (TAGS[id] = tag);
+    try { localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); } catch (e){}
+  }
   const VAULT_PREVIEW = 12; // two rows of the vault column; phones show 10 (CSS)
   // Which view is open: gear (default) or armor sets (#sets).
   function showView(name, focus){
@@ -313,6 +321,8 @@
     if (state.flags.has("godroll") && !(item.roll && item.roll.full)) return false;
     if (state.flags.has("set") && !item.set) return false;
     if (state.flags.has("equipped") && !item.equipped) return false;
+    if (state.flags.has("favorite") && TAGS[item.id] !== "favorite") return false;
+    if (state.flags.has("junk") && TAGS[item.id] !== "junk") return false;
     if (state.q && !state.q.split(/\s+/).every(w => item.text.includes(w))) return false;
     return true;
   }
@@ -320,12 +330,15 @@
   function tileHtml(item){
     const d = item.def, dmg = DB.damage[item.damage];
     const label = [d.n, d.y, item.power ? "power " + item.power : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
-      item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : ""].filter(Boolean).join(", ");
-    return '<button type="button" class="item-tile ' + tierClass(d) + (item.equipped ? " equipped" : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
+      item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : "",
+      TAGS[item.id] ? "tagged " + TAGS[item.id] : ""].filter(Boolean).join(", ");
+    const tag = TAGS[item.id];
+    return '<button type="button" class="item-tile ' + tierClass(d) + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
       '<img class="icon" src="' + esc(img(d.i)) + '" alt="" loading="lazy" width="64" height="64">' +
       (d.w ? '<img class="wm" src="' + esc(img(d.w)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (item.set ? '<span class="tile-badge set" aria-hidden="true">' + item.setProgress.slots.size + "</span>" : "") +
-      (item.roll && item.roll.full ? '<span class="tile-badge" aria-hidden="true">★</span>' : "") +
+      (item.roll && item.roll.full || tag ? '<span class="tile-badges" aria-hidden="true">' + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
+        (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag === "junk" ? '<span class="tile-badge junk">✕</span>' : "") + "</span>" : "") +
       '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") + (item.power || "") + "</span>" +
     "</button>";
   }
@@ -338,7 +351,8 @@
     const groups = OWNERS.map(o => o.id).concat("vault").filter(showsOwner);
     // Character columns share the width; the vault gets a double column.
     const colsTemplate = groups.map(g => g === "vault" ? "minmax(0, 2fr)" : "minmax(0, 1fr)").join(" ");
-    const byPower = (x, y) => (y.equipped - x.equipped) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
+    const isJunk = i => TAGS[i.id] === "junk" ? 1 : 0;
+    const byPower = (x, y) => (y.equipped - x.equipped) || (isJunk(x) - isJunk(y)) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
     // Long vault lists show a preview, but never while searching or
     // filtering, so a match can't end up hidden.
     const filtering = !!(state.q || state.type || state.flags.size);
@@ -366,23 +380,28 @@
     $("fold-all").textContent = BUCKETS.every(b => folds.slots.has(b.hash)) ? "Expand all" : "Collapse all";
   }
 
-  // Postmaster: only shown when something is waiting, per character, with
-  // a warning as it nears Bungie's 21-item limit (after that, items are lost).
+  // Postmaster: a slim foldable bar (closed by default) with a count and
+  // "Pull all" per character, red as it nears Bungie's 21-item limit
+  // (after that, new items are lost). Open, it shows small tiles.
   function postmasterHtml(){
     const groups = OWNERS.filter(o => showsOwner(o.id)).map(o => ({ o, items: POSTMASTER.filter(p => p.owner === o.id) })).filter(g => g.items.length);
     if (!groups.length) return "";
-    return '<section class="bucket postmaster" aria-labelledby="pm-head"><h2 id="pm-head">Postmaster <span>' + groups.reduce((n, g) => n + g.items.length, 0) + "</span></h2>" +
-      groups.map(g => {
-        const full = g.items.length >= POSTMASTER_CAP - 3;
-        return '<div class="pm-group' + (full ? " nearly-full" : "") + '"><div class="group-label">' + esc(g.o.name) + " · " + g.items.length + "/" + POSTMASTER_CAP +
-          (full ? " · almost full, new items will be lost" : "") + '</div><div class="pm-row"><div class="item-grid">' +
-          g.items.map(p => {
-            const d = p.gear ? p.gear.def : DB.items[p.hash] || { n: "Loading…" };
-            return '<button type="button" class="item-tile pm-tile ' + (p.gear ? tierClass(d) : "") + '" data-pm="' + esc(p.id) + '" aria-label="' + esc(d.n + (p.quantity > 1 ? ", " + p.quantity + " of them" : "") + ", in your " + g.o.name + "'s postmaster") + '">' +
-              (d.i ? '<img class="icon" src="' + esc(img(d.i)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
-              (p.quantity > 1 ? '<span class="tile-power">' + p.quantity + "</span>" : p.gear && p.gear.power ? '<span class="tile-power">' + p.gear.power + "</span>" : "") + "</button>";
-          }).join("") + '</div><button type="button" class="locker-btn ghost pm-all" data-pm-all="' + g.o.id + '">Pull all to ' + esc(g.o.name) + "</button></div></div>";
-      }).join("") + "</section>";
+    const open = folds.pmOpen, total = groups.reduce((n, g) => n + g.items.length, 0);
+    const chips = groups.map(g => {
+      const full = g.items.length >= POSTMASTER_CAP - 3;
+      return '<span class="pm-chip' + (full ? " nearly-full" : "") + '"><span>' + esc(g.o.name) + " " + g.items.length + "/" + POSTMASTER_CAP + (full ? " · almost full" : "") + "</span>" +
+        '<button type="button" class="pm-all" data-pm-all="' + g.o.id + '" aria-label="Pull all ' + g.items.length + " items to your " + esc(g.o.name) + '">Pull all</button></span>';
+    }).join("");
+    const tiles = groups.map(g => '<div class="pm-group"><div class="group-label">' + esc(g.o.name) + '</div><div class="item-grid pm-grid">' +
+      g.items.map(p => {
+        const d = p.gear ? p.gear.def : DB.items[p.hash] || { n: "Loading…" };
+        return '<button type="button" class="item-tile pm-tile ' + (p.gear ? tierClass(d) : "") + '" data-pm="' + esc(p.id) + '" aria-label="' + esc(d.n + (p.quantity > 1 ? ", " + p.quantity + " of them" : "") + ", in your " + g.o.name + "'s postmaster") + '">' +
+          (d.i ? '<img class="icon" src="' + esc(img(d.i)) + '" alt="" loading="lazy" width="44" height="44">' : "") +
+          (p.quantity > 1 ? '<span class="tile-power">' + p.quantity + "</span>" : "") + "</button>";
+      }).join("") + "</div></div>").join("");
+    return '<section class="bucket postmaster' + (open ? "" : " folded") + '" aria-labelledby="pm-head"><div class="pm-bar">' +
+      '<h2 id="pm-head"><button type="button" class="bucket-toggle" data-slot="pm" aria-expanded="' + open + '" aria-controls="pm-body"><span class="chev" aria-hidden="true"></span>Postmaster <span>' + total + "</span></button></h2>" +
+      chips + '</div><div class="pm-body" id="pm-body"' + (open ? "" : " hidden") + ">" + tiles + "</div></section>";
   }
 
   function render(){ renderOwners(); renderSets(); renderItems(); }
@@ -683,7 +702,10 @@
     const actions = '<div class="dlg-actions">' +
       '<div class="act-row"><span class="act-label">Equip</span>' + OWNERS.filter(o => classOk(item, o.id)).map(o => ownerBtn(o, "equip", item.owner === o.id && item.equipped)).join("") + "</div>" +
       '<div class="act-row"><span class="act-label">Move</span>' + OWNERS.concat([{ id: "vault", name: "Vault" }]).map(o => ownerBtn(o, "move", item.owner === o.id)).join("") +
-        '<button type="button" class="act-btn lock" data-act="lock" aria-pressed="' + !!(item.state & STATE_LOCKED) + '">' + (item.state & STATE_LOCKED ? "Locked" : "Lock") + "</button></div></div>";
+        '<button type="button" class="act-btn lock" data-act="lock" aria-pressed="' + !!(item.state & STATE_LOCKED) + '">' + (item.state & STATE_LOCKED ? "Locked" : "Lock") + "</button></div>" +
+      '<div class="act-row"><span class="act-label">Tag</span>' +
+        '<button type="button" class="act-btn tag" data-tag="favorite" aria-pressed="' + (TAGS[item.id] === "favorite") + '">♥ Favorite</button>' +
+        '<button type="button" class="act-btn tag" data-tag="junk" aria-pressed="' + (TAGS[item.id] === "junk") + '">✕ Junk</button></div></div>';
     const blocks = [
       notes ? '<div class="rf-notes">' + notes + "</div>" : "",
       stats ? label("Stats") + stats : "",
@@ -709,6 +731,14 @@
       const p = DB.items[b.dataset.plug];
       $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(+b.dataset.plug) ? " · in our God Roll" : "") +
         (p.x ? "<br>" + esc(p.x) : "");
+    }));
+    // Tags are local (no Bungie call), so they apply instantly.
+    dlg.querySelectorAll("[data-tag]").forEach(b => b.addEventListener("click", () => {
+      toggleTag(item.id, b.dataset.tag);
+      renderItems();
+      openItem(item.id);
+      const again = dlg.querySelector('[data-tag="' + b.dataset.tag + '"]');
+      if (again) again.focus();
     }));
     dlg.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => {
       if (b.getAttribute("aria-disabled") === "true" || busyNotice()) return;
@@ -787,6 +817,7 @@
       const more = e.target.closest(".vault-more");
       const btn = slot || more;
       if (!btn) return;
+      if (slot && slot.dataset.slot === "pm"){ folds.pmOpen = !folds.pmOpen; saveFolds(); renderItems(); return $("pm-head").querySelector("button").focus(); }
       const set = slot ? folds.slots : folds.vaults, h = +btn.dataset.slot;
       set.has(h) ? set.delete(h) : set.add(h);
       saveFolds();

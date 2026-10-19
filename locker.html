@@ -297,14 +297,30 @@
   .locker-toast.busy::before{ animation:toast-pulse 0.9s ease-in-out infinite alternate; }
   @keyframes toast-pulse{ from{ opacity:0.3; } to{ opacity:1; } }
   /* Postmaster */
-  .bucket.postmaster h2{ font-family:'Oswald', sans-serif; font-weight:600; font-size:17px; letter-spacing:0.06em; text-transform:uppercase; display:flex; gap:10px; align-items:baseline; }
-  .bucket.postmaster h2 span{ font-family:'Inter', sans-serif; font-size:13px; font-weight:500; letter-spacing:0; text-transform:none; color:var(--text-dim); }
-  .pm-group{ padding:12px 14px; border-radius:12px; border:1px solid var(--edge); background:var(--panel); margin-bottom:10px; }
-  .pm-group.nearly-full{ border-color:#d9534f; box-shadow:0 0 18px -8px #d9534f; }
-  .pm-group.nearly-full .group-label{ color:var(--text); }
-  .pm-row{ display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
-  .pm-row .item-grid{ flex:1; }
+  /* Postmaster: one slim bar; tiles only when opened */
+  .bucket.postmaster{ margin-top:24px; padding:8px 12px; border-radius:12px; border:1px solid var(--edge); background:var(--panel); }
+  .pm-bar{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; }
+  .bucket.postmaster h2{ margin:0; font-size:15px; }
+  .pm-chip{ display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--text-dim); }
+  .pm-chip.nearly-full{ color:var(--text); font-weight:600; }
+  .pm-chip.nearly-full > span:first-child::before{ content:""; display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%; background:#e5534b; box-shadow:0 0 8px #e5534b; }
+  .bucket.postmaster:has(.nearly-full){ border-color:#d9534f; }
+  .pm-all{ padding:3px 10px; border-radius:999px; border:1px solid var(--accent); background:none; color:var(--accent-text); font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.04em; cursor:pointer; }
+  .pm-all:hover{ background:var(--accent-dim); }
+  .pm-body{ display:flex; flex-wrap:wrap; gap:10px 24px; margin-top:10px; }
+  .pm-body[hidden]{ display:none; }
+  .pm-group{ flex:1 1 280px; min-width:0; }
+  .pm-grid{ grid-template-columns:repeat(auto-fill, 44px) !important; gap:6px !important; }
+  .pm-grid .item-tile{ width:44px !important; height:44px !important; border-width:1px; }
   .pm-tile:not(.tier-5):not(.tier-6){ border-color:var(--panel-border); }
+  /* Tags */
+  .tile-badges{ position:absolute; top:2px; right:2px; display:flex; gap:2px; }
+  .tile-badges .tile-badge{ position:static; }
+  .tile-badge.fav{ background:#ff8fb1; }
+  .tile-badge.junk{ background:#c9ced8; }
+  .item-tile.tag-junk img.icon{ filter:grayscale(1) brightness(0.55); }
+  .act-btn.tag{ padding-left:11px; }
+  .act-btn.tag[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
   /* Drag and drop */
   .item-tile[draggable="true"]{ cursor:grab; }
   .owner-group.drop-target{ background:var(--accent-dim); outline:2px dashed var(--accent); outline-offset:4px; border-radius:6px; }
@@ -359,6 +375,8 @@
         <button class="chip" type="button" data-kind="flag" data-value="godroll" aria-pressed="false">★ Our God Rolls</button>
         <button class="chip" type="button" data-kind="flag" data-value="set" aria-pressed="false">Set pieces</button>
         <button class="chip" type="button" data-kind="flag" data-value="equipped" aria-pressed="false">Equipped</button>
+        <button class="chip" type="button" data-kind="flag" data-value="favorite" aria-pressed="false">♥ Favorites</button>
+        <button class="chip" type="button" data-kind="flag" data-value="junk" aria-pressed="false">Junk</button>
         <span class="locker-count" id="locker-count" aria-live="polite"></span>
         <button type="button" class="fold-all" id="locker-refresh">Refresh</button>
         <button type="button" class="fold-all" id="fold-all">Collapse all</button>
