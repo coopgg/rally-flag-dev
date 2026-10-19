@@ -47,7 +47,50 @@
   const img = p => p ? (p.charAt(0) === "/" ? BUNGIE + p : p) : "";
   const slugify = s => s.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-  let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [], POSTMASTER = [], MEMBERSHIP_TYPE = 0;
+  let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [], POSTMASTER = [], MEMBERSHIP_TYPE = 0, PROFILE_PATH = "";
+
+  // Bungie's profile can lag a moment behind a move, so a reload or
+  // Refresh right after one would put the item back where it was. Every
+  // change we make is noted here (this tab, 5 minutes) and laid over any
+  // profile Bungie minted before it (like DIM keeps its own state).
+  const JOURNAL_KEY = "rallyflag_locker_journal", JOURNAL_MS = 5 * 60 * 1000;
+  function readJournal(){
+    try {
+      const j = JSON.parse(sessionStorage.getItem(JOURNAL_KEY) || "{}"), now = Date.now();
+      for (const k in j) if (now - j[k].at > JOURNAL_MS) delete j[k];
+      return j;
+    } catch (e){ return {}; }
+  }
+  function remember(entries){
+    const j = readJournal(), at = Date.now();
+    for (const [key, value] of entries) j[key] = Object.assign({ at }, value);
+    try { sessionStorage.setItem(JOURNAL_KEY, JSON.stringify(j)); } catch (e){}
+  }
+  const rememberItems = items => remember(items.map(i => [i.id, { owner: i.owner, equipped: i.equipped, locked: !!(i.state & STATE_LOCKED) }]));
+  // Returns how many journal entries were newer than the profile.
+  function applyJournal(){
+    // The older of Bungie's two stamps: inventory ("secondary") data can
+    // be older than the response that carries it.
+    const stamps = [PROFILE.responseMintedTimestamp, PROFILE.secondaryComponentsMintedTimestamp].map(t => Date.parse(t || "")).filter(t => t > 0);
+    const j = readJournal(), minted = stamps.length ? Math.min(...stamps) : 0;
+    let applied = 0;
+    for (const key in j){
+      const e = j[key];
+      if (e.at <= minted) continue;
+      if (key.startsWith("pm:")){
+        const pm = POSTMASTER.find(p => p.id === key.slice(3));
+        if (pm){ POSTMASTER = POSTMASTER.filter(p => p !== pm); if (pm.gear) ITEMS.push(pm.gear); applied++; }
+        continue;
+      }
+      const item = ITEMS.find(i => i.id === key);
+      if (!item) continue;
+      if (e.equipped) for (const i of ITEMS) if (i !== item && i.owner === e.owner && i.def.b === item.def.b) i.equipped = false;
+      item.owner = e.owner; item.equipped = e.equipped;
+      item.state = e.locked ? (item.state | STATE_LOCKED) : (item.state & ~STATE_LOCKED);
+      applied++;
+    }
+    return applied;
+  }
   // owners: the character/vault cards toggled on; none means everyone.
   const state = { owners: new Set(), type: null, flags: new Set(), q: "" };
   const showsOwner = id => !state.owners.size || state.owners.has(id);
@@ -105,7 +148,8 @@
     });
   }
   async function authedGet(path){
-    const res = await RallyFlagAuth.authedFetch(path);
+    // no-store: never a browser-cached copy of the profile after a move.
+    const res = await RallyFlagAuth.authedFetch(path, { cache: "no-store" });
     const data = await res.json();
     if (!res.ok || data.ErrorCode !== 1) throw new Error((data && data.Message) || ("HTTP " + res.status));
     return data.Response;
@@ -120,7 +164,8 @@
     const list = memberships.destinyMemberships || [];
     if (!list.length) throw new Error("this Bungie account has no linked Destiny 2 platform.");
     const primary = list.find(m => m.membershipId === memberships.primaryMembershipId) || list[0];
-    return authedGet("/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId + "/?components=" + COMPONENTS);
+    PROFILE_PATH = "/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId;
+    return authedGet(PROFILE_PATH + "/?components=" + COMPONENTS);
   }
 
   // ---------------- model ----------------
@@ -196,8 +241,10 @@
       });
       for (const it of ((eqs[o.id] && eqs[o.id].items) || [])) add(it, o.id, true);
     }
+    JOURNAL_APPLIED = applyJournal();
     computeSets();
   }
+  let JOURNAL_APPLIED = 0;
 
   // Set progress per (set, class): distinct armor slots owned anywhere.
   function computeSets(){
@@ -373,6 +420,7 @@
       // Bungie's own code, shown small under the message, for bug reports.
       err.code = (status || "HTTP " + res.status) + (data.ErrorCode ? " #" + data.ErrorCode : "");
       err.scope = scope;
+      err.status = status;
       throw err;
     }
     if (data.ThrottleSeconds) await sleep(data.ThrottleSeconds * 1000);
@@ -381,10 +429,13 @@
   const classOk = (item, charId) => item.def.t !== 2 || item.def.c === 3 || item.def.c === (ownerOf(charId) || {}).cls;
 
   const transfer = (item, toVault, charId) => post("TransferItem", { itemReferenceHash: item.hash, stackSize: 1, transferToVault: toVault, itemId: item.id, characterId: charId });
+  // Model + journal update for one finished transfer step.
+  const landed = (item, owner) => { item.owner = owner; item.equipped = false; rememberItems([item]); };
   async function equipCall(item, charId){
     await post("EquipItem", { itemId: item.id, characterId: charId });
     for (const i of ITEMS) if (i.owner === charId && i.equipped && i.def.b === item.def.b) i.equipped = false;
     item.equipped = true;
+    rememberItems(ITEMS.filter(i => i.owner === charId && i.def.b === item.def.b));
   }
   // An equipped item can't leave: equip the best other item in that slot
   // first (a Legendary when there is one, so the Exotic limit can't bite).
@@ -397,8 +448,8 @@
   async function moveTo(item, dest){
     if (item.owner === dest) return;
     if (item.equipped) await swapOut(item);
-    if (item.owner !== "vault"){ await transfer(item, true, item.owner); item.owner = "vault"; }
-    if (dest !== "vault"){ await transfer(item, false, dest); item.owner = dest; }
+    if (item.owner !== "vault"){ await transfer(item, true, item.owner); landed(item, "vault"); }
+    if (dest !== "vault"){ await transfer(item, false, dest); landed(item, dest); }
   }
   async function equipOn(item, charId){
     if (!classOk(item, charId)) throw new Error("Only a " + (CLASS_NAMES[item.def.c] || "matching class") + " can equip this.");
@@ -408,18 +459,43 @@
   async function setLock(item, locked){
     await post("SetLockState", { state: locked, itemId: item.id, characterId: item.owner === "vault" ? OWNERS[0].id : item.owner });
     item.state = locked ? (item.state | STATE_LOCKED) : (item.state & ~STATE_LOCKED);
+    rememberItems([item]);
   }
   async function pull(pm){
     await post("PullFromPostmaster", { itemReferenceHash: pm.hash, stackSize: pm.quantity, itemId: pm.instanceId, characterId: pm.owner });
     POSTMASTER = POSTMASTER.filter(p => p !== pm);
     if (pm.gear) ITEMS.push(pm.gear);
+    remember([["pm:" + pm.id, { pulled: true }]].concat(pm.gear ? [[pm.gear.id, { owner: pm.gear.owner, equipped: false, locked: !!(pm.gear.state & STATE_LOCKED) }]] : []));
+  }
+
+  // "Not found" means the page's idea of where an item is went stale
+  // (e.g. moved in game). Ask Bungie where it really is (one item), fix
+  // the page, and let the action retry once. Returns true if it moved.
+  async function relocate(item){
+    if (DEMO || !PROFILE_PATH) return false;
+    const r = await authedGet(PROFILE_PATH + "/Item/" + item.id + "/?components=300,307");
+    const loc = r.item && r.item.data && r.item.data.location;
+    const owner = r.characterId || (loc === 2 ? "vault" : null);
+    if (!owner) return false;
+    const equipped = !!(r.instance && r.instance.data && r.instance.data.isEquipped);
+    const changed = owner !== item.owner || equipped !== item.equipped;
+    item.owner = owner; item.equipped = equipped;
+    rememberItems([item]);
+    return changed;
   }
 
   // Runs an action with a visible status, then re-renders.
-  function run(busy, done, fn, after){
+  function run(busy, done, fn, after, item){
     toast(busy + "…", "busy");
     document.body.classList.add("locker-busy");
-    return enqueue(fn).then(() => {
+    const attempt = async () => {
+      try { await fn(); }
+      catch (err){
+        if (err.status === "DestinyItemNotFound" && item && await relocate(item).catch(() => false)){ await fn(); return; }
+        throw err;
+      }
+    };
+    return enqueue(attempt).then(() => {
       computeSets(); render();
       if (after) after(); // redraws the popup first, so the message isn't wiped
       toast(done, "ok");
@@ -611,11 +687,11 @@
       if (b.getAttribute("aria-disabled") === "true" || document.body.classList.contains("locker-busy")) return;
       const to = b.dataset.to, where = ownerLabel(to), name = d.n;
       const reopen = () => { if (dlg.open && dlg.dataset.item === item.id) openItem(item.id); };
-      if (b.dataset.act === "equip") run("Equipping " + name + " on your " + where, "Equipped " + name + " on your " + where + ".", () => equipOn(item, to), reopen);
-      else if (b.dataset.act === "move") run("Moving " + name + " to " + (to === "vault" ? "the vault" : "your " + where), "Moved " + name + " to " + (to === "vault" ? "the vault" : "your " + where) + ".", () => moveTo(item, to), reopen);
+      if (b.dataset.act === "equip") run("Equipping " + name + " on your " + where, "Equipped " + name + " on your " + where + ".", () => equipOn(item, to), reopen, item);
+      else if (b.dataset.act === "move") run("Moving " + name + " to " + (to === "vault" ? "the vault" : "your " + where), "Moved " + name + " to " + (to === "vault" ? "the vault" : "your " + where) + ".", () => moveTo(item, to), reopen, item);
       else {
         const lock = !(item.state & STATE_LOCKED);
-        run((lock ? "Locking " : "Unlocking ") + name, (lock ? "Locked " : "Unlocked ") + name + ".", () => setLock(item, lock), reopen);
+        run((lock ? "Locking " : "Unlocking ") + name, (lock ? "Locked " : "Unlocked ") + name + ".", () => setLock(item, lock), reopen, item);
       }
     }));
     if (!dlg.open) dlg.showModal();
@@ -717,12 +793,15 @@
       if (!g || !item) return;
       e.preventDefault();
       const to = g.dataset.owner, where = to === "vault" ? "the vault" : "your " + ownerLabel(to);
-      if (!document.body.classList.contains("locker-busy")) run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to));
+      if (!document.body.classList.contains("locker-busy")) run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to), null, item);
     });
     $("locker-refresh").addEventListener("click", async () => {
       if (document.body.classList.contains("locker-busy")) return;
       toast("Refreshing from Bungie…", "busy");
-      try { PROFILE = await loadProfile(); buildModel(); render(); resolvePostmasterNames(); toast("Up to date.", "ok"); }
+      try {
+        PROFILE = await loadProfile(); buildModel(); render(); resolvePostmasterNames();
+        toast(JOURNAL_APPLIED ? "Up to date. Bungie's copy is a few seconds behind, so your latest moves are kept." : "Up to date.", "ok");
+      }
       catch (err){ toast("Couldn't refresh: " + (err.message || err), "error"); }
     });
     $("fold-all").addEventListener("click", () => {

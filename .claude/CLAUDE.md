@@ -110,7 +110,11 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   /Platform/Destiny2/Actions/Items/{TransferItem,EquipItem,SetLockState,
   PullFromPostmaster}/ one at a time; these need the app's "Move or equip
   Destiny gear" OAuth scope (owner, bungie.net), and players re-sign-in
-  after it's enabled. `?demo` simulates every action locally. Test the
+  after it's enabled. Bungie's profile lags a moment behind moves, so
+  every change goes into a 5-minute sessionStorage journal laid over any
+  profile minted before it (older of response/secondary minted stamps);
+  DestinyItemNotFound triggers a one-item GetItem lookup and one retry.
+  `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.
 - **`404.html`** is served for any missing path at any depth; it sets `<base>`
