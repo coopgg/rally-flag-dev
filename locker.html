@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* Boot script: theme, light/dark mode, load guard. Generated from tools/boot-script.js; edit there and run node tools/sync-boot-script.js. */
+(function(){
+  var d = document.documentElement;
+  // Valid saved themes; a first visit gets a random subclass (not Cosmic).
+  var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
+  var theme = null, modePref = null, legacyMode = null;
+  try {
+    theme = localStorage.getItem("rallyflag_theme");
+    if (THEMES.indexOf(theme) < 0){
+      theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+      localStorage.setItem("rallyflag_theme", theme);
+    }
+    modePref = localStorage.getItem("rallyflag_mode_pref");
+    legacyMode = localStorage.getItem("rallyflag_mode");
+  } catch (e) {}
+  if (THEMES.indexOf(theme) < 0) theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+  if (modePref !== "light" && modePref !== "dark"){
+    modePref = legacyMode === "light" ? "light"
+      : (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  }
+  d.setAttribute("data-theme", theme);
+  d.setAttribute("data-mode", modePref);
+
+  d.classList.add("rf-boot");
+  var reveal = function(){ d.classList.remove("rf-boot"); };
+  document.addEventListener("DOMContentLoaded", function(){
+    Promise.race([
+      document.fonts ? document.fonts.ready : 0,
+      new Promise(function(r){ setTimeout(r, 400); })
+    ]).then(function(){ requestAnimationFrame(reveal); });
+  });
+  setTimeout(reveal, 2500);
+})();
+</script>
+<title>Locker (preview) - Rally Flag</title>
+<meta name="description" content="Your Destiny 2 gear in Rally Flag style: every weapon and armor piece across your characters and vault, with our God Roll matches and armor set progress.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rally Flag">
+<meta property="og:title" content="Locker">
+<meta property="og:description" content="Your Destiny 2 gear in Rally Flag style: every weapon and armor piece across your characters and vault, with our God Roll matches and armor set progress.">
+<meta property="og:url" content="https://rallyflag.gg/locker.html">
+<link rel="canonical" href="https://rallyflag.gg/locker.html">
+<meta property="og:image" content="https://rallyflag.gg/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Rally Flag: Destiny 2 raid and dungeon guides, weapon god rolls, builds and live trackers">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Locker">
+<meta name="twitter:description" content="Your Destiny 2 gear in Rally Flag style: every weapon and armor piece across your characters and vault, with our God Roll matches and armor set progress.">
+<meta name="twitter:image" content="https://rallyflag.gg/assets/og-image.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.bungie.net">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  /* Locker (dev-only preview, stage 1: read-only). Script: assets/locker.js */
+  .locker-root{ max-width:1180px; margin:0 auto; padding:0 24px 90px; min-height:100vh; }
+  .preview-tag{ display:inline-block; margin-left:8px; padding:2px 8px; border:1px solid var(--accent); border-radius:999px; color:var(--accent-text); font-size:12px; letter-spacing:0.08em; vertical-align:middle; }
+
+  /* Status panels: signed out, loading, error, sample-data banner */
+  .locker-panel{ max-width:640px; margin:32px auto 0; padding:26px; text-align:center; }
+  .locker-panel p{ color:var(--text-dim); font-size:15px; max-width:52ch; margin:0 auto 16px; }
+  .locker-panel p:last-child{ margin-bottom:0; }
+  .locker-btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:40px;
+    font-family:'Oswald', sans-serif; font-weight:600; font-size:14px; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--on-accent); background:var(--accent-fill); border:1px solid var(--accent-fill); border-radius:999px;
+    padding:9px 20px; cursor:pointer; text-decoration:none;
+  }
+  .locker-btn.ghost{ color:var(--accent-text); background:transparent; border-color:var(--accent); }
+  .locker-actions{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+  .locker-steps{ list-style:none; padding:0; margin:0 auto; max-width:46ch; text-align:left; color:var(--text-dim); font-size:14px; }
+  .locker-steps li{ padding:4px 0 4px 22px; position:relative; }
+  .locker-steps li::before{ content:"…"; position:absolute; left:0; color:var(--accent-text); }
+  .locker-steps li.done::before{ content:"✓"; }
+  .demo-banner{ display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px 16px; margin:24px auto 0; padding:12px 18px; max-width:760px; font-size:14px; color:var(--text-dim); text-align:center; }
+
+  /* Characters + vault: owner filter */
+  .owner-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); grid-auto-rows:1fr; gap:12px; margin-top:28px; }
+  .owner-card{
+    position:relative; display:flex; flex-direction:column; justify-content:flex-end; min-height:84px; padding:12px 14px;
+    border-radius:12px; border:1px solid var(--edge); overflow:hidden; cursor:pointer; text-align:left;
+    background-color:var(--panel); background-size:cover; background-position:left center; color:#fff;
+    font:inherit; transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  /* Emblem art sits under a dark wash so the white text passes contrast in either mode. */
+  .owner-card::before{ content:""; position:absolute; inset:0; background:linear-gradient(90deg, rgba(5,8,16,0.86), rgba(5,8,16,0.55)); }
+  .owner-card > *{ position:relative; }
+  .owner-card[aria-pressed="true"]{ border-color:var(--accent); box-shadow:0 0 0 1px var(--accent), 0 0 22px -6px var(--glow); }
+  .owner-card .owner-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:20px; letter-spacing:0.04em; text-transform:uppercase; }
+  .owner-card .owner-meta{ font-size:13px; color:rgba(255,255,255,0.85); }
+  .owner-card.vault{ background-image:none; background:linear-gradient(135deg, #0d1424, #1b2236); }
+  .owner-card.all{ background:linear-gradient(135deg, #10131c, #20263a); }
+
+  /* Filters */
+  .locker-controls{ margin-top:22px; display:flex; flex-direction:column; gap:12px; }
+  .search-box input{
+    width:100%; background:var(--panel); border:1px solid var(--panel-border); color:var(--text);
+    font-family:'Inter', sans-serif; font-size:15px; padding:13px 16px; border-radius:10px; outline:none;
+  }
+  .search-box input:focus{ border-color:var(--accent); }
+  .search-box input::placeholder{ color:var(--text-dimmer); }
+  .chip-row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .chip{
+    font-family:'Inter', sans-serif; font-size:13px; font-weight:500; color:var(--text-dim);
+    background:var(--panel); border:1px solid var(--panel-border); padding:7px 14px; border-radius:999px; cursor:pointer;
+    transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+  }
+  .chip:hover{ color:var(--text); }
+  .chip[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
+  .chip-sep{ width:1px; height:22px; background:var(--panel-border); margin:0 4px; }
+  .locker-count{ font-size:13px; color:var(--text-dim); margin-left:auto; }
+
+  /* Armor set progress */
+  .sets-panel{ margin-top:30px; }
+  .sets-panel summary{ cursor:pointer; list-style:none; display:flex; align-items:baseline; gap:10px; }
+  .sets-panel summary::-webkit-details-marker{ display:none; }
+  .sets-panel summary .section-label{ margin:0; }
+  .sets-panel summary .hint{ font-size:13px; color:var(--text-dim); }
+  .set-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); grid-auto-rows:1fr; gap:12px; margin-top:14px; }
+  .set-card{ padding:14px 16px; display:flex; flex-direction:column; gap:8px; }
+  .set-card-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:16px; color:var(--text); line-height:1.25; }
+  .set-card-class{ font-size:13px; color:var(--text-dim); }
+  .set-pips{ display:flex; gap:5px; }
+  .set-pip{ flex:1; height:6px; border-radius:3px; background:var(--panel-border); }
+  .set-pip.on{ background:var(--accent-fill); box-shadow:0 0 8px -2px var(--glow); }
+  .set-card-status{ font-size:13px; color:var(--accent-text); font-weight:600; margin-top:auto; }
+  .set-card a{ font-size:13px; color:var(--accent-text); }
+
+  /* Gear by slot */
+  .bucket{ margin-top:30px; }
+  .bucket h2{ font-family:'Oswald', sans-serif; font-weight:600; font-size:17px; letter-spacing:0.06em; text-transform:uppercase; color:var(--text); margin:0 0 12px; display:flex; align-items:baseline; gap:10px; }
+  .bucket h2 span{ font-family:'Inter', sans-serif; font-weight:500; font-size:13px; letter-spacing:0; text-transform:none; color:var(--text-dim); }
+  .item-grid{ display:grid; grid-template-columns:repeat(auto-fill, 64px); gap:8px; }
+  .item-tile{
+    position:relative; width:64px; height:64px; padding:0; border-radius:6px; overflow:hidden; cursor:pointer;
+    border:2px solid #4f3a72; background:#1a1f2b; transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .item-tile.tier-6{ border-color:#c9a227; }
+  .item-tile:hover, .item-tile:focus-visible{ transform:translateY(-2px); box-shadow:0 6px 18px -6px var(--glow); }
+  .item-tile:focus-visible{ outline:2px solid var(--accent-text); outline-offset:2px; }
+  .item-tile.equipped{ box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+  .item-tile img.icon, .item-tile img.wm{ position:absolute; inset:0; width:100%; height:100%; }
+  .tile-power{ position:absolute; left:0; right:0; bottom:0; padding:1px 4px; font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:700; line-height:1.3; text-align:right; color:#fff; background:rgba(0,0,0,0.78); }
+  .tile-power img{ width:12px; height:12px; float:left; margin-top:2px; }
+  .tile-badge{ position:absolute; top:2px; right:2px; min-width:18px; height:18px; padding:0 3px; border-radius:9px; font-size:12px; font-weight:700; line-height:18px; text-align:center; color:#111; background:#ffd76a; box-shadow:0 0 0 1px rgba(0,0,0,0.5); }
+  .tile-badge.set{ background:#9fe3ff; left:2px; right:auto; }
+  .tile-owner{ position:absolute; top:2px; left:2px; padding:0 4px; border-radius:4px; font-size:12px; font-weight:700; line-height:16px; color:#fff; background:rgba(0,0,0,0.78); }
+  .tile-badge.set + .tile-owner{ top:22px; }
+  .locker-empty{ margin-top:30px; text-align:center; color:var(--text-dim); }
+
+  /* Item details */
+  dialog.item-dialog{
+    width:min(560px, calc(100vw - 24px)); max-height:calc(100vh - 40px); padding:0; border-radius:16px;
+    border:1px solid var(--edge); background:var(--bg); color:var(--text); box-shadow:0 30px 80px -20px rgba(0,0,0,0.7);
+  }
+  dialog.item-dialog::backdrop{ background:rgba(4,6,12,0.66); }
+  .dlg-head{ display:flex; gap:14px; align-items:center; padding:18px 58px 14px 18px; border-bottom:1px solid var(--panel-border); position:relative; }
+  .dlg-icon{ position:relative; width:72px; height:72px; flex-shrink:0; border-radius:8px; overflow:hidden; border:2px solid #4f3a72; }
+  .dlg-icon.tier-6{ border-color:#c9a227; }
+  .dlg-icon img{ position:absolute; inset:0; width:100%; height:100%; }
+  .dlg-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:22px; line-height:1.15; margin:0; }
+  .dlg-type{ font-size:13.5px; color:var(--text-dim); margin-top:3px; }
+  .dlg-meta{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .tag{ font-size:12px; padding:2px 8px; border-radius:999px; border:1px solid var(--panel-border); color:var(--text-dim); }
+  .tag.power{ color:var(--text); font-family:'JetBrains Mono', monospace; font-weight:700; }
+  .dlg-close{ position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:8px; border:1px solid var(--panel-border); background:var(--panel); color:var(--text-dim); font-size:18px; cursor:pointer; }
+  .dlg-body{ padding:16px 18px 20px; overflow-y:auto; }
+  .dlg-section{ margin-top:16px; }
+  .dlg-section:first-child{ margin-top:0; }
+  .dlg-label{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); margin-bottom:8px; }
+  .callout{ padding:10px 12px; border-radius:10px; border:1px solid var(--accent); background:var(--accent-dim); font-size:14px; }
+  .callout a{ color:var(--accent-text); font-weight:600; }
+  .callout .muted{ color:var(--text-dim); }
+  .perk-cols{ display:flex; flex-wrap:wrap; gap:10px; }
+  .perk-col{ display:flex; flex-direction:column; gap:6px; min-width:0; flex:1 1 140px; }
+  .plug{ display:flex; align-items:center; gap:8px; padding:5px 8px 5px 5px; border-radius:8px; border:1px solid var(--panel-border); font-size:13px; color:var(--text); background:var(--panel); }
+  .plug img{ width:26px; height:26px; border-radius:50%; flex-shrink:0; background:#2a3142; }
+  .plug.alt{ color:var(--text-dim); background:transparent; }
+  .plug.ours{ border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+  .plug .ours-mark{ margin-left:auto; color:var(--accent-text); font-weight:700; }
+  .stat-row{ display:grid; grid-template-columns:120px 1fr 34px; align-items:center; gap:10px; font-size:13px; color:var(--text-dim); padding:2px 0; }
+  .stat-bar{ height:6px; border-radius:3px; background:var(--panel-border); overflow:hidden; }
+  .stat-bar i{ display:block; height:100%; background:var(--accent-fill); }
+  .stat-row b{ color:var(--text); font-family:'JetBrains Mono', monospace; text-align:right; }
+
+  @media (max-width:640px){
+    .locker-root{ padding:0 16px 80px; }
+    .owner-grid{ grid-template-columns:repeat(2, 1fr); gap:8px; }
+    .owner-card{ min-height:70px; padding:10px 12px; }
+    .owner-card .owner-name{ font-size:17px; }
+    .item-grid{ grid-template-columns:repeat(auto-fill, 60px); gap:7px; }
+    .item-tile{ width:60px; height:60px; }
+    .locker-count{ margin-left:0; width:100%; }
+    .stat-row{ grid-template-columns:96px 1fr 30px; }
+  }
+</style>
+</head>
+<body data-nav-group="locker">
+
+<div id="site-nav"></div>
+
+<main id="main-content" tabindex="-1">
+
+<div class="hero">
+  <div class="eyebrow">Destiny 2 · Your Gear <span class="preview-tag">Preview</span></div>
+  <h1 class="title">Locker</h1>
+  <p class="subtitle">Every weapon and armor piece across your characters and vault, with our God Roll matches and your armor set progress.</p>
+</div>
+
+<div class="locker-root" id="locker-root">
+  <div id="locker-status" role="status"></div>
+  <div id="locker-app" hidden>
+    <div id="demo-banner"></div>
+    <div class="owner-grid" id="owner-grid" role="group" aria-label="Show gear from"></div>
+
+    <div class="locker-controls">
+      <div class="search-box"><input type="search" id="locker-search" aria-label="Search your gear by name, type or perk" placeholder="Search by name, type or perk…" autocomplete="off"></div>
+      <div class="chip-row" id="locker-chips">
+        <button class="chip" type="button" data-kind="type" data-value="weapons" aria-pressed="false">Weapons</button>
+        <button class="chip" type="button" data-kind="type" data-value="armor" aria-pressed="false">Armor</button>
+        <span class="chip-sep" aria-hidden="true"></span>
+        <button class="chip" type="button" data-kind="flag" data-value="exotic" aria-pressed="false">Exotic</button>
+        <button class="chip" type="button" data-kind="flag" data-value="godroll" aria-pressed="false">★ Our God Rolls</button>
+        <button class="chip" type="button" data-kind="flag" data-value="set" aria-pressed="false">Set pieces</button>
+        <button class="chip" type="button" data-kind="flag" data-value="equipped" aria-pressed="false">Equipped</button>
+        <span class="locker-count" id="locker-count" aria-live="polite"></span>
+      </div>
+    </div>
+
+    <details class="sets-panel" id="sets-panel" open>
+      <summary><span class="section-label">Armor set progress</span><span class="hint" id="sets-hint"></span></summary>
+      <div class="set-grid" id="set-grid"></div>
+    </details>
+
+    <div id="buckets"></div>
+  </div>
+</div>
+
+</main>
+
+<dialog class="item-dialog" id="item-dialog" aria-labelledby="dlg-name"></dialog>
+
+<footer>
+  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
+</footer>
+
+<script src="assets/api-keys.js"></script>
+<script src="assets/oauth.js"></script>
+<script src="assets/god-rolls-data.js"></script>
+<script src="assets/sets-data.js"></script>
+<script src="assets/nav.js"></script>
+<script src="assets/locker.js"></script>
+</body>
+</html>

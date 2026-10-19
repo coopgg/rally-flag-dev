@@ -68,7 +68,8 @@
     NAV_SECTIONS.push({
       label: "Debug",
       items: [
-        { label: "🐞 Debug", href: "debug.html", group: "debug" }
+        { label: "🐞 Debug", href: "debug.html", group: "debug" },
+        { label: "Locker (preview)", href: "locker.html", group: "locker" }
       ]
     });
   }

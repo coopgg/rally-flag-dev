@@ -19,7 +19,9 @@ git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)debug.html' ':(exclude)clan-admin.html' ':(exclude)discord-bot' \
   ':(exclude)api-debug.html' ':(exclude)xur-debug.html' ':(exclude).claude' \
   ':(exclude)skills-lock.json' ':(exclude).gitignore' ':(exclude)tools' \
-  ':(exclude)tests' ':(exclude).github' > /tmp/promote.patch
+  ':(exclude)tests' ':(exclude).github' ':(exclude)locker.html' \
+  ':(exclude)assets/locker.js' ':(exclude)assets/locker-worker.js' \
+  ':(exclude)assets/locker-demo.json' > /tmp/promote.patch
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
@@ -93,6 +95,18 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   stay `align-items:start` and reserve the variable bits instead (fixed line
   counts / min-heights). New card content that can vary in length needs the
   same treatment or the grid stops matching.
+- **Locker (dev-only preview).** `locker.html` + `assets/locker.js` show the
+  signed-in player's weapons/armor (one GetProfile call) with God Roll
+  matches and armor set progress. `assets/locker-worker.js` downloads
+  Bungie's DestinyInventoryItemLiteDefinition (~3MB gz), trims it to ~6MB
+  and caches it in IndexedDB per manifest version. Armor sets join Bungie's
+  DestinyEquipableItemSetDefinition to sets-data.js by name or slug.
+  `locker.html?demo` uses `assets/locker-demo.json`, built by
+  `node --max-old-space-size=6144 tools/build-locker-demo.js <manifest dir>`
+  from real hashes (needs the full item, plug set, item set and stat
+  tables). Linked from nav.js's Debug section (hidden on rallyflag.gg); its
+  four files are excluded from promotion. Stage 1 is read-only; moving/
+  equipping needs the app's OAuth "move/equip" scope (owner, bungie.net).
 - **`404.html`** is served for any missing path at any depth; it sets `<base>`
   to the site root and writes its asset tags from script. Keep that pattern.
 

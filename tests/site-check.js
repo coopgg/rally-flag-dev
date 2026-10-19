@@ -47,8 +47,13 @@ const TYPES = { ".html": "text/html", ".js": "application/javascript", ".css": "
 
 // Dev-only tools and pages that need OAuth parameters aren't public pages.
 const SKIP = new Set(["debug.html", "api-debug.html", "xur-debug.html", "clan-admin.html", "oauth-callback.html"]);
+// Public-looking pages that only exist on dev (linked from nav.js's Debug
+// section, which rallyflag.gg hides). Checked on dev; absent on prod.
+const DEV_ONLY = new Set(["locker.html"]);
 let pages = fs.readdirSync(ROOT).filter(f => f.endsWith(".html") && !SKIP.has(f)).sort();
 pages.push("no/such/page"); // served by 404.html, like GitHub Pages
+// The Locker's sample-data view renders the whole app without a sign-in.
+if (fs.existsSync(path.join(ROOT, "assets", "locker-demo.json"))) pages.push("locker.html?demo");
 
 // Live-mode HTTP requests (honours HTTPS_PROXY, unlike Node's fetch).
 let http = null;
@@ -115,6 +120,8 @@ async function newContext(browser, combo, opts = {}){
 
 async function settle(page){
   await page.waitForFunction(() => !document.documentElement.classList.contains("rf-boot"), null, { timeout: 5000 }).catch(() => {});
+  // The Locker's sample view downloads Bungie's item database first.
+  if (page.url().includes("locker.html?demo")) await page.waitForSelector("#locker-app:not([hidden])", { timeout: 30000 }).catch(() => {});
   await page.waitForTimeout(1200);
 }
 
@@ -302,7 +309,7 @@ async function checkLinks(links){
     }
     // On the prod clone, nav.js's Debug entry still renders (we serve it at
     // the dev host); on rallyflag.gg it's hidden, so dev-only pages are fine.
-    if (process.env.SITE_ROOT && SKIP.has(file)) continue;
+    if (process.env.SITE_ROOT && (SKIP.has(file) || DEV_ONLY.has(file))) continue;
     if (!fs.existsSync(path.join(ROOT, file))) missing.add(from + " → " + href);
   }
   record(`internal links point at real pages (${links.length} links checked)`, !missing.size, [...missing].slice(0, 10).join("; "));

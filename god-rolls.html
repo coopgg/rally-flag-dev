@@ -799,6 +799,14 @@
       wireAltRollToggle(weapon);
     }
     initFilters();
+    // god-rolls.html#weapon-<slug> (the Locker links here) opens and
+    // scrolls to that card; the cards are built by script, so the
+    // browser's own jump to the anchor happens too early.
+    const linked = location.hash.startsWith("#weapon-") && document.getElementById(location.hash.slice(1));
+    if (linked){
+      linked.classList.add("expanded");
+      linked.scrollIntoView({ block: "start" });
+    }
     updateExpandAllLabel();
 
     document.getElementById("expand-all-btn").addEventListener("click", () => {
