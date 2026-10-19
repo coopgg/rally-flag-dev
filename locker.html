@@ -164,12 +164,16 @@
   /* --tile: item size. Phones fill the row like DIM: equipped + 4 inventory. */
   .locker-root{ --tile:64px; --tile-gap:8px; --bar:17px; }
   .item-grid{ display:grid; grid-template-columns:repeat(auto-fill, var(--tile)); gap:var(--tile-gap); }
+  /* Square, like DIM, and no hover animation: with a full vault (1,000+
+     tiles) Firefox built a rounded clip mask per tile and repainted the
+     lift-and-glow on every pass of the mouse, which made scrolling lag
+     (frames >34ms 39 → 6-9 in Firefox with 1,254 tiles). */
   .item-tile{
-    position:relative; width:var(--tile); height:var(--tile); padding:0; border-radius:6px; overflow:hidden; cursor:pointer;
-    border:2px solid #4f3a72; background:#1a1f2b; transition: transform 0.12s ease, box-shadow 0.12s ease;
+    position:relative; width:var(--tile); height:var(--tile); padding:0; overflow:hidden; cursor:pointer;
+    border:2px solid #4f3a72; background:#1a1f2b;
   }
   .item-tile.tier-6{ border-color:#c9a227; }
-  .item-tile:hover, .item-tile:focus-visible{ transform:translateY(-2px); box-shadow:0 6px 18px -6px var(--glow); }
+  .item-tile:hover{ outline:2px solid var(--accent); outline-offset:2px; }
   .item-tile:focus-visible{ outline:2px solid var(--accent-text); outline-offset:2px; }
   .item-tile.equipped{ box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
   .item-tile img.icon, .item-tile img.wm, .item-tile img.ov{ position:absolute; inset:0; width:100%; height:100%; }
@@ -190,7 +194,7 @@
   .char-slot{ display:flex; align-items:flex-start; gap:14px; }
   .slot-equipped{ flex:none; padding-right:14px; border-right:1px dashed var(--panel-border); }
   .slot-inv{ flex:1; min-width:0; }
-  .tile-empty{ display:block; width:var(--tile); height:var(--tile); border:2px dashed var(--panel-border); border-radius:6px; }
+  .tile-empty{ display:block; width:var(--tile); height:var(--tile); border:2px dashed var(--panel-border); }
   .slot-count.full::after{ content:" · full"; color:#e5534b; }
   [data-mode="light"] .slot-count.full::after{ color:#b42318; }
   .sr-only{ position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
@@ -328,7 +332,7 @@
   .pm-chip.nearly-full{ color:var(--text); font-weight:600; }
   .pm-chip.nearly-full > span:first-child::before{ content:""; display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%; background:#e5534b; box-shadow:0 0 8px #e5534b; }
   .bucket.postmaster:has(.nearly-full){ border-color:#d9534f; }
-  .pm-all{ padding:3px 10px; border-radius:999px; border:1px solid var(--accent); background:none; color:var(--accent-text); font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.04em; cursor:pointer; }
+  .pm-all{ min-height:24px; padding:3px 10px; border-radius:999px; border:1px solid var(--accent); background:none; color:var(--accent-text); font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.04em; cursor:pointer; }
   .pm-all:hover{ background:var(--accent-dim); }
   .pm-body{ display:flex; flex-wrap:wrap; gap:10px 24px; margin-top:10px; }
   .pm-body[hidden]{ display:none; }
