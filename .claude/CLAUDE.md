@@ -117,6 +117,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   After every action the profile re-syncs on its own (1.5s debounce).
   Farming mode (per character, sessionStorage) runs every 45s while the
   tab is visible: inventory over 7 per slot and postmaster gear go to the vault.
+  Junk cleanup sends vault Junk to a character's free spaces (and turns that
+  character's farming off).
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

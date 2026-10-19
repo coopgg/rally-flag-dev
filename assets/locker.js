@@ -188,7 +188,7 @@
   function buildModel(){
     const chars = data(PROFILE, "characters");
     const order = (PROFILE.profile && PROFILE.profile.data && PROFILE.profile.data.characterIds) || Object.keys(chars);
-    OWNERS = order.filter(id => chars[id]).map(id => ({ id, cls: chars[id].classType, name: CLASS_NAMES[chars[id].classType] || "Guardian", light: chars[id].light, bg: chars[id].emblemBackgroundPath, emblem: chars[id].emblemPath }));
+    OWNERS = order.filter(id => chars[id]).map(id => ({ id, played: Date.parse(chars[id].dateLastPlayed) || 0, cls: chars[id].classType, name: CLASS_NAMES[chars[id].classType] || "Guardian", light: chars[id].light, bg: chars[id].emblemBackgroundPath, emblem: chars[id].emblemPath }));
     const user = (PROFILE.profile && PROFILE.profile.data && PROFILE.profile.data.userInfo) || {};
     MEMBERSHIP_TYPE = user.membershipType || (chars[OWNERS[0] && OWNERS[0].id] || {}).membershipType || 0;
 
@@ -289,6 +289,34 @@
     ]);
     $("owner-grid").innerHTML = cards.join("");
     renderFarm();
+    renderJunk();
+  }
+
+  // ---------------- junk cleanup ----------------
+  // Send the vault's Junk-tagged items to a character to dismantle in game.
+  // Fills only that character's free spaces per slot; the rest wait in the vault.
+  function junkPlan(charId){
+    const moves = [];
+    let left = 0;
+    for (const b of BUCKETS){
+      const junk = ITEMS.filter(i => i.owner === "vault" && TAGS[i.id] === "junk" && i.def.b === b.hash);
+      const free = INVENTORY_CAP - ITEMS.filter(i => i.owner === charId && !i.equipped && i.def.b === b.hash).length;
+      const n = Math.max(0, Math.min(free, junk.length));
+      moves.push(...junk.slice(0, n));
+      left += junk.length - n;
+    }
+    return { moves, left };
+  }
+  function renderJunk(){
+    const row = $("junk-row");
+    if (!row) return;
+    const n = ITEMS.filter(i => i.owner === "vault" && TAGS[i.id] === "junk").length;
+    // The character played most recently first: that's usually who's online.
+    const byPlayed = OWNERS.slice().sort((a, b) => b.played - a.played);
+    row.innerHTML = '<span class="farm-label">Junk cleanup</span>' +
+      (n ? '<span class="farm-note">' + n + " junk in the vault. Send to:</span>" +
+        byPlayed.map((o, k) => '<button type="button" class="farm-btn junk-btn" data-junk-to="' + o.id + '">' + ICON_TRASH + esc(o.name) + (k === 0 && byPlayed.length > 1 ? " · last played" : "") + "</button>").join("")
+      : '<span class="farm-note">No junk in the vault. Tag items as Junk (trash icon) to send them to a character for dismantling.</span>');
   }
 
   // ---------------- farming mode ----------------
@@ -809,7 +837,7 @@
     // Tags are local (no Bungie call), so they apply instantly.
     dlg.querySelectorAll("[data-tag]").forEach(b => b.addEventListener("click", () => {
       toggleTag(item.id, b.dataset.tag);
-      renderItems();
+      renderItems(); renderJunk();
       openItem(item.id);
       const again = dlg.querySelector('[data-tag="' + b.dataset.tag + '"]');
       if (again) again.focus();
@@ -936,6 +964,21 @@
       saveFarm(); setFarmTimer(); renderFarm();
       $("farm-row").querySelector('[data-farm="' + id + '"]').focus();
       if (farming.has(id)) farmTick(); // first check right away
+    });
+    $("junk-row").addEventListener("click", e => {
+      const b = e.target.closest("[data-junk-to]");
+      if (!b || busyNotice()) return;
+      const charId = b.dataset.junkTo, who = ownerLabel(charId), { moves, left } = junkPlan(charId);
+      if (!moves.length) return toast("Your " + who + " has no free inventory space in those slots. Dismantle or move a few things first.", "error");
+      // Farming would send them straight back to the vault.
+      const paused = farming.delete(charId);
+      if (paused){ farmNote = ""; saveFarm(); setFarmTimer(); }
+      const locked = moves.filter(i => i.state & STATE_LOCKED).length;
+      const done = "Sent " + moves.length + " junk to your " + who + "." +
+        (left ? " " + left + " more didn't fit: dismantle these, then send again." : "") +
+        (locked ? " " + locked + (locked === 1 ? " is" : " are") + " locked: unlock before dismantling." : "") +
+        (paused ? " Farming on your " + who + " is off so it doesn't send them back." : "");
+      run("Sending " + moves.length + " junk to your " + who, done, async () => { for (const i of moves) await moveTo(i, charId); });
     });
     // Coming back to the tab: catch up once.
     document.addEventListener("visibilitychange", () => { if (!document.hidden && farming.size) farmTick(); });
