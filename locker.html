@@ -209,6 +209,10 @@
   .bucket.folded .bucket-toggle .chev{ transform:rotate(-45deg); }
   .bucket-toggle:hover{ color:var(--accent-text); }
   .owner-group.clipped .item-tile:nth-child(n+13){ display:none; }
+  /* Searching (applySearch): vault previews open up, empty rows/slots hide */
+  #buckets.searching .owner-group.clipped .item-tile:not([hidden]){ display:block; }
+  #buckets.searching .vault-more{ display:none; }
+  .bucket[hidden], .vault-class[hidden], .locker-empty[hidden]{ display:none; }
   .vault-more, .fold-all{ margin-top:8px; padding:4px 0; border:0; background:none; color:var(--accent-text); font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
   .fold-all{ margin-top:0; }
   .group-empty{ color:var(--text-dim); font-size:13px; }

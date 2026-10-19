@@ -458,6 +458,8 @@
     }).join("");
   }
 
+  // Owner, type and chip filters decide which tiles get built; the search
+  // text doesn't (applySearch hides and shows built tiles instead).
   function matches(item){
     if (!isWide() && item.owner !== state.focus) return false;
     const bucket = BUCKET_BY_HASH.get(item.def.b);
@@ -468,8 +470,33 @@
     if (state.flags.has("equipped") && !item.equipped) return false;
     if (state.flags.has("favorite") && TAGS[item.id] !== "favorite") return false;
     if (state.flags.has("junk") && TAGS[item.id] !== "junk") return false;
-    if (state.q && !state.q.split(/\s+/).every(w => item.text.includes(w))) return false;
     return true;
+  }
+
+  // Search hides and shows the tiles already on the page instead of
+  // rebuilding them (a rebuild of ~1,250 tiles took 200-290ms per keystroke
+  // in Firefox). Slots and class rows left empty hide too, the counts follow
+  // what's visible, and vault previews open up so no match stays clipped.
+  function applySearch(){
+    const root = $("buckets"), words = state.q ? state.q.split(/\s+/) : [];
+    const byId = new Map(ITEMS.map(i => [i.id, i]));
+    let shown = 0;
+    root.querySelectorAll(".item-tile[data-id]").forEach(t => {
+      const item = byId.get(t.dataset.id);
+      const hit = !words.length || !!(item && words.every(w => item.text.includes(w)));
+      if (t.hidden === hit) t.hidden = !hit; // touch only tiles that change
+      if (hit) shown++;
+    });
+    root.classList.toggle("searching", words.length > 0);
+    const visible = el => el.querySelectorAll(".item-tile[data-id]:not([hidden])").length;
+    root.querySelectorAll(".vault-class").forEach(r => { r.hidden = words.length > 0 && !visible(r); });
+    root.querySelectorAll(".bucket:not(.postmaster)").forEach(sec => {
+      sec.hidden = words.length > 0 && !visible(sec);
+      sec.querySelectorAll(".vis-count").forEach(c => { c.textContent = visible(c.closest(".owner-group") || sec); });
+    });
+    const empty = $("search-empty");
+    if (empty) empty.hidden = !(words.length && !shown);
+    $("locker-count").textContent = "Showing " + shown + " of " + $("locker-count").dataset.total + " items";
   }
 
   function tileHtml(item){
@@ -495,6 +522,7 @@
   const WIDE = window.matchMedia("(min-width: 1100px)");
   const isWide = () => WIDE.matches;
   function renderItems(){ isWide() ? renderAll() : renderOne(); }
+  const SEARCH_EMPTY = '<p class="locker-empty" id="search-empty" hidden>Nothing matches this search.</p>';
 
   // Everyone (DIM desktop): per slot, a row of character cells lined up
   // under their cards (equipped item, then inventory), then that slot's
@@ -503,7 +531,7 @@
     const shown = ITEMS.filter(matches);
     const isJunk = i => TAGS[i.id] === "junk" ? 1 : 0;
     const byPower = (x, y) => (y.equipped - x.equipped) || (isJunk(x) - isJunk(y)) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
-    const filtering = !!(state.q || state.type || state.flags.size);
+    const filtering = !!(state.type || state.flags.size);
     const slot = b => {
       const items = shown.filter(i => i.def.b === b.hash).sort(byPower);
       if (filtering && !items.length) return "";
@@ -523,18 +551,19 @@
       const groups = b.kind === "armor"
         ? [3].concat(OWNERS.map(o => o.cls)).map(c => ({ c, list: vault.filter(i => i.def.c === c) })).filter(g => g.list.length)
         : [{ c: null, list: vault }];
-      const vaultHtml = '<div class="owner-group vault vault-all" data-owner="vault"><div class="group-label">Vault · ' + vault.length + "</div>" +
+      const vaultHtml = '<div class="owner-group vault vault-all" data-owner="vault"><div class="group-label">Vault · <span class="vis-count">' + vault.length + "</span></div>" +
         (vault.length ? groups.map(g => '<div class="vault-class">' + (g.c === null ? "" : '<span class="vault-class-label">' + (g.c === 3 ? "Any class" : esc(CLASS_NAMES[g.c] || "")) + "</span>") +
           '<div class="item-grid">' + g.list.map(tileHtml).join("") + "</div></div>").join("") : '<div class="group-empty">Nothing here.</div>') + "</div>";
       const folded = folds.slots.has(b.hash);
       return '<section class="bucket" aria-labelledby="b-' + b.hash + '">' +
         '<h2 id="b-' + b.hash + '"><button type="button" class="bucket-toggle" data-slot="' + b.hash + '" aria-expanded="' + !folded + '" aria-controls="bb-' + b.hash + '">' +
-          '<span class="chev" aria-hidden="true"></span>' + b.label + " <span>" + items.length + "</span></button></h2>" +
+          '<span class="chev" aria-hidden="true"></span>' + b.label + ' <span class="vis-count">' + items.length + "</span></button></h2>" +
         '<div class="slot-body" id="bb-' + b.hash + '"' + (folded ? " hidden" : "") + '><div class="all-chars" style="--n:' + OWNERS.length + '">' + cells + "</div>" + vaultHtml + "</div></section>";
     };
     const html = BUCKETS.filter(b => !state.type || state.type === b.kind).map(slot).join("");
-    $("buckets").innerHTML = postmasterHtml() + (html || '<p class="locker-empty">Nothing matches these filters.</p>');
-    $("locker-count").textContent = "Showing " + shown.length + " of " + ITEMS.length + " items";
+    $("buckets").innerHTML = postmasterHtml() + (html || '<p class="locker-empty">Nothing matches these filters.</p>') + SEARCH_EMPTY;
+    $("locker-count").dataset.total = ITEMS.length;
+    applySearch();
     $("fold-all").textContent = BUCKETS.every(b => folds.slots.has(b.hash)) ? "Expand all" : "Collapse all";
   }
 
@@ -548,14 +577,14 @@
     const byPower = (x, y) => (y.equipped - x.equipped) || (isJunk(x) - isJunk(y)) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
     // Long vault lists show a preview, but never while searching or
     // filtering, so a match can't end up hidden.
-    const filtering = !!(state.q || state.type || state.flags.size);
+    const filtering = !!(state.type || state.flags.size);
     const slot = b => {
       const items = shown.filter(i => i.def.b === b.hash).sort(byPower);
       if (filtering && !items.length) return "";
       let count, full = false, body;
       if (vault){
         const long = !filtering && items.length > VAULT_PREVIEW, open = folds.vaults.has(b.hash);
-        count = items.length;
+        count = '<span class="vis-count">' + items.length + "</span>";
         body = '<div class="owner-group vault' + (long && !open ? " clipped" : "") + '" data-owner="vault">' +
           (items.length ? '<div class="item-grid" id="vg-' + b.hash + '">' + items.map(tileHtml).join("") + "</div>" : '<div class="group-empty">Nothing here.</div>') +
           (long ? '<button type="button" class="vault-more" data-slot="' + b.hash + '" aria-expanded="' + open + '" aria-controls="vg-' + b.hash + '">' + (open ? "Show less" : "Show all " + items.length) + "</button>" : "") + "</div>";
@@ -576,8 +605,9 @@
     const cols = ["weapons", "armor"].filter(k => !state.type || state.type === k)
       .map(k => BUCKETS.filter(b => b.kind === k).map(slot).join("")).filter(Boolean)
       .map(h => '<div class="slot-col">' + h + "</div>").join("");
-    $("buckets").innerHTML = postmasterHtml() + (cols ? '<div class="slot-cols">' + cols + "</div>" : '<p class="locker-empty">Nothing matches these filters.</p>');
-    $("locker-count").textContent = "Showing " + shown.length + " of " + ITEMS.filter(i => i.owner === owner).length + " items";
+    $("buckets").innerHTML = postmasterHtml() + (cols ? '<div class="slot-cols">' + cols + "</div>" : '<p class="locker-empty">Nothing matches these filters.</p>') + SEARCH_EMPTY;
+    $("locker-count").dataset.total = ITEMS.filter(i => i.owner === owner).length;
+    applySearch();
     $("fold-all").textContent = BUCKETS.every(b => folds.slots.has(b.hash)) ? "Expand all" : "Collapse all";
   }
 
@@ -1004,7 +1034,7 @@
     let t = 0;
     $("locker-search").addEventListener("input", e => {
       clearTimeout(t);
-      t = setTimeout(() => { state.q = e.target.value.trim().toLowerCase(); renderItems(); }, 120);
+      t = setTimeout(() => { state.q = e.target.value.trim().toLowerCase(); applySearch(); }, 120);
     });
     $("buckets").addEventListener("click", e => {
       const pmTile = e.target.closest("[data-pm]");
