@@ -279,7 +279,7 @@
   .act-btn.current{ color:var(--text-dim); border-style:dashed; cursor:default; box-shadow:none; }
   .act-btn.lock{ margin-left:auto; padding-left:11px; }
   .act-btn.lock[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
-  body.locker-busy .act-btn, body.locker-busy .pm-all{ opacity:0.55; cursor:progress; }
+  body.locker-busy .act-btn, body.locker-busy .pm-all{ border-style:dashed; cursor:progress; } /* no fade: text keeps its contrast */
   /* Status messages */
   .locker-toast{
     position:fixed; left:50%; bottom:20px; z-index:1000; max-width:min(520px, calc(100vw - 32px)); transform:translate(-50%, 20px);
@@ -317,7 +317,25 @@
   .tile-badges{ position:absolute; top:2px; right:2px; display:flex; gap:2px; }
   .tile-badges .tile-badge{ position:static; }
   .tile-badge.fav{ background:#ff8fb1; }
-  .tile-badge.junk{ background:#c9ced8; }
+  .tile-badge.junk{ background:#c9ced8; display:flex; align-items:center; justify-content:center; }
+  .tile-badge.junk .ico{ width:12px; height:12px; stroke-width:2.4; }
+  .ico{ flex-shrink:0; vertical-align:-3px; }
+  .chip .ico{ vertical-align:-2px; }
+  .act-btn .ico{ width:16px; height:16px; }
+  .act-btn.icon-only{ width:36px; padding:0; justify-content:center; }
+  /* Farming mode */
+  .farm-row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; margin-top:12px; }
+  .farm-label{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
+  .farm-btn{ padding:5px 12px; border-radius:999px; border:1px solid var(--panel-border); background:var(--panel); color:var(--text-dim); font:inherit; font-size:13px; cursor:pointer; }
+  .farm-btn[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; box-shadow:0 0 14px -4px var(--glow); }
+  .farm-btn[aria-pressed="true"]::before{ content:""; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:currentColor; animation:toast-pulse 0.9s ease-in-out infinite alternate; }
+  .farm-note{ font-size:13px; color:var(--text-dim); }
+  /* Character columns: equipped on its own row, then the inventory */
+  .equip-row{ display:flex; align-items:center; gap:10px; padding-bottom:8px; margin-bottom:8px; border-bottom:1px dashed var(--panel-border); }
+  .equip-label, .inv-label{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-dim); }
+  .inv-label{ margin-bottom:6px; }
+  .inv-label.full{ color:var(--text); }
+  .inv-label.full::after{ content:" · full"; color:#e5534b; }
   .item-tile.tag-junk img.icon{ filter:grayscale(1) brightness(0.55); }
   .act-btn.tag{ padding-left:11px; }
   .act-btn.tag[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
@@ -358,6 +376,7 @@
   <div id="locker-app" hidden>
     <div id="demo-banner"></div>
     <div class="owner-grid" id="owner-grid" role="group" aria-label="Show only gear from (tap again to show everything)"></div>
+    <div class="farm-row" id="farm-row" role="group" aria-label="Farming mode"></div>
 
     <div class="view-tabs" role="tablist" aria-label="Locker views">
       <button class="view-tab" type="button" role="tab" id="tab-gear" aria-controls="view-gear" aria-selected="true">Gear</button>
@@ -376,7 +395,7 @@
         <button class="chip" type="button" data-kind="flag" data-value="set" aria-pressed="false">Set pieces</button>
         <button class="chip" type="button" data-kind="flag" data-value="equipped" aria-pressed="false">Equipped</button>
         <button class="chip" type="button" data-kind="flag" data-value="favorite" aria-pressed="false">♥ Favorites</button>
-        <button class="chip" type="button" data-kind="flag" data-value="junk" aria-pressed="false">Junk</button>
+        <button class="chip" type="button" data-kind="flag" data-value="junk" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg> Junk</button>
         <span class="locker-count" id="locker-count" aria-live="polite"></span>
         <button type="button" class="fold-all" id="locker-refresh">Refresh</button>
         <button type="button" class="fold-all" id="fold-all">Collapse all</button>

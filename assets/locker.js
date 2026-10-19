@@ -42,6 +42,12 @@
   const SHOW_PLUG = /trait|intrinsic|magazine|barrel|battery|sight|scope|haft|stock|bowstring|arrow|blade|guard|grip|frame|archetype|armor perk|mod$|tuning/i;
   const HIDE_PLUG = /shader|ornament|memento|flair|tracker|restore|deprecated|transmat|emote/i;
 
+  // Small line icons (stroke follows the text colour).
+  const svg = d => '<svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + "</svg>";
+  const ICON_TRASH = svg('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>');
+  const ICON_LOCK = svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>');
+  const ICON_UNLOCK = svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>');
+  const INVENTORY_CAP = 9; // Bungie: 9 unequipped items per weapon/armor slot on a character
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const img = p => p ? (p.charAt(0) === "/" ? BUNGIE + p : p) : "";
@@ -282,6 +288,63 @@
       '<button type="button" class="owner-card vault" data-owner="vault" aria-pressed="' + state.owners.has("vault") + '"><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span></button>"
     ]);
     $("owner-grid").innerHTML = cards.join("");
+    renderFarm();
+  }
+
+  // ---------------- farming mode ----------------
+  // Per character, while this tab is open and visible: every 45 seconds,
+  // re-sync, move extras to the vault so each weapon/armor slot keeps
+  // 2 free spaces (junk first, then unlocked, lowest power first; never
+  // equipped items), and pull weapons/armor from the postmaster when
+  // there's room (then on to the vault), so new drops don't land in (and
+  // overflow) the postmaster.
+  // Kept in sessionStorage: closing the tab turns it off.
+  const FARM_KEY = "rallyflag_locker_farming", FARM_EVERY = 45000, FARM_KEEP = INVENTORY_CAP - 2;
+  const farming = (() => { try { return new Set(JSON.parse(sessionStorage.getItem(FARM_KEY) || "[]")); } catch (e){ return new Set(); } })();
+  let farmTimer = 0, farmNote = "";
+  function saveFarm(){ try { sessionStorage.setItem(FARM_KEY, JSON.stringify([...farming])); } catch (e){} }
+  function renderFarm(){
+    const row = $("farm-row");
+    if (!row) return;
+    row.innerHTML = '<span class="farm-label">Farming mode</span>' +
+      OWNERS.map(o => '<button type="button" class="farm-btn" data-farm="' + o.id + '" aria-pressed="' + farming.has(o.id) + '">' + esc(o.name) + "</button>").join("") +
+      '<span class="farm-note" id="farm-note" aria-live="polite">' + esc(farming.size ? farmNote || "Keeping 2 free spaces per slot; checks every 45s while this page is open." : "Keeps inventory and postmaster from filling up while you play.") + "</span>";
+  }
+  function setFarmTimer(){
+    clearInterval(farmTimer);
+    if (farming.size) farmTimer = setInterval(farmTick, FARM_EVERY);
+  }
+  // What farming would do for one character right now.
+  function farmPlan(charId){
+    const moves = [], pulls = [];
+    for (const b of BUCKETS){
+      const inv = ITEMS.filter(i => i.owner === charId && !i.equipped && i.def.b === b.hash);
+      const extra = inv.length - FARM_KEEP;
+      if (extra > 0){
+        const order = (x, y) => ((TAGS[y.id] === "junk") - (TAGS[x.id] === "junk")) || ((x.state & STATE_LOCKED) - (y.state & STATE_LOCKED)) ||
+          ((TAGS[x.id] === "favorite") - (TAGS[y.id] === "favorite")) || (x.power - y.power);
+        moves.push(...inv.sort(order).slice(0, extra));
+      }
+    }
+    // Postmaster weapons/armor: pulled and sent straight on to the vault, so
+    // the 2 free spaces stay free. At most 10 a round keeps a round short.
+    pulls.push(...POSTMASTER.filter(p => p.owner === charId && p.gear).slice(0, 10));
+    return { moves, pulls };
+  }
+  async function farmTick(){
+    if (!farming.size || document.hidden || isBusy()) return;
+    await sync();
+    for (const charId of farming){
+      const { moves, pulls } = farmPlan(charId), who = ownerLabel(charId);
+      if (!moves.length && !pulls.length) continue;
+      const parts = [moves.length ? "moved " + moves.length + " to the vault" : "", pulls.length ? "sent " + pulls.length + " from the postmaster to the vault" : ""].filter(Boolean).join(", ");
+      farmNote = "Last check: " + who + " " + parts + ".";
+      await run("Farming on your " + who + ": making room", "Farming on your " + who + ": " + parts + ".", async () => {
+        for (const i of moves) await moveTo(i, "vault");
+        for (const p of pulls){ await pull(p); await moveTo(p.gear, "vault"); }
+      });
+    }
+    renderFarm();
   }
 
   function setStatus(p){
@@ -338,7 +401,7 @@
       (d.w ? '<img class="wm" src="' + esc(img(d.w)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (item.set ? '<span class="tile-badge set" aria-hidden="true">' + item.setProgress.slots.size + "</span>" : "") +
       (item.roll && item.roll.full || tag ? '<span class="tile-badges" aria-hidden="true">' + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
-        (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag === "junk" ? '<span class="tile-badge junk">✕</span>' : "") + "</span>" : "") +
+        (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag === "junk" ? '<span class="tile-badge junk">' + ICON_TRASH + "</span>" : "") + "</span>" : "") +
       '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") + (item.power || "") + "</span>" +
     "</button>";
   }
@@ -363,9 +426,19 @@
         const items = inSlot.filter(i => i.owner === g).sort(byPower);
         const long = g === "vault" && !filtering && items.length > VAULT_PREVIEW;
         const open = folds.vaults.has(b.hash);
+        // Characters: the equipped item on its own row, then the inventory
+        // with its count against Bungie's 9-per-slot limit. Vault: one grid.
+        let body;
+        if (g === "vault") body = items.length ? '<div class="item-grid" id="vg-' + b.hash + "-" + g + '">' + items.map(tileHtml).join("") + "</div>" : '<div class="group-empty">—</div>';
+        else {
+          const eq = items.filter(i => i.equipped), inv = items.filter(i => !i.equipped);
+          const invTotal = ITEMS.filter(i => i.owner === g && !i.equipped && i.def.b === b.hash).length; // filters don't change how full it is
+          body = (eq.length ? '<div class="equip-row"><div class="item-grid">' + eq.map(tileHtml).join("") + '</div><span class="equip-label">Equipped</span></div>' : "") +
+            '<div class="inv-label' + (invTotal >= INVENTORY_CAP ? " full" : "") + '">Inventory ' + invTotal + "/" + INVENTORY_CAP + "</div>" +
+            (inv.length ? '<div class="item-grid">' + inv.map(tileHtml).join("") + "</div>" : "");
+        }
         return '<div class="owner-group' + (g === "vault" ? " vault" : "") + (items.length ? "" : " empty") + (long && !open ? " clipped" : "") + '" data-owner="' + g + '">' +
-          '<div class="group-label">' + esc(ownerLabel(g)) + " · " + items.length + "</div>" +
-          (items.length ? '<div class="item-grid" id="vg-' + b.hash + "-" + g + '">' + items.map(tileHtml).join("") + "</div>" : '<div class="group-empty">—</div>') +
+          '<div class="group-label">' + esc(ownerLabel(g)) + (g === "vault" ? " · " + items.length : "") + "</div>" + body +
           (long ? '<button type="button" class="vault-more" data-slot="' + b.hash + '" aria-expanded="' + open + '" aria-controls="vg-' + b.hash + "-" + g + '">' + (open ? "Show less" : "Show all " + items.length) + "</button>" : "") +
           "</div>";
       }).join("");
@@ -702,10 +775,11 @@
     const actions = '<div class="dlg-actions">' +
       '<div class="act-row"><span class="act-label">Equip</span>' + OWNERS.filter(o => classOk(item, o.id)).map(o => ownerBtn(o, "equip", item.owner === o.id && item.equipped)).join("") + "</div>" +
       '<div class="act-row"><span class="act-label">Move</span>' + OWNERS.concat([{ id: "vault", name: "Vault" }]).map(o => ownerBtn(o, "move", item.owner === o.id)).join("") +
-        '<button type="button" class="act-btn lock" data-act="lock" aria-pressed="' + !!(item.state & STATE_LOCKED) + '">' + (item.state & STATE_LOCKED ? "Locked" : "Lock") + "</button></div>" +
+        // Icon shows what a tap does: a closed lock locks it, an open lock unlocks it.
+        '<button type="button" class="act-btn lock icon-only" data-act="lock" aria-label="' + (item.state & STATE_LOCKED ? "Unlock (it's locked)" : "Lock") + '" title="' + (item.state & STATE_LOCKED ? "Unlock" : "Lock") + '">' + (item.state & STATE_LOCKED ? ICON_UNLOCK : ICON_LOCK) + "</button></div>" +
       '<div class="act-row"><span class="act-label">Tag</span>' +
         '<button type="button" class="act-btn tag" data-tag="favorite" aria-pressed="' + (TAGS[item.id] === "favorite") + '">♥ Favorite</button>' +
-        '<button type="button" class="act-btn tag" data-tag="junk" aria-pressed="' + (TAGS[item.id] === "junk") + '">✕ Junk</button></div></div>';
+        '<button type="button" class="act-btn tag" data-tag="junk" aria-pressed="' + (TAGS[item.id] === "junk") + '">' + ICON_TRASH + "Junk</button></div></div>";
     const blocks = [
       notes ? '<div class="rf-notes">' + notes + "</div>" : "",
       stats ? label("Stats") + stats : "",
@@ -853,6 +927,18 @@
       const to = g.dataset.owner, where = to === "vault" ? "the vault" : "your " + ownerLabel(to);
       if (!busyNotice()) run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to), null, item);
     });
+    $("farm-row").addEventListener("click", e => {
+      const b = e.target.closest("[data-farm]");
+      if (!b) return;
+      const id = b.dataset.farm;
+      farming.has(id) ? farming.delete(id) : farming.add(id);
+      farmNote = "";
+      saveFarm(); setFarmTimer(); renderFarm();
+      $("farm-row").querySelector('[data-farm="' + id + '"]').focus();
+      if (farming.has(id)) farmTick(); // first check right away
+    });
+    // Coming back to the tab: catch up once.
+    document.addEventListener("visibilitychange", () => { if (!document.hidden && farming.size) farmTick(); });
     $("locker-refresh").addEventListener("click", async () => {
       if (busyNotice()) return;
       toast("Refreshing from Bungie…", "busy");
@@ -902,6 +988,7 @@
       wire();
       render();
       resolvePostmasterNames();
+      setFarmTimer();
       if (location.hash === "#sets") showView("sets");
       window.addEventListener("hashchange", () => showView(location.hash === "#sets" ? "sets" : "gear"));
     } catch (e){

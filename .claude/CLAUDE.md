@@ -115,6 +115,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   profile minted before it (older of response/secondary minted stamps);
   DestinyItemNotFound triggers a one-item GetItem lookup and one retry.
   After every action the profile re-syncs on its own (1.5s debounce).
+  Farming mode (per character, sessionStorage) runs every 45s while the
+  tab is visible: inventory over 7 per slot and postmaster gear go to the vault.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.
