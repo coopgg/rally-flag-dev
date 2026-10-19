@@ -380,10 +380,9 @@ body::before{
     radial-gradient(1.5px 1.5px at 55% 30%, var(--star-dim) 50%, transparent 51%);
   background-size:420px 420px, 520px 520px, 610px 610px, 380px 380px, 470px 470px, 690px 690px;
 }
-@media (prefers-reduced-motion: no-preference){
-  body::before{ animation: star-twinkle 7s ease-in-out infinite alternate; }
-}
-@keyframes star-twinkle{ from{ opacity:0.65; } to{ opacity:1; } }
+/* No twinkle: an endless animation on this full-screen layer kept the
+   browser recompositing every frame, which made hovers and scrolling lag
+   on large or high-resolution screens (reported from a 2484px window). */
 /* Nebula in the theme colours, fixed like the stars so the page scrolls
    over it (a pseudo-element, since background-attachment:fixed is ignored
    on iOS). Below the stars, no twinkle. */
