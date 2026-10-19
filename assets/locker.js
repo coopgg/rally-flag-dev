@@ -248,24 +248,33 @@
     const d = item.def, dmg = DB.damage[item.damage];
     const label = [d.n, d.y, item.power ? "power " + item.power : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
       item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : ""].filter(Boolean).join(", ");
-    const ownerTag = state.owner === "all" ? '<span class="tile-owner" aria-hidden="true">' + (item.owner === "vault" ? "V" : ownerLabel(item.owner).charAt(0)) + "</span>" : "";
     return '<button type="button" class="item-tile ' + tierClass(d) + (item.equipped ? " equipped" : "") + '" data-id="' + item.id + '" aria-label="' + esc(label) + '">' +
       '<img class="icon" src="' + esc(img(d.i)) + '" alt="" loading="lazy" width="64" height="64">' +
       (d.w ? '<img class="wm" src="' + esc(img(d.w)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (item.set ? '<span class="tile-badge set" aria-hidden="true">' + item.setProgress.slots.size + "</span>" : "") +
-      ownerTag +
       (item.roll && item.roll.full ? '<span class="tile-badge" aria-hidden="true">★</span>' : "") +
       '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") + (item.power || "") + "</span>" +
     "</button>";
   }
 
+  // Each slot is split by who holds the item: one group per character
+  // (equipped first), then the vault. Wide screens lay the groups out as
+  // aligned columns (like DIM); phones stack them under small labels.
   function renderItems(){
     const shown = ITEMS.filter(matches);
+    const groups = state.owner === "all" ? OWNERS.map(o => o.id).concat("vault") : [state.owner];
+    const byPower = (x, y) => (y.equipped - x.equipped) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
     const html = BUCKETS.map(b => {
-      const items = shown.filter(i => i.def.b === b.hash).sort((x, y) => (y.equipped - x.equipped) || (y.power - x.power) || x.def.n.localeCompare(y.def.n));
-      if (!items.length) return "";
-      return '<section class="bucket" aria-labelledby="b-' + b.hash + '"><h2 id="b-' + b.hash + '">' + b.label + " <span>" + items.length + "</span></h2>" +
-        '<div class="item-grid">' + items.map(tileHtml).join("") + "</div></section>";
+      const inSlot = shown.filter(i => i.def.b === b.hash);
+      if (!inSlot.length) return "";
+      const cols = groups.map(g => {
+        const items = inSlot.filter(i => i.owner === g).sort(byPower);
+        return '<div class="owner-group' + (g === "vault" ? " vault" : "") + (items.length ? "" : " empty") + '">' +
+          '<div class="group-label">' + esc(ownerLabel(g)) + " · " + items.length + "</div>" +
+          (items.length ? '<div class="item-grid">' + items.map(tileHtml).join("") + "</div>" : '<div class="group-empty">—</div>') + "</div>";
+      }).join("");
+      return '<section class="bucket" aria-labelledby="b-' + b.hash + '"><h2 id="b-' + b.hash + '">' + b.label + " <span>" + inSlot.length + "</span></h2>" +
+        '<div class="owner-groups' + (groups.length > 1 ? " multi" : "") + '" style="--chars:' + (groups.length - 1) + '">' + cols + "</div></section>";
     }).join("");
     $("buckets").innerHTML = html || '<p class="locker-empty">Nothing matches these filters.</p>';
     $("locker-count").textContent = "Showing " + shown.length + " of " + ITEMS.length + " items";

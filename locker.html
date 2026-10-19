@@ -160,9 +160,19 @@
   .tile-power img{ width:12px; height:12px; float:left; margin-top:2px; }
   .tile-badge{ position:absolute; top:2px; right:2px; min-width:18px; height:18px; padding:0 3px; border-radius:9px; font-size:12px; font-weight:700; line-height:18px; text-align:center; color:#111; background:#ffd76a; box-shadow:0 0 0 1px rgba(0,0,0,0.5); }
   .tile-badge.set{ background:#9fe3ff; left:2px; right:auto; }
-  .tile-owner{ position:absolute; top:2px; left:2px; padding:0 4px; border-radius:4px; font-size:12px; font-weight:700; line-height:16px; color:#fff; background:rgba(0,0,0,0.78); }
-  .tile-badge.set + .tile-owner{ top:22px; }
   .locker-empty{ margin-top:30px; text-align:center; color:var(--text-dim); }
+  /* Owner groups inside each slot: aligned columns on wide screens
+     (characters, then a wider vault), stacked with labels on phones. */
+  .owner-groups{ display:flex; flex-direction:column; gap:14px; }
+  .group-label{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); margin-bottom:6px; }
+  .owner-group.empty{ display:none; }
+  .group-empty{ color:var(--text-dim); font-size:13px; }
+  @media (min-width:900px){
+    .owner-groups.multi{ display:grid; grid-template-columns:repeat(var(--chars), minmax(0, 1fr)) minmax(0, 2fr); gap:0; }
+    .owner-groups.multi .owner-group{ padding:0 12px; border-left:1px solid var(--panel-border); }
+    .owner-groups.multi .owner-group:first-child{ padding-left:0; border-left:0; }
+    .owner-groups.multi .owner-group.empty{ display:block; }
+  }
 
   /* Item details. Same reading order as DIM's popup (header, stats,
      frame, perk columns, mods) so DIM players feel at home, drawn in
