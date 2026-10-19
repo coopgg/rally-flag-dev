@@ -125,7 +125,6 @@
     TAGS[id] === tag ? delete TAGS[id] : (TAGS[id] = tag);
     try { localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); } catch (e){}
   }
-  const VAULT_PREVIEW = 12; // two rows of the vault column; phones show 10 (CSS)
   // Which view is open: gear (default) or armor sets (#sets).
   function showView(name, focus){
     const sets = name === "sets";
@@ -522,14 +521,21 @@
   const WIDE = window.matchMedia("(min-width: 1100px)");
   const isWide = () => WIDE.matches;
   function renderItems(){ isWide() ? renderAll() : renderOne(); }
-  // Vault armor, one row per class, as DIM does: any class first, then your
-  // characters' classes, then any other class you hold armor for (once each).
-  function classRows(list){
-    const order = [...new Set([3].concat(OWNERS.map(o => o.cls), [0, 1, 2]))];
-    return order.map(c => ({ c, list: list.filter(i => i.def.c === c) })).filter(g => g.list.length);
+  // The vault in labelled rows, as DIM does, each keeping the list's order
+  // (highest Power first). Armor: one row per class, any class first, then
+  // your characters' classes, then any other class you hold (once each).
+  // Weapons: one row per weapon type (Auto Rifle, Bow, …), A to Z.
+  function vaultRows(list, kind){
+    if (kind === "armor"){
+      const order = [...new Set([3].concat(OWNERS.map(o => o.cls), [0, 1, 2]))];
+      return order.map(c => ({ label: c === 3 ? "Any class" : CLASS_NAMES[c] || "", list: list.filter(i => i.def.c === c) })).filter(g => g.list.length);
+    }
+    const type = i => i.def.y || "Other";
+    return [...new Set(list.map(type))].sort((a, b) => a.localeCompare(b)).map(t => ({ label: t, list: list.filter(i => type(i) === t) }));
   }
-  const classRowHtml = g => '<div class="vault-class"><span class="vault-class-label">' + (g.c === 3 ? "Any class" : esc(CLASS_NAMES[g.c] || "")) + "</span>" +
+  const vaultRowHtml = g => '<div class="vault-class"><span class="vault-class-label">' + esc(g.label) + "</span>" +
     '<div class="item-grid">' + g.list.map(tileHtml).join("") + "</div></div>";
+  const PHONE_ROW_PREVIEW = 10; // tiles per vault row before "Show all" (CSS clips at 10)
   const SEARCH_EMPTY = '<p class="locker-empty" id="search-empty" hidden>Nothing matches this search.</p>';
 
   // Everyone (DIM desktop): per slot, a row of character cells lined up
@@ -556,9 +562,9 @@
       }).join("");
       const vault = items.filter(i => i.owner === "vault");
       // Armor in the vault: one row per class (any class first), as DIM does.
-      const groups = b.kind === "armor" ? classRows(vault) : [{ c: null, list: vault }];
+      const groups = vaultRows(vault, b.kind);
       const vaultHtml = '<div class="owner-group vault vault-all" data-owner="vault"><div class="group-label">Vault · <span class="vis-count">' + vault.length + "</span></div>" +
-        (vault.length ? groups.map(g => g.c === null ? '<div class="vault-class"><div class="item-grid">' + g.list.map(tileHtml).join("") + "</div></div>" : classRowHtml(g)).join("") : '<div class="group-empty">Nothing here.</div>') + "</div>";
+        (vault.length ? groups.map(vaultRowHtml).join("") : '<div class="group-empty">Nothing here.</div>') + "</div>";
       const folded = folds.slots.has(b.hash);
       return '<section class="bucket" aria-labelledby="b-' + b.hash + '">' +
         '<h2 id="b-' + b.hash + '"><button type="button" class="bucket-toggle" data-slot="' + b.hash + '" aria-expanded="' + !folded + '" aria-controls="bb-' + b.hash + '">' +
@@ -588,13 +594,15 @@
       if (filtering && !items.length) return "";
       let count, full = false, body;
       if (vault){
-        const long = !filtering && items.length > VAULT_PREVIEW, open = folds.vaults.has(b.hash);
+        const rows = vaultRows(items, b.kind);
+        // "Show all" only when a row actually has more than its preview shows.
+        const long = !filtering && rows.some(g => g.list.length > PHONE_ROW_PREVIEW), open = folds.vaults.has(b.hash);
         count = '<span class="vis-count">' + items.length + "</span>";
         body = '<div class="owner-group vault' + (long && !open ? " clipped" : "") + '" data-owner="vault">' +
-          // Armor: one row per class, highest Power first (previews clip each row).
+          // One row per class (armor) or weapon type, highest Power first;
+          // previews clip each row.
           (!items.length ? '<div class="group-empty">Nothing here.</div>'
-            : b.kind === "armor" ? '<div id="vg-' + b.hash + '">' + classRows(items).map(classRowHtml).join("") + "</div>"
-            : '<div class="item-grid" id="vg-' + b.hash + '">' + items.map(tileHtml).join("") + "</div>") +
+            : '<div id="vg-' + b.hash + '">' + rows.map(vaultRowHtml).join("") + "</div>") +
           (long ? '<button type="button" class="vault-more" data-slot="' + b.hash + '" aria-expanded="' + open + '" aria-controls="vg-' + b.hash + '">' + (open ? "Show less" : "Show all " + items.length) + "</button>" : "") + "</div>";
       } else {
         const eq = items.filter(i => i.equipped), inv = items.filter(i => !i.equipped);

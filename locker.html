@@ -212,7 +212,7 @@
   .bucket-toggle .chev{ width:8px; height:8px; border-right:2px solid var(--accent-text); border-bottom:2px solid var(--accent-text); transform:rotate(45deg) translate(-2px, -2px); transition:transform 0.15s ease; align-self:center; }
   .bucket.folded .bucket-toggle .chev{ transform:rotate(-45deg); }
   .bucket-toggle:hover{ color:var(--accent-text); }
-  .owner-group.clipped .item-tile:nth-child(n+13){ display:none; }
+  .owner-group.clipped .item-tile:nth-child(n+11){ display:none; } /* PHONE_ROW_PREVIEW in locker.js */
   /* Searching (applySearch): vault previews open up, empty rows/slots hide */
   #buckets.searching .owner-group.clipped .item-tile:not([hidden]){ display:block; }
   #buckets.searching .vault-more{ display:none; }
@@ -390,7 +390,7 @@
   .vault-all{ margin-top:14px; padding-top:10px; border-top:1px dashed var(--panel-border); }
   .vault-class{ display:flex; align-items:flex-start; gap:12px; padding:8px 0; }
   .vault-class + .vault-class{ border-top:1px solid var(--panel-border); }
-  .vault-class-label{ flex:none; width:76px; padding-top:4px; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-dim); }
+  .vault-class-label{ flex:none; width:110px; padding-top:4px; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-dim); }
   .vault-class .item-grid{ flex:1; min-width:0; }
   .drop-bar{ position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:50; display:flex; align-items:center; gap:8px; padding:8px; border-radius:12px;
     border:1px solid var(--edge); background:var(--bg); box-shadow:0 14px 40px -12px rgba(0,0,0,0.6), 0 0 24px -10px var(--glow); }
@@ -417,7 +417,6 @@
     .chip-meta{ flex:1 0 100%; margin-left:0; }
     .vault-class{ flex-direction:column; align-items:stretch; gap:6px; }
     .vault-class-label{ width:auto; padding-top:0; }
-    .owner-group.clipped .item-tile:nth-child(n+11){ display:none; }
     .act-label{ width:100%; }
     .act-btn.lock{ margin-left:0; }
     /* Bottom sheet on phones, like DIM */
