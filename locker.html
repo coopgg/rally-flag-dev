@@ -85,7 +85,8 @@
   .demo-banner{ display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px 16px; margin:24px auto 0; padding:12px 18px; max-width:760px; font-size:14px; color:var(--text-dim); text-align:center; }
 
   /* Characters + vault: owner filter */
-  .owner-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); grid-auto-rows:1fr; gap:12px; margin-top:28px; }
+  /* Character + vault toggles: one row of four on wide screens, 2 × 2 on phones */
+  .owner-grid{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); grid-auto-rows:1fr; gap:12px; margin-top:28px; }
   .owner-card{
     position:relative; display:flex; flex-direction:column; justify-content:flex-end; min-height:84px; padding:12px 14px;
     border-radius:12px; border:1px solid var(--edge); overflow:hidden; cursor:pointer; text-align:left;
@@ -99,7 +100,6 @@
   .owner-card .owner-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:20px; letter-spacing:0.04em; text-transform:uppercase; }
   .owner-card .owner-meta{ font-size:13px; color:rgba(255,255,255,0.85); }
   .owner-card.vault{ background-image:none; background:linear-gradient(135deg, #0d1424, #1b2236); }
-  .owner-card.all{ background:linear-gradient(135deg, #10131c, #20263a); }
 
   /* Filters */
   .locker-controls{ margin-top:22px; display:flex; flex-direction:column; gap:12px; }
@@ -180,7 +180,7 @@
   .fold-all{ margin-top:0; }
   .group-empty{ color:var(--text-dim); font-size:13px; }
   @media (min-width:900px){
-    .owner-groups.multi{ display:grid; grid-template-columns:repeat(var(--chars), minmax(0, 1fr)) minmax(0, 2fr); gap:0; }
+    .owner-groups.multi{ display:grid; grid-template-columns:var(--cols); gap:0; }
     .owner-groups.multi .owner-group{ padding:0 12px; border-left:1px solid var(--panel-border); }
     .owner-groups.multi .owner-group:first-child{ padding-left:0; border-left:0; }
     .owner-groups.multi .owner-group.empty{ display:block; }
@@ -338,7 +338,7 @@
   <div id="locker-status" role="status"></div>
   <div id="locker-app" hidden>
     <div id="demo-banner"></div>
-    <div class="owner-grid" id="owner-grid" role="group" aria-label="Show gear from"></div>
+    <div class="owner-grid" id="owner-grid" role="group" aria-label="Show only gear from (tap again to show everything)"></div>
 
     <div class="view-tabs" role="tablist" aria-label="Locker views">
       <button class="view-tab" type="button" role="tab" id="tab-gear" aria-controls="view-gear" aria-selected="true">Gear</button>

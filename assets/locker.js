@@ -48,7 +48,9 @@
   const slugify = s => s.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
   let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [], POSTMASTER = [], MEMBERSHIP_TYPE = 0;
-  const state = { owner: "all", type: null, flags: new Set(), q: "" };
+  // owners: the character/vault cards toggled on; none means everyone.
+  const state = { owners: new Set(), type: null, flags: new Set(), q: "" };
+  const showsOwner = id => !state.owners.size || state.owners.has(id);
   // Folded slots and opened vault lists, remembered per browser.
   const FOLD_KEY = "rallyflag_locker_folds";
   const folds = (() => { try { const f = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}"); return { slots: new Set(f.slots || []), vaults: new Set(f.vaults || []) }; } catch (e){ return { slots: new Set(), vaults: new Set() }; } })();
@@ -218,13 +220,11 @@
 
   function renderOwners(){
     const counts = id => ITEMS.filter(i => i.owner === id).length;
-    const cards = [
-      '<button type="button" class="owner-card all" data-owner="all" aria-pressed="' + (state.owner === "all") + '"><span class="owner-name">All gear</span><span class="owner-meta">' + ITEMS.length + " items</span></button>"
-    ].concat(OWNERS.map(o =>
-      '<button type="button" class="owner-card" data-owner="' + o.id + '" aria-pressed="' + (state.owner === o.id) + '" style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
+    const cards = OWNERS.map(o =>
+      '<button type="button" class="owner-card" data-owner="' + o.id + '" aria-pressed="' + state.owners.has(o.id) + '" style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
         '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta">Power ' + esc(o.light) + " · " + counts(o.id) + " items</span></button>"
-    )).concat([
-      '<button type="button" class="owner-card vault" data-owner="vault" aria-pressed="' + (state.owner === "vault") + '"><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span></button>"
+    ).concat([
+      '<button type="button" class="owner-card vault" data-owner="vault" aria-pressed="' + state.owners.has("vault") + '"><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span></button>"
     ]);
     $("owner-grid").innerHTML = cards.join("");
   }
@@ -238,11 +238,14 @@
   function setHref(p){ return p.set.ours ? "armor-set-bonuses.html?highlight=" + p.set.ours.slug : null; }
 
   function renderSets(){
-    const list = state.owner === "all" || state.owner === "vault" ? SETS : SETS.filter(p => p.cls === (OWNERS.find(o => o.id === state.owner) || {}).cls);
+    // Sets follow the selected characters' classes (all of them when no
+    // character is selected).
+    const chosen = OWNERS.filter(o => state.owners.has(o.id));
+    const list = chosen.length ? SETS.filter(p => chosen.some(o => o.cls === p.cls)) : SETS;
     $("sets-count").textContent = list.length;
     $("sets-hint").textContent = list.length
-      ? "Armor sets you own pieces of" + (state.owner === "all" || state.owner === "vault" ? ", per class" : " for your " + ((OWNERS.find(o => o.id === state.owner) || {}).name || "")) + ". Pieces in your vault count too."
-      : "You don't own any set pieces for this character yet.";
+      ? "Armor sets you own pieces of" + (chosen.length ? " for your " + chosen.map(o => o.name).join(" and ") : ", per class") + ". Pieces in your vault count too."
+      : "You don't own any set pieces for " + (chosen.length > 1 ? "these characters" : "this character") + " yet.";
     $("set-grid").innerHTML = list.map(p => {
       const pips = ARMOR_SLOTS.map(s => '<span class="set-pip' + (p.slots.has(s) ? " on" : "") + '"></span>').join("");
       const href = setHref(p);
@@ -256,7 +259,7 @@
   }
 
   function matches(item){
-    if (state.owner !== "all" && item.owner !== state.owner) return false;
+    if (!showsOwner(item.owner)) return false;
     const bucket = BUCKET_BY_HASH.get(item.def.b);
     if (state.type && bucket.kind !== state.type) return false;
     if (state.flags.has("exotic") && item.def.r !== 6) return false;
@@ -285,7 +288,9 @@
   // aligned columns (like DIM); phones stack them under small labels.
   function renderItems(){
     const shown = ITEMS.filter(matches);
-    const groups = state.owner === "all" ? OWNERS.map(o => o.id).concat("vault") : [state.owner];
+    const groups = OWNERS.map(o => o.id).concat("vault").filter(showsOwner);
+    // Character columns share the width; the vault gets a double column.
+    const colsTemplate = groups.map(g => g === "vault" ? "minmax(0, 2fr)" : "minmax(0, 1fr)").join(" ");
     const byPower = (x, y) => (y.equipped - x.equipped) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
     // Long vault lists show a preview, but never while searching or
     // filtering, so a match can't end up hidden.
@@ -307,7 +312,7 @@
       return '<section class="bucket' + (folded ? " folded" : "") + '" aria-labelledby="b-' + b.hash + '">' +
         '<h2 id="b-' + b.hash + '"><button type="button" class="bucket-toggle" data-slot="' + b.hash + '" aria-expanded="' + !folded + '" aria-controls="bb-' + b.hash + '">' +
           '<span class="chev" aria-hidden="true"></span>' + b.label + " <span>" + inSlot.length + "</span></button></h2>" +
-        '<div class="owner-groups' + (groups.length > 1 ? " multi" : "") + '" id="bb-' + b.hash + '" style="--chars:' + (groups.length - 1) + '"' + (folded ? " hidden" : "") + ">" + cols + "</div></section>";
+        '<div class="owner-groups' + (groups.length > 1 ? " multi" : "") + '" id="bb-' + b.hash + '" style="--cols:' + colsTemplate + '"' + (folded ? " hidden" : "") + ">" + cols + "</div></section>";
     }).join("");
     $("buckets").innerHTML = postmasterHtml() + (html || '<p class="locker-empty">Nothing matches these filters.</p>');
     $("locker-count").textContent = "Showing " + shown.length + " of " + ITEMS.length + " items";
@@ -317,7 +322,7 @@
   // Postmaster: only shown when something is waiting, per character, with
   // a warning as it nears Bungie's 21-item limit (after that, items are lost).
   function postmasterHtml(){
-    const groups = OWNERS.filter(o => state.owner === "all" || state.owner === o.id).map(o => ({ o, items: POSTMASTER.filter(p => p.owner === o.id) })).filter(g => g.items.length);
+    const groups = OWNERS.filter(o => showsOwner(o.id)).map(o => ({ o, items: POSTMASTER.filter(p => p.owner === o.id) })).filter(g => g.items.length);
     if (!groups.length) return "";
     return '<section class="bucket postmaster" aria-labelledby="pm-head"><h2 id="pm-head">Postmaster <span>' + groups.reduce((n, g) => n + g.items.length, 0) + "</span></h2>" +
       groups.map(g => {
@@ -616,7 +621,9 @@
     $("owner-grid").addEventListener("click", e => {
       const b = e.target.closest("[data-owner]");
       if (!b) return;
-      state.owner = b.dataset.owner;
+      // Toggle: tap to show only this (plus any others on), tap again to undo.
+      const id = b.dataset.owner;
+      state.owners.has(id) ? state.owners.delete(id) : state.owners.add(id);
       render();
     });
     $("locker-chips").addEventListener("click", e => {
