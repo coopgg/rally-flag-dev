@@ -19,7 +19,7 @@
    ============================================================ */
 (function(){
   const BUNGIE = "https://www.bungie.net";
-  const COMPONENTS = "100,102,103,200,201,205,300,304,305,310";
+  const COMPONENTS = "100,102,103,200,201,205,206,300,304,305,310";
   const DEMO = new URLSearchParams(location.search).has("demo");
 
   const CLASS_NAMES = ["Titan", "Hunter", "Warlock"];
@@ -64,7 +64,7 @@
   const MW_OVERLAY = { 5: "/img/destiny_content/items/masterwork-overlay-border.png", 6: "/img/destiny_content/items/masterwork-overlay-exotic-border.png" };
   const slugify = s => s.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-  let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [], POSTMASTER = [], MEMBERSHIP_TYPE = 0, PROFILE_PATH = "";
+  let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [], POSTMASTER = [], MEMBERSHIP_TYPE = 0, PROFILE_PATH = "", INSTANCE_HASH = new Map();
 
   // Bungie's profile can lag a moment behind a move, so a reload or
   // Refresh right after one would put the item back where it was. Every
@@ -229,6 +229,13 @@
     }
 
     ITEMS = []; POSTMASTER = [];
+    // Every item instance -> its definition hash (in-game loadouts list
+    // instance ids, including subclasses, which aren't Locker gear).
+    INSTANCE_HASH = new Map();
+    for (const it of (data(PROFILE, "profileInventory").items || []).concat(
+      ...Object.values(data(PROFILE, "characterInventories")).map(c => c.items || []),
+      ...Object.values(data(PROFILE, "characterEquipment")).map(c => c.items || [])))
+      if (it.itemInstanceId) INSTANCE_HASH.set(String(it.itemInstanceId), it.itemHash);
     // A weapon or armor piece as the Locker models it, or null.
     const gearItem = (it, owner, equipped) => {
       const def = DB.items[it.itemHash];
@@ -420,6 +427,51 @@
       if (!item.equipped) await equipCall(item, charId);
   }
 
+  // In-game loadouts (component 206): the 10 slots each character has in
+  // Destiny. Empty slots have no items. Applying one moves any missing
+  // weapons/armor onto the character first (as our own loadouts do), then
+  // asks Bungie to equip it, which also sets its subclass and mods.
+  function gameLoadouts(charId){
+    const raw = (data(PROFILE, "characterLoadouts")[charId] || {}).loadouts || [];
+    const L = (DB && DB.loadouts) || { names: {}, icons: {}, colors: {} };
+    return raw.map((lo, index) => {
+      const ids = (lo.items || []).map(x => String(x.itemInstanceId)).filter(id => id && id !== "0");
+      return { index, ids, name: L.names[lo.nameHash] || "Loadout " + (index + 1), icon: L.icons[lo.iconHash] || "", color: L.colors[lo.colorHash] || "",
+        missing: ids.filter(id => !INSTANCE_HASH.has(id)).length };
+    }).filter(lo => lo.ids.length);
+  }
+  async function equipGameLoadout(charId, lo){
+    const gear = lo.ids.map(id => ITEMS.find(i => i.id === id)).filter(Boolean);
+    const keep = new Set(gear.map(i => i.id));
+    for (const item of gear){
+      if (item.owner === charId) continue;
+      await makeRoom(charId, item.def.b, keep);
+      await moveTo(item, charId);
+    }
+    await post("Loadouts/EquipLoadout", { loadoutIndex: lo.index, characterId: charId });
+    // Bungie equipped the whole set: show it now (the auto-sync confirms it).
+    for (const item of gear){
+      for (const i of ITEMS) if (i.owner === charId && i.equipped && i.def.b === item.def.b) i.equipped = false;
+      item.equipped = true;
+    }
+    rememberItems(ITEMS.filter(i => i.owner === charId));
+  }
+  function gameSection(){
+    const mini = id => { const d = DB.items[INSTANCE_HASH.get(id)] || {}; return '<span class="lo-mini' + (INSTANCE_HASH.has(id) ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
+    const groups = OWNERS.map(o => {
+      const list = gameLoadouts(o.id);
+      if (!list.length) return "";
+      return '<div class="lo-owner">' + esc(o.name) + "</div>" + list.map(lo =>
+        '<div class="lo-card"><div class="lo-main lo-game">' +
+            '<span class="lo-badge" aria-hidden="true"' + (lo.color ? ' style="background-image:url(\'' + esc(img(lo.color)) + '\')"' : "") + ">" + (lo.icon ? '<img src="' + esc(img(lo.icon)) + '" alt="" width="28" height="28">' : "") + "</span>" +
+            "<b>" + esc(lo.name) + "</b>" + (lo.missing ? ' <span class="muted">· ' + lo.missing + " not found</span>" : "") + "</div>" +
+          '<div class="lo-items" aria-hidden="true">' + lo.ids.map(mini).join("") + "</div>" +
+          '<div class="act-row"><button type="button" class="act-btn" data-game-lo="' + lo.index + '" data-to="' + o.id + '">Equip<span class="sr-only"> ' + esc(lo.name) + " on your " + esc(o.name) + "</span></button></div></div>"
+      ).join("");
+    }).join("");
+    return groups || '<p class="muted">No in-game loadouts saved yet. Make them in Destiny\'s Character screen and they\'ll show here.</p>';
+  }
+
   function renderLoadoutRow(){
     const row = $("loadout-row");
     if (!row) return;
@@ -432,7 +484,7 @@
     const dlg = $("item-dialog"), list = readLoadouts();
     // A redraw replaces the buttons: keep keyboard focus on the same control.
     const was = dlg.open && dlg.contains(document.activeElement) ? document.activeElement : null;
-    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean);
+    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean);
     const byId = new Map(ITEMS.map(i => [i.id, i]));
     const mini = (hash, have) => { const d = DB.items[hash] || {}; return '<span class="lo-mini' + (have ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
     const maxRows = OWNERS.map(o => {
@@ -457,7 +509,8 @@
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
       '<div class="dlg-body">' +
         '<div class="dlg-block"><div class="dlg-label">Max Power</div><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</div>" +
-        '<div class="dlg-block"><div class="dlg-label">Saved</div>' + saved + "</div>" +
+        '<div class="dlg-block"><div class="dlg-label">In-game loadouts</div><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first.</p>' + gameSection() + "</div>" +
+        '<div class="dlg-block"><div class="dlg-label">Rally Flag loadouts</div>' + saved + "</div>" +
         '<div class="dlg-block"><div class="dlg-label">Save a loadout</div>' +
           '<label class="lo-name"><span>Name</span><input type="text" id="lo-name" maxlength="40" placeholder="e.g. Raid DPS" autocomplete="off"></label>' +
           '<div class="act-row">' + OWNERS.map(o => '<button type="button" class="act-btn" data-lo-save="' + o.id + '">Save ' + esc(o.name) + "'s gear</button>").join("") + "</div></div>" +
@@ -477,6 +530,12 @@
       const items = lo.items.map(x => ITEMS.find(i => i.id === x.id)).filter(i => i && classOk(i, o.id));
       const missing = lo.items.length - items.length;
       run("Equipping " + lo.name + " on your " + o.name, "Equipped " + lo.name + " on your " + o.name + "." + (missing ? " " + missing + " item" + (missing === 1 ? " was" : "s were") + " missing and skipped." : ""), () => equipSet(items, o.id), reopen);
+    }));
+    dlg.querySelectorAll("[data-game-lo]").forEach(b => b.addEventListener("click", () => {
+      if (busyNotice()) return;
+      const o = ownerOf(b.dataset.to), lo = gameLoadouts(o.id).find(x => x.index === +b.dataset.gameLo);
+      if (!lo) return;
+      run("Equipping " + lo.name + " on your " + o.name, "Equipped " + lo.name + " on your " + o.name + "." + (lo.missing ? " " + lo.missing + " item" + (lo.missing === 1 ? " wasn't" : "s weren't") + " found." : ""), () => equipGameLoadout(o.id, lo), reopen);
     }));
     dlg.querySelectorAll("[data-lo-del]").forEach(b => b.addEventListener("click", () => {
       // Two taps: the first asks, the second deletes.
@@ -812,7 +871,8 @@
   };
   async function post(endpoint, body){
     if (DEMO){ await sleep(250); return; }
-    const res = await RallyFlagAuth.authedFetch(ACTIONS + endpoint + "/", {
+    // "TransferItem" etc. live under Actions/Items/; "Loadouts/EquipLoadout" names its own section.
+    const res = await RallyFlagAuth.authedFetch((endpoint.includes("/") ? "/Platform/Destiny2/Actions/" : ACTIONS) + endpoint + "/", {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify(Object.assign({ membershipType: MEMBERSHIP_TYPE }, body))
     });

@@ -139,6 +139,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   dragstart cancels the drag in Chrome).
   Loadouts + max Power: `maxPowerPlan` / `equipSet` / `makeRoom` (shared
   `spareFirst` ordering with farming); saved per account in localStorage.
+  In-game loadouts: component 206 + Actions/Loadouts/EquipLoadout (also
+  sets subclass and mods); missing items are moved onto the character first.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

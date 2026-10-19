@@ -2,25 +2,26 @@
    Locker item database (dev-only, used by locker.html).
 
    Downloads Bungie's DestinyInventoryItemLiteDefinition (~3MB over the
-   wire, ~61MB of JSON) plus the small stat, damage-type, armor-set and
-   inventory-bucket tables, keeps only what the Locker shows (~6MB) and stores that in
+   wire, ~61MB of JSON) plus the small stat, damage-type, armor-set,
+   inventory-bucket and in-game loadout (name/icon/colour) tables, keeps only what the Locker shows (~6MB) and stores that in
    IndexedDB under the manifest version. Later visits make one small
    request to check the version and read the rest from IndexedDB.
    Runs in a Worker so parsing 61MB of JSON never blocks the page.
 
    Message in:  { apiKey }
    Messages out: { type:"progress", step } … then
-                 { type:"done", db:{ schema, version, items, stats, statIcons, damage, sets, buckets } }
+                 { type:"done", db:{ schema, version, items, stats, statIcons, damage, sets, buckets, loadouts } }
                  or { type:"error", message }
    items: hash -> { n name, i icon, w watermark, t itemType, s subType,
      r tierType, b bucketHash, c classType, d damageTypeHash,
      y itemTypeDisplayName, x description (plugs) }; currencies keep n, i.
    buckets: hash -> { n name, c capacity } (vault space in the banner).
+   loadouts: { names: hash -> name, icons: hash -> path, colors: hash -> path }.
    ============================================================ */
 const BUNGIE = "https://www.bungie.net";
 const DB_NAME = "rallyflag-locker", STORE = "manifest", KEY = "lite";
 // Bump when the stored shape changes, so cached copies are rebuilt.
-const SCHEMA = 2;
+const SCHEMA = 3;
 
 function idb(){
   return new Promise((resolve, reject) => {
@@ -57,9 +58,10 @@ async function getJson(url, headers){
   return res.json();
 }
 
-// Weapons, armor, the plugs (perks, mods, intrinsics) they carry, and
-// currencies (Glimmer, Bright Dust, Silver) for the vault card.
-const KEEP_TYPES = new Set([0, 1, 2, 3, 19]);
+// Weapons, armor, the plugs (perks, mods, intrinsics) they carry,
+// currencies (Glimmer, Bright Dust, Silver) for the vault card, and
+// subclasses (shown in in-game loadouts).
+const KEEP_TYPES = new Set([0, 1, 2, 3, 16, 19]);
 function trimItems(lite){
   const out = {};
   for (const hash in lite){
@@ -94,12 +96,15 @@ self.onmessage = async (msg) => {
 
     const paths = manifest.jsonWorldComponentContentPaths.en;
     self.postMessage({ type: "progress", step: "Downloading Bungie's item database (first visit or after a game update, about 3MB)…" });
-    const [lite, statDefs, damageDefs, setDefs, bucketDefs] = await Promise.all([
+    const [lite, statDefs, damageDefs, setDefs, bucketDefs, loNames, loIcons, loColors] = await Promise.all([
       getJson(BUNGIE + paths.DestinyInventoryItemLiteDefinition),
       getJson(BUNGIE + paths.DestinyStatDefinition),
       getJson(BUNGIE + paths.DestinyDamageTypeDefinition),
       getJson(BUNGIE + paths.DestinyEquipableItemSetDefinition),
-      getJson(BUNGIE + paths.DestinyInventoryBucketDefinition)
+      getJson(BUNGIE + paths.DestinyInventoryBucketDefinition),
+      getJson(BUNGIE + paths.DestinyLoadoutNameDefinition),
+      getJson(BUNGIE + paths.DestinyLoadoutIconDefinition),
+      getJson(BUNGIE + paths.DestinyLoadoutColorDefinition)
     ]);
     self.postMessage({ type: "progress", step: "Preparing the item database…" });
     const stats = {}, statIcons = {};
@@ -114,7 +119,9 @@ self.onmessage = async (msg) => {
     for (const h in damageDefs){ const dp = damageDefs[h].displayProperties || {}; if (dp.name) damage[h] = { n: dp.name, i: dp.icon || "" }; }
     const sets = {};
     for (const h in setDefs){ const s = setDefs[h]; if (s.setItems && s.setItems.length) sets[h] = { n: (s.displayProperties && s.displayProperties.name) || "", items: s.setItems }; }
-    const db = { schema: SCHEMA, version, items: trimItems(lite), stats, statIcons, damage, sets, buckets };
+    const pickField = (defs, field) => { const out = {}; for (const h in defs) if (defs[h][field]) out[h] = defs[h][field]; return out; };
+    const loadouts = { names: pickField(loNames, "name"), icons: pickField(loIcons, "iconImagePath"), colors: pickField(loColors, "colorImagePath") };
+    const db = { schema: SCHEMA, version, items: trimItems(lite), stats, statIcons, damage, sets, buckets, loadouts };
     await idbPut(db);
     self.postMessage({ type: "done", db, cached: false });
   } catch (e){
