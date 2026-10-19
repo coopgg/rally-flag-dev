@@ -456,18 +456,31 @@
     }
     rememberItems(ITEMS.filter(i => i.owner === charId));
   }
+  // Loadouts show as a grid of name tiles (like DIM); tapping one opens its
+  // items and buttons under the grid, tapping it again closes them. One open
+  // at a time, kept across redraws so an equip doesn't fold it away.
+  let loOpen = null;
+  function loGrid(group, entries){
+    const open = entries.find(e => e.key === loOpen);
+    return '<div class="lo-grid">' + entries.map(e =>
+      '<button type="button" class="lo-tile' + (e.gone ? " warn" : "") + '" data-lo-pick="' + esc(e.key) + '" aria-expanded="' + (e === open) + '" aria-controls="lo-detail-' + group + '">' +
+        e.badge + '<span class="lo-tile-name">' + esc(e.name) + "</span></button>").join("") + "</div>" +
+      '<div class="lo-detail" id="lo-detail-' + group + '"' + (open ? "" : " hidden") + ">" + (open ? open.detail : "") + "</div>";
+  }
+  function loBadge(icon, color){
+    return '<span class="lo-badge" aria-hidden="true"' + (color ? ' style="background-image:url(\'' + esc(img(color)) + '\')"' : "") + ">" + (icon ? '<img src="' + esc(img(icon)) + '" alt="" width="28" height="28" loading="lazy">' : "") + "</span>";
+  }
   function gameSection(){
     const mini = id => { const d = DB.items[INSTANCE_HASH.get(id)] || {}; return '<span class="lo-mini' + (INSTANCE_HASH.has(id) ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
     const groups = OWNERS.map(o => {
       const list = gameLoadouts(o.id);
       if (!list.length) return "";
-      return '<div class="lo-owner">' + esc(o.name) + "</div>" + list.map(lo =>
-        '<div class="lo-card"><div class="lo-main lo-game">' +
-            '<span class="lo-badge" aria-hidden="true"' + (lo.color ? ' style="background-image:url(\'' + esc(img(lo.color)) + '\')"' : "") + ">" + (lo.icon ? '<img src="' + esc(img(lo.icon)) + '" alt="" width="28" height="28">' : "") + "</span>" +
-            "<b>" + esc(lo.name) + "</b>" + (lo.missing ? ' <span class="muted">· ' + lo.missing + " not found</span>" : "") + "</div>" +
+      return '<div class="lo-owner">' + esc(o.name) + "</div>" + loGrid("g" + o.id, list.map(lo => ({
+        key: "g-" + o.id + "-" + lo.index, name: lo.name, gone: lo.missing, badge: loBadge(lo.icon, lo.color),
+        detail: '<div class="lo-main"><b>' + esc(lo.name) + "</b>" + (lo.missing ? ' <span class="muted">· ' + lo.missing + " not found</span>" : "") + "</div>" +
           '<div class="lo-items" aria-hidden="true">' + lo.ids.map(mini).join("") + "</div>" +
-          '<div class="act-row"><button type="button" class="act-btn" data-game-lo="' + lo.index + '" data-to="' + o.id + '">Equip<span class="sr-only"> ' + esc(lo.name) + " on your " + esc(o.name) + "</span></button></div></div>"
-      ).join("");
+          '<div class="act-row"><button type="button" class="act-btn" data-game-lo="' + lo.index + '" data-to="' + o.id + '">Equip<span class="sr-only"> ' + esc(lo.name) + " on your " + esc(o.name) + "</span></button></div>"
+      })));
     }).join("");
     return groups || '<p class="muted">No in-game loadouts saved yet. Make them in Destiny\'s Character screen and they\'ll show here.</p>';
   }
@@ -484,7 +497,7 @@
     const dlg = $("item-dialog"), list = readLoadouts();
     // A redraw replaces the buttons: keep keyboard focus on the same control.
     const was = dlg.open && dlg.contains(document.activeElement) ? document.activeElement : null;
-    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean);
+    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean);
     const byId = new Map(ITEMS.map(i => [i.id, i]));
     const mini = (hash, have) => { const d = DB.items[hash] || {}; return '<span class="lo-mini' + (have ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
     const maxRows = OWNERS.map(o => {
@@ -495,14 +508,16 @@
         '<button type="button" class="act-btn" data-lo-max="' + o.id + '"' + (done ? ' aria-disabled="true"' : "") + ">" +
           (done ? "At max Power" : 'Equip max Power<span class="sr-only"> on your ' + esc(o.name) + "</span>") + "</button></div>";
     }).join("");
-    const saved = list.length ? list.map(lo => {
+    const saved = list.length ? loGrid("r", list.map(lo => {
       const have = lo.items.filter(x => byId.has(x.id)).length, gone = lo.items.length - have, owners = OWNERS.filter(o => o.cls === lo.cls);
-      return '<div class="lo-card"><div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(CLASS_NAMES[lo.cls] || "") +
+      const first = DB.items[(lo.items[0] || {}).hash] || {};
+      return { key: "r-" + lo.id, name: lo.name, gone, badge: loBadge(first.i, ""),
+        detail: '<div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(CLASS_NAMES[lo.cls] || "") +
           (gone ? " · " + gone + " item" + (gone === 1 ? "" : "s") + " no longer found" : "") + "</span></div>" +
         '<div class="lo-items" aria-hidden="true">' + lo.items.map(x => mini(x.hash, byId.has(x.id))).join("") + "</div>" +
         '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
-          '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div></div>";
-    }).join("") : '<p class="muted">No loadouts yet. Save what one of your characters has equipped below.</p>';
+          '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" };
+    })) : '<p class="muted">No loadouts yet. Save what one of your characters has equipped below.</p>';
     dlg.dataset.item = ""; dlg.dataset.view = "loadouts";
     redrawDialog(dlg,
       '<div class="dlg-head"><div class="dlg-title"><div class="dlg-eyebrow">Your characters</div><h2 class="dlg-name" id="dlg-name">Loadouts</h2></div>' +
@@ -518,6 +533,10 @@
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
     if (dlg.open && (was || !dlg.contains(document.activeElement))) (refocus && dlg.querySelector(refocus) || dlg.querySelector(".dlg-close")).focus();
     const reopen = () => { if (dlg.open && dlg.dataset.view === "loadouts") openLoadouts(); };
+    dlg.querySelectorAll("[data-lo-pick]").forEach(b => b.addEventListener("click", () => {
+      loOpen = loOpen === b.dataset.loPick ? null : b.dataset.loPick;
+      openLoadouts();
+    }));
     dlg.querySelectorAll("[data-lo-max]").forEach(b => b.addEventListener("click", () => {
       if (b.getAttribute("aria-disabled") === "true" || busyNotice()) return;
       const o = ownerOf(b.dataset.loMax), plan = maxPowerPlan(o.id);
