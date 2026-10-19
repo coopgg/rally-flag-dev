@@ -140,6 +140,9 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.
+- **Standalone pages:** `<body data-nav="standalone">` (nav.js) hides the
+  site menu and Discord/Ko-fi, keeps brand + settings (theme, sign-in). The
+  Locker uses it so it can be shared directly; its links go to rallyflag.gg.
 - **`404.html`** is served for any missing path at any depth; it sets `<base>`
   to the site root and writes its asset tags from script. Keep that pattern.
 

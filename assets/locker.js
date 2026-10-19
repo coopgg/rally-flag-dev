@@ -431,7 +431,12 @@
     if (n >= 2) return (p.equipped.size >= 2 ? "2-piece bonus active" : "2-piece bonus ready") + " · " + (4 - n) + " more for 4-piece";
     return (2 - n) + " more for the 2-piece bonus";
   }
-  function setHref(p){ return p.set.ours ? "armor-set-bonuses.html?highlight=" + p.set.ours.slug : null; }
+  // The Locker is shared on its own (no site menu), so its links go to the
+  // public site in a new tab rather than around the dev site.
+  const PUBLIC_SITE = "https://rallyflag.gg/";
+  const NEW_TAB = ' target="_blank" rel="noopener"';
+  const NEW_TAB_NOTE = '<span class="sr-only"> (opens rallyflag.gg in a new tab)</span>';
+  function setHref(p){ return p.set.ours ? PUBLIC_SITE + "armor-set-bonuses.html?highlight=" + p.set.ours.slug : null; }
 
   function renderSets(){
     // Sets follow the chosen character's class (every class for the vault).
@@ -448,7 +453,7 @@
         '<div><div class="set-card-name">' + esc(p.set.ours ? p.set.ours.name : p.set.name) + '</div><div class="set-card-class">' + esc(CLASS_NAMES[p.cls] || "") + " · " + p.slots.size + ' of 5 slots</div></div>' +
         '<div class="set-pips" role="img" aria-label="' + p.slots.size + ' of 5 armor slots owned">' + pips + "</div>" +
         '<div class="set-card-status">' + esc(setStatus(p)) + "</div>" +
-        (href ? '<a href="' + href + '">Set bonuses →</a>' : "") +
+        (href ? '<a href="' + href + '"' + NEW_TAB + ">Set bonuses →" + NEW_TAB_NOTE + "</a>" : "") +
       "</div>";
     }).join("");
   }
@@ -853,12 +858,12 @@
     if (item.roll){
       const r = item.roll;
       notes += '<div class="callout godroll"><span><strong>' + (r.full ? "Our God Roll" : r.matched + " of " + r.total + " God Roll perks") + "</strong>" +
-        ' <span class="muted">(gold diamonds below)</span></span><a href="god-rolls.html#weapon-' + esc(r.weapon.slug) + '">See our roll →</a></div>';
+        ' <span class="muted">(gold diamonds below)</span></span><a href="' + PUBLIC_SITE + "god-rolls.html#weapon-" + esc(r.weapon.slug) + '"' + NEW_TAB + ">See our roll →" + NEW_TAB_NOTE + "</a></div>";
     }
     if (item.set){
       const p = item.setProgress, ours = item.set.ours;
       notes += '<div class="callout"><span><strong>' + esc(ours ? ours.name : item.set.name) + "</strong> " + p.slots.size + '/5 · <span class="muted">' + esc(setStatus(p)) + "</span></span>" +
-        (ours ? '<a href="' + setHref(p) + '">Set bonuses →</a>' : "") + "</div>";
+        (ours ? '<a href="' + setHref(p) + '"' + NEW_TAB + ">Set bonuses →" + NEW_TAB_NOTE + "</a>" : "") + "</div>";
     }
 
     const statRows = Object.values(item.stats)
