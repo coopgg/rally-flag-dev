@@ -274,10 +274,9 @@
   function render(){ renderOwners(); renderSets(); renderItems(); }
 
   // ---------------- item details ----------------
-  // Laid out like DIM's item popup: rarity header, owner line, stats,
-  // the frame/archetype on one line, perks as icon columns (rolled perk
-  // filled, free-swap options under it), mods as squares. Tapping a perk
-  // or mod shows its name and description underneath.
+  // Same reading order as DIM's popup (header, stats, frame, perk columns,
+  // mods) so it feels familiar, in Rally Flag's own look (styles in
+  // locker.html). Tapping a perk or mod shows its name and description.
   function showPlug(hash){
     const p = DB.items[hash];
     return p && p.n && !/^(empty|locked) /i.test(p.n) && !HIDE_PLUG.test(p.y || "") && SHOW_PLUG.test(p.y || "");
@@ -292,11 +291,31 @@
   const STAT_SHORT = { "Rounds Per Minute": "RPM", "Aim Assistance": "Aim Assist", "Airborne Effectiveness": "Airborne", "Ammo Generation": "Ammo Gen" };
   const NO_BAR = /per minute|magazine|charge time|draw time|recoil direction/i;
 
+  // Recoil Direction compass: the same formula as vendors.html /
+  // api-debug.html (verified against DIM's own drawings), drawn in the
+  // theme colours. A wider wedge means more side-to-side kick.
+  const RECOIL_LEAN_RATIO = [-8 / 9, -0.8453835700401364, -0.7191262172221752, -0.5224757798155321, -0.2746817727777316, 0,
+    0.2746817727777319, 0.5224757798155313, 0.7191262172221743, 0.8453835700401364];
+  function recoilCompassHtml(value){
+    const half = 0.9 * (100 - value);
+    const center = value >= 100 ? 0 : (Math.floor(value / 10) % 2 === 0 ? -1 : 1) * RECOIL_LEAN_RATIO[value % 10] * half;
+    const pt = deg => { const r = deg * Math.PI / 180; return [(1 + Math.sin(r)).toFixed(4), (1 - Math.cos(r)).toFixed(4)]; };
+    let inner;
+    if (half < 1){
+      const [x, y] = pt(center), [ox, oy] = pt(center + 180);
+      inner = '<line class="spread" x1="' + ox + '" y1="' + oy + '" x2="' + x + '" y2="' + y + '" stroke-width="0.1"></line>';
+    } else {
+      const [x1, y1] = pt(center + half), [x2, y2] = pt(center - half);
+      inner = '<path class="spread" d="M1,1 L' + x1 + "," + y1 + " A1,1 0 0,0 " + x2 + "," + y2 + ' Z"></path>';
+    }
+    return '<svg class="recoil-compass" viewBox="0 0 2 1" role="img" aria-label="Recoil direction ' + value + '"><circle class="dial" r="1" cx="1" cy="1"></circle>' + inner + "</svg>";
+  }
+
   function dotHtml(hash, cls, ours){
     const p = DB.items[hash];
     return '<button type="button" class="perk-dot ' + cls + '" data-plug="' + hash + '" aria-pressed="false" title="' + esc(p.n) + '" aria-label="' +
       esc(p.n + (cls === "sel" ? " (on this copy)" : " (can swap to)") + (ours ? ", in our God Roll" : "")) + '">' +
-      (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="44" height="44">' : "") + (ours ? '<span class="ours" aria-hidden="true">★</span>' : "") + "</button>";
+      (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="44" height="44">' : "") + (ours ? '<span class="ours" aria-hidden="true"></span>' : "") + "</button>";
   }
 
   function openItem(id){
@@ -304,17 +323,18 @@
     if (!item) return;
     const d = item.def, dmg = DB.damage[item.damage];
     const ourPerks = new Set(item.roll ? item.roll.weapon.perkHashes : []);
-    const typeLine = (d.y || "") + (d.t === 3 && dmg ? " · " + dmg.n : "");
-    const meta = [esc(ownerLabel(item.owner)) + (item.equipped ? " · equipped" : "")]
-      .concat(item.state & STATE_MASTERWORK ? ["Masterworked"] : [])
-      .concat(item.state & STATE_LOCKED ? ["🔒 Locked"] : []);
+    const eyebrow = (d.r === 6 ? "Exotic" : "Legendary") + " · " + (d.y || "");
+    const sub = (d.t === 3 && dmg ? "<span>" + (dmg.i ? '<img src="' + esc(img(dmg.i)) + '" alt="">' : "") + esc(dmg.n) + "</span>" : "") +
+      "<span>" + esc(ownerLabel(item.owner)) + (item.equipped ? " · equipped" : "") + "</span>" +
+      (item.state & STATE_MASTERWORK ? '<span class="flag">Masterworked</span>' : "") +
+      (item.state & STATE_LOCKED ? '<span class="flag">Locked</span>' : "");
 
     // Rally Flag's own notes first: our God Roll and armor set progress.
     let notes = "";
     if (item.roll){
       const r = item.roll;
-      notes += '<div class="callout"><span><strong>★ ' + (r.full ? "Our God Roll" : r.matched + "/" + r.total + " of our God Roll") + "</strong>" +
-        (r.full ? "" : ' <span class="muted">(★ on the perks)</span>') + '</span><a href="god-rolls.html#weapon-' + esc(r.weapon.slug) + '">See our roll →</a></div>';
+      notes += '<div class="callout godroll"><span><strong>' + (r.full ? "Our God Roll" : r.matched + " of " + r.total + " God Roll perks") + "</strong>" +
+        ' <span class="muted">(gold diamonds below)</span></span><a href="god-rolls.html#weapon-' + esc(r.weapon.slug) + '">See our roll →</a></div>';
     }
     if (item.set){
       const p = item.setProgress, ours = item.set.ours;
@@ -331,7 +351,8 @@
       });
     const barMax = d.t === 2 ? 42 : 100;
     const stats = statRows.map(st => '<div class="stat-row"><span>' + esc(STAT_SHORT[st.name] || st.name) + "</span><b>" + st.value + "</b>" +
-      (NO_BAR.test(st.name) ? "<i></i>" : '<span class="stat-bar"><i style="width:' + Math.max(0, Math.min(100, st.value / barMax * 100)) + '%"></i></span>') + "</div>").join("");
+      (st.name === "Recoil Direction" ? recoilCompassHtml(st.value)
+        : NO_BAR.test(st.name) ? "<i></i>" : '<span class="stat-bar"><i style="width:' + Math.max(0, Math.min(100, st.value / barMax * 100)) + '%"></i></span>') + "</div>").join("");
 
     // Sort sockets into the frame line, perk columns and mod squares.
     let intrinsic = "";
@@ -341,8 +362,8 @@
       const p = DB.items[h];
       if (isIntrinsic(p) && !intrinsic){
         const rpm = statRows.find(st => st.name === "Rounds Per Minute"), impact = statRows.find(st => st.name === "Impact");
-        const sub = rpm && impact ? rpm.value + " rpm / " + impact.value + " impact" : (p.y || "");
-        intrinsic = '<div class="intrinsic">' + (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="40" height="40">' : "") + "<div><b>" + esc(p.n) + "</b><small>" + esc(sub) + "</small></div></div>";
+        const detail = rpm && impact ? rpm.value + " rpm / " + impact.value + " impact" : (p.y || "");
+        intrinsic = '<div class="intrinsic">' + (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="42" height="42">' : "") + "<div><b>" + esc(p.n) + "</b><small>" + esc(detail) + "</small></div></div>";
       } else if (isMod(p)){
         // Mod slots list every mod you own as an option; show only the one in it.
         mods.push('<button type="button" class="mod-sq" data-plug="' + h + '" aria-pressed="false" title="' + esc(p.n) + '" aria-label="' + esc(p.n) + '">' +
@@ -353,26 +374,29 @@
       }
     });
 
-    const blocks = [notes, stats, intrinsic,
-      cols.length ? '<div class="perk-cols" role="group" aria-label="Perks">' + cols.join("") + "</div>" : "",
-      mods.length ? '<div class="mod-row" role="group" aria-label="Mods">' + mods.join("") + "</div>" : ""
+    const label = t => '<div class="dlg-label">' + t + "</div>";
+    const blocks = [
+      notes ? '<div class="rf-notes">' + notes + "</div>" : "",
+      stats ? label("Stats") + stats : "",
+      intrinsic ? label(d.t === 3 ? "Frame" : "Archetype") + intrinsic : "",
+      cols.length ? label("Perks") + '<div class="perk-cols" role="group" aria-label="Perks">' + cols.join("") + "</div>" : "",
+      mods.length ? label("Mods") + '<div class="mod-row" role="group" aria-label="Mods">' + mods.join("") + "</div>" : ""
     ].filter(Boolean).map(b => '<div class="dlg-block">' + b + "</div>");
     const hasPlugs = cols.length || mods.length;
 
     const dlg = $("item-dialog");
     dlg.innerHTML =
       '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-icon"><img src="' + esc(img(d.i)) + '" alt="">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="">' : "") + "</div>" +
-        '<div class="dlg-title"><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-type">' + esc(typeLine) + "</div></div>" +
-        '<div class="dlg-power">' + (d.t === 3 && dmg && dmg.i ? '<img src="' + esc(img(dmg.i)) + '" alt="">' : "") + (item.power || "") + "</div>" +
+        '<div class="dlg-title"><div class="dlg-eyebrow">' + esc(eyebrow) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub">' + sub + "</div></div>" +
+        (item.power ? '<div class="dlg-power"><small>Power</small><b>' + item.power + "</b></div>" : "") +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
-      '<div class="dlg-meta">' + meta.map(m => "<span>" + m + "</span>").join("") + "</div>" +
       '<div class="dlg-body">' + blocks.join("") +
         (hasPlugs ? '<div class="plug-info" id="plug-info" aria-live="polite">Tap a perk or mod to see what it does.</div>' : "") + "</div>";
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
     dlg.querySelectorAll("[data-plug]").forEach(b => b.addEventListener("click", () => {
       dlg.querySelectorAll("[data-plug]").forEach(o => o.setAttribute("aria-pressed", String(o === b)));
       const p = DB.items[b.dataset.plug];
-      $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(+b.dataset.plug) ? " · ★ in our God Roll" : "") +
+      $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(+b.dataset.plug) ? " · in our God Roll" : "") +
         (p.x ? "<br>" + esc(p.x) : "");
     }));
     dlg.showModal();

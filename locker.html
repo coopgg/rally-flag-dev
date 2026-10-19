@@ -164,59 +164,83 @@
   .tile-badge.set + .tile-owner{ top:22px; }
   .locker-empty{ margin-top:30px; text-align:center; color:var(--text-dim); }
 
-  /* Item details, laid out like DIM's item popup: rarity header bar,
-     compact stats, the frame on one line, perks as icon columns, mods as
-     a row of squares. Tapping a perk or mod shows its name below. */
+  /* Item details. Same reading order as DIM's popup (header, stats,
+     frame, perk columns, mods) so DIM players feel at home, drawn in
+     Rally Flag's HUD style: rarity edge + glow, mono section labels,
+     segmented stat bars, our recoil compass, theme-coloured selection
+     and the Rally Flag diamond on our God Roll perks. */
+  :root{ --tier-5:#7b4fb8; --tier-6:#d9b33c; --tier-5-text:#c4a3f2; --tier-6-text:#e8c65c; }
+  [data-mode="light"]{ --tier-5-text:#5d3592; --tier-6-text:#715500; }
   dialog.item-dialog{
-    width:min(440px, calc(100vw - 24px)); max-height:calc(100vh - 40px); padding:0; border-radius:12px; overflow:hidden;
-    border:1px solid var(--edge); background:var(--bg); color:var(--text); box-shadow:0 30px 80px -20px rgba(0,0,0,0.7);
+    width:min(460px, calc(100vw - 24px)); max-height:calc(100vh - 40px); padding:0; border-radius:14px; overflow:hidden;
+    border:1px solid var(--edge); background:var(--bg); color:var(--text); box-shadow:0 30px 80px -20px rgba(0,0,0,0.7), 0 0 40px -18px var(--glow);
   }
   dialog.item-dialog[open]{ display:flex; flex-direction:column; }
-  dialog.item-dialog::backdrop{ background:rgba(4,6,12,0.66); }
-  .dlg-head{ display:flex; gap:12px; align-items:center; padding:10px 12px; color:#fff; background:linear-gradient(90deg, #4c2f6e, #2e2140); }
-  .dlg-head.tier-6{ color:#16120a; background:linear-gradient(90deg, #d9b33c, #a8862a); }
-  .dlg-icon{ position:relative; width:52px; height:52px; flex-shrink:0; border-radius:4px; overflow:hidden; box-shadow:0 0 0 1px rgba(255,255,255,0.35); }
+  dialog.item-dialog::backdrop{ background:rgba(4,6,12,0.7); }
+  .dlg-head{
+    --tier:var(--tier-5); --tier-text:var(--tier-5-text);
+    position:relative; display:flex; gap:14px; align-items:center; padding:14px 14px 14px 18px;
+    background:radial-gradient(ellipse 70% 120% at 100% 0%, color-mix(in srgb, var(--tier) 30%, transparent), transparent 70%), var(--panel);
+    border-bottom:1px solid color-mix(in srgb, var(--tier) 45%, var(--panel-border));
+  }
+  .dlg-head.tier-6{ --tier:var(--tier-6); --tier-text:var(--tier-6-text); }
+  .dlg-head::before{ content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--tier); box-shadow:0 0 14px var(--tier); }
+  .dlg-icon{ position:relative; width:56px; height:56px; flex-shrink:0; border-radius:6px; overflow:hidden; box-shadow:0 0 0 1px var(--tier), 0 0 16px -4px var(--tier); }
   .dlg-icon img{ position:absolute; inset:0; width:100%; height:100%; }
   .dlg-title{ flex:1; min-width:0; }
-  .dlg-name{ font-family:'Oswald', sans-serif; font-weight:700; font-size:21px; line-height:1.1; letter-spacing:0.02em; text-transform:uppercase; margin:0; }
-  .dlg-type{ font-size:13.5px; color:rgba(255,255,255,0.88); margin-top:2px; }
-  .dlg-head.tier-6 .dlg-type{ color:#2a2008; }
-  .dlg-power{ display:flex; align-items:center; gap:5px; font-family:'JetBrains Mono', monospace; font-weight:700; font-size:19px; }
-  .dlg-power img{ width:18px; height:18px; }
-  .dlg-close{ flex-shrink:0; width:32px; height:32px; border-radius:50%; border:0; background:rgba(0,0,0,0.35); color:inherit; font-size:18px; line-height:1; cursor:pointer; }
-  .dlg-meta{ display:flex; flex-wrap:wrap; gap:4px 14px; padding:7px 12px; font-size:13px; color:var(--text-dim); background:var(--panel); border-bottom:1px solid var(--panel-border); }
-  .dlg-body{ padding:12px; overflow-y:auto; }
-  .dlg-block{ padding:10px 0; border-top:1px solid var(--panel-border); }
-  .dlg-block:first-child{ border-top:0; padding-top:0; }
-  .callout{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; padding:8px 10px; border-radius:8px; border:1px solid var(--accent); background:var(--accent-dim); font-size:13.5px; }
+  .dlg-eyebrow{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--tier-text); }
+  .dlg-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:23px; line-height:1.1; letter-spacing:0.02em; margin:2px 0 0; }
+  .dlg-sub{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; margin-top:4px; font-size:13px; color:var(--text-dim); }
+  .dlg-sub img{ width:14px; height:14px; vertical-align:-2px; margin-right:3px; }
+  .dlg-sub .flag{ padding:0 7px; border:1px solid var(--panel-border); border-radius:999px; font-size:12px; line-height:18px; }
+  .dlg-power{ text-align:right; }
+  .dlg-power small{ display:block; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; color:var(--text-dim); }
+  .dlg-power b{ font-family:'JetBrains Mono', monospace; font-size:22px; color:var(--text); }
+  .dlg-close{ position:absolute; top:8px; right:8px; width:30px; height:30px; border-radius:8px; border:1px solid var(--panel-border); background:var(--bg); color:var(--text-dim); font-size:17px; line-height:1; cursor:pointer; }
+  .dlg-head{ padding-right:46px; }
+  .dlg-body{ padding:4px 16px 16px; overflow-y:auto; }
+  .dlg-block{ padding:12px 0 0; }
+  .dlg-label{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--accent-text); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .dlg-label::after{ content:""; flex:1; height:1px; background:var(--panel-border); }
+  /* Rally Flag notes: our God Roll, set progress */
+  .rf-notes{ display:flex; flex-direction:column; gap:6px; }
+  .callout{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; padding:8px 10px 8px 28px; position:relative; border-radius:8px; border:1px solid var(--edge); background:var(--accent-dim); font-size:13.5px; }
+  .callout::before{ content:""; position:absolute; left:10px; top:50%; width:9px; height:9px; margin-top:-4.5px; background:var(--accent); clip-path:polygon(50% 0, 100% 50%, 50% 100%, 0 50%); box-shadow:0 0 10px var(--glow); }
+  .callout.godroll::before{ background:#ffd76a; }
   .callout a{ color:var(--accent-text); font-weight:600; margin-left:auto; }
   .callout .muted{ color:var(--text-dim); }
-  /* Stats: label | value | bar, like DIM */
-  .stat-row{ display:grid; grid-template-columns:118px 34px 1fr; align-items:center; gap:8px; font-size:13px; line-height:20px; }
-  .stat-row span{ text-align:right; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-  .stat-row b{ font-family:'JetBrains Mono', monospace; font-weight:600; color:var(--text); }
-  .stat-bar{ height:9px; background:var(--panel-border); }
-  .stat-bar i{ display:block; height:100%; background:var(--text); opacity:0.85; }
-  /* Frame / archetype: one line */
-  .intrinsic{ display:flex; align-items:center; gap:10px; }
-  .intrinsic img{ width:40px; height:40px; border-radius:6px; background:#2a3142; }
+  /* Stats: label | value | segmented bar (or the recoil compass) */
+  .stat-row{ display:grid; grid-template-columns:112px 34px 1fr; align-items:center; gap:10px; font-size:13px; line-height:21px; }
+  .stat-row span{ color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stat-row b{ font-family:'JetBrains Mono', monospace; font-weight:600; color:var(--text); text-align:right; }
+  .stat-bar{ position:relative; height:8px; background:var(--panel-border); }
+  .stat-bar i{ display:block; height:100%; background:var(--accent-fill); box-shadow:0 0 8px -2px var(--glow); }
+  .stat-bar::after{ content:""; position:absolute; inset:0; background:repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), var(--bg) calc(10% - 2px) 10%); }
+  .recoil-compass{ width:48px; height:24px; display:block; }
+  .recoil-compass .dial{ fill:color-mix(in srgb, var(--text) 16%, transparent); }
+  .recoil-compass .spread{ fill:var(--accent-fill); }
+  .recoil-compass line.spread{ stroke:var(--accent-fill); }
+  /* Frame / archetype */
+  .intrinsic{ display:flex; align-items:center; gap:12px; }
+  .intrinsic img{ width:42px; height:42px; border-radius:8px; background:#2a3142; box-shadow:0 0 0 1px var(--edge); }
   .intrinsic b{ display:block; font-size:14.5px; font-weight:600; }
   .intrinsic small{ font-size:13px; color:var(--text-dim); }
-  /* Perks: icon columns; the rolled perk is filled, options are outlined */
-  .perk-cols{ display:flex; gap:6px; }
-  .perk-col{ display:flex; flex-direction:column; align-items:center; gap:6px; padding:0 6px; }
-  .perk-col + .perk-col{ border-left:1px solid var(--panel-border); }
-  .perk-dot{ position:relative; width:44px; height:44px; padding:0; border-radius:50%; cursor:pointer; border:2px solid transparent; background:transparent; }
+  /* Perks: one column per socket; the perk on this copy on top */
+  .perk-cols{ display:flex; gap:4px; }
+  .perk-col{ display:flex; flex-direction:column; align-items:center; gap:7px; padding:2px 7px; }
+  .perk-col + .perk-col{ border-left:1px dashed var(--panel-border); }
+  .perk-dot{ position:relative; width:44px; height:44px; padding:0; border-radius:50%; cursor:pointer; border:2px solid transparent; background:#1d2333; }
   .perk-dot img{ width:100%; height:100%; border-radius:50%; display:block; }
-  .perk-dot.sel{ background:#3d6fb3; border-color:#7fb2ff; }
-  .perk-dot.alt{ opacity:0.7; border-color:var(--panel-border); }
-  .perk-dot[aria-pressed="true"]{ box-shadow:0 0 0 3px var(--accent); opacity:1; }
-  .perk-dot .ours{ position:absolute; top:-5px; right:-5px; width:18px; height:18px; border-radius:50%; font-size:11px; line-height:18px; text-align:center; color:#111; background:#ffd76a; box-shadow:0 0 0 2px var(--bg); }
-  .mod-row{ display:flex; flex-wrap:wrap; gap:6px; }
-  .mod-sq{ width:44px; height:44px; padding:0; border-radius:4px; border:1px solid var(--panel-border); background:#2a3142; cursor:pointer; overflow:hidden; }
+  .perk-dot.sel{ border-color:var(--accent); box-shadow:0 0 12px -2px var(--glow); }
+  .perk-dot.alt{ opacity:0.62; border-color:var(--panel-border); }
+  .perk-dot:hover, .perk-dot[aria-pressed="true"]{ opacity:1; }
+  .perk-dot[aria-pressed="true"]{ outline:2px solid var(--accent-text); outline-offset:2px; }
+  .perk-dot .ours{ position:absolute; top:-4px; right:-4px; width:15px; height:15px; background:#ffd76a; clip-path:polygon(50% 0, 100% 50%, 50% 100%, 0 50%); filter:drop-shadow(0 0 3px rgba(255,215,106,0.8)); }
+  .mod-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .mod-sq{ width:44px; height:44px; padding:0; border-radius:8px; border:1px solid var(--edge); background:#1d2333; cursor:pointer; overflow:hidden; }
   .mod-sq img{ width:100%; height:100%; display:block; }
-  .mod-sq[aria-pressed="true"]{ box-shadow:0 0 0 3px var(--accent); }
-  .plug-info{ margin-top:10px; padding:8px 10px; border-radius:8px; background:var(--panel); font-size:13.5px; color:var(--text-dim); min-height:20px; }
+  .mod-sq[aria-pressed="true"]{ outline:2px solid var(--accent-text); outline-offset:2px; }
+  .plug-info{ margin-top:12px; padding:9px 11px; border-radius:8px; border:1px solid var(--panel-border); background:var(--panel); font-size:13.5px; color:var(--text-dim); }
   .plug-info b{ color:var(--text); }
   @media (max-width:640px){
     .locker-root{ padding:0 16px 80px; }
@@ -228,7 +252,7 @@
     .locker-count{ margin-left:0; width:100%; }
     /* Bottom sheet on phones, like DIM */
     dialog.item-dialog{ width:100%; max-width:100%; max-height:88vh; margin:auto 0 0; border-radius:14px 14px 0 0; border-bottom:0; }
-    .stat-row{ grid-template-columns:104px 32px 1fr; }
+    .stat-row{ grid-template-columns:100px 32px 1fr; }
   }
 </style>
 </head>
