@@ -93,7 +93,15 @@ function rollSockets(d, want){
       const mods = pool.filter(h => !/^Empty/.test(def(h).displayProperties.name) && (def(h).itemTypeDisplayName || "").endsWith("Armor Mod"));
       if (mods.length) plug = pick(mods);
     }
+    // Weapon mod sockets: a real mod in it and, as on real accounts, every
+    // owned mod listed as a free swap (the Locker must not show those).
+    let modPool = null;
+    if (d.itemType === 3 && pool.length && /Weapon Mod$/.test((def(pool[0]) || {}).itemTypeDisplayName || "")){
+      modPool = pool.filter(h => /Weapon Mod$/.test(def(h).itemTypeDisplayName || "") && !/^Empty/.test(def(h).displayProperties.name));
+      if (modPool.length) plug = pick(modPool);
+    }
     out.push({ plugHash: plug || undefined, isEnabled: true, isVisible: !!plug });
+    if (modPool && modPool.length > 1) pools[i] = modPool.map(h => ({ plugItemHash: h, canInsert: true, enabled: true }));
     if (e.randomizedPlugSetHash && pool.length > 1){
       const alts = sample(pool.filter(h => h !== plug), between(1, 2));
       pools[i] = [plug, ...alts].filter(Boolean).map(h => ({ plugItemHash: h, canInsert: true, enabled: true }));

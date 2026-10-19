@@ -310,7 +310,10 @@
     const cols = [];
     item.plugs.forEach((h, idx) => {
       if (!showPlug(h)) return;
-      const alts = (item.alts[idx] || []).map(p => p.plugItemHash).filter(a => a !== h && showPlug(a));
+      // Mod slots list every mod you own as an option, so show only the
+      // one that's in it; perk columns list what this copy rolled.
+      const isMod = /mod$/i.test(DB.items[h].y || "");
+      const alts = isMod ? [] : (item.alts[idx] || []).map(p => p.plugItemHash).filter(a => a !== h && showPlug(a));
       cols.push('<div class="perk-col">' + plugHtml(h, "", ourPerks.has(h)) + alts.map(a => plugHtml(a, "alt", ourPerks.has(a))).join("") + "</div>");
     });
     const perksHtml = cols.length ? '<div class="dlg-section"><div class="dlg-label">' + (d.t === 3 ? "Perks" : "Perks &amp; mods") + '</div><div class="perk-cols">' + cols.join("") + "</div></div>" : "";
