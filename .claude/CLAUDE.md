@@ -64,6 +64,11 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   10-minute handoff lets the tab that started sign-in adopt it. iPhone
   home-screen installs can't share storage with Safari; the manifest uses
   `display: minimal-ui` so the icon opens in Safari.
+- **Body font: `font-family:var(--font-sans)`**, never a bare `'Inter',
+  sans-serif`. The stack adds "Inter Fallback" (Arial/Liberation/Helvetica)
+  and "Inter Fallback Roboto" faces in `theme.css`, size-adjusted to Inter's
+  width, so text wraps the same before and after a late Inter swap (a
+  2→3-line subtitle on Armor Set Bonuses was a 0.56 CLS on slow fonts).
 - **Light mode colours:** use `--accent-text` for accent-coloured text and
   `--accent-fill` / `--accent-fill-deep` with `--on-accent` for solid fills.
   Raw `--accent` fails contrast on light backgrounds.

@@ -95,13 +95,29 @@ html :is(input, select, textarea):focus-visible{ outline:2px solid var(--accent-
     transition-duration:0.01ms !important; scroll-behavior:auto !important;
   }
 }
+/* Stand-ins for Inter while the web font loads, scaled to Inter's width
+   and line metrics so text wraps the same before and after the swap (no
+   jump when a slow connection gets Inter late). Arial / Liberation Sans /
+   Helvetica on desktop and iOS; Roboto on Android. Same characters as
+   Google's Inter (latin), so symbols Inter lacks (♥, →) still come from
+   the system font as before. Use var(--font-sans). */
+@font-face{ font-family:"Inter Fallback"; src:local("Arial"), local("ArialMT"), local("Liberation Sans"), local("LiberationSans"), local("Helvetica");
+  size-adjust:107%; ascent-override:90.5%; descent-override:22.6%; line-gap-override:0%;
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face{ font-family:"Inter Fallback Roboto"; src:local("Roboto"), local("Roboto-Regular");
+  size-adjust:108%; ascent-override:89.7%; descent-override:22.4%; line-gap-override:0%;
+  unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+:root{ --font-sans:'Inter', "Inter Fallback", "Inter Fallback Roboto", sans-serif; }
+
 body{
   min-height:100vh;
   /* The nebula (body::after) and starfield (body::before) are fixed layers
      behind the page; see the Cosmic layer below. */
   background:var(--bg);
   color:var(--text);
-  font-family:'Inter', sans-serif;
+  font-family:var(--font-sans);
   line-height:1.5;
   -webkit-font-smoothing:antialiased;
   transition: background-color 0.3s ease, color 0.3s ease;
