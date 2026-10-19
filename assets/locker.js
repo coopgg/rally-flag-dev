@@ -44,6 +44,18 @@
 
   let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [];
   const state = { owner: "all", type: null, flags: new Set(), q: "" };
+  // Which view is open: gear (default) or armor sets (#sets).
+  function showView(name, focus){
+    const sets = name === "sets";
+    $("tab-gear").setAttribute("aria-selected", String(!sets));
+    $("tab-sets").setAttribute("aria-selected", String(sets));
+    $("tab-gear").tabIndex = sets ? -1 : 0;
+    $("tab-sets").tabIndex = sets ? 0 : -1;
+    $("view-gear").hidden = sets;
+    $("view-sets").hidden = !sets;
+    if (focus) $(sets ? "tab-sets" : "tab-gear").focus();
+    history.replaceState(null, "", location.pathname + location.search + (sets ? "#sets" : ""));
+  }
 
   // ---------------- status panels ----------------
   function showStatus(html){ $("locker-status").innerHTML = html ? '<div class="locker-panel panel-card">' + html + "</div>" : ""; }
@@ -204,7 +216,10 @@
 
   function renderSets(){
     const list = state.owner === "all" || state.owner === "vault" ? SETS : SETS.filter(p => p.cls === (OWNERS.find(o => o.id === state.owner) || {}).cls);
-    $("sets-hint").textContent = list.length ? list.length + " sets you own pieces of" : "no set pieces yet";
+    $("sets-count").textContent = list.length;
+    $("sets-hint").textContent = list.length
+      ? "Armor sets you own pieces of" + (state.owner === "all" || state.owner === "vault" ? ", per class" : " for your " + ((OWNERS.find(o => o.id === state.owner) || {}).name || "")) + ". Pieces in your vault count too."
+      : "You don't own any set pieces for this character yet.";
     $("set-grid").innerHTML = list.map(p => {
       const pips = ARMOR_SLOTS.map(s => '<span class="set-pip' + (p.slots.has(s) ? " on" : "") + '"></span>').join("");
       const href = setHref(p);
@@ -356,6 +371,17 @@
       const tile = e.target.closest(".item-tile");
       if (tile) openItem(tile.dataset.id);
     });
+    document.querySelector(".view-tabs").addEventListener("click", e => {
+      const t = e.target.closest(".view-tab");
+      if (t) showView(t.id === "tab-sets" ? "sets" : "gear");
+    });
+    // Arrow keys move between the two tabs (WAI-ARIA tabs pattern).
+    document.querySelector(".view-tabs").addEventListener("keydown", e => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
+      e.preventDefault();
+      const toSets = e.key === "End" || ((e.key === "ArrowRight" || e.key === "ArrowLeft") && $("tab-gear").getAttribute("aria-selected") === "true");
+      showView(toSets ? "sets" : "gear", true);
+    });
     // Click on the backdrop closes the dialog.
     $("item-dialog").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
   }
@@ -377,6 +403,8 @@
       $("locker-app").hidden = false;
       wire();
       render();
+      if (location.hash === "#sets") showView("sets");
+      window.addEventListener("hashchange", () => showView(location.hash === "#sets" ? "sets" : "gear"));
     } catch (e){
       showError(e.message || String(e));
     }

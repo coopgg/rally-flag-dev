@@ -121,11 +121,17 @@
   .locker-count{ font-size:13px; color:var(--text-dim); margin-left:auto; }
 
   /* Armor set progress */
-  .sets-panel{ margin-top:30px; }
-  .sets-panel summary{ cursor:pointer; list-style:none; display:flex; align-items:baseline; gap:10px; }
-  .sets-panel summary::-webkit-details-marker{ display:none; }
-  .sets-panel summary .section-label{ margin:0; }
-  .sets-panel summary .hint{ font-size:13px; color:var(--text-dim); }
+  /* Gear | Armor Sets views */
+  .view-tabs{ display:flex; gap:4px; margin-top:22px; border-bottom:1px solid var(--panel-border); }
+  .view-tab{
+    font-family:'Oswald', sans-serif; font-weight:600; font-size:15px; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--text-dim); background:none; border:0; border-bottom:2px solid transparent; margin-bottom:-1px;
+    padding:10px 14px; cursor:pointer;
+  }
+  .view-tab:hover{ color:var(--text); }
+  .view-tab[aria-selected="true"]{ color:var(--accent-text); border-bottom-color:var(--accent); }
+  .view-tab span{ font-family:'Inter', sans-serif; font-weight:500; font-size:13px; letter-spacing:0; color:var(--text-dim); margin-left:4px; }
+  .sets-intro{ margin:20px 0 0; font-size:14px; color:var(--text-dim); }
   .set-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(230px, 1fr)); grid-auto-rows:1fr; gap:12px; margin-top:14px; }
   .set-card{ padding:14px 16px; display:flex; flex-direction:column; gap:8px; }
   .set-card-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:16px; color:var(--text); line-height:1.25; }
@@ -223,6 +229,12 @@
     <div id="demo-banner"></div>
     <div class="owner-grid" id="owner-grid" role="group" aria-label="Show gear from"></div>
 
+    <div class="view-tabs" role="tablist" aria-label="Locker views">
+      <button class="view-tab" type="button" role="tab" id="tab-gear" aria-controls="view-gear" aria-selected="true">Gear</button>
+      <button class="view-tab" type="button" role="tab" id="tab-sets" aria-controls="view-sets" aria-selected="false" tabindex="-1">Armor Sets <span id="sets-count"></span></button>
+    </div>
+
+    <div id="view-gear" role="tabpanel" aria-labelledby="tab-gear">
     <div class="locker-controls">
       <div class="search-box"><input type="search" id="locker-search" aria-label="Search your gear by name, type or perk" placeholder="Search by name, type or perk…" autocomplete="off"></div>
       <div class="chip-row" id="locker-chips">
@@ -237,12 +249,13 @@
       </div>
     </div>
 
-    <details class="sets-panel" id="sets-panel" open>
-      <summary><span class="section-label">Armor set progress</span><span class="hint" id="sets-hint"></span></summary>
-      <div class="set-grid" id="set-grid"></div>
-    </details>
-
     <div id="buckets"></div>
+    </div>
+
+    <div id="view-sets" role="tabpanel" aria-labelledby="tab-sets" hidden>
+      <p class="sets-intro" id="sets-hint"></p>
+      <div class="set-grid" id="set-grid"></div>
+    </div>
   </div>
 </div>
 
