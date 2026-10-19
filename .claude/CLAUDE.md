@@ -114,6 +114,7 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   every change goes into a 5-minute sessionStorage journal laid over any
   profile minted before it (older of response/secondary minted stamps);
   DestinyItemNotFound triggers a one-item GetItem lookup and one retry.
+  After every action the profile re-syncs on its own (1.5s debounce).
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

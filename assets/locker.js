@@ -503,7 +503,34 @@
       computeSets(); render(); // partial progress (e.g. reached the vault) still shows
       if (after) after();
       toast(err.message || String(err), "error", err);
-    }).finally(() => document.body.classList.remove("locker-busy"));
+    }).finally(() => { document.body.classList.remove("locker-busy"); scheduleSync(); });
+  }
+
+  // After every action, re-read the profile from Bungie once things go
+  // quiet (one sync for a burst of moves). The move journal keeps the
+  // page right even if Bungie's copy is still a few seconds behind.
+  const isBusy = () => document.body.classList.contains("locker-busy");
+  // For taps while an action or sync is running: say so instead of ignoring them.
+  function busyNotice(){
+    if (!isBusy()) return false;
+    if (!$("locker-toast").classList.contains("busy")) toast("One moment, syncing with Bungie…", "busy");
+    return true;
+  }
+  let syncTimer = 0;
+  function scheduleSync(){ clearTimeout(syncTimer); syncTimer = setTimeout(sync, 1500); }
+  async function sync(){
+    if (isBusy()) return scheduleSync();
+    document.body.classList.add("locker-busy"); // actions wait for the fresh model
+    try {
+      PROFILE = await loadProfile(); buildModel(); render(); resolvePostmasterNames();
+      const dlg = $("item-dialog");
+      if (dlg.open && dlg.dataset.item) ITEMS.some(i => i.id === dlg.dataset.item) ? openItem(dlg.dataset.item) : dlg.close();
+    } catch (e){ /* a missed sync is harmless: the journal keeps the page right */ }
+    finally {
+      document.body.classList.remove("locker-busy");
+      const t = $("locker-toast");
+      if (t.classList.contains("busy") && t.textContent.startsWith("One moment")) t.className = "locker-toast"; // our own notice: done
+    }
   }
   // Redrawing the popup (innerHTML) must not destroy the message element
   // when it's hosted inside the popup: park it, redraw, put it back.
@@ -684,7 +711,7 @@
         (p.x ? "<br>" + esc(p.x) : "");
     }));
     dlg.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => {
-      if (b.getAttribute("aria-disabled") === "true" || document.body.classList.contains("locker-busy")) return;
+      if (b.getAttribute("aria-disabled") === "true" || busyNotice()) return;
       const to = b.dataset.to, where = ownerLabel(to), name = d.n;
       const reopen = () => { if (dlg.open && dlg.dataset.item === item.id) openItem(item.id); };
       if (b.dataset.act === "equip") run("Equipping " + name + " on your " + where, "Equipped " + name + " on your " + where + ".", () => equipOn(item, to), reopen, item);
@@ -711,7 +738,7 @@
       '<div class="dlg-actions"><div class="act-row"><button type="button" class="act-btn" id="pm-pull">' + (o.emblem ? '<img src="' + esc(img(o.emblem)) + '" alt="" width="20" height="20">' : "") + "Pull to " + esc(o.name) + "</button></div></div>");
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
     $("pm-pull").addEventListener("click", () => {
-      if (document.body.classList.contains("locker-busy")) return;
+      if (busyNotice()) return;
       run("Pulling " + d.n + " to your " + o.name, "Pulled " + d.n + " to your " + o.name + ".", () => pull(p), () => dlg.close());
     });
     if (!dlg.open) dlg.showModal();
@@ -750,7 +777,7 @@
       if (pmTile) return openPostmaster(pmTile.dataset.pm);
       const pmAll = e.target.closest("[data-pm-all]");
       if (pmAll){
-        if (document.body.classList.contains("locker-busy")) return;
+        if (busyNotice()) return;
         const charId = pmAll.dataset.pmAll, list = POSTMASTER.filter(p => p.owner === charId), who = ownerLabel(charId);
         return run("Pulling " + list.length + " items to your " + who, "Pulled everything to your " + who + ".", async () => { for (const p of list) await pull(p); });
       }
@@ -793,10 +820,10 @@
       if (!g || !item) return;
       e.preventDefault();
       const to = g.dataset.owner, where = to === "vault" ? "the vault" : "your " + ownerLabel(to);
-      if (!document.body.classList.contains("locker-busy")) run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to), null, item);
+      if (!busyNotice()) run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to), null, item);
     });
     $("locker-refresh").addEventListener("click", async () => {
-      if (document.body.classList.contains("locker-busy")) return;
+      if (busyNotice()) return;
       toast("Refreshing from Bungie…", "busy");
       try {
         PROFILE = await loadProfile(); buildModel(); render(); resolvePostmasterNames();
