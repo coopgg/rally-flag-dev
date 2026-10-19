@@ -117,6 +117,10 @@ function addItem(itemHash, ownerId, opts = {}){
   const isWeapon = d.itemType === 3;
   const power = opts.power || between(438, 452);
   instances[id] = { damageTypeHash: d.defaultDamageTypeHash || undefined, primaryStat: { statHash: POWER_STAT, value: power }, itemLevel: Math.floor(power / 10), quality: 0, isEquipped: !!opts.equipped, canEquip: true, equipRequiredLevel: 0 };
+  // Gear tier 1-5 (0 = older, untiered gear), from the instance id rather
+  // than rand() so adding it left the rest of the sample unchanged.
+  const tier = Number(id.slice(-6)) * 7 % 6;
+  if (tier) instances[id].gearTier = tier;
   if (isWeapon){
     const s = {};
     for (const st of Object.values((d.stats && d.stats.stats) || {})){ if (st.value && STATS[String(st.statHash)] && STATS[String(st.statHash)].displayProperties.name) s[st.statHash] = { statHash: st.statHash, value: st.value }; }

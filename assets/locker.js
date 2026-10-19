@@ -51,6 +51,13 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const img = p => p ? (p.charAt(0) === "/" ? BUNGIE + p : p) : "";
+  // Masterworked: Bungie's own gold frame (DestinyInventoryItemConstants-
+  // Definition; a brighter one for Exotics). Gear tier: gold diamonds down
+  // the left edge, as in game and DIM, drawn bolder than Bungie's overlay so
+  // they read on bright weapon art.
+  const tierPips = n => '<svg class="tier-pips" viewBox="0 0 8 40" aria-hidden="true">' +
+    Array.from({ length: n }, (_, k) => '<path d="M4 ' + k * 8 + "l3.5 4L4 " + (k * 8 + 8) + "L0.5 " + (k * 8 + 4) + 'z"/>').join("") + "</svg>";
+  const MW_OVERLAY = { 5: "/img/destiny_content/items/masterwork-overlay-border.png", 6: "/img/destiny_content/items/masterwork-overlay-exotic-border.png" };
   const slugify = s => s.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
   let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [], POSTMASTER = [], MEMBERSHIP_TYPE = 0, PROFILE_PATH = "";
@@ -226,7 +233,7 @@
       const plugs = ((sockets[it.itemInstanceId] && sockets[it.itemInstanceId].sockets) || []).map(s => s.plugHash || 0);
       const alts = (reusable[it.itemInstanceId] && reusable[it.itemInstanceId].plugs) || {};
       const item = {
-        id: it.itemInstanceId, hash: it.itemHash, def, owner, equipped, state: it.state || 0,
+        id: it.itemInstanceId, hash: it.itemHash, def, owner, equipped, state: it.state || 0, tier: inst.gearTier || 0,
         power: (inst.primaryStat && inst.primaryStat.value) || 0,
         damage: inst.damageTypeHash || def.d || 0,
         plugs, alts, stats: (stats[it.itemInstanceId] && stats[it.itemInstanceId].stats) || {},
@@ -423,14 +430,16 @@
 
   function tileHtml(item){
     const d = item.def, dmg = DB.damage[item.damage];
-    const label = [d.n, d.y, item.power ? "power " + item.power : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
+    const mw = item.state & STATE_MASTERWORK;
+    const label = [d.n, d.y, item.power ? "power " + item.power : "", item.tier ? "tier " + item.tier : "", mw ? "masterworked" : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
       item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : "",
       TAGS[item.id] ? "tagged " + TAGS[item.id] : ""].filter(Boolean).join(", ");
     const tag = TAGS[item.id];
-    return '<button type="button" class="item-tile ' + tierClass(d) + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
+    return '<button type="button" class="item-tile ' + tierClass(d) + (mw ? " mw" : "") + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
       '<img class="icon" src="' + esc(img(d.i)) + '" alt="" loading="lazy" width="64" height="64">' +
       (d.w ? '<img class="wm" src="' + esc(img(d.w)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
-      (item.set ? '<span class="tile-badge set" aria-hidden="true">' + item.setProgress.slots.size + "</span>" : "") +
+      (mw ? '<img class="ov" src="' + esc(img(MW_OVERLAY[d.r === 6 ? 6 : 5])) + '" alt="" loading="lazy" width="64" height="64">' : "") +
+      (item.tier >= 1 && item.tier <= 5 ? tierPips(item.tier) : "") +
       (item.roll && item.roll.full || tag ? '<span class="tile-badges" aria-hidden="true">' + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
         (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag === "junk" ? '<span class="tile-badge junk">' + ICON_TRASH + "</span>" : "") + "</span>" : "") +
       '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") + (item.power || "") + "</span>" +
@@ -750,6 +759,7 @@
     const eyebrow = (d.r === 6 ? "Exotic" : "Legendary") + " · " + (d.y || "");
     const sub = (d.t === 3 && dmg ? "<span>" + (dmg.i ? '<img src="' + esc(img(dmg.i)) + '" alt="">' : "") + esc(dmg.n) + "</span>" : "") +
       "<span>" + esc(ownerLabel(item.owner)) + (item.equipped ? " · equipped" : "") + "</span>" +
+      (item.tier ? '<span class="flag">Tier ' + item.tier + "</span>" : "") +
       (item.state & STATE_MASTERWORK ? '<span class="flag">Masterworked</span>' : "") +
       (item.state & STATE_LOCKED ? '<span class="flag">Locked</span>' : "");
 
