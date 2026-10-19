@@ -137,6 +137,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   onto a card, a character cell (wide) or the
   "Move to" bar (shown a tick after dragstart; changing the DOM inside
   dragstart cancels the drag in Chrome).
+  Loadouts + max Power: `maxPowerPlan` / `equipSet` / `makeRoom` (shared
+  `spareFirst` ordering with farming); saved per account in localStorage.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

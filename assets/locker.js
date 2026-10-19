@@ -329,7 +329,7 @@
       : counts("vault") + " items";
     const cards = OWNERS.map(o =>
       open("", o.id) + ' style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
-        '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta"><span class="owner-pw">Power </span>' + esc(o.light) + '<span class="owner-items"> · ' + counts(o.id) + " items</span></span>" + statRow(o) + close
+        '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta"><span class="owner-pw">Power </span>' + esc(o.light) + '<span class="owner-items"> · Max ' + fmtPower(maxPowerPlan(o.id).power) + " · " + counts(o.id) + " items</span></span>" + statRow(o) + close
     ).concat([
       open(" vault", "vault") + '><span class="owner-name">Vault</span><span class="owner-meta">' + vaultMeta + "</span>" +
         (money ? '<span class="owner-stats">' + money + "</span>" : "") + close
@@ -339,6 +339,7 @@
     $("owner-grid").innerHTML = cards.join("");
     renderFarm();
     renderJunk();
+    renderLoadoutRow();
   }
 
   // ---------------- junk cleanup ----------------
@@ -356,6 +357,145 @@
     }
     return { moves, left };
   }
+  // Which items to send to the vault first when a slot needs room (farming,
+  // loadouts): junk, then unlocked, then non-favourites, then lowest Power.
+  const spareFirst = (x, y) => ((TAGS[y.id] === "junk") - (TAGS[x.id] === "junk")) || ((x.state & STATE_LOCKED) - (y.state & STATE_LOCKED)) ||
+    ((TAGS[x.id] === "favorite") - (TAGS[y.id] === "favorite")) || (x.power - y.power);
+
+  // ---------------- loadouts + max Power ----------------
+  // A loadout is the 8 weapon/armor items a character had equipped, saved in
+  // this browser per Bungie account (like tags). Equipping one, or a
+  // character's max Power set, moves each item over (sending a spare to the
+  // vault when a slot is full), then equips Legendaries before Exotics so
+  // the one-Exotic rule can't block a swap. Subclass and mods aren't
+  // included yet.
+  const loadoutKey = () => "rallyflag_locker_loadouts:" + (PROFILE_PATH.split("/").pop() || "demo");
+  function readLoadouts(){ try { return JSON.parse(localStorage.getItem(loadoutKey()) || "[]"); } catch (e){ return []; } }
+  function writeLoadouts(list){ try { localStorage.setItem(loadoutKey(), JSON.stringify(list)); } catch (e){} }
+  const gearPower = items => items.length === BUCKETS.length ? items.reduce((n, i) => n + i.power, 0) / items.length : null;
+  const fmtPower = n => n == null ? "—" : (Math.round(n * 10) / 10).toFixed(1);
+  const equippedOn = charId => BUCKETS.map(b => ITEMS.find(i => i.owner === charId && i.equipped && i.def.b === b.hash)).filter(Boolean);
+
+  // The highest-Power item for every slot this character can use, from
+  // anywhere, with at most one Exotic weapon and one Exotic armor piece.
+  // Ties go to items already on this character (fewer moves), and away from
+  // items equipped on another character.
+  function maxPowerPlan(charId){
+    const pool = ITEMS.filter(i => classOk(i, charId));
+    const here = i => i.owner === charId, elsewhereEquipped = i => i.equipped && !here(i);
+    const rank = (a, b) => b.power - a.power || (here(b) && b.equipped) - (here(a) && a.equipped) || here(b) - here(a) || elsewhereEquipped(a) - elsewhereEquipped(b);
+    const items = [];
+    for (const kind of ["weapons", "armor"]){
+      const best = BUCKETS.filter(b => b.kind === kind).map(b => {
+        const inSlot = pool.filter(i => i.def.b === b.hash).sort(rank);
+        return { leg: inSlot.find(i => i.def.r !== 6) || null, exo: inSlot.find(i => i.def.r === 6) || null };
+      });
+      let pick = null, score = null;
+      for (let ex = -1; ex < best.length; ex++){ // -1: no Exotic; k: the Exotic goes in slot k
+        const set = best.map((b, k) => k === ex ? b.exo : b.leg);
+        if (set.some(x => !x)) continue;
+        const s2 = [set.reduce((n, i) => n + i.power, 0), -set.filter(i => !here(i)).length];
+        if (!score || s2[0] > score[0] || (s2[0] === score[0] && s2[1] > score[1])){ score = s2; pick = set; }
+      }
+      items.push(...(pick || best.map(b => b.leg || b.exo).filter(Boolean)));
+    }
+    return { items, power: gearPower(items) };
+  }
+
+  async function makeRoom(charId, bucket, keep){
+    const inv = ITEMS.filter(i => i.owner === charId && !i.equipped && i.def.b === bucket);
+    if (inv.length < INVENTORY_CAP) return;
+    const spare = inv.filter(i => !keep.has(i.id)).sort(spareFirst)[0];
+    if (!spare) throw new Error("Your " + ownerLabel(charId) + " has no room in that slot. Move something to the vault first.");
+    await moveTo(spare, "vault");
+  }
+  async function equipSet(items, charId){
+    const keep = new Set(items.map(i => i.id));
+    for (const item of items){
+      if (item.owner === charId) continue;
+      await makeRoom(charId, item.def.b, keep);
+      await moveTo(item, charId);
+    }
+    for (const item of items.slice().sort((a, b) => (a.def.r === 6) - (b.def.r === 6)))
+      if (!item.equipped) await equipCall(item, charId);
+  }
+
+  function renderLoadoutRow(){
+    const row = $("loadout-row");
+    if (!row) return;
+    const n = readLoadouts().length;
+    row.innerHTML = '<span class="farm-label">Loadouts</span><button type="button" class="farm-btn" id="open-loadouts">Loadouts &amp; max Power</button>' +
+      '<span class="farm-note">' + (n ? n + " saved." : "Save what a character has equipped, or equip their highest Power.") + "</span>";
+  }
+
+  function openLoadouts(){
+    const dlg = $("item-dialog"), list = readLoadouts();
+    // A redraw replaces the buttons: keep keyboard focus on the same control.
+    const was = dlg.open && dlg.contains(document.activeElement) ? document.activeElement : null;
+    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean);
+    const byId = new Map(ITEMS.map(i => [i.id, i]));
+    const mini = (hash, have) => { const d = DB.items[hash] || {}; return '<span class="lo-mini' + (have ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
+    const maxRows = OWNERS.map(o => {
+      const plan = maxPowerPlan(o.id), now = gearPower(equippedOn(o.id));
+      const done = plan.items.every(i => i.owner === o.id && i.equipped);
+      return '<div class="lo-row"><div class="lo-main"><b>' + esc(o.name) + "</b> " +
+          '<span class="muted">Gear now ' + fmtPower(now) + " · max " + fmtPower(plan.power) + "</span></div>" +
+        '<button type="button" class="act-btn" data-lo-max="' + o.id + '"' + (done ? ' aria-disabled="true"' : "") + ">" +
+          (done ? "At max Power" : 'Equip max Power<span class="sr-only"> on your ' + esc(o.name) + "</span>") + "</button></div>";
+    }).join("");
+    const saved = list.length ? list.map(lo => {
+      const have = lo.items.filter(x => byId.has(x.id)).length, gone = lo.items.length - have, owners = OWNERS.filter(o => o.cls === lo.cls);
+      return '<div class="lo-card"><div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(CLASS_NAMES[lo.cls] || "") +
+          (gone ? " · " + gone + " item" + (gone === 1 ? "" : "s") + " no longer found" : "") + "</span></div>" +
+        '<div class="lo-items" aria-hidden="true">' + lo.items.map(x => mini(x.hash, byId.has(x.id))).join("") + "</div>" +
+        '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
+          '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div></div>";
+    }).join("") : '<p class="muted">No loadouts yet. Save what one of your characters has equipped below.</p>';
+    dlg.dataset.item = ""; dlg.dataset.view = "loadouts";
+    redrawDialog(dlg,
+      '<div class="dlg-head"><div class="dlg-title"><div class="dlg-eyebrow">Your characters</div><h2 class="dlg-name" id="dlg-name">Loadouts</h2></div>' +
+        '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
+      '<div class="dlg-body">' +
+        '<div class="dlg-block"><div class="dlg-label">Max Power</div><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</div>" +
+        '<div class="dlg-block"><div class="dlg-label">Saved</div>' + saved + "</div>" +
+        '<div class="dlg-block"><div class="dlg-label">Save a loadout</div>' +
+          '<label class="lo-name"><span>Name</span><input type="text" id="lo-name" maxlength="40" placeholder="e.g. Raid DPS" autocomplete="off"></label>' +
+          '<div class="act-row">' + OWNERS.map(o => '<button type="button" class="act-btn" data-lo-save="' + o.id + '">Save ' + esc(o.name) + "'s gear</button>").join("") + "</div></div>" +
+      "</div>");
+    dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
+    if (dlg.open && (was || !dlg.contains(document.activeElement))) (refocus && dlg.querySelector(refocus) || dlg.querySelector(".dlg-close")).focus();
+    const reopen = () => { if (dlg.open && dlg.dataset.view === "loadouts") openLoadouts(); };
+    dlg.querySelectorAll("[data-lo-max]").forEach(b => b.addEventListener("click", () => {
+      if (b.getAttribute("aria-disabled") === "true" || busyNotice()) return;
+      const o = ownerOf(b.dataset.loMax), plan = maxPowerPlan(o.id);
+      run("Equipping max Power on your " + o.name, "Your " + o.name + " is at max gear Power (" + fmtPower(plan.power) + ").", () => equipSet(plan.items, o.id), reopen);
+    }));
+    dlg.querySelectorAll("[data-lo-equip]").forEach(b => b.addEventListener("click", () => {
+      if (busyNotice()) return;
+      const lo = readLoadouts().find(x => x.id === b.dataset.loEquip), o = ownerOf(b.dataset.to);
+      if (!lo || !o) return;
+      const items = lo.items.map(x => ITEMS.find(i => i.id === x.id)).filter(i => i && classOk(i, o.id));
+      const missing = lo.items.length - items.length;
+      run("Equipping " + lo.name + " on your " + o.name, "Equipped " + lo.name + " on your " + o.name + "." + (missing ? " " + missing + " item" + (missing === 1 ? " was" : "s were") + " missing and skipped." : ""), () => equipSet(items, o.id), reopen);
+    }));
+    dlg.querySelectorAll("[data-lo-del]").forEach(b => b.addEventListener("click", () => {
+      // Two taps: the first asks, the second deletes.
+      if (b.dataset.confirm !== "1"){ b.dataset.confirm = "1"; b.firstChild.textContent = "Tap again to delete"; return; }
+      writeLoadouts(readLoadouts().filter(x => x.id !== b.dataset.loDel));
+      renderLoadoutRow(); openLoadouts(); toast("Loadout deleted.", "ok");
+    }));
+    dlg.querySelectorAll("[data-lo-save]").forEach(b => b.addEventListener("click", () => {
+      const o = ownerOf(b.dataset.loSave), items = equippedOn(o.id);
+      if (!items.length) return toast("Your " + o.name + " has nothing equipped to save.", "error");
+      const all = readLoadouts(), typed = $("lo-name").value.trim();
+      const name = typed || o.name + " loadout " + (all.filter(x => x.cls === o.cls).length + 1);
+      all.push({ id: Date.now().toString(36), name, cls: o.cls, items: items.map(i => ({ id: i.id, hash: i.hash })) });
+      writeLoadouts(all);
+      renderLoadoutRow(); openLoadouts(); toast("Saved " + name + ".", "ok");
+    }));
+    if (!dlg.open) dlg.showModal();
+  }
+
   function renderJunk(){
     const row = $("junk-row");
     if (!row) return;
@@ -398,9 +538,7 @@
       const inv = ITEMS.filter(i => i.owner === charId && !i.equipped && i.def.b === b.hash);
       const extra = inv.length - FARM_KEEP;
       if (extra > 0){
-        const order = (x, y) => ((TAGS[y.id] === "junk") - (TAGS[x.id] === "junk")) || ((x.state & STATE_LOCKED) - (y.state & STATE_LOCKED)) ||
-          ((TAGS[x.id] === "favorite") - (TAGS[y.id] === "favorite")) || (x.power - y.power);
-        moves.push(...inv.sort(order).slice(0, extra));
+        moves.push(...inv.sort(spareFirst).slice(0, extra));
       }
     }
     // Postmaster weapons/armor: pulled and sent straight on to the vault, so
@@ -791,7 +929,8 @@
     try {
       PROFILE = await loadProfile(); buildModel(); render(); resolvePostmasterNames();
       const dlg = $("item-dialog");
-      if (dlg.open && dlg.dataset.item) ITEMS.some(i => i.id === dlg.dataset.item) ? openItem(dlg.dataset.item) : dlg.close();
+      if (dlg.open && dlg.dataset.view === "loadouts") openLoadouts();
+      else if (dlg.open && dlg.dataset.item) ITEMS.some(i => i.id === dlg.dataset.item) ? openItem(dlg.dataset.item) : dlg.close();
     } catch (e){ /* a missed sync is harmless: the journal keeps the page right */ }
     finally {
       document.body.classList.remove("locker-busy");
@@ -966,7 +1105,7 @@
     const hasPlugs = cols.length || mods.length;
 
     const dlg = $("item-dialog");
-    dlg.dataset.item = item.id;
+    dlg.dataset.item = item.id; dlg.dataset.view = "item";
     redrawDialog(dlg,
       '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-icon"><img src="' + esc(img(d.i)) + '" alt="">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="">' : "") + "</div>" +
         '<div class="dlg-title"><div class="dlg-eyebrow">' + esc(eyebrow) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub">' + sub + "</div></div>" +
@@ -1010,7 +1149,7 @@
     if (!p) return;
     const d = p.gear ? p.gear.def : DB.items[p.hash] || { n: "Unknown item" }, o = ownerOf(p.owner);
     const dlg = $("item-dialog");
-    dlg.dataset.item = "";
+    dlg.dataset.item = ""; dlg.dataset.view = "postmaster";
     redrawDialog(dlg,
       '<div class="dlg-head ' + (p.gear ? tierClass(d) : "") + '"><div class="dlg-icon">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="">' : "") + "</div>" +
         '<div class="dlg-title"><div class="dlg-eyebrow">Postmaster · ' + esc(o.name) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub"><span>' + esc(d.y || "") + (p.quantity > 1 ? " · ×" + p.quantity : "") + "</span></div></div>" +
@@ -1128,6 +1267,7 @@
       $("farm-row").querySelector('[data-farm="' + id + '"]').focus();
       if (farming.has(id)) farmTick(); // first check right away
     });
+    $("loadout-row").addEventListener("click", e => { if (e.target.closest("#open-loadouts")) openLoadouts(); });
     $("junk-row").addEventListener("click", e => {
       const b = e.target.closest("[data-junk-to]");
       if (!b || busyNotice()) return;
