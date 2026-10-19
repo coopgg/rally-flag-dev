@@ -105,8 +105,14 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   `node --max-old-space-size=6144 tools/build-locker-demo.js <manifest dir>`
   from real hashes (needs the full item, plug set, item set and stat
   tables). Linked from nav.js's Debug section (hidden on rallyflag.gg); its
-  four files are excluded from promotion. Stage 1 is read-only; moving/
-  equipping needs the app's OAuth "move/equip" scope (owner, bungie.net).
+  four files are excluded from promotion. Stage 2 (moving, equipping,
+  locking, postmaster pulls, desktop drag and drop) posts to
+  /Platform/Destiny2/Actions/Items/{TransferItem,EquipItem,SetLockState,
+  PullFromPostmaster}/ one at a time; these need the app's "Move or equip
+  Destiny gear" OAuth scope (owner, bungie.net), and players re-sign-in
+  after it's enabled. `?demo` simulates every action locally. Test the
+  real path with Playwright: a fake session in sessionStorage
+  (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.
 - **`404.html`** is served for any missing path at any depth; it sets `<base>`
   to the site root and writes its asset tags from script. Keep that pattern.
 

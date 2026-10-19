@@ -193,6 +193,21 @@ for (const c of characters){
   for (const d of sample(classArmor.filter(d => d.inventory.tierType === 6), 3)) addItem(d.hash, rand() < 0.5 ? null : c.id);
 }
 
+// Postmaster (stage 2): a few things waiting on the Titan, including an
+// engram and a material stack, which aren't weapons or armor.
+{
+  const titan = characters[0].id, POSTMASTER = 215593132;
+  const toPostmaster = it => { it.bucketHash = POSTMASTER; it.location = 4; };
+  for (const d of sample(legendaryWeapons, 2)){ const it = addItem(d.hash, titan); if (it) toPostmaster(it); }
+  const armor = Object.values(ITEMS).filter(d => d.itemType === 2 && obtainable(d) && d.classType === 0 && d.inventory.tierType === 5 && d.sockets);
+  { const it = addItem(pick(armor).hash, titan); if (it) toPostmaster(it); }
+  const engram = Object.values(ITEMS).find(d => d.itemType === 8 && d.displayProperties && d.displayProperties.icon && /engram/i.test(d.displayProperties.name));
+  const material = Object.values(ITEMS).find(d => d.itemType === 0 && d.inventory && d.inventory.maxStackSize > 100 && d.displayProperties && d.displayProperties.icon && /glimmer|shard|core|alloy|prism/i.test(d.displayProperties.name));
+  for (const [d, qty] of [[engram, 1], [material, 25]]){
+    if (d) invItems[titan].push({ itemHash: d.hash, quantity: qty, bindStatus: 0, location: 4, bucketHash: POSTMASTER, transferStatus: 0, lockable: false, state: 0 });
+  }
+}
+
 const charData = {};
 for (const c of characters){
   const eq = equipItems[c.id].map(it => instances[it.itemInstanceId].primaryStat.value);

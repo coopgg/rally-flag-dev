@@ -1,5 +1,5 @@
 /* ============================================================
-   Locker (dev-only preview, stage 1: read-only).
+   Locker (dev-only preview, stage 2: move / equip / lock / postmaster).
 
    Shows every weapon and armor piece across the signed-in player's
    characters and vault, Rally Flag style: God Roll matches from
@@ -11,7 +11,11 @@
    locker.html?demo uses assets/locker-demo.json instead of an account
    (built by tools/build-locker-demo.js from real manifest hashes).
 
-   Nothing here writes to Bungie: moving/equipping is stage 2.
+   Stage 2 writes to Bungie only when the player presses a button (or
+   drops a tile): TransferItem, EquipItem, SetLockState and
+   PullFromPostmaster, one at a time through a queue. These need the
+   app's "Move or equip Destiny gear" OAuth scope (set on bungie.net).
+   In ?demo every action is simulated locally.
    ============================================================ */
 (function(){
   const BUNGIE = "https://www.bungie.net";
@@ -32,6 +36,7 @@
   const BUCKET_BY_HASH = new Map(BUCKETS.map(b => [b.hash, b]));
   const ARMOR_SLOTS = BUCKETS.filter(b => b.kind === "armor").map(b => b.hash);
   const STATE_LOCKED = 1, STATE_MASTERWORK = 4;
+  const POSTMASTER_BUCKET = 215593132, POSTMASTER_CAP = 21;
   // Plugs worth showing in the perk columns; cosmetics, trackers and
   // empty sockets are left out.
   const SHOW_PLUG = /trait|intrinsic|magazine|barrel|battery|sight|scope|haft|stock|bowstring|arrow|blade|guard|grip|frame|archetype|armor perk|mod$|tuning/i;
@@ -42,7 +47,7 @@
   const img = p => p ? (p.charAt(0) === "/" ? BUNGIE + p : p) : "";
   const slugify = s => s.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
-  let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [];
+  let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [], POSTMASTER = [], MEMBERSHIP_TYPE = 0;
   const state = { owner: "all", type: null, flags: new Set(), q: "" };
   // Folded slots and opened vault lists, remembered per browser.
   const FOLD_KEY = "rallyflag_locker_folds";
@@ -66,7 +71,7 @@
   function showStatus(html){ $("locker-status").innerHTML = html ? '<div class="locker-panel panel-card">' + html + "</div>" : ""; }
   function showSignedOut(){
     showStatus(
-      "<p>Sign in with Bungie.net to see your weapons and armor here, matched against our God Rolls and armor sets. Rally Flag only reads your gear; nothing is stored anywhere but your browser.</p>" +
+      "<p>Sign in with Bungie.net to see your weapons and armor here, matched against our God Rolls and armor sets. Rally Flag only moves or equips something when you press a button, and nothing is stored anywhere but your browser.</p>" +
       '<div class="locker-actions"><button class="locker-btn" type="button" id="locker-signin">Sign in with Bungie.net</button>' +
       '<a class="locker-btn ghost" href="locker.html?demo">Try it with sample data</a></div>');
     $("locker-signin").addEventListener("click", () => RallyFlagAuth.signIn());
@@ -122,8 +127,9 @@
   function buildModel(){
     const chars = data(PROFILE, "characters");
     const order = (PROFILE.profile && PROFILE.profile.data && PROFILE.profile.data.characterIds) || Object.keys(chars);
-    OWNERS = order.filter(id => chars[id]).map(id => ({ id, cls: chars[id].classType, name: CLASS_NAMES[chars[id].classType] || "Guardian", light: chars[id].light, bg: chars[id].emblemBackgroundPath }));
-    const ownerById = new Map(OWNERS.map(o => [o.id, o]));
+    OWNERS = order.filter(id => chars[id]).map(id => ({ id, cls: chars[id].classType, name: CLASS_NAMES[chars[id].classType] || "Guardian", light: chars[id].light, bg: chars[id].emblemBackgroundPath, emblem: chars[id].emblemPath }));
+    const user = (PROFILE.profile && PROFILE.profile.data && PROFILE.profile.data.userInfo) || {};
+    MEMBERSHIP_TYPE = user.membershipType || (chars[OWNERS[0] && OWNERS[0].id] || {}).membershipType || 0;
 
     const comp = PROFILE.itemComponents || {};
     const instances = (comp.instances && comp.instances.data) || {};
@@ -148,10 +154,11 @@
       for (const h of s.items) setByItem.set(h, entry);
     }
 
-    ITEMS = [];
-    const add = (it, owner, equipped) => {
+    ITEMS = []; POSTMASTER = [];
+    // A weapon or armor piece as the Locker models it, or null.
+    const gearItem = (it, owner, equipped) => {
       const def = DB.items[it.itemHash];
-      if (!def || (def.t !== 2 && def.t !== 3) || !BUCKET_BY_HASH.has(def.b) || !it.itemInstanceId) return;
+      if (!def || (def.t !== 2 && def.t !== 3) || !BUCKET_BY_HASH.has(def.b) || !it.itemInstanceId) return null;
       const inst = instances[it.itemInstanceId] || {};
       const plugs = ((sockets[it.itemInstanceId] && sockets[it.itemInstanceId].sockets) || []).map(s => s.plugHash || 0);
       const alts = (reusable[it.itemInstanceId] && reusable[it.itemInstanceId].plugs) || {};
@@ -171,16 +178,27 @@
       }
       // Searchable text: name, type and every visible perk.
       item.text = (def.n + " " + (def.y || "") + " " + plugs.map(h => DB.items[h] ? DB.items[h].n : "").join(" ")).toLowerCase();
-      ITEMS.push(item);
+      return item;
     };
+    const add = (it, owner, equipped) => { const g = gearItem(it, owner, equipped); if (g) ITEMS.push(g); };
     for (const it of (data(PROFILE, "profileInventory").items || [])) add(it, "vault", false);
     const invs = data(PROFILE, "characterInventories"), eqs = data(PROFILE, "characterEquipment");
     for (const o of OWNERS){
-      for (const it of ((invs[o.id] && invs[o.id].items) || [])) add(it, o.id, false);
+      ((invs[o.id] && invs[o.id].items) || []).forEach((it, idx) => {
+        // The postmaster lives in each character's inventory (its own bucket)
+        // and holds anything: gear, engrams, materials.
+        if (it.bucketHash === POSTMASTER_BUCKET){
+          POSTMASTER.push({ id: it.itemInstanceId || ("pm-" + o.id + "-" + idx), instanceId: it.itemInstanceId || "0", hash: it.itemHash,
+            owner: o.id, quantity: it.quantity || 1, gear: gearItem(it, o.id, false) });
+        } else add(it, o.id, false);
+      });
       for (const it of ((eqs[o.id] && eqs[o.id].items) || [])) add(it, o.id, true);
     }
+    computeSets();
+  }
 
-    // Set progress per (set, class): distinct armor slots owned anywhere.
+  // Set progress per (set, class): distinct armor slots owned anywhere.
+  function computeSets(){
     const progress = new Map();
     for (const item of ITEMS){
       if (!item.set) continue;
@@ -253,7 +271,7 @@
     const d = item.def, dmg = DB.damage[item.damage];
     const label = [d.n, d.y, item.power ? "power " + item.power : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
       item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : ""].filter(Boolean).join(", ");
-    return '<button type="button" class="item-tile ' + tierClass(d) + (item.equipped ? " equipped" : "") + '" data-id="' + item.id + '" aria-label="' + esc(label) + '">' +
+    return '<button type="button" class="item-tile ' + tierClass(d) + (item.equipped ? " equipped" : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
       '<img class="icon" src="' + esc(img(d.i)) + '" alt="" loading="lazy" width="64" height="64">' +
       (d.w ? '<img class="wm" src="' + esc(img(d.w)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (item.set ? '<span class="tile-badge set" aria-hidden="true">' + item.setProgress.slots.size + "</span>" : "") +
@@ -279,7 +297,7 @@
         const items = inSlot.filter(i => i.owner === g).sort(byPower);
         const long = g === "vault" && !filtering && items.length > VAULT_PREVIEW;
         const open = folds.vaults.has(b.hash);
-        return '<div class="owner-group' + (g === "vault" ? " vault" : "") + (items.length ? "" : " empty") + (long && !open ? " clipped" : "") + '">' +
+        return '<div class="owner-group' + (g === "vault" ? " vault" : "") + (items.length ? "" : " empty") + (long && !open ? " clipped" : "") + '" data-owner="' + g + '">' +
           '<div class="group-label">' + esc(ownerLabel(g)) + " · " + items.length + "</div>" +
           (items.length ? '<div class="item-grid" id="vg-' + b.hash + "-" + g + '">' + items.map(tileHtml).join("") + "</div>" : '<div class="group-empty">—</div>') +
           (long ? '<button type="button" class="vault-more" data-slot="' + b.hash + '" aria-expanded="' + open + '" aria-controls="vg-' + b.hash + "-" + g + '">' + (open ? "Show less" : "Show all " + items.length) + "</button>" : "") +
@@ -291,12 +309,138 @@
           '<span class="chev" aria-hidden="true"></span>' + b.label + " <span>" + inSlot.length + "</span></button></h2>" +
         '<div class="owner-groups' + (groups.length > 1 ? " multi" : "") + '" id="bb-' + b.hash + '" style="--chars:' + (groups.length - 1) + '"' + (folded ? " hidden" : "") + ">" + cols + "</div></section>";
     }).join("");
-    $("buckets").innerHTML = html || '<p class="locker-empty">Nothing matches these filters.</p>';
+    $("buckets").innerHTML = postmasterHtml() + (html || '<p class="locker-empty">Nothing matches these filters.</p>');
     $("locker-count").textContent = "Showing " + shown.length + " of " + ITEMS.length + " items";
     $("fold-all").textContent = BUCKETS.every(b => folds.slots.has(b.hash)) ? "Expand all" : "Collapse all";
   }
 
+  // Postmaster: only shown when something is waiting, per character, with
+  // a warning as it nears Bungie's 21-item limit (after that, items are lost).
+  function postmasterHtml(){
+    const groups = OWNERS.filter(o => state.owner === "all" || state.owner === o.id).map(o => ({ o, items: POSTMASTER.filter(p => p.owner === o.id) })).filter(g => g.items.length);
+    if (!groups.length) return "";
+    return '<section class="bucket postmaster" aria-labelledby="pm-head"><h2 id="pm-head">Postmaster <span>' + groups.reduce((n, g) => n + g.items.length, 0) + "</span></h2>" +
+      groups.map(g => {
+        const full = g.items.length >= POSTMASTER_CAP - 3;
+        return '<div class="pm-group' + (full ? " nearly-full" : "") + '"><div class="group-label">' + esc(g.o.name) + " · " + g.items.length + "/" + POSTMASTER_CAP +
+          (full ? " · almost full, new items will be lost" : "") + '</div><div class="pm-row"><div class="item-grid">' +
+          g.items.map(p => {
+            const d = p.gear ? p.gear.def : DB.items[p.hash] || { n: "Loading…" };
+            return '<button type="button" class="item-tile pm-tile ' + (p.gear ? tierClass(d) : "") + '" data-pm="' + esc(p.id) + '" aria-label="' + esc(d.n + (p.quantity > 1 ? ", " + p.quantity + " of them" : "") + ", in your " + g.o.name + "'s postmaster") + '">' +
+              (d.i ? '<img class="icon" src="' + esc(img(d.i)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
+              (p.quantity > 1 ? '<span class="tile-power">' + p.quantity + "</span>" : p.gear && p.gear.power ? '<span class="tile-power">' + p.gear.power + "</span>" : "") + "</button>";
+          }).join("") + '</div><button type="button" class="locker-btn ghost pm-all" data-pm-all="' + g.o.id + '">Pull all to ' + esc(g.o.name) + "</button></div></div>";
+      }).join("") + "</section>";
+  }
+
   function render(){ renderOwners(); renderSets(); renderItems(); }
+
+  // ---------------- actions (stage 2) ----------------
+  // One Bungie action at a time; the model is updated after each step
+  // succeeds, so the page always shows where things really are.
+  const ACTIONS = "/Platform/Destiny2/Actions/Items/";
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  let queue = Promise.resolve();
+  const enqueue = fn => { const p = queue.then(fn); queue = p.catch(() => {}); return p; };
+
+  // Bungie's error statuses, in player words.
+  const FRIENDLY = {
+    DestinyNoRoomInDestination: "There's no room there: that character already has 9 items in this slot, or the vault is full.",
+    DestinyItemUniqueEquipRestricted: "You can only equip one Exotic weapon and one Exotic armor piece at a time.",
+    DestinyCannotPerformActionAtThisLocation: "Bungie only allows this while that character is in orbit or a social space.",
+    DestinyCharacterNotInTower: "Bungie only allows this while that character is in orbit or a social space.",
+    DestinyItemNotTransferrable: "Bungie doesn't allow this item to be moved.",
+    DestinyItemNotFound: "Bungie couldn't find this item where we expected it. Try Refresh.",
+    AccessNotPermittedByApplicationScope: "Rally Flag isn't allowed to move gear yet: the site's Bungie app needs the \"Move or equip Destiny gear\" permission."
+  };
+  async function post(endpoint, body){
+    if (DEMO){ await sleep(250); return; }
+    const res = await RallyFlagAuth.authedFetch(ACTIONS + endpoint + "/", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ membershipType: MEMBERSHIP_TYPE }, body))
+    });
+    let data = {};
+    try { data = await res.json(); } catch (e){}
+    if (!res.ok || data.ErrorCode !== 1){
+      const status = data.ErrorStatus || "";
+      throw new Error(FRIENDLY[status] || (/scope/i.test(status + " " + (data.Message || "")) ? FRIENDLY.AccessNotPermittedByApplicationScope : (data.Message || "Bungie said no (HTTP " + res.status + ").")));
+    }
+    if (data.ThrottleSeconds) await sleep(data.ThrottleSeconds * 1000);
+  }
+  const ownerOf = id => OWNERS.find(o => o.id === id);
+  const classOk = (item, charId) => item.def.t !== 2 || item.def.c === 3 || item.def.c === (ownerOf(charId) || {}).cls;
+
+  const transfer = (item, toVault, charId) => post("TransferItem", { itemReferenceHash: item.hash, stackSize: 1, transferToVault: toVault, itemId: item.id, characterId: charId });
+  async function equipCall(item, charId){
+    await post("EquipItem", { itemId: item.id, characterId: charId });
+    for (const i of ITEMS) if (i.owner === charId && i.equipped && i.def.b === item.def.b) i.equipped = false;
+    item.equipped = true;
+  }
+  // An equipped item can't leave: equip the best other item in that slot
+  // first (a Legendary when there is one, so the Exotic limit can't bite).
+  async function swapOut(item){
+    const rep = ITEMS.filter(i => i !== item && i.owner === item.owner && !i.equipped && i.def.b === item.def.b && classOk(i, item.owner))
+      .sort((a, b) => (a.def.r === 6) - (b.def.r === 6) || b.power - a.power)[0];
+    if (!rep) throw new Error("It's equipped and your " + ownerLabel(item.owner) + " has nothing else in that slot to swap in. Move something there first.");
+    await equipCall(rep, item.owner);
+  }
+  async function moveTo(item, dest){
+    if (item.owner === dest) return;
+    if (item.equipped) await swapOut(item);
+    if (item.owner !== "vault"){ await transfer(item, true, item.owner); item.owner = "vault"; }
+    if (dest !== "vault"){ await transfer(item, false, dest); item.owner = dest; }
+  }
+  async function equipOn(item, charId){
+    if (!classOk(item, charId)) throw new Error("Only a " + (CLASS_NAMES[item.def.c] || "matching class") + " can equip this.");
+    await moveTo(item, charId);
+    await equipCall(item, charId);
+  }
+  async function setLock(item, locked){
+    await post("SetLockState", { state: locked, itemId: item.id, characterId: item.owner === "vault" ? OWNERS[0].id : item.owner });
+    item.state = locked ? (item.state | STATE_LOCKED) : (item.state & ~STATE_LOCKED);
+  }
+  async function pull(pm){
+    await post("PullFromPostmaster", { itemReferenceHash: pm.hash, stackSize: pm.quantity, itemId: pm.instanceId, characterId: pm.owner });
+    POSTMASTER = POSTMASTER.filter(p => p !== pm);
+    if (pm.gear) ITEMS.push(pm.gear);
+  }
+
+  // Runs an action with a visible status, then re-renders.
+  function run(busy, done, fn, after){
+    toast(busy + "…", "busy");
+    document.body.classList.add("locker-busy");
+    return enqueue(fn).then(() => {
+      computeSets(); render();
+      toast(done, "ok");
+      if (after) after();
+    }, err => {
+      computeSets(); render(); // partial progress (e.g. reached the vault) still shows
+      toast(err.message || String(err), "error");
+      if (after) after();
+    }).finally(() => document.body.classList.remove("locker-busy"));
+  }
+  let toastTimer = 0;
+  function toast(text, kind){
+    const t = $("locker-toast");
+    t.textContent = text;
+    t.className = "locker-toast show " + kind;
+    clearTimeout(toastTimer);
+    if (kind !== "busy") toastTimer = setTimeout(() => { t.className = "locker-toast"; }, kind === "error" ? 9000 : 3500);
+  }
+
+  // Postmaster names for things outside the trimmed database (engrams,
+  // consumables): looked up one by one, only when something is waiting.
+  async function resolvePostmasterNames(){
+    const missing = [...new Set(POSTMASTER.filter(p => !DB.items[p.hash]).map(p => p.hash))];
+    await Promise.all(missing.map(async h => {
+      try {
+        const res = await fetch(BUNGIE + "/Platform/Destiny2/Manifest/DestinyInventoryItemDefinition/" + h + "/", { headers: { "X-API-Key": window.RallyFlagAPI.BUNGIE_API_KEY } });
+        const d = (await res.json()).Response;
+        if (d && d.displayProperties) DB.items[h] = { n: d.displayProperties.name || "Unknown item", i: d.displayProperties.icon, y: d.itemTypeDisplayName || "" };
+      } catch (e){}
+    }));
+    if (missing.length) renderItems();
+  }
 
   // ---------------- item details ----------------
   // Same reading order as DIM's popup (header, stats, frame, perk columns,
@@ -400,6 +544,13 @@
     });
 
     const label = t => '<div class="dlg-label">' + t + "</div>";
+    // Equip on a character that can use it; move to any character or the vault.
+    const ownerBtn = (o, act, current) => '<button type="button" class="act-btn' + (current ? " current" : "") + '" data-act="' + act + '" data-to="' + o.id + '"' + (current ? ' aria-disabled="true"' : "") + ">" +
+      (o.emblem ? '<img src="' + esc(img(o.emblem)) + '" alt="" width="20" height="20">' : "") + esc(o.name) + "</button>";
+    const actions = '<div class="dlg-actions">' +
+      '<div class="act-row"><span class="act-label">Equip</span>' + OWNERS.filter(o => classOk(item, o.id)).map(o => ownerBtn(o, "equip", item.owner === o.id && item.equipped)).join("") + "</div>" +
+      '<div class="act-row"><span class="act-label">Move</span>' + OWNERS.concat([{ id: "vault", name: "Vault" }]).map(o => ownerBtn(o, "move", item.owner === o.id)).join("") +
+        '<button type="button" class="act-btn lock" data-act="lock" aria-pressed="' + !!(item.state & STATE_LOCKED) + '">' + (item.state & STATE_LOCKED ? "Locked" : "Lock") + "</button></div></div>";
     const blocks = [
       notes ? '<div class="rf-notes">' + notes + "</div>" : "",
       stats ? label("Stats") + stats : "",
@@ -410,11 +561,13 @@
     const hasPlugs = cols.length || mods.length;
 
     const dlg = $("item-dialog");
+    dlg.dataset.item = item.id;
     dlg.innerHTML =
       '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-icon"><img src="' + esc(img(d.i)) + '" alt="">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="">' : "") + "</div>" +
         '<div class="dlg-title"><div class="dlg-eyebrow">' + esc(eyebrow) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub">' + sub + "</div></div>" +
         (item.power ? '<div class="dlg-power"><small>Power</small><b>' + item.power + "</b></div>" : "") +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
+      actions +
       '<div class="dlg-body">' + blocks.join("") +
         (hasPlugs ? '<div class="plug-info" id="plug-info" aria-live="polite">Tap a perk or mod to see what it does.</div>' : "") + "</div>";
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
@@ -424,7 +577,38 @@
       $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(+b.dataset.plug) ? " · in our God Roll" : "") +
         (p.x ? "<br>" + esc(p.x) : "");
     }));
-    dlg.showModal();
+    dlg.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => {
+      if (b.getAttribute("aria-disabled") === "true" || document.body.classList.contains("locker-busy")) return;
+      const to = b.dataset.to, where = ownerLabel(to), name = d.n;
+      const reopen = () => { if (dlg.open && dlg.dataset.item === item.id) openItem(item.id); };
+      if (b.dataset.act === "equip") run("Equipping " + name + " on your " + where, "Equipped " + name + " on your " + where + ".", () => equipOn(item, to), reopen);
+      else if (b.dataset.act === "move") run("Moving " + name + " to " + (to === "vault" ? "the vault" : "your " + where), "Moved " + name + " to " + (to === "vault" ? "the vault" : "your " + where) + ".", () => moveTo(item, to), reopen);
+      else {
+        const lock = !(item.state & STATE_LOCKED);
+        run((lock ? "Locking " : "Unlocking ") + name, (lock ? "Locked " : "Unlocked ") + name + ".", () => setLock(item, lock), reopen);
+      }
+    }));
+    if (!dlg.open) dlg.showModal();
+  }
+
+  // Postmaster items: a short popup with what it is and a Pull button.
+  function openPostmaster(id){
+    const p = POSTMASTER.find(x => x.id === id);
+    if (!p) return;
+    const d = p.gear ? p.gear.def : DB.items[p.hash] || { n: "Unknown item" }, o = ownerOf(p.owner);
+    const dlg = $("item-dialog");
+    dlg.dataset.item = "";
+    dlg.innerHTML =
+      '<div class="dlg-head ' + (p.gear ? tierClass(d) : "") + '"><div class="dlg-icon">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="">' : "") + "</div>" +
+        '<div class="dlg-title"><div class="dlg-eyebrow">Postmaster · ' + esc(o.name) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub"><span>' + esc(d.y || "") + (p.quantity > 1 ? " · ×" + p.quantity : "") + "</span></div></div>" +
+        '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
+      '<div class="dlg-actions"><div class="act-row"><button type="button" class="act-btn" id="pm-pull">' + (o.emblem ? '<img src="' + esc(img(o.emblem)) + '" alt="" width="20" height="20">' : "") + "Pull to " + esc(o.name) + "</button></div></div>";
+    dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
+    $("pm-pull").addEventListener("click", () => {
+      if (document.body.classList.contains("locker-busy")) return;
+      run("Pulling " + d.n + " to your " + o.name, "Pulled " + d.n + " to your " + o.name + ".", () => pull(p), () => dlg.close());
+    });
+    if (!dlg.open) dlg.showModal();
   }
 
   // ---------------- wiring ----------------
@@ -454,6 +638,14 @@
       t = setTimeout(() => { state.q = e.target.value.trim().toLowerCase(); renderItems(); }, 120);
     });
     $("buckets").addEventListener("click", e => {
+      const pmTile = e.target.closest("[data-pm]");
+      if (pmTile) return openPostmaster(pmTile.dataset.pm);
+      const pmAll = e.target.closest("[data-pm-all]");
+      if (pmAll){
+        if (document.body.classList.contains("locker-busy")) return;
+        const charId = pmAll.dataset.pmAll, list = POSTMASTER.filter(p => p.owner === charId), who = ownerLabel(charId);
+        return run("Pulling " + list.length + " items to your " + who, "Pulled everything to your " + who + ".", async () => { for (const p of list) await pull(p); });
+      }
       const tile = e.target.closest(".item-tile");
       if (tile) return openItem(tile.dataset.id);
       const slot = e.target.closest(".bucket-toggle");
@@ -466,6 +658,40 @@
       renderItems();
       const again = document.querySelector((slot ? ".bucket-toggle" : ".vault-more") + '[data-slot="' + h + '"]');
       if (again) again.focus(); // keep keyboard focus on the toggle
+    });
+    // Drag a tile onto another character's or the vault's column (pointer
+    // devices; the popup's Move buttons do the same everywhere).
+    let dragId = null;
+    $("buckets").addEventListener("dragstart", e => {
+      const tile = e.target.closest(".item-tile[data-id]");
+      if (!tile){ e.preventDefault(); return; }
+      dragId = tile.dataset.id;
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", dragId);
+    });
+    $("buckets").addEventListener("dragover", e => {
+      const g = e.target.closest(".owner-group[data-owner]");
+      const item = dragId && ITEMS.find(i => i.id === dragId);
+      if (!g || !item || g.dataset.owner === item.owner || !g.closest("#bb-" + item.def.b)) return;
+      e.preventDefault();
+      document.querySelectorAll(".drop-target").forEach(x => x !== g && x.classList.remove("drop-target"));
+      g.classList.add("drop-target");
+    });
+    $("buckets").addEventListener("dragleave", e => { const g = e.target.closest(".owner-group"); if (g && !g.contains(e.relatedTarget)) g.classList.remove("drop-target"); });
+    $("buckets").addEventListener("dragend", () => { dragId = null; document.querySelectorAll(".drop-target").forEach(x => x.classList.remove("drop-target")); });
+    $("buckets").addEventListener("drop", e => {
+      const g = e.target.closest(".owner-group[data-owner]");
+      const item = dragId && ITEMS.find(i => i.id === dragId);
+      if (!g || !item) return;
+      e.preventDefault();
+      const to = g.dataset.owner, where = to === "vault" ? "the vault" : "your " + ownerLabel(to);
+      if (!document.body.classList.contains("locker-busy")) run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to));
+    });
+    $("locker-refresh").addEventListener("click", async () => {
+      if (document.body.classList.contains("locker-busy")) return;
+      toast("Refreshing from Bungie…", "busy");
+      try { PROFILE = await loadProfile(); buildModel(); render(); resolvePostmasterNames(); toast("Up to date.", "ok"); }
+      catch (err){ toast("Couldn't refresh: " + (err.message || err), "error"); }
     });
     $("fold-all").addEventListener("click", () => {
       const all = BUCKETS.every(b => folds.slots.has(b.hash));
@@ -505,6 +731,7 @@
       $("locker-app").hidden = false;
       wire();
       render();
+      resolvePostmasterNames();
       if (location.hash === "#sets") showView("sets");
       window.addEventListener("hashchange", () => showView(location.hash === "#sets" ? "sets" : "gear"));
     } catch (e){

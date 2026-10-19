@@ -264,6 +264,47 @@
   .mod-sq[aria-pressed="true"]{ outline:2px solid var(--accent-text); outline-offset:2px; }
   .plug-info{ margin-top:12px; padding:9px 11px; border-radius:8px; border:1px solid var(--panel-border); background:var(--panel); font-size:13.5px; color:var(--text-dim); }
   .plug-info b{ color:var(--text); }
+
+  /* Stage 2: actions in the item popup */
+  .dlg-actions{ display:flex; flex-direction:column; gap:8px; padding:10px 16px; border-bottom:1px solid var(--panel-border); background:var(--panel); }
+  .act-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .act-label{ width:50px; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
+  .act-btn{
+    display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:4px 11px 4px 5px; border-radius:999px;
+    border:1px solid var(--edge); background:var(--bg); color:var(--text); font:inherit; font-size:13px; font-weight:500; cursor:pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .act-btn img{ width:20px; height:20px; border-radius:50%; }
+  .act-btn:hover{ border-color:var(--accent); box-shadow:0 0 12px -4px var(--glow); }
+  .act-btn.current{ color:var(--text-dim); border-style:dashed; cursor:default; box-shadow:none; }
+  .act-btn.lock{ margin-left:auto; padding-left:11px; }
+  .act-btn.lock[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
+  body.locker-busy .act-btn, body.locker-busy .pm-all{ opacity:0.55; cursor:progress; }
+  /* Status messages */
+  .locker-toast{
+    position:fixed; left:50%; bottom:20px; z-index:1000; max-width:min(520px, calc(100vw - 32px)); transform:translate(-50%, 20px);
+    padding:10px 16px 10px 32px; border-radius:10px; border:1px solid var(--edge); background:var(--bg); color:var(--text);
+    font-size:14px; box-shadow:0 14px 40px -12px rgba(0,0,0,0.6), 0 0 22px -10px var(--glow); opacity:0; pointer-events:none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .locker-toast::before{ content:""; position:absolute; left:12px; top:50%; width:9px; height:9px; margin-top:-4.5px; background:var(--accent); clip-path:polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  .locker-toast.show{ opacity:1; transform:translate(-50%, 0); }
+  .locker-toast.error{ border-color:#d9534f; }
+  .locker-toast.error::before{ background:#e5534b; }
+  .locker-toast.busy::before{ animation:toast-pulse 0.9s ease-in-out infinite alternate; }
+  @keyframes toast-pulse{ from{ opacity:0.3; } to{ opacity:1; } }
+  /* Postmaster */
+  .bucket.postmaster h2{ font-family:'Oswald', sans-serif; font-weight:600; font-size:17px; letter-spacing:0.06em; text-transform:uppercase; display:flex; gap:10px; align-items:baseline; }
+  .bucket.postmaster h2 span{ font-family:'Inter', sans-serif; font-size:13px; font-weight:500; letter-spacing:0; text-transform:none; color:var(--text-dim); }
+  .pm-group{ padding:12px 14px; border-radius:12px; border:1px solid var(--edge); background:var(--panel); margin-bottom:10px; }
+  .pm-group.nearly-full{ border-color:#d9534f; box-shadow:0 0 18px -8px #d9534f; }
+  .pm-group.nearly-full .group-label{ color:var(--text); }
+  .pm-row{ display:flex; flex-wrap:wrap; align-items:center; gap:12px; }
+  .pm-row .item-grid{ flex:1; }
+  .pm-tile:not(.tier-5):not(.tier-6){ border-color:var(--panel-border); }
+  /* Drag and drop */
+  .item-tile[draggable="true"]{ cursor:grab; }
+  .owner-group.drop-target{ background:var(--accent-dim); outline:2px dashed var(--accent); outline-offset:4px; border-radius:6px; }
   @media (max-width:640px){
     .locker-root{ padding:0 16px 80px; }
     .owner-grid{ grid-template-columns:repeat(2, 1fr); gap:8px; }
@@ -273,6 +314,8 @@
     .item-tile{ width:60px; height:60px; }
     .locker-count{ margin-left:0; width:auto; flex:1; }
     .owner-group.clipped .item-tile:nth-child(n+11){ display:none; }
+    .act-label{ width:100%; }
+    .act-btn.lock{ margin-left:0; }
     /* Bottom sheet on phones, like DIM */
     dialog.item-dialog{ width:100%; max-width:100%; max-height:88vh; margin:auto 0 0; border-radius:14px 14px 0 0; border-bottom:0; }
     .stat-row{ grid-template-columns:100px 32px 1fr; }
@@ -314,6 +357,7 @@
         <button class="chip" type="button" data-kind="flag" data-value="set" aria-pressed="false">Set pieces</button>
         <button class="chip" type="button" data-kind="flag" data-value="equipped" aria-pressed="false">Equipped</button>
         <span class="locker-count" id="locker-count" aria-live="polite"></span>
+        <button type="button" class="fold-all" id="locker-refresh">Refresh</button>
         <button type="button" class="fold-all" id="fold-all">Collapse all</button>
       </div>
     </div>
@@ -331,6 +375,7 @@
 </main>
 
 <dialog class="item-dialog" id="item-dialog" aria-labelledby="dlg-name"></dialog>
+<div class="locker-toast" id="locker-toast" role="status" aria-live="polite"></div>
 
 <footer>
   <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
