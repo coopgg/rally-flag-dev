@@ -356,7 +356,7 @@
     DestinyCharacterNotInTower: "Bungie only allows this while that character is in orbit or a social space.",
     DestinyItemNotTransferrable: "Bungie doesn't allow this item to be moved.",
     DestinyItemNotFound: "Bungie couldn't find this item where we expected it. Try Refresh.",
-    AccessNotPermittedByApplicationScope: "Rally Flag isn't allowed to move gear yet: the site's Bungie app needs the \"Move or equip Destiny gear\" permission."
+    AccessNotPermittedByApplicationScope: "Bungie says your sign-in doesn't include permission to move gear. Bungie adds that permission when you sign in, so sign in again (once the site's app has \"Move or equip Destiny gear\" turned on)."
   };
   async function post(endpoint, body){
     if (DEMO){ await sleep(250); return; }
@@ -368,7 +368,12 @@
     try { data = await res.json(); } catch (e){}
     if (!res.ok || data.ErrorCode !== 1){
       const status = data.ErrorStatus || "";
-      throw new Error(FRIENDLY[status] || (/scope/i.test(status + " " + (data.Message || "")) ? FRIENDLY.AccessNotPermittedByApplicationScope : (data.Message || "Bungie said no (HTTP " + res.status + ").")));
+      const scope = status === "AccessNotPermittedByApplicationScope" || /scope/i.test(status + " " + (data.Message || ""));
+      const err = new Error(FRIENDLY[status] || (scope ? FRIENDLY.AccessNotPermittedByApplicationScope : (data.Message || "Bungie said no (HTTP " + res.status + ").")));
+      // Bungie's own code, shown small under the message, for bug reports.
+      err.code = (status || "HTTP " + res.status) + (data.ErrorCode ? " #" + data.ErrorCode : "");
+      err.scope = scope;
+      throw err;
     }
     if (data.ThrottleSeconds) await sleep(data.ThrottleSeconds * 1000);
   }
@@ -416,21 +421,41 @@
     document.body.classList.add("locker-busy");
     return enqueue(fn).then(() => {
       computeSets(); render();
+      if (after) after(); // redraws the popup first, so the message isn't wiped
       toast(done, "ok");
-      if (after) after();
     }, err => {
       computeSets(); render(); // partial progress (e.g. reached the vault) still shows
-      toast(err.message || String(err), "error");
       if (after) after();
+      toast(err.message || String(err), "error", err);
     }).finally(() => document.body.classList.remove("locker-busy"));
   }
+  // Redrawing the popup (innerHTML) must not destroy the message element
+  // when it's hosted inside the popup: park it, redraw, put it back.
+  function redrawDialog(dlg, html){
+    const t = $("locker-toast"), inside = dlg.contains(t);
+    if (inside) document.body.appendChild(t);
+    dlg.innerHTML = html;
+    if (inside) dlg.appendChild(t);
+  }
   let toastTimer = 0;
-  function toast(text, kind){
+  function toast(text, kind, err){
     const t = $("locker-toast");
+    // A modal popup makes the rest of the page inert, so while it's open
+    // the message lives inside it (its button must stay clickable).
+    const dlg = $("item-dialog"), host = dlg.open ? dlg : document.body;
+    if (t.parentNode !== host) host.appendChild(t);
     t.textContent = text;
-    t.className = "locker-toast show " + kind;
+    // Errors carry Bungie's code, and a permission error offers a fresh sign-in.
+    if (err && err.code){ const c = document.createElement("small"); c.className = "toast-code"; c.textContent = "Bungie: " + err.code; t.appendChild(c); }
+    if (err && err.scope && !DEMO){
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "toast-action"; b.textContent = "Sign in again";
+      b.addEventListener("click", () => { RallyFlagAuth.signOut(); RallyFlagAuth.signIn(location.pathname); });
+      t.appendChild(b);
+    }
+    t.className = "locker-toast show " + kind + (t.querySelector("button") ? " has-action" : "");
     clearTimeout(toastTimer);
-    if (kind !== "busy") toastTimer = setTimeout(() => { t.className = "locker-toast"; }, kind === "error" ? 9000 : 3500);
+    if (kind !== "busy") toastTimer = setTimeout(() => { t.className = "locker-toast"; }, kind === "error" ? (err && err.scope ? 20000 : 9000) : 3500);
   }
 
   // Postmaster names for things outside the trimmed database (engrams,
@@ -567,14 +592,14 @@
 
     const dlg = $("item-dialog");
     dlg.dataset.item = item.id;
-    dlg.innerHTML =
+    redrawDialog(dlg,
       '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-icon"><img src="' + esc(img(d.i)) + '" alt="">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="">' : "") + "</div>" +
         '<div class="dlg-title"><div class="dlg-eyebrow">' + esc(eyebrow) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub">' + sub + "</div></div>" +
         (item.power ? '<div class="dlg-power"><small>Power</small><b>' + item.power + "</b></div>" : "") +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
       actions +
       '<div class="dlg-body">' + blocks.join("") +
-        (hasPlugs ? '<div class="plug-info" id="plug-info" aria-live="polite">Tap a perk or mod to see what it does.</div>' : "") + "</div>";
+        (hasPlugs ? '<div class="plug-info" id="plug-info" aria-live="polite">Tap a perk or mod to see what it does.</div>' : "") + "</div>");
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
     dlg.querySelectorAll("[data-plug]").forEach(b => b.addEventListener("click", () => {
       dlg.querySelectorAll("[data-plug]").forEach(o => o.setAttribute("aria-pressed", String(o === b)));
@@ -603,11 +628,11 @@
     const d = p.gear ? p.gear.def : DB.items[p.hash] || { n: "Unknown item" }, o = ownerOf(p.owner);
     const dlg = $("item-dialog");
     dlg.dataset.item = "";
-    dlg.innerHTML =
+    redrawDialog(dlg,
       '<div class="dlg-head ' + (p.gear ? tierClass(d) : "") + '"><div class="dlg-icon">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="">' : "") + "</div>" +
         '<div class="dlg-title"><div class="dlg-eyebrow">Postmaster · ' + esc(o.name) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub"><span>' + esc(d.y || "") + (p.quantity > 1 ? " · ×" + p.quantity : "") + "</span></div></div>" +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
-      '<div class="dlg-actions"><div class="act-row"><button type="button" class="act-btn" id="pm-pull">' + (o.emblem ? '<img src="' + esc(img(o.emblem)) + '" alt="" width="20" height="20">' : "") + "Pull to " + esc(o.name) + "</button></div></div>";
+      '<div class="dlg-actions"><div class="act-row"><button type="button" class="act-btn" id="pm-pull">' + (o.emblem ? '<img src="' + esc(img(o.emblem)) + '" alt="" width="20" height="20">' : "") + "Pull to " + esc(o.name) + "</button></div></div>");
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
     $("pm-pull").addEventListener("click", () => {
       if (document.body.classList.contains("locker-busy")) return;
@@ -719,6 +744,7 @@
     });
     // Click on the backdrop closes the dialog.
     $("item-dialog").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+    $("item-dialog").addEventListener("close", () => document.body.appendChild($("locker-toast")));
   }
 
   async function init(){
