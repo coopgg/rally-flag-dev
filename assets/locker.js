@@ -292,12 +292,18 @@
 
   function renderOwners(){
     const counts = id => ITEMS.filter(i => i.owner === id).length;
+    // Phones and tablets: the cards pick whose gear shows. Wide screens show
+    // everyone, so the cards are plain panels (still drop targets).
+    const wide = isWide();
+    const open = (cls, id) => wide ? '<div class="owner-card' + cls + '" data-owner="' + id + '"' : '<button type="button" class="owner-card' + cls + '" data-owner="' + id + '" aria-pressed="' + (id === state.focus) + '"';
+    const close = wide ? "</div>" : "</button>";
     const cards = OWNERS.map(o =>
-      '<button type="button" class="owner-card" data-owner="' + o.id + '" aria-pressed="' + (o.id === state.focus) + '" style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
-        '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta">Power ' + esc(o.light) + " · " + counts(o.id) + " items</span></button>"
+      open("", o.id) + ' style="background-image:url(\'' + esc(img(o.bg)) + '\')">' +
+        '<span class="owner-name">' + esc(o.name) + '</span><span class="owner-meta">Power ' + esc(o.light) + " · " + counts(o.id) + " items</span>" + close
     ).concat([
-      '<button type="button" class="owner-card vault" data-owner="vault" aria-pressed="' + (state.focus === "vault") + '"><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span></button>"
+      open(" vault", "vault") + '><span class="owner-name">Vault</span><span class="owner-meta">' + counts("vault") + " items</span>" + close
     ]);
+    $("owner-grid").setAttribute("aria-label", wide ? "Your characters and vault" : "Show gear for");
     $("owner-grid").innerHTML = cards.join("");
     renderFarm();
     renderJunk();
@@ -396,7 +402,7 @@
 
   function renderSets(){
     // Sets follow the chosen character's class (every class for the vault).
-    const chosen = OWNERS.filter(o => o.id === state.focus);
+    const chosen = isWide() ? [] : OWNERS.filter(o => o.id === state.focus);
     const list = chosen.length ? SETS.filter(p => chosen.some(o => o.cls === p.cls)) : SETS;
     $("sets-count").textContent = list.length;
     $("sets-hint").textContent = list.length
@@ -415,7 +421,7 @@
   }
 
   function matches(item){
-    if (item.owner !== state.focus) return false;
+    if (!isWide() && item.owner !== state.focus) return false;
     const bucket = BUCKET_BY_HASH.get(item.def.b);
     if (state.type && bucket.kind !== state.type) return false;
     if (state.flags.has("exotic") && item.def.r !== 6) return false;
@@ -446,14 +452,59 @@
     "</button>";
   }
 
-  // Each slot is split by who holds the item: one group per character
-  // (equipped first), then the vault. Wide screens lay the groups out as
-  // aligned columns (like DIM); phones stack them under small labels.
-  // One owner at a time. A character's slot is DIM-like: the equipped item
-  // on the left, the inventory beside it, n/9 in the heading. The vault is
-  // one grid per slot (long lists show a preview). On wide screens weapons
-  // and armor sit side by side, so a whole loadout fits on screen.
-  function renderItems(){
+  // Wide screens show everyone at once, like DIM on desktop; narrower ones
+  // one owner at a time, like DIM on a phone.
+  const WIDE = window.matchMedia("(min-width: 1100px)");
+  const isWide = () => WIDE.matches;
+  function renderItems(){ isWide() ? renderAll() : renderOne(); }
+
+  // Everyone (DIM desktop): per slot, a row of character cells lined up
+  // under their cards (equipped item, then inventory), then that slot's
+  // vault items full width, armor split by class. Nothing is clipped.
+  function renderAll(){
+    const shown = ITEMS.filter(matches);
+    const isJunk = i => TAGS[i.id] === "junk" ? 1 : 0;
+    const byPower = (x, y) => (y.equipped - x.equipped) || (isJunk(x) - isJunk(y)) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
+    const filtering = !!(state.q || state.type || state.flags.size);
+    const slot = b => {
+      const items = shown.filter(i => i.def.b === b.hash).sort(byPower);
+      if (filtering && !items.length) return "";
+      const cells = OWNERS.map(o => {
+        const eq = items.filter(i => i.owner === o.id && i.equipped), inv = items.filter(i => i.owner === o.id && !i.equipped);
+        const invTotal = ITEMS.filter(i => i.owner === o.id && !i.equipped && i.def.b === b.hash).length;
+        const full = invTotal >= INVENTORY_CAP;
+        return '<div class="owner-group char-slot" data-owner="' + o.id + '" role="group" aria-label="' + esc(o.name + ", " + invTotal + " of " + INVENTORY_CAP + " in inventory" + (full ? ", full" : "")) + '">' +
+          // n/9 sits under the equipped item (where DIM has its "+"), so the
+          // inventory lines up with the equipped item's top.
+          '<div class="slot-equipped">' + (eq.length ? eq.map(tileHtml).join("") : '<span class="tile-empty" aria-hidden="true"></span>') +
+          '<div class="cell-count' + (full ? " full" : "") + '" aria-hidden="true">' + invTotal + "/" + INVENTORY_CAP + "</div></div>" +
+          '<div class="item-grid slot-inv">' + inv.map(tileHtml).join("") + "</div></div>";
+      }).join("");
+      const vault = items.filter(i => i.owner === "vault");
+      // Armor in the vault: one row per class (any class first), as DIM does.
+      const groups = b.kind === "armor"
+        ? [3].concat(OWNERS.map(o => o.cls)).map(c => ({ c, list: vault.filter(i => i.def.c === c) })).filter(g => g.list.length)
+        : [{ c: null, list: vault }];
+      const vaultHtml = '<div class="owner-group vault vault-all" data-owner="vault"><div class="group-label">Vault · ' + vault.length + "</div>" +
+        (vault.length ? groups.map(g => '<div class="vault-class">' + (g.c === null ? "" : '<span class="vault-class-label">' + (g.c === 3 ? "Any class" : esc(CLASS_NAMES[g.c] || "")) + "</span>") +
+          '<div class="item-grid">' + g.list.map(tileHtml).join("") + "</div></div>").join("") : '<div class="group-empty">Nothing here.</div>') + "</div>";
+      const folded = folds.slots.has(b.hash);
+      return '<section class="bucket" aria-labelledby="b-' + b.hash + '">' +
+        '<h2 id="b-' + b.hash + '"><button type="button" class="bucket-toggle" data-slot="' + b.hash + '" aria-expanded="' + !folded + '" aria-controls="bb-' + b.hash + '">' +
+          '<span class="chev" aria-hidden="true"></span>' + b.label + " <span>" + items.length + "</span></button></h2>" +
+        '<div class="slot-body" id="bb-' + b.hash + '"' + (folded ? " hidden" : "") + '><div class="all-chars" style="--n:' + OWNERS.length + '">' + cells + "</div>" + vaultHtml + "</div></section>";
+    };
+    const html = BUCKETS.filter(b => !state.type || state.type === b.kind).map(slot).join("");
+    $("buckets").innerHTML = postmasterHtml() + (html || '<p class="locker-empty">Nothing matches these filters.</p>');
+    $("locker-count").textContent = "Showing " + shown.length + " of " + ITEMS.length + " items";
+    $("fold-all").textContent = BUCKETS.every(b => folds.slots.has(b.hash)) ? "Expand all" : "Collapse all";
+  }
+
+  // One owner at a time (DIM on a phone). A character's slot: the equipped
+  // item on the left, the inventory beside it, n/9 in the heading. The vault
+  // is one grid per slot (long lists show a preview). Between phone and
+  // desktop widths, weapons and armor sit side by side.
+  function renderOne(){
     const shown = ITEMS.filter(matches), owner = state.focus, vault = owner === "vault";
     const isJunk = i => TAGS[i.id] === "junk" ? 1 : 0;
     const byPower = (x, y) => (y.equipped - x.equipped) || (isJunk(x) - isJunk(y)) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
@@ -517,6 +568,7 @@
   }
 
   function render(){ renderOwners(); renderSets(); renderItems(); }
+  WIDE.addEventListener("change", () => { if (ITEMS.length) render(); });
 
   // ---------------- actions (stage 2) ----------------
   // One Bungie action at a time; the model is updated after each step
@@ -893,6 +945,7 @@
     $("owner-grid").addEventListener("click", e => {
       const b = e.target.closest("[data-owner]");
       if (!b) return;
+      if (isWide()) return; // everyone is already shown
       state.focus = b.dataset.owner;
       try { localStorage.setItem(FOCUS_KEY, state.focus); } catch (e){}
       render();
@@ -943,7 +996,7 @@
     // (pointer devices; the popup's Move buttons do the same everywhere).
     let dragId = null;
     const dropOn = e => {
-      const t = e.target.closest("[data-drop], .owner-card[data-owner]");
+      const t = e.target.closest("[data-drop], .owner-card[data-owner], .owner-group[data-owner]");
       const item = dragId && ITEMS.find(i => i.id === dragId);
       const to = t && (t.dataset.drop || t.dataset.owner);
       return t && item && to !== item.owner ? { t, item, to } : null;

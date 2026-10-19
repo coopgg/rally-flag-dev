@@ -124,10 +124,13 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   tab is visible: inventory over 7 per slot and postmaster gear go to the vault.
   Junk cleanup sends vault Junk to a character's free spaces (and turns that
   character's farming off).
-  Gear shows one owner at a time (DIM-mobile style): the character/vault
-  cards pick `state.focus` (localStorage `rallyflag_locker_focus`); a
-  character's slot is equipped tile | inventory, n/9 in the heading; weapons
-  and armor are two columns on desktop. Drag a tile onto a card or the
+  Two layouts (`WIDE` = min-width 1100px, re-renders on change). Wide =
+  DIM desktop (`renderAll`): per slot, character cells aligned under their
+  cards (equipped | inventory, n/9 under the equipped item), then that
+  slot's vault items full width, armor one row per class; cards are plain
+  divs. Narrower = DIM mobile (`renderOne`): the cards pick `state.focus`
+  (localStorage `rallyflag_locker_focus`), one owner shown. Drag a tile
+  onto a card, a character cell (wide) or the
   "Move to" bar (shown a tick after dragstart; changing the DOM inside
   dragstart cancels the drag in Chrome).
   `?demo` simulates every action locally. Test the

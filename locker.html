@@ -348,6 +348,23 @@
   /* Drag and drop */
   .item-tile[draggable="true"]{ cursor:grab; }
   .owner-card.drop-target{ outline:2px dashed var(--accent); outline-offset:3px; }
+  .owner-group.drop-target{ outline:2px dashed var(--accent); outline-offset:3px; border-radius:6px; background:var(--accent-dim); }
+  /* Everyone at once (DIM desktop, wide screens): character cells line up
+     under their cards (the card row has one more column, the vault), then
+     each slot's vault items run full width, armor one row per class. */
+  @media (min-width:1100px){
+    .locker-root{ max-width:1640px; }
+    div.owner-card{ cursor:default; }
+  }
+  .all-chars{ display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:12px; width:calc((100% + 12px) * var(--n) / (var(--n) + 1) - 12px); }
+  .cell-count{ margin-top:6px; text-align:center; font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dim); }
+  .cell-count.full{ color:#e5534b; }
+  [data-mode="light"] .cell-count.full{ color:#b42318; }
+  .vault-all{ margin-top:14px; padding-top:10px; border-top:1px dashed var(--panel-border); }
+  .vault-class{ display:flex; align-items:flex-start; gap:12px; padding:8px 0; }
+  .vault-class + .vault-class{ border-top:1px solid var(--panel-border); }
+  .vault-class-label{ flex:none; width:76px; padding-top:4px; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; color:var(--text-dim); }
+  .vault-class .item-grid{ flex:1; min-width:0; }
   .drop-bar{ position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:50; display:flex; align-items:center; gap:8px; padding:8px; border-radius:12px;
     border:1px solid var(--edge); background:var(--bg); box-shadow:0 14px 40px -12px rgba(0,0,0,0.6), 0 0 24px -10px var(--glow); }
   .drop-bar[hidden]{ display:none; }
