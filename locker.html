@@ -133,7 +133,11 @@
   .chip:hover{ color:var(--text); }
   .chip[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
   .chip-sep{ width:1px; height:22px; background:var(--panel-border); margin:0 4px; }
-  .locker-count{ font-size:13px; color:var(--text-dim); margin-left:auto; }
+  /* Count + Refresh / Collapse all: never broken mid-phrase; on phones it's
+     its own line under the chips (count left, actions right). */
+  .chip-meta{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 14px; margin-left:auto; }
+  .locker-count{ font-size:13px; color:var(--text-dim); white-space:nowrap; }
+  .chip-actions{ display:flex; gap:14px; white-space:nowrap; }
 
   /* Armor set progress */
   /* Gear | Armor Sets views */
@@ -410,7 +414,9 @@
     .char-slot{ gap:8px; }
     .slot-equipped{ padding-right:8px; }
     .tile-power{ font-size:13px; }
-    .locker-count{ margin-left:0; width:auto; flex:1; }
+    .chip-meta{ flex:1 0 100%; margin-left:0; }
+    .vault-class{ flex-direction:column; align-items:stretch; gap:6px; }
+    .vault-class-label{ width:auto; padding-top:0; }
     .owner-group.clipped .item-tile:nth-child(n+11){ display:none; }
     .act-label{ width:100%; }
     .act-btn.lock{ margin-left:0; }
@@ -460,9 +466,10 @@
         <button class="chip" type="button" data-kind="flag" data-value="equipped" aria-pressed="false">Equipped</button>
         <button class="chip" type="button" data-kind="flag" data-value="favorite" aria-pressed="false">♥ Favorites</button>
         <button class="chip" type="button" data-kind="flag" data-value="junk" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg> Junk</button>
-        <span class="locker-count" id="locker-count" aria-live="polite"></span>
-        <button type="button" class="fold-all" id="locker-refresh">Refresh</button>
-        <button type="button" class="fold-all" id="fold-all">Collapse all</button>
+        <div class="chip-meta">
+          <span class="locker-count" id="locker-count" aria-live="polite"></span>
+          <span class="chip-actions"><button type="button" class="fold-all" id="locker-refresh">Refresh</button><button type="button" class="fold-all" id="fold-all">Collapse all</button></span>
+        </div>
       </div>
     </div>
 

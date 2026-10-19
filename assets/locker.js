@@ -522,6 +522,14 @@
   const WIDE = window.matchMedia("(min-width: 1100px)");
   const isWide = () => WIDE.matches;
   function renderItems(){ isWide() ? renderAll() : renderOne(); }
+  // Vault armor, one row per class, as DIM does: any class first, then your
+  // characters' classes, then any other class you hold armor for (once each).
+  function classRows(list){
+    const order = [...new Set([3].concat(OWNERS.map(o => o.cls), [0, 1, 2]))];
+    return order.map(c => ({ c, list: list.filter(i => i.def.c === c) })).filter(g => g.list.length);
+  }
+  const classRowHtml = g => '<div class="vault-class"><span class="vault-class-label">' + (g.c === 3 ? "Any class" : esc(CLASS_NAMES[g.c] || "")) + "</span>" +
+    '<div class="item-grid">' + g.list.map(tileHtml).join("") + "</div></div>";
   const SEARCH_EMPTY = '<p class="locker-empty" id="search-empty" hidden>Nothing matches this search.</p>';
 
   // Everyone (DIM desktop): per slot, a row of character cells lined up
@@ -548,12 +556,9 @@
       }).join("");
       const vault = items.filter(i => i.owner === "vault");
       // Armor in the vault: one row per class (any class first), as DIM does.
-      const groups = b.kind === "armor"
-        ? [3].concat(OWNERS.map(o => o.cls)).map(c => ({ c, list: vault.filter(i => i.def.c === c) })).filter(g => g.list.length)
-        : [{ c: null, list: vault }];
+      const groups = b.kind === "armor" ? classRows(vault) : [{ c: null, list: vault }];
       const vaultHtml = '<div class="owner-group vault vault-all" data-owner="vault"><div class="group-label">Vault · <span class="vis-count">' + vault.length + "</span></div>" +
-        (vault.length ? groups.map(g => '<div class="vault-class">' + (g.c === null ? "" : '<span class="vault-class-label">' + (g.c === 3 ? "Any class" : esc(CLASS_NAMES[g.c] || "")) + "</span>") +
-          '<div class="item-grid">' + g.list.map(tileHtml).join("") + "</div></div>").join("") : '<div class="group-empty">Nothing here.</div>') + "</div>";
+        (vault.length ? groups.map(g => g.c === null ? '<div class="vault-class"><div class="item-grid">' + g.list.map(tileHtml).join("") + "</div></div>" : classRowHtml(g)).join("") : '<div class="group-empty">Nothing here.</div>') + "</div>";
       const folded = folds.slots.has(b.hash);
       return '<section class="bucket" aria-labelledby="b-' + b.hash + '">' +
         '<h2 id="b-' + b.hash + '"><button type="button" class="bucket-toggle" data-slot="' + b.hash + '" aria-expanded="' + !folded + '" aria-controls="bb-' + b.hash + '">' +
@@ -586,7 +591,10 @@
         const long = !filtering && items.length > VAULT_PREVIEW, open = folds.vaults.has(b.hash);
         count = '<span class="vis-count">' + items.length + "</span>";
         body = '<div class="owner-group vault' + (long && !open ? " clipped" : "") + '" data-owner="vault">' +
-          (items.length ? '<div class="item-grid" id="vg-' + b.hash + '">' + items.map(tileHtml).join("") + "</div>" : '<div class="group-empty">Nothing here.</div>') +
+          // Armor: one row per class, highest Power first (previews clip each row).
+          (!items.length ? '<div class="group-empty">Nothing here.</div>'
+            : b.kind === "armor" ? '<div id="vg-' + b.hash + '">' + classRows(items).map(classRowHtml).join("") + "</div>"
+            : '<div class="item-grid" id="vg-' + b.hash + '">' + items.map(tileHtml).join("") + "</div>") +
           (long ? '<button type="button" class="vault-more" data-slot="' + b.hash + '" aria-expanded="' + open + '" aria-controls="vg-' + b.hash + '">' + (open ? "Show less" : "Show all " + items.length) + "</button>" : "") + "</div>";
       } else {
         const eq = items.filter(i => i.equipped), inv = items.filter(i => !i.equipped);
