@@ -53,7 +53,7 @@ const DEV_ONLY = new Set(["locker.html"]);
 let pages = fs.readdirSync(ROOT).filter(f => f.endsWith(".html") && !SKIP.has(f)).sort();
 pages.push("no/such/page"); // served by 404.html, like GitHub Pages
 // The Locker's sample-data view renders the whole app without a sign-in.
-if (fs.existsSync(path.join(ROOT, "assets", "locker-demo.json"))) pages.push("locker.html?demo", "locker.html?demo#sets");
+if (fs.existsSync(path.join(ROOT, "assets", "locker-demo.json"))) pages.push("locker.html?demo", "locker.html?demo#loadouts", "locker.html?demo#sets");
 
 // Live-mode HTTP requests (honours HTTPS_PROXY, unlike Node's fetch).
 let http = null;

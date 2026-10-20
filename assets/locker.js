@@ -153,7 +153,7 @@
   function showStatus(html){ $("locker-status").innerHTML = html ? '<div class="locker-panel panel-card">' + html + "</div>" : ""; }
   function showSignedOut(){
     showStatus(
-      "<p>Sign in with Bungie.net to see your weapons and armor here, matched against our God Rolls and armor sets. Rally Flag only moves or equips something when you press a button, and nothing is stored anywhere but your browser.</p>" +
+      "<p>Sign in with Bungie.net to see your weapons and armor here, matched against our God Rolls and armor sets. Rally Flag only moves or equips something when you press a button. Your tags stay in your browser; loadouts you save are also kept under your Bungie account so they're on every device (see <a href=\"" + PUBLIC_SITE + "privacy.html\"" + NEW_TAB + ">Privacy" + NEW_TAB_NOTE + "</a>).</p>" +
       '<div class="locker-actions"><button class="locker-btn" type="button" id="locker-signin">Sign in with Bungie.net</button>' +
       '<a class="locker-btn ghost" href="locker.html?demo">Try it with sample data</a></div>');
     $("locker-signin").addEventListener("click", () => RallyFlagAuth.signIn());
@@ -1040,7 +1040,7 @@
         '<div class="lo-tools">' +
           '<div class="lo-tool"><label class="lo-name"><span>Name</span><input type="text" id="lo-name" maxlength="40" placeholder="e.g. Raid DPS" autocomplete="off"></label>' +
             '<div class="act-row">' + OWNERS.map(o => '<button type="button" class="act-btn" data-lo-save="' + o.id + '">Save ' + esc(o.name) + "'s loadout</button>").join("") + "</div></div>" +
-          '<div class="lo-tool"><label class="lo-name"><span>DIM link</span><input type="url" id="lo-dim" placeholder="https://dim.gg/…" autocomplete="off" inputmode="url"></label>' +
+          '<div class="lo-tool"><label class="lo-name"><span>DIM link</span><input type="url" id="lo-dim" placeholder="https://dim.gg/…" autocomplete="off" inputmode="url" spellcheck="false"></label>' +
             '<div class="act-row"><button type="button" class="act-btn" id="lo-dim-go">Import</button></div></div>' +
         "</div>" + saved +
         (list.length ? '<div class="lo-erase"><button type="button" class="act-btn" id="lo-erase">Delete all my saved loadouts</button>' +
@@ -1744,7 +1744,7 @@
     const d = item.def, dmg = DB.damage[item.damage];
     const ourPerks = new Set(item.roll ? item.roll.weapon.perkHashes : []);
     const eyebrow = (d.r === 6 ? "Exotic" : "Legendary") + " · " + (d.y || "");
-    const sub = (d.t === 3 && dmg ? "<span>" + (dmg.i ? '<img src="' + esc(img(dmg.i)) + '" alt="">' : "") + esc(dmg.n) + "</span>" : "") +
+    const sub = (d.t === 3 && dmg ? "<span>" + (dmg.i ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="14" height="14">' : "") + esc(dmg.n) + "</span>" : "") +
       "<span>" + esc(ownerLabel(item.owner)) + (item.equipped ? " · equipped" : "") + "</span>" +
       (item.tier ? '<span class="flag">Tier ' + item.tier + "</span>" : "") +
       (item.state & STATE_MASTERWORK ? '<span class="flag">Masterworked</span>' : "") +
@@ -1822,7 +1822,7 @@
     const dlg = $("item-dialog");
     dlg.dataset.item = item.id; dlg.dataset.view = "item";
     redrawDialog(dlg,
-      '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-icon"><img src="' + esc(img(iconOf(item))) + '" alt="">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="">' : "") + "</div>" +
+      '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-icon"><img src="' + esc(img(iconOf(item))) + '" alt="" width="56" height="56">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="" width="56" height="56">' : "") + "</div>" +
         '<div class="dlg-title"><div class="dlg-eyebrow">' + esc(eyebrow) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub">' + sub + "</div></div>" +
         (item.power ? '<div class="dlg-power"><small>Power</small><b>' + item.power + "</b></div>" : "") +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
@@ -1866,7 +1866,7 @@
     const dlg = $("item-dialog");
     dlg.dataset.item = ""; dlg.dataset.view = "postmaster";
     redrawDialog(dlg,
-      '<div class="dlg-head ' + (p.gear ? tierClass(d) : "") + '"><div class="dlg-icon">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="">' : "") + "</div>" +
+      '<div class="dlg-head ' + (p.gear ? tierClass(d) : "") + '"><div class="dlg-icon">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="56" height="56">' : "") + "</div>" +
         '<div class="dlg-title"><div class="dlg-eyebrow">Postmaster · ' + esc(o.name) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub"><span>' + esc(d.y || "") + (p.quantity > 1 ? " · ×" + p.quantity : "") + "</span></div></div>" +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
       '<div class="dlg-actions"><div class="act-row"><button type="button" class="act-btn" id="pm-pull">' + (o.emblem ? '<img src="' + esc(img(o.emblem)) + '" alt="" width="20" height="20">' : "") + "Pull to " + esc(o.name) + "</button></div></div>");

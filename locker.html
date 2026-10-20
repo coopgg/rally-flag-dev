@@ -136,6 +136,8 @@
   /* Count + Refresh / Collapse all: never broken mid-phrase; on phones it's
      its own line under the chips (count left, actions right). */
   .chip-meta{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 14px; margin-left:auto; }
+  /* Numbers line up as they change (counts, Power, stat totals). */
+  .owner-meta, .owner-stats, .locker-count, .vis-count, .lo-status, .set-state, .pick-main small, .set-piece small{ font-variant-numeric:tabular-nums; }
   .locker-count{ font-size:13px; color:var(--text-dim); white-space:nowrap; }
   .chip-actions{ display:flex; gap:14px; white-space:nowrap; }
 
@@ -246,6 +248,7 @@
      and the Rally Flag diamond on our God Roll perks. */
   :root{ --tier-5:#7b4fb8; --tier-6:#d9b33c; --tier-5-text:#c4a3f2; --tier-6-text:#e8c65c; }
   [data-mode="light"]{ --tier-5-text:#5d3592; --tier-6-text:#715500; }
+  dialog.item-dialog, .dlg-body{ overscroll-behavior:contain; }
   dialog.item-dialog{
     width:min(460px, calc(100vw - 24px)); max-height:calc(100vh - 40px); padding:0; border-radius:14px; overflow:hidden;
     border:1px solid var(--edge); background:var(--bg); color:var(--text); box-shadow:0 30px 80px -20px rgba(0,0,0,0.7), 0 0 40px -18px var(--glow);
@@ -427,7 +430,7 @@
   .lo-tile:hover{ border-color:var(--accent-text); }
   .lo-tile[aria-expanded="true"]{ border-color:var(--accent-text); box-shadow:inset 0 0 0 1px var(--accent-text); }
   .lo-tile-name{ min-width:0; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow-wrap:anywhere; }
-  .lo-tile.warn::after{ content:"!"; position:absolute; top:3px; right:5px; width:14px; height:14px; border-radius:50%; background:#e8912d; color:#111; font-size:10px; font-weight:700; line-height:14px; text-align:center; }
+  .lo-tile.warn::after{ content:"!"; position:absolute; top:3px; right:4px; width:16px; height:16px; border-radius:50%; background:#e8912d; color:#111; font-size:12px; font-weight:700; line-height:16px; text-align:center; }
   .lo-check{ position:absolute; top:3px; right:4px; width:16px; height:16px; }
   .lo-check svg{ display:block; fill:var(--text-dim); stroke:var(--bg); }
   .lo-mini.orn-off{ outline:2px solid #e8912d; outline-offset:1px; }
@@ -519,7 +522,7 @@
 <div class="hero">
   <div class="eyebrow">Destiny 2 · Your Gear <span class="preview-tag">Preview</span></div>
   <h1 class="title">Locker</h1>
-  <p class="subtitle">Every weapon and armor piece across your characters and vault, with our God Roll matches and your armor set progress.</p>
+  <p class="subtitle">Every weapon and armor piece across your characters and vault, with loadouts, our God Roll matches and your armor set progress.</p>
 </div>
 
 <div class="locker-root" id="locker-root">
@@ -527,11 +530,9 @@
   <div id="locker-app" hidden>
     <div id="demo-banner"></div>
     <div class="locker-head" id="locker-head">
-        <div class="search-box"><input type="search" id="locker-search" aria-label="Search your gear by name, type or perk" placeholder="Search by name, type or perk…" autocomplete="off"></div>
+        <div class="search-box"><input type="search" id="locker-search" spellcheck="false" aria-label="Search your gear by name, type or perk" placeholder="Search by name, type or perk…" autocomplete="off"></div>
       <div class="owner-grid" id="owner-grid" role="group" aria-label="Show gear for"></div>
     </div>
-    <div class="farm-row" id="farm-row" role="group" aria-label="Farming mode"></div>
-    <div class="farm-row" id="junk-row" role="group" aria-label="Junk cleanup"></div>
 
     <div class="view-tabs" role="tablist" aria-label="Locker views">
       <button class="view-tab" type="button" role="tab" id="tab-gear" aria-controls="view-gear" aria-selected="true">Gear</button>
@@ -540,6 +541,8 @@
     </div>
 
     <div id="view-gear" role="tabpanel" aria-labelledby="tab-gear">
+    <div class="farm-row" id="farm-row" role="group" aria-label="Farming mode"></div>
+    <div class="farm-row" id="junk-row" role="group" aria-label="Junk cleanup"></div>
     <div class="locker-controls">
       <div class="chip-row" id="locker-chips">
         <button class="chip" type="button" data-kind="type" data-value="weapons" aria-pressed="false">Weapons</button>
