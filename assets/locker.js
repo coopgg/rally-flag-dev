@@ -552,7 +552,7 @@
   // loadout JSON is read as is. Weapons, armor, subclass (with its super,
   // abilities, aspects and fragments), armor mods and per-slot shaders and
   // ornaments are kept; the artifact can't be set through Bungie's API.
-  const DIM_RELAY = "https://rallyflag-dim.hoffmn-cb2.workers.dev/";
+  const DIM_RELAY = "https://rallyflag-dim.rallyflag.workers.dev/";
   async function readDimLoadout(text){
     text = text.trim();
     let json = null;
