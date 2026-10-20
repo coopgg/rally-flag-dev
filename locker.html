@@ -416,6 +416,17 @@
   .ge-swatch[aria-pressed="true"]{ border-color:var(--accent-text); box-shadow:0 0 0 2px var(--accent-text); }
   .lo-tile.empty{ border-style:dashed; color:var(--text-dim); }
   .lo-badge-empty{ font-size:20px; color:var(--text-dim); background:transparent; }
+  .cmp-scroll{ overflow-x:auto; overscroll-behavior-x:contain; }
+  .cmp{ border-collapse:collapse; font-size:13px; font-variant-numeric:tabular-nums; }
+  .cmp th, .cmp td{ padding:6px 8px; text-align:left; vertical-align:top; border-top:1px solid var(--panel-border); min-width:110px; }
+  .cmp thead th, .cmp thead td{ border-top:0; }
+  .cmp tbody th{ color:var(--text-dim); font-weight:400; min-width:84px; white-space:nowrap; }
+  .cmp thead th{ font-weight:400; }
+  .cmp thead img{ display:block; width:48px; height:48px; border:1px solid var(--panel-border); margin-bottom:4px; }
+  .cmp-name{ display:block; font-size:12px; color:var(--text-dim); margin-bottom:4px; }
+  .cmp td.best{ color:var(--accent-text); font-weight:700; }
+  .cmp-perk{ display:block; }
+  .cmp-perk.ours{ color:var(--accent-text); font-weight:600; }
   .lo-erase{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:18px; padding-top:12px; border-top:1px solid var(--panel-border); font-size:13px; }
   .lo-erase .muted{ color:var(--text-dim); }
   .lo-review{ margin-top:12px; padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
@@ -573,6 +584,7 @@
         <button class="chip" type="button" data-kind="flag" data-value="godroll" aria-pressed="false">★ Our God Rolls</button>
         <button class="chip" type="button" data-kind="flag" data-value="set" aria-pressed="false">Set pieces</button>
         <button class="chip" type="button" data-kind="flag" data-value="equipped" aria-pressed="false">Equipped</button>
+        <button class="chip" type="button" data-kind="flag" data-value="dupes" aria-pressed="false">Duplicates</button>
         <select class="chip chip-select" id="tag-filter" aria-label="Show items with this tag">
           <option value="">All tags</option>
           <option value="favorite">♥ Favorite</option>

@@ -189,6 +189,24 @@ await section("Gear", async () => {
   await p.keyboard.press("Escape");
   await p.fill("#locker-search", "zzzzqq"); await p.waitForTimeout(300);
   check("gear: search with no match says so", await p.isVisible("#search-empty"));
+  // Duplicates filter and compare.
+  await p.fill("#locker-search", ""); await p.waitForTimeout(200);
+  const counts = {}; allItems.filter(i => i.itemInstanceId).forEach(i => { counts[i.itemHash] = (counts[i.itemHash] || 0) + 1; });
+  await p.click('.chip[data-value="dupes"]');
+  const shown = await p.$$eval("#buckets .item-tile[data-id]", t => t.map(x => x.dataset.id));
+  check("dupes: the Duplicates filter shows only items you own more than once", shown.length > 0 && shown.every(id => counts[hashOf(id)] >= 2), shown.length + " shown");
+  const dupe = shown[0], n = counts[allItems.find(i => i.itemInstanceId === dupe).itemHash];
+  await p.click('#buckets .item-tile[data-id="' + dupe + '"]');
+  check("compare: the popup offers Compare N copies", (await p.textContent("#open-compare")) === "Compare " + n + " copies");
+  await p.click("#open-compare");
+  check("compare: one column per copy, focus on this one", await p.locator(".cmp thead th").count() === n && await p.evaluate(id => document.activeElement.dataset.cmpOpen === id, dupe));
+  check("compare: best values are marked", await p.locator(".cmp td.best").count() > 0);
+  const other = await p.$$eval("[data-cmp-open]", b => b.map(x => x.dataset.cmpOpen));
+  const target = other.find(x => x !== dupe);
+  await p.click('[data-cmp-open="' + target + '"]');
+  check("compare: Open goes to that copy", await p.evaluate(() => document.getElementById("item-dialog").dataset.item) === target);
+  await p.keyboard.press("Escape");
+  await p.click('.chip[data-value="dupes"]');
   check("gear: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
 });

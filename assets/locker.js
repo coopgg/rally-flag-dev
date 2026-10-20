@@ -1546,7 +1546,15 @@
 
   // Owner, type and chip filters decide which tiles get built; the search
   // text doesn't (applySearch hides and shows built tiles instead).
+  // Copies of the same item you own (weapons and armor), for the
+  // Duplicates filter and the compare view.
+  const copiesOf = item => ITEMS.filter(i => i.hash === item.hash).sort((a, b) => b.power - a.power || (b.equipped - a.equipped));
+  let dupeCount = null;
   function matches(item){
+    if (state.flags.has("dupes")){
+      if (!dupeCount){ dupeCount = new Map(); for (const i of ITEMS) dupeCount.set(i.hash, (dupeCount.get(i.hash) || 0) + 1); }
+      if (dupeCount.get(item.hash) < 2) return false;
+    }
     if (!isWide() && item.owner !== state.focus) return false;
     const bucket = BUCKET_BY_HASH.get(item.def.b);
     if (state.type && bucket.kind !== state.type) return false;
@@ -1739,7 +1747,7 @@
       chips + '</div><div class="pm-body" id="pm-body"' + (open ? "" : " hidden") + ">" + tiles + "</div></section>";
   }
 
-  function render(){ renderOwners(); renderSets(); renderItems(); }
+  function render(){ dupeCount = null; renderOwners(); renderSets(); renderItems(); }
   WIDE.addEventListener("change", () => { if (ITEMS.length) render(); });
 
   // ---------------- actions (stage 2) ----------------
@@ -1977,6 +1985,59 @@
       (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="44" height="44">' : "") + (ours ? '<span class="ours" aria-hidden="true"></span>' : "") + "</button>";
   }
 
+  // Compare every copy of an item side by side (like DIM's compare):
+  // Power, where it is, tier, tag, perks (weapons) or stats (armor), with
+  // the best value in each stat row marked. "Open" goes to that copy.
+  const LOWER_IS_BETTER = /charge time|draw time/i;
+  function openCompare(fromId){
+    const from = ITEMS.find(i => i.id === fromId);
+    if (!from) return;
+    const copies = copiesOf(from), d = from.def, weapon = d.t === 3;
+    const statOf = (i, name) => { for (const st of Object.values(i.stats)) if (DB.stats[st.statHash] === name) return st.value; return null; };
+    let names;
+    if (weapon){
+      names = [...new Set(copies.flatMap(i => Object.values(i.stats).map(st => DB.stats[st.statHash]).filter(n => n && n !== "Power")))]
+        .sort((a, b) => { const ia = STAT_ORDER.indexOf(a), ib = STAT_ORDER.indexOf(b); return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib) || a.localeCompare(b); });
+    } else names = ARMOR_STATS.map(h => DB.stats[h]).filter(Boolean);
+    const row = (label, cells, best) => "<tr><th scope=\"row\">" + esc(label) + "</th>" + cells.map((c, k) => '<td' + (best && best[k] ? ' class="best"' : "") + ">" + c + (best && best[k] ? '<span class="sr-only"> (best)</span>' : "") + "</td>").join("") + "</tr>";
+    const statRows = names.map(n => {
+      const vals = copies.map(i => statOf(i, n)), nums = vals.filter(v => v != null);
+      const top = nums.length > 1 && !nums.every(v => v === nums[0]) ? (LOWER_IS_BETTER.test(n) ? Math.min(...nums) : Math.max(...nums)) : null;
+      return row(STAT_SHORT[n] || n, vals.map(v => v == null ? "–" : String(v)), top == null ? null : vals.map(v => v === top));
+    });
+    if (!weapon){
+      const totals = copies.map(i => ARMOR_STATS.reduce((t, h) => t + ((i.stats[h] || {}).value || 0), 0)), top = Math.max(...totals);
+      statRows.push(row("Total", totals.map(String), totals.every(t => t === top) ? null : totals.map(t => t === top)));
+    }
+    const perks = i => {
+      const ours = new Set(i.roll ? i.roll.weapon.perkHashes : []);
+      return i.plugs.filter(h => showPlug(h) && !isMod(DB.items[h]) && !isIntrinsic(DB.items[h]))
+        .map(h => '<span class="cmp-perk' + (ours.has(h) ? " ours" : "") + '">' + esc(DB.items[h].n) + (ours.has(h) ? '<span class="sr-only"> (our God Roll)</span>' : "") + "</span>").join("");
+    };
+    const powers = copies.map(i => i.power), topPower = Math.max(...powers);
+    const head = copies.map(i => '<th scope="col"><img src="' + esc(img(iconOf(i))) + '" alt="" width="48" height="48"><span class="cmp-name">' + (i.id === fromId ? "This one" : "Copy") + "</span>" +
+      '<button type="button" class="act-btn" data-cmp-open="' + i.id + '">Open<span class="sr-only"> ' + esc(d.n) + ", " + i.power + " in " + esc(ownerLabel(i.owner)) + "</span></button></th>").join("");
+    const body = [
+      row("Power", powers.map(String), powers.every(p => p === topPower) ? null : powers.map(p => p === topPower)),
+      row("Where", copies.map(i => esc(ownerLabel(i.owner)) + (i.equipped ? ", equipped" : ""))),
+      row("Tier", copies.map(i => i.tier ? String(i.tier) : "–")),
+      row("Masterwork", copies.map(i => i.state & STATE_MASTERWORK ? "Yes" : "No")),
+      row("Tag", copies.map(i => TAGS[i.id] ? esc((TAG_LIST.find(t => t[0] === TAGS[i.id]) || [, TAGS[i.id]])[1]) : "–")),
+      weapon ? row("Perks", copies.map(perks)) : ""
+    ].concat(statRows).join("");
+    const dlg = $("item-dialog");
+    dlg.dataset.item = ""; dlg.dataset.view = "compare";
+    redrawDialog(dlg,
+      '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-title"><div class="dlg-eyebrow">Compare · ' + copies.length + " copies</div><h2 class=\"dlg-name\" id=\"dlg-name\">" + esc(d.n) + "</h2></div>" +
+        '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
+      '<div class="dlg-body"><div class="cmp-scroll" tabindex="0" role="region" aria-label="Copies side by side"><table class="cmp"><caption class="sr-only">Your copies of ' + esc(d.n) + "</caption>" +
+        "<thead><tr><td></td>" + head + "</tr></thead><tbody>" + body + "</tbody></table></div></div>");
+    dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
+    dlg.querySelectorAll("[data-cmp-open]").forEach(b => b.addEventListener("click", () => openItem(b.dataset.cmpOpen)));
+    if (!dlg.open) dlg.showModal();
+    const focusBtn = dlg.querySelector('[data-cmp-open="' + fromId + '"]'); if (focusBtn) focusBtn.focus();
+  }
+
   function openItem(id){
     const item = ITEMS.find(i => i.id === id);
     if (!item) return;
@@ -2043,6 +2104,7 @@
       '<div class="act-row"><span class="act-label">Move</span>' + OWNERS.concat([{ id: "vault", name: "Vault" }]).map(o => ownerBtn(o, "move", item.owner === o.id)).join("") +
         // Icon shows what a tap does: a closed lock locks it, an open lock unlocks it.
         '<button type="button" class="act-btn lock icon-only" data-act="lock" aria-label="' + (item.state & STATE_LOCKED ? "Unlock (it's locked)" : "Lock") + '" title="' + (item.state & STATE_LOCKED ? "Unlock" : "Lock") + '">' + (item.state & STATE_LOCKED ? ICON_UNLOCK : ICON_LOCK) + "</button></div>" +
+      (copiesOf(item).length > 1 ? '<div class="act-row"><span class="act-label">Copies</span><button type="button" class="act-btn" id="open-compare">Compare ' + copiesOf(item).length + " copies</button></div>" : "") +
       '<div class="act-row"><span class="act-label">Tag</span>' +
         TAG_LIST.map(([t, name, ico]) => '<button type="button" class="act-btn tag" data-tag="' + t + '" aria-pressed="' + (TAGS[item.id] === t) + '">' + (ico.charAt(0) === "<" ? ico : ico + " ") + name + "</button>").join("") + "</div>" +
       '<form class="act-row note-row" id="note-form"><label class="act-label" for="item-note">Note</label>' +
@@ -2093,6 +2155,8 @@
       const again = dlg.querySelector('[data-tag="' + b.dataset.tag + '"]');
       if (again) again.focus();
     }));
+    const cmp = $("open-compare");
+    if (cmp) cmp.addEventListener("click", () => openCompare(item.id));
     $("note-form").addEventListener("submit", e => {
       e.preventDefault();
       const text = $("item-note").value;
