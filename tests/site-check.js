@@ -136,6 +136,12 @@ async function expandAll(page){
     document.querySelectorAll(".encounter-advanced:not(.open) .encounter-advanced-toggle").forEach(b => b.click());
     // Locker: folded slots and clipped vault lists (each click re-renders).
     for (let i = 0, b; i < 50 && (b = document.querySelector('.bucket-toggle[aria-expanded="false"], .vault-more[aria-expanded="false"]')); i++) b.click();
+    // Locker: the started (one-piece) armor sets, and the first set and
+    // loadout (one opens at a time) on whichever tab shows.
+    const open = sel => { const b = document.querySelector(sel); if (b) b.click(); };
+    open('#set-started[aria-expanded="false"]');
+    open('.set-row-btn[aria-expanded="false"]');
+    open('#view-loadouts:not([hidden]) [data-lo-pick][aria-expanded="false"]');
   });
   await page.waitForTimeout(500);
 }

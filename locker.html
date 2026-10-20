@@ -152,7 +152,7 @@
   .view-tab:hover{ color:var(--text); }
   .view-tab[aria-selected="true"]{ color:var(--accent-text); border-bottom-color:var(--accent); }
   .view-tab span{ font-family:var(--font-sans); font-weight:500; font-size:13px; letter-spacing:0; color:var(--text-dim); margin-left:4px; }
-  .sets-intro{ margin:20px 0 0; font-size:14px; color:var(--text-dim); }
+  .sets-intro{ margin:20px 0 0; max-width:70ch; font-size:14px; color:var(--text-dim); }
   .set-grid{ margin-top:10px; }
   .set-class{ margin-top:16px; }
   .set-class-name, .set-sub{ margin:0 0 8px; font-family:'JetBrains Mono', monospace; font-weight:400; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
@@ -403,7 +403,8 @@
   .lo-review .lo-help{ margin:0; }
   .pick-head{ margin:0 0 4px; font-size:14px; font-weight:600; }
   .pick-note{ margin:0 0 6px; font-size:13px; color:var(--text-dim); }
-  .pick-list{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap:6px; align-items:start; }
+  /* Copies side by side are one height (their perk counts differ). */
+  .pick-list{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); grid-auto-rows:1fr; gap:6px; }
   .pick{ display:flex; gap:10px; align-items:flex-start; padding:8px; text-align:left; font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--panel-border); border-radius:8px; cursor:pointer; min-height:44px; }
   .pick:hover{ border-color:var(--text-dim); }
   .pick.on{ border-color:var(--accent-text); box-shadow:inset 0 0 0 1px var(--accent-text); }
@@ -417,9 +418,9 @@
   .pick-perk.ours{ border-color:var(--accent-text); color:var(--accent-text); }
   .pick-perk img{ width:18px; height:18px; border-radius:50%; }
   .pick-chosen{ display:inline-block; margin-left:6px; padding:1px 7px; border-radius:10px; font-size:12px; font-weight:600; background:var(--accent-fill); color:var(--on-accent); vertical-align:2px; }
-  .pick-empty{ align-items:center; color:var(--text-dim); font-size:13px; }
+  .pick-empty{ margin-top:6px; align-items:center; color:var(--text-dim); font-size:13px; }
   /* Loadouts panel (in the item popup) */
-  .lo-help{ margin:0 0 8px; font-size:13px; }
+  .lo-help{ margin:0 0 8px; max-width:70ch; font-size:13px; }
   .lo-row{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 10px; padding:8px 0; border-top:1px solid var(--panel-border); }
   .lo-row:first-of-type{ border-top:0; }
   .lo-main{ font-size:14px; }

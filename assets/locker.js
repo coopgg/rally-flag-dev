@@ -957,8 +957,8 @@
         return '<div class="pick-slot" role="group" aria-labelledby="pick-h-' + slot.k + '"><h3 class="pick-head" id="pick-h-' + slot.k + '">' + esc(d.y || "Item") + ": " + esc(label) + "</h3>" +
           (slot.similar ? '<p class="pick-note">' + (slot.cands.length ? "You don't have " + esc(label) + ". Use another " + esc(d.y || "item") + ", or leave it empty." : "You don't have " + esc(label) + " or anything like it. It'll be left empty.") + "</p>"
             : slot.cands.length > 1 ? '<p class="pick-note">You have ' + slot.cands.length + " copies.</p>" : "") +
-          '<div class="pick-list">' + slot.cands.map(i => pickHtml(slot, i)).join("") +
-            '<button type="button" class="pick pick-empty' + (slot.pick === "" ? " on" : "") + '" data-pick-slot="' + slot.k + '" data-pick="" aria-pressed="' + (slot.pick === "") + '">Leave this slot empty' + (slot.pick === "" ? ' <span class="pick-chosen">Chosen</span>' : "") + "</button></div></div>";
+          (slot.cands.length ? '<div class="pick-list">' + slot.cands.map(i => pickHtml(slot, i)).join("") + "</div>" : "") +
+            '<button type="button" class="pick pick-empty' + (slot.pick === "" ? " on" : "") + '" data-pick-slot="' + slot.k + '" data-pick="" aria-pressed="' + (slot.pick === "") + '">Leave this slot empty' + (slot.pick === "" ? ' <span class="pick-chosen">Chosen</span>' : "") + "</button></div>";
       }).join("") +
       '<div class="act-row"><button type="button" class="act-btn" id="lo-review-save">Save loadout</button><button type="button" class="act-btn" id="lo-review-cancel">' + (r.isNew ? "Don't import" : "Cancel") + "</button></div></section>";
   }
