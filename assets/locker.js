@@ -563,7 +563,10 @@
       try { json = JSON.parse(text); } catch (e){ throw new Error("That isn't a DIM loadout."); }
     } else if (/^(https?:\/\/)?(www\.)?dim\.gg\/[a-z0-9]+/i.test(text)){
       let res;
-      try { res = await fetch(DIM_RELAY + "?url=" + encodeURIComponent(text)); } catch (e){ throw new Error("Couldn't reach DIM. Check your connection and try again."); }
+      // A failed fetch (offline, or a blocker/network filter stopping
+      // workers.dev) can't be told apart here, so name both and the way round.
+      try { res = await fetch(DIM_RELAY + "?url=" + encodeURIComponent(text)); }
+      catch (e){ throw new Error("Couldn't reach Rally Flag's DIM helper (" + new URL(DIM_RELAY).host + "). If you're online, an ad blocker or network filter may be blocking it. Instead, open the link, right-click or long-press \"Open in DIM\", copy that link and paste it here."); }
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error || "Couldn't read that DIM link.");
       json = body;
