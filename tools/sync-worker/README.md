@@ -9,7 +9,7 @@ device where they sign in. The Locker calls
 ## What it stores
 
 One row per Destiny account: the loadout list (names, item instance ids and
-hashes, subclass/mod/shader/ornament plug hashes, timestamps), recent
+hashes, subclass/artifact/mod/shader/ornament plug hashes, timestamps), recent
 deletions, Favorite/Junk tags (item instance id, tag, when it was set;
 removed tags kept 60 days), a version number and when it was last saved. No names, emails
 or tokens. The player's Bungie sign-in token is sent with each request so

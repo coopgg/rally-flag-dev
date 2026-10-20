@@ -270,6 +270,30 @@ for (const c of characters){
   });
 }
 
+// Artifacts: each character wears Tablet of Ruin and carries the Slayer
+// Baron Apothecary Satchel, with perks picked from each column's plug set
+// (different per character and socket, never the same perk twice). The
+// Reset socket keeps its default. No rand() calls.
+const ARTIFACT_BUCKET = 1506418338, ARTIFACTS = [3821685388, 1770364095];
+characters.forEach((c, ci) => {
+  ARTIFACTS.forEach((hash, k) => {
+    const d = def(hash);
+    if (!d || !d.sockets) return;
+    const id = String(nextInstance++);
+    instances[id] = { isEquipped: k === 0, canEquip: true, equipRequiredLevel: 0 };
+    const used = new Set();
+    sockets[id] = { sockets: d.sockets.socketEntries.map((e, si) => {
+      let plug = e.singleInitialItemHash || 0;
+      const set = PLUGSETS[String(e.reusablePlugSetHash)];
+      const perks = set ? set.reusablePlugItems.map(p => p.plugItemHash).filter(h => def(h) && def(h).itemTypeDisplayName === "Artifact Perk") : [];
+      if (perks.length){ const pick = perks.filter(h => !used.has(h))[(ci * 3 + si) % Math.max(1, perks.length - 3)]; if (pick){ plug = pick; used.add(pick); } }
+      return { plugHash: plug || undefined, isEnabled: true, isVisible: !!plug };
+    }) };
+    const item = { itemHash: hash, itemInstanceId: id, quantity: 1, bindStatus: 0, location: 1, bucketHash: ARTIFACT_BUCKET, transferStatus: 0, lockable: false, state: 0 };
+    (k === 0 ? equipItems : invItems)[c.id].push(item);
+  });
+});
+
 // A loadout item's plugs, one per socket (2166136261 = leave as is), with
 // its ornament socket set to the ornament it wears, or `orn` if given.
 const NO_CHANGE = 2166136261;

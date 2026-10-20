@@ -102,6 +102,7 @@
       if (e.at <= minted) continue;
       if (key.startsWith("sock:")){ for (const k in e.plugs) patchPlug(key.slice(5), +k, e.plugs[k]); applied++; continue; }
       if (key.startsWith("sc:")){ patchSubclass(key.slice(3), e.id); applied++; continue; }
+      if (key.startsWith("art:")){ patchSubclass(key.slice(4), e.id, isArtifact); applied++; continue; }
       if (key.startsWith("pm:")){
         const pm = POSTMASTER.find(p => p.id === key.slice(3));
         if (pm){ POSTMASTER = POSTMASTER.filter(p => p !== pm); if (pm.gear) ITEMS.push(pm.gear); applied++; }
@@ -629,10 +630,11 @@
     const L = (DB && DB.loadouts) || { names: {}, icons: {}, colors: {} };
     return raw.map((lo, index) => {
       const all = (lo.items || []).map(x => String(x.itemInstanceId)).filter(id => id && id !== "0");
-      // Loadouts hold the subclass too; it isn't Locker gear, so it's
-      // checked on its own.
+      // Loadouts hold the subclass (and may hold the artifact); they aren't
+      // Locker gear, so the subclass is checked on its own.
       const isSub = id => { const d = DB.items[INSTANCE_HASH.get(id)]; return !!d && /Subclass$/.test(d.y || ""); };
-      const ids = all.filter(id => !isSub(id)), sub = all.find(isSub) || "";
+      const isArt = id => { const d = DB.items[INSTANCE_HASH.get(id)]; return !!d && d.y === "Artifact"; };
+      const ids = all.filter(id => !isSub(id) && !isArt(id)), sub = all.find(isSub) || "";
       // The ornament the loadout puts on each item (0 = the default look);
       // items whose loadout entry has no ornament plug aren't checked.
       const orn = new Map();
@@ -724,8 +726,8 @@
   // (tools/dim-relay; dim.gg doesn't let browsers read it), an
   // app.destinyitemmanager.com link carries the loadout itself, and pasted
   // loadout JSON is read as is. Weapons, armor, subclass (with its super,
-  // abilities, aspects and fragments), armor mods and per-slot shaders and
-  // ornaments are kept; the artifact can't be set through Bungie's API.
+  // abilities, aspects and fragments), the artifact and its perks, armor
+  // mods and per-slot shaders and ornaments are kept.
   const DIM_RELAY = "https://rallyflag-dim.rallyflag.workers.dev/";
   async function readDimLoadout(text){
     text = text.trim();
@@ -750,11 +752,13 @@
     const gear = all.filter(x => DB.items[x.hash] && (DB.items[x.hash].t === 2 || DB.items[x.hash].t === 3));
     const params = json.parameters || {};
     const sub = all.find(x => DB.items[x.hash] && /Subclass$/.test(DB.items[x.hash].y || ""));
+    const art = all.find(x => DB.items[x.hash] && DB.items[x.hash].y === "Artifact" && x.socketOverrides);
     return {
       id: "dim-" + (json.id || Date.now().toString(36)), name: String(json.name || "DIM loadout").slice(0, 60), cls: json.classType == null ? 3 : json.classType,
       items: gear.map(x => ({ id: String(x.id || ""), hash: x.hash })),
       dim: { id: json.id || "" },
       subclass: sub ? { hash: sub.hash, sockets: sub.socketOverrides || {} } : null,
+      artifact: art ? { hash: art.hash, sockets: art.socketOverrides } : null,
       mods: (params.mods || []).filter(h => DB.items[h] && DB.items[h].k),
       cosmetics: params.modsByBucket || {}
     };
@@ -787,14 +791,21 @@
     patchPlug(itemId, k, h); rememberPlug(itemId, k, h);
   }
   // Subclasses aren't Locker gear: read them from the profile.
-  function subclassesOf(charId){
-    const take = (list, equipped) => (list || []).filter(it => it.itemInstanceId && DB.items[it.itemHash] && /Subclass$/.test(DB.items[it.itemHash].y || ""))
+  // Subclasses and artifacts aren't Locker gear: read them from the profile.
+  // A character wears one of each and keeps the others in its inventory.
+  const ARTIFACT_BUCKET = 1506418338, EMPTY_ARTIFACT_PERK = 1235188590;
+  const isSubclass = it => !!DB.items[it.itemHash] && /Subclass$/.test(DB.items[it.itemHash].y || "");
+  const isArtifact = it => !!DB.items[it.itemHash] && (it.bucketHash === ARTIFACT_BUCKET || DB.items[it.itemHash].y === "Artifact");
+  function wornKindOf(charId, isKind){
+    const take = (list, equipped) => (list || []).filter(it => it.itemInstanceId && isKind(it))
       .map(it => ({ id: String(it.itemInstanceId), hash: it.itemHash, equipped }));
     return take((data(PROFILE, "characterEquipment")[charId] || {}).items, true).concat(take((data(PROFILE, "characterInventories")[charId] || {}).items, false));
   }
-  function patchSubclass(charId, id){
+  const subclassesOf = charId => wornKindOf(charId, isSubclass);
+  const artifactsOf = charId => wornKindOf(charId, isArtifact);
+  function patchSubclass(charId, id, isKind = isSubclass){
     const eq = (data(PROFILE, "characterEquipment")[charId] || {}).items || [], inv = (data(PROFILE, "characterInventories")[charId] || {}).items || [];
-    const isSub = it => DB.items[it.itemHash] && /Subclass$/.test(DB.items[it.itemHash].y || "");
+    const isSub = isKind;
     const k = inv.findIndex(it => String(it.itemInstanceId) === id && isSub(it)), cur = eq.findIndex(isSub);
     if (k < 0) return;
     const next = inv.splice(k, 1)[0];
@@ -866,6 +877,29 @@
     return plan.unplaced;
   }
 
+  // The artifact (as DIM does it): the copy of that artifact on this
+  // character, worn, then its perks one socket at a time. Bungie won't take
+  // a perk that's already in another socket, so a socket whose perk the
+  // loadout wants somewhere else is emptied first. The Reset socket is never
+  // in the list. Perks the player hasn't unlocked are refused by Bungie.
+  async function applyArtifact(want, charId, failed, notes){
+    const art = artifactsOf(charId).find(x => x.hash === want.hash), name = (DB.items[want.hash] || {}).n || "its artifact";
+    if (!art){ notes.push("Your " + ownerLabel(charId) + " doesn't have " + name + "."); return; }
+    if (!art.equipped){
+      await post("EquipItem", { itemId: art.id, characterId: charId });
+      patchSubclass(charId, art.id, isArtifact); remember([["art:" + charId, { id: art.id }]]);
+    }
+    const wants = {};
+    for (const k in want.sockets) wants[k] = want.sockets[k];
+    const cur = plugsOf(art.id);
+    for (let j = 0; j < cur.length; j++){
+      const h = cur[j];
+      if (!h || wants[j] === h || isEmptyPlug(h)) continue;
+      if (Object.keys(wants).some(k => +k !== j && wants[k] === h)) await setSockets(art.id, charId, { [j]: EMPTY_ARTIFACT_PERK }, failed, true);
+    }
+    await setSockets(art.id, charId, wants, failed);
+  }
+
   // Everything past the gear: equip the loadout's subclass and set its
   // choices, put shaders/ornaments on each slot, then the armor mods.
   // Returns a sentence for the toast.
@@ -884,6 +918,7 @@
         await setSockets(sc.id, charId, wants, failed);
       }
     }
+    if (lo.artifact) await applyArtifact(lo.artifact, charId, failed, notes);
     const worn = BUCKETS.map(b => ITEMS.find(i => i.owner === charId && i.equipped && i.def.b === b.hash)).filter(Boolean);
     for (const bucket in lo.cosmetics || {}){
       const item = worn.find(i => String(i.def.b) === bucket);
@@ -918,6 +953,11 @@
       const ok = sc && sc.equipped && Object.keys(lo.subclass.sockets).every(k => plugsOf(sc.id).includes(lo.subclass.sockets[k]));
       out.push({ ok: !!ok, text: "subclass " + (ok ? "set" : sc ? "not set" : "missing") });
     }
+    if (lo.artifact){
+      const art = artifactsOf(charId).find(x => x.hash === lo.artifact.hash);
+      const ok = art && art.equipped && Object.keys(lo.artifact.sockets).every(k => plugsOf(art.id).includes(lo.artifact.sockets[k]));
+      out.push({ ok: !!ok, text: "artifact " + (ok ? "set" : art ? "not set" : "missing") });
+    }
     if (lo.mods && lo.mods.length){
       const have = [];
       for (const b of BUCKETS){ const i = ITEMS.find(x => x.owner === charId && x.equipped && x.def.b === b.hash && x.def.t === 2); if (i) have.push(...plugsOf(i.id)); }
@@ -942,7 +982,10 @@
         if (DB.items[h] && (DB.items[h].o || DB.items[h].sh)) (cosmetics[i.def.b] = cosmetics[i.def.b] || []).push(h);
       }
     }
-    return { items: items.map(i => ({ id: i.id, hash: i.hash })), subclass: sc ? { hash: sc.hash, sockets } : null, mods, cosmetics };
+    const art = artifactsOf(charId).find(x => x.equipped), perks = {};
+    if (art) plugsOf(art.id).forEach((h, k) => { if (DB.items[h] && DB.items[h].y === "Artifact Perk") perks[k] = h; });
+    return { items: items.map(i => ({ id: i.id, hash: i.hash })), subclass: sc ? { hash: sc.hash, sockets } : null, mods, cosmetics,
+      artifact: art ? { hash: art.hash, sockets: perks } : null };
   }
 
   // Choosing your copies. An imported loadout (or a saved one whose item
@@ -1046,9 +1089,13 @@
       // What it carries besides gear (older saves and imports only had gear).
       const gearOnly = !("mods" in lo);
       const carries = gearOnly ? (lo.dim ? "Import it again to bring its subclass and mods too." : "Gear only (saved before loadouts kept subclass and mods).")
-        : [lo.subclass ? ((DB.items[lo.subclass.hash] || {}).n || "Subclass") + " with " + Object.keys(lo.subclass.sockets).length + " choices" : "", lo.mods && lo.mods.length ? lo.mods.length + " mods" : ""].filter(Boolean).join(", ");
+        : [lo.subclass ? ((DB.items[lo.subclass.hash] || {}).n || "Subclass") + " with " + Object.keys(lo.subclass.sockets).length + " choices" : "",
+           lo.artifact ? ((DB.items[lo.artifact.hash] || {}).n || "Artifact") + " with " + Object.keys(lo.artifact.sockets).length + " perks" : "",
+           lo.mods && lo.mods.length ? lo.mods.length + " mods" : ""].filter(Boolean).join(", ");
       const from = lo.dim ? 'From DIM' + (lo.dim.id ? ' (<a href="https://dim.gg/' + esc(lo.dim.id) + '/" target="_blank" rel="noopener">dim.gg/' + esc(lo.dim.id) + '<span class="sr-only"> (opens in a new tab)</span></a>)' : "") + ". " : "";
-      const note = from || carries ? '<p class="lo-status muted">' + from + esc(carries) + (lo.dim && !gearOnly ? (carries ? "; the" : "The") + " artifact is set in game." : "") + "</p>" : "";
+      // DIM imports from before artifacts were kept: say how to get it.
+      const noArtifact = lo.dim && !gearOnly && !("artifact" in lo) ? (carries ? ". " : "") + "Import it again to bring its artifact too." : "";
+      const note = from || carries || noArtifact ? '<p class="lo-status muted">' + from + esc(carries) + esc(noArtifact) + "</p>" : "";
       // Is it on? Gear equipped on the matching character, plus subclass/mods.
       const who = owners[0];
       const worn = who ? found.filter(i => i && i.owner === who.id && i.equipped).length : 0;
@@ -1072,7 +1119,7 @@
     }).join("") : '<p class="muted">Nothing saved yet. Save what a character wears now, or import a DIM link.</p>';
     box.innerHTML = (loReview ? reviewHtml() : "") +
       '<section class="lo-section" aria-labelledby="lo-h-saved"><h2 class="dlg-label" id="lo-h-saved">Saved in this browser</h2>' +
-        '<p class="muted lo-help">Gear, subclass, mods, shaders and ornaments. ' + (DEMO ? "" : "Saved in this browser and to Rally Flag's sync service under your Bungie account, so they're on any device where you sign in. ") +
+        '<p class="muted lo-help">Gear, subclass, artifact perks, mods, shaders and ornaments. ' + (DEMO ? "" : "Saved in this browser and to Rally Flag's sync service under your Bungie account, so they're on any device where you sign in. ") +
           '<span id="lo-sync" role="status">' + esc(syncText()) + "</span></p>" +
         '<div class="lo-tools">' +
           '<div class="lo-tool"><label class="lo-name"><span>Name</span><input type="text" id="lo-name" maxlength="40" placeholder="e.g. Raid DPS" autocomplete="off"></label>' +

@@ -181,7 +181,7 @@ await section("Loadouts", async () => {
   check("loadouts: #loadouts opens the tab", await p.isVisible("#view-loadouts"));
   await p.fill("#lo-name", "Check Titan"); await p.click('[data-lo-save="' + TITAN + '"]');
   const saved = await status(p);
-  check("loadouts: a saved loadout is fully on", /equipped 8 of 8 · subclass set · mods (\d+) of \1/.test(saved) && await p.locator('.lo-tile[aria-expanded="true"] .lo-check').count() === 1, saved);
+  check("loadouts: a saved loadout is fully on", /equipped 8 of 8 · subclass set · artifact set · mods (\d+) of \1/.test(saved) && await p.locator('.lo-tile[aria-expanded="true"] .lo-check').count() === 1, saved);
   await p.click('[data-lo-pick="g-' + TITAN + '-1"]'); await p.click('[data-game-lo="1"][data-to="' + TITAN + '"]'); await idle(p);
   await p.click('[data-lo-pick^="r-"]');
   check("loadouts: equipping something else is reflected", /equipped 0 of 8/.test(await status(p)), await status(p));
@@ -253,6 +253,39 @@ await section("DIM apply", async () => {
   if (!(await p.isVisible('[data-lo-pick="r-dim-chk002"][aria-expanded="true"]'))) await p.click('[data-lo-pick="r-dim-chk002"]');
   const st = await status(p);
   check("dim apply: the loadout reads as fully on", /equipped 8 of 8 · subclass set · mods (\d+) of \1/.test(st), st);
+  await p.context_.close();
+});
+
+// ---------- 6b. Artifact (mocked Bungie) ----------
+await section("Artifact", async () => {
+  const ARTIFACT_BUCKET = 1506418338;
+  const p = await open({ real: true, hash: "#loadouts" });
+  await p.fill("#lo-name", "Worn"); await p.click('[data-lo-save="' + TITAN + '"]');
+  const A = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:4611686018400000000")).find(x => x.name === "Worn"));
+  const worn = DEMO.characterEquipment.data[TITAN].items.find(i => i.bucketHash === ARTIFACT_BUCKET);
+  check("artifact: saving keeps the worn artifact and its perks", A.artifact && A.artifact.hash === worn.itemHash && Object.keys(A.artifact.sockets).length >= 5, JSON.stringify(A.artifact));
+  // A DIM link with the other artifact (carried, not worn), its first two
+  // perks swapped: both sockets must be emptied first, then set.
+  const spare = DEMO.characterInventories.data[TITAN].items.find(i => i.bucketHash === ARTIFACT_BUCKET);
+  const plugs = DEMO.itemComponents.sockets.data[spare.itemInstanceId].sockets.map(x => x.plugHash || 0);
+  const want = { 0: plugs[1], 1: plugs[0], 2: plugs[2] };
+  const fixture = { id: "chk003", name: "Artifact check", classType: 0, equipped: A.items.concat([{ id: "5", hash: spare.itemHash, socketOverrides: want }]), unequipped: [], parameters: { mods: [] } };
+  await p.route(RELAY + "**", r => r.fulfill(json(fixture)));
+  await p.fill("#lo-dim", "https://dim.gg/chk003/x"); await p.click("#lo-dim-go"); await p.waitForTimeout(800);
+  p.calls.length = 0;
+  await p.click('[data-lo-equip="dim-chk003"][data-to="' + TITAN + '"]'); await idle(p);
+  const onSpare = p.calls.filter(c => c.ep === "InsertSocketPlugFree" && c.body.itemId === spare.itemInstanceId).map(c => c.body.plug.socketIndex + ":" + c.body.plug.plugItemHash);
+  check("artifact: the loadout's artifact is equipped", p.calls.some(c => c.ep === "EquipItem" && c.body.itemId === spare.itemInstanceId), JSON.stringify(p.calls.map(c => c.ep)));
+  check("artifact: swapped perks are emptied first, then set (socket 2 untouched)",
+    onSpare.join() === ["0:1235188590", "1:1235188590", "0:" + plugs[1], "1:" + plugs[0]].join(), onSpare.join());
+  if (!(await p.isVisible('[data-lo-pick="r-dim-chk003"][aria-expanded="true"]'))) await p.click('[data-lo-pick="r-dim-chk003"]');
+  check("artifact: the loadout reads as artifact set", /artifact set/.test(await status(p)) && /Slayer Baron|Artifact/.test(await p.textContent("#view-loadouts .lo-detail:not([hidden])")), await status(p));
+  // The saved loadout brings the original artifact back, with no perk changes.
+  const id = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:4611686018400000000")).find(x => x.name === "Worn").id);
+  p.calls.length = 0;
+  await p.click('[data-lo-pick="r-' + id + '"]'); await p.click('[data-lo-equip="' + id + '"][data-to="' + TITAN + '"]'); await idle(p);
+  check("artifact: a saved loadout puts its own artifact back", p.calls.some(c => c.ep === "EquipItem" && c.body.itemId === worn.itemInstanceId) && !p.calls.some(c => c.ep === "InsertSocketPlugFree" && c.body.itemId === worn.itemInstanceId), JSON.stringify(p.calls.map(c => c.ep + (c.body.itemId ? ":" + c.body.itemId.slice(-3) : ""))));
+  check("artifact: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
 });
 
