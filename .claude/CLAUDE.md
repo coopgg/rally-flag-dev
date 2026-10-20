@@ -141,6 +141,9 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   `spareFirst` ordering with farming); saved per account in localStorage.
   In-game loadouts: component 206 + Actions/Loadouts/EquipLoadout (also
   sets subclass and mods); missing items are moved onto the character first.
+  DIM import: dim.gg links go through the Cloudflare Worker in
+  `tools/dim-relay/` (dim.gg has no CORS); deployed by the owner from the
+  Cloudflare dashboard, so changing it means pasting the file there again.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

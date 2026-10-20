@@ -528,6 +528,48 @@
       '<span class="farm-note">' + (n ? n + " saved." : "Save what a character has equipped, or equip their highest Power.") + "</span>";
   }
 
+  // A saved loadout item -> the item to use: that exact copy, or (for DIM
+  // imports from someone else, or a copy since dismantled) your best copy of
+  // the same item, preferring one already on the character.
+  function loItem(x, charId){
+    const exact = x.id && ITEMS.find(i => i.id === x.id);
+    if (exact) return exact;
+    return ITEMS.filter(i => i.hash === x.hash && (!charId || classOk(i, charId)))
+      .sort((a, b) => b.power - a.power || (b.owner === charId) - (a.owner === charId))[0] || null;
+  }
+
+  // DIM loadouts: a dim.gg link goes through our Cloudflare Worker
+  // (tools/dim-relay; dim.gg doesn't let browsers read it), an
+  // app.destinyitemmanager.com link carries the loadout itself, and pasted
+  // loadout JSON is read as is. Weapons and armor are kept; subclass,
+  // artifact and mods are counted but not applied yet.
+  const DIM_RELAY = "https://rallyflag-dim.hoffmn-cb2.workers.dev/";
+  async function readDimLoadout(text){
+    text = text.trim();
+    let json = null;
+    const inline = text.match(/[?&]loadout=([^&#\s]+)/);
+    if (inline){
+      try { json = JSON.parse(decodeURIComponent(inline[1].replace(/\+/g, " "))); } catch (e){ throw new Error("That DIM link looks cut off. Copy the whole link and try again."); }
+    } else if (text.charAt(0) === "{"){
+      try { json = JSON.parse(text); } catch (e){ throw new Error("That isn't a DIM loadout."); }
+    } else if (/^(https?:\/\/)?(www\.)?dim\.gg\/[a-z0-9]+/i.test(text)){
+      let res;
+      try { res = await fetch(DIM_RELAY + "?url=" + encodeURIComponent(text)); } catch (e){ throw new Error("Couldn't reach DIM. Check your connection and try again."); }
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || "Couldn't read that DIM link.");
+      json = body;
+    } else throw new Error("Paste a DIM loadout link (dim.gg/…).");
+    if (!json || !Array.isArray(json.equipped)) throw new Error("That isn't a DIM loadout.");
+    const all = json.equipped.concat(json.unequipped || []);
+    const gear = all.filter(x => DB.items[x.hash] && (DB.items[x.hash].t === 2 || DB.items[x.hash].t === 3));
+    const params = json.parameters || {};
+    return {
+      id: "dim-" + (json.id || Date.now().toString(36)), name: String(json.name || "DIM loadout").slice(0, 60), cls: json.classType == null ? 3 : json.classType,
+      items: gear.map(x => ({ id: String(x.id || ""), hash: x.hash })),
+      dim: { id: json.id || "", mods: (params.mods || []).length, subclass: all.some(x => DB.items[x.hash] && /Subclass$/.test(DB.items[x.hash].y || "")) }
+    };
+  }
+
   function openLoadouts(){
     const dlg = $("item-dialog"), list = readLoadouts();
     // A redraw replaces the buttons: keep keyboard focus on the same control.
@@ -544,12 +586,17 @@
           (done ? "At max Power" : 'Equip max Power<span class="sr-only"> on your ' + esc(o.name) + "</span>") + "</button></div>";
     }).join("");
     const saved = list.length ? loGrid("r", list.map(lo => {
-      const have = lo.items.filter(x => byId.has(x.id)).length, gone = lo.items.length - have, owners = OWNERS.filter(o => o.cls === lo.cls);
+      const owners = OWNERS.filter(o => lo.cls === 3 || o.cls === lo.cls);
+      const found = lo.items.map(x => loItem(x)), gone = found.filter(i => !i).length;
+      const copies = lo.items.filter((x, k) => found[k] && found[k].id !== x.id).length;
       const first = DB.items[(lo.items[0] || {}).hash] || {};
+      const dim = lo.dim ? '<p class="lo-status muted">From DIM' + (lo.dim.id ? ' (<a href="https://dim.gg/' + esc(lo.dim.id) + '/"' + ' target="_blank" rel="noopener">dim.gg/' + esc(lo.dim.id) + '<span class="sr-only"> (opens in a new tab)</span></a>)' : "") +
+        ". Weapons and armor only for now" + (lo.dim.subclass || lo.dim.mods ? ": its " + [lo.dim.subclass ? "subclass" : "", lo.dim.mods ? lo.dim.mods + " mods" : ""].filter(Boolean).join(" and ") + " aren't applied" : "") + ".</p>" : "";
       return { key: "r-" + lo.id, name: lo.name, gone, badge: loBadge(first.i, ""),
-        detail: '<div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(CLASS_NAMES[lo.cls] || "") +
-          (gone ? " · " + gone + " item" + (gone === 1 ? "" : "s") + " no longer found" : "") + "</span></div>" +
-        '<div class="lo-items" aria-hidden="true">' + lo.items.map(x => mini(x.hash, byId.has(x.id), byId.get(x.id))).join("") + "</div>" +
+        detail: '<div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(lo.cls === 3 ? "Any class" : CLASS_NAMES[lo.cls] || "") +
+          (gone ? " · " + gone + " item" + (gone === 1 ? "" : "s") + (lo.dim ? " you don't have" : " no longer found") : "") +
+          (copies ? " · " + copies + " from your own copies" : "") + "</span></div>" +
+        '<div class="lo-items" aria-hidden="true">' + lo.items.map((x, k) => mini(x.hash, !!found[k], found[k])).join("") + "</div>" + dim +
         '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
           '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" };
     })) : '<p class="muted">No loadouts yet. Save what one of your characters has equipped below.</p>';
@@ -561,6 +608,9 @@
         '<div class="dlg-block"><div class="dlg-label">Max Power</div><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</div>" +
         '<div class="dlg-block"><div class="dlg-label">In-game loadouts</div><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first.</p>' + gameSection() + "</div>" +
         '<div class="dlg-block"><div class="dlg-label">Rally Flag loadouts</div>' + saved + "</div>" +
+        '<div class="dlg-block"><div class="dlg-label">Import from DIM</div><p class="muted lo-help">Paste a DIM share link. Items from someone else\'s link use your own copies.</p>' +
+          '<label class="lo-name"><span>Link</span><input type="url" id="lo-dim" placeholder="https://dim.gg/…" autocomplete="off" inputmode="url"></label>' +
+          '<div class="act-row"><button type="button" class="act-btn" id="lo-dim-go">Import</button></div></div>' +
         '<div class="dlg-block"><div class="dlg-label">Save a loadout</div>' +
           '<label class="lo-name"><span>Name</span><input type="text" id="lo-name" maxlength="40" placeholder="e.g. Raid DPS" autocomplete="off"></label>' +
           '<div class="act-row">' + OWNERS.map(o => '<button type="button" class="act-btn" data-lo-save="' + o.id + '">Save ' + esc(o.name) + "'s gear</button>").join("") + "</div></div>" +
@@ -581,7 +631,7 @@
       if (busyNotice()) return;
       const lo = readLoadouts().find(x => x.id === b.dataset.loEquip), o = ownerOf(b.dataset.to);
       if (!lo || !o) return;
-      const items = lo.items.map(x => ITEMS.find(i => i.id === x.id)).filter(i => i && classOk(i, o.id));
+      const items = lo.items.map(x => loItem(x, o.id)).filter(i => i && classOk(i, o.id));
       const missing = lo.items.length - items.length;
       run("Equipping " + lo.name + " on your " + o.name, "Equipped " + lo.name + " on your " + o.name + "." + (missing ? " " + missing + " item" + (missing === 1 ? " was" : "s were") + " missing and skipped." : ""), () => equipSet(items, o.id), reopen);
     }));
@@ -597,6 +647,30 @@
       writeLoadouts(readLoadouts().filter(x => x.id !== b.dataset.loDel));
       renderLoadoutRow(); openLoadouts(); toast("Loadout deleted.", "ok");
     }));
+    const dimGo = $("lo-dim-go"), dimIn = $("lo-dim");
+    const importDim = async () => {
+      if (!dimIn.value.trim() || dimGo.getAttribute("aria-disabled") === "true") return;
+      dimGo.setAttribute("aria-disabled", "true"); dimGo.textContent = "Importing…";
+      try {
+        const lo = await readDimLoadout(dimIn.value);
+        if (!lo.items.length) throw new Error("That loadout has no weapons or armor.");
+        // Importing the same link again replaces the earlier copy.
+        const all = readLoadouts().filter(x => x.id !== lo.id);
+        all.push(lo); writeLoadouts(all);
+        const have = lo.items.filter(x => loItem(x)).length;
+        loOpen = "r-" + lo.id;
+        renderLoadoutRow();
+        if (dlg.open && dlg.dataset.view === "loadouts") openLoadouts();
+        toast("Imported " + lo.name + ": you have " + have + " of its " + lo.items.length + " items.", "ok");
+        const tile = dlg.querySelector('[data-lo-pick="r-' + lo.id + '"]');
+        if (tile){ tile.focus(); tile.scrollIntoView({ block: "nearest" }); }
+      } catch (e){
+        toast((e && e.message) || "Couldn't import that link.", "error");
+        dimGo.removeAttribute("aria-disabled"); dimGo.textContent = "Import";
+      }
+    };
+    dimGo.addEventListener("click", importDim);
+    dimIn.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); importDim(); } });
     dlg.querySelectorAll("[data-lo-save]").forEach(b => b.addEventListener("click", () => {
       const o = ownerOf(b.dataset.loSave), items = equippedOn(o.id);
       if (!items.length) return toast("Your " + o.name + " has nothing equipped to save.", "error");
