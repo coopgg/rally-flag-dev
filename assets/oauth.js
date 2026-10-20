@@ -374,6 +374,13 @@ window.RallyFlagAuth = (function(){
     return null;
   }
 
+  // The current token if it's still good, else null. Never redirects, so
+  // background work (the Locker's loadout sync) can use it safely.
+  function peekAccessToken(){
+    const auth = loadAuth();
+    return auth && auth.access_token && Date.now() < auth.access_expires_at - EXPIRY_BUFFER_MS ? auth.access_token : null;
+  }
+
   // Convenience wrapper for pages that need to hit an OAuth-protected
   // Platform endpoint — attaches both required headers. `path` is
   // relative to the Bungie root, e.g. "/Platform/Destiny2/...".
@@ -412,6 +419,7 @@ window.RallyFlagAuth = (function(){
     claimAutoRetry,
     getLastReturnTo,
     getAccessToken,
+    peekAccessToken,
     authedFetch,
     onChange
   };

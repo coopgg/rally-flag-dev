@@ -392,7 +392,128 @@
   // included yet.
   const loadoutKey = () => "rallyflag_locker_loadouts:" + (PROFILE_PATH.split("/").pop() || "demo");
   function readLoadouts(){ try { return JSON.parse(localStorage.getItem(loadoutKey()) || "[]"); } catch (e){ return []; } }
-  function writeLoadouts(list){ try { localStorage.setItem(loadoutKey(), JSON.stringify(list)); } catch (e){} }
+  function setLoadoutsRaw(list){ try { localStorage.setItem(loadoutKey(), JSON.stringify(list)); } catch (e){} }
+  // Every change stamps the loadouts it touched (`at`) and notes deletions,
+  // so copies from two devices can be merged (see sync below).
+  const sansAt = lo => { const c = Object.assign({}, lo); delete c.at; return JSON.stringify(c); };
+  function writeLoadouts(list){
+    const old = readLoadouts(), oldBy = new Map(old.map(x => [x.id, x])), now = Date.now();
+    const out = list.map(lo => { const prev = oldBy.get(lo.id); return Object.assign({}, lo, { at: prev && sansAt(prev) === sansAt(lo) ? prev.at || 1 : now }); });
+    const meta = readSyncMeta();
+    for (const x of old) if (!out.some(y => y.id === x.id)) meta.deleted[x.id] = now;
+    for (const x of out) if (meta.deleted[x.id] && meta.deleted[x.id] < x.at) delete meta.deleted[x.id];
+    meta.dirty = true;
+    setLoadoutsRaw(out); writeSyncMeta(meta);
+    syncGen++; schedulePush();
+  }
+
+  // ---------------- loadout sync ----------------
+  // Signed-in players' loadouts also live on Rally Flag's sync service (a
+  // Cloudflare Worker + D1 database, tools/sync-worker), under their
+  // Destiny account, so clearing site data or switching devices keeps
+  // them. This browser's copy stays the working copy; changes go up a
+  // moment later, and the service's copy is merged in on load and when
+  // the tab comes back. Merge: per loadout the newest `at` wins, and a
+  // deletion wins over anything older than it.
+  const SYNC_URL = "https://rallyflag-sync.rallyflag.workers.dev/loadouts/";
+  const SYNC_KEEP_DELETED = 60 * 24 * 3600 * 1000;
+  const syncMetaKey = () => "rallyflag_locker_loadouts_sync:" + (PROFILE_PATH.split("/").pop() || "demo");
+  function readSyncMeta(){ try { return Object.assign({ version: 0, deleted: {}, dirty: false }, JSON.parse(localStorage.getItem(syncMetaKey()) || "{}")); } catch (e){ return { version: 0, deleted: {}, dirty: false }; } }
+  function writeSyncMeta(m){ try { localStorage.setItem(syncMetaKey(), JSON.stringify(m)); } catch (e){} }
+  let syncGen = 0, syncTimerLo = 0, syncBusy = false, syncPulledAt = 0;
+  let SYNC = { state: DEMO ? "demo" : "off", at: 0, msg: "" };
+  const syncOn = () => !DEMO && !!PROFILE_PATH && window.RallyFlagAuth && RallyFlagAuth.isSignedIn();
+  function mergeLoadouts(a, b){
+    const deleted = Object.assign({}, a.deleted);
+    for (const id in b.deleted) deleted[id] = Math.max(deleted[id] || 0, b.deleted[id]);
+    const by = new Map();
+    for (const lo of a.loadouts.concat(b.loadouts)){ const cur = by.get(lo.id); if (!cur || (lo.at || 0) > (cur.at || 0)) by.set(lo.id, lo); }
+    const cut = Date.now() - SYNC_KEEP_DELETED;
+    for (const id in deleted) if (deleted[id] < cut) delete deleted[id];
+    // Keep this browser's order; loadouts new from the other copy go last.
+    const order = [...new Set(a.loadouts.concat(b.loadouts).map(lo => lo.id))];
+    const loadouts = order.map(id => by.get(id)).filter(lo => !(deleted[lo.id] >= (lo.at || 0)));
+    return { loadouts, deleted };
+  }
+  const sameSet = (a, b) => JSON.stringify(a.loadouts.map(x => x.id + ":" + x.at).sort()) === JSON.stringify(b.loadouts.map(x => x.id + ":" + x.at).sort()) &&
+    JSON.stringify(Object.keys(a.deleted).sort()) === JSON.stringify(Object.keys(b.deleted).sort());
+  function setSync(state, msg){
+    SYNC = { state, at: state === "ok" ? Date.now() : SYNC.at, msg: msg || "" };
+    // After a failure, try again in a minute (and whenever the tab comes back).
+    if (state === "error"){ clearTimeout(syncTimerLo); syncTimerLo = setTimeout(() => readSyncMeta().dirty ? pushLoadouts() : pullLoadouts(), 60000); }
+    const el = $("lo-sync");
+    if (el) el.textContent = syncText();
+  }
+  function syncText(){
+    if (SYNC.state === "demo") return "Sample data: kept in this browser only.";
+    if (SYNC.state === "saving") return "Syncing…";
+    if (SYNC.state === "ok") return "Synced to your Bungie account.";
+    if (SYNC.state === "error") return SYNC.msg + " They're still saved in this browser, and syncing will try again.";
+    return "";
+  }
+  async function syncFetch(method, body){
+    const token = RallyFlagAuth.peekAccessToken();
+    if (!token) throw new Error("Sign in again to sync your loadouts.");
+    let res;
+    try {
+      res = await fetch(SYNC_URL + PROFILE_PATH.split("/").pop(), { method, headers: Object.assign({ "Authorization": "Bearer " + token }, body ? { "Content-Type": "application/json" } : {}), body: body ? JSON.stringify(body) : undefined });
+    } catch (e){ throw new Error("Couldn't reach Rally Flag's sync service."); }
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 409) return { conflict: true, data };
+    if (!res.ok) throw new Error(data.error || "Syncing failed (HTTP " + res.status + ").");
+    return { data };
+  }
+  // Puts the merged copy in this browser; redraws the tab if it changed.
+  function adoptMerged(merged, version, dirty){
+    const local = { loadouts: readLoadouts(), deleted: readSyncMeta().deleted };
+    const changed = !sameSet(local, merged);
+    setLoadoutsRaw(merged.loadouts);
+    writeSyncMeta({ version, deleted: merged.deleted, dirty });
+    if (changed){ renderLoadoutCount(); if (loadoutsShown()) renderLoadouts(); }
+  }
+  async function pullLoadouts(){
+    if (!syncOn() || syncBusy) return;
+    syncBusy = true; setSync("saving");
+    try {
+      const { data } = await syncFetch("GET");
+      syncPulledAt = Date.now();
+      const server = { loadouts: data.loadouts || [], deleted: data.deleted || {} };
+      const merged = mergeLoadouts({ loadouts: readLoadouts(), deleted: readSyncMeta().deleted }, server);
+      const ahead = !sameSet(merged, server);
+      adoptMerged(merged, data.version || 0, ahead);
+      syncBusy = false;
+      if (ahead) await pushLoadouts(); else setSync("ok");
+    } catch (e){ syncBusy = false; setSync("error", e.message); }
+  }
+  async function pushLoadouts(){
+    if (!syncOn() || syncBusy) return;
+    if (!readSyncMeta().dirty){ if (SYNC.state === "saving") setSync("ok"); return; }
+    syncBusy = true; setSync("saving");
+    try {
+      for (let tries = 0; tries < 4; tries++){
+        const gen = syncGen, meta = readSyncMeta();
+        const r = await syncFetch("PUT", { base: meta.version, loadouts: readLoadouts(), deleted: meta.deleted });
+        if (r.conflict){
+          // Another device saved first: merge its copy in and try again.
+          const server = { loadouts: r.data.loadouts || [], deleted: r.data.deleted || {} };
+          adoptMerged(mergeLoadouts({ loadouts: readLoadouts(), deleted: meta.deleted }, server), r.data.version || 0, true);
+          continue;
+        }
+        const m = readSyncMeta(); m.version = r.data.version; m.dirty = gen !== syncGen; writeSyncMeta(m);
+        syncBusy = false;
+        if (m.dirty) return schedulePush();
+        return setSync("ok");
+      }
+      throw new Error("Couldn't save: your loadouts kept changing on another device.");
+    } catch (e){ syncBusy = false; setSync("error", e.message); }
+  }
+  function schedulePush(){ if (!syncOn()) return; clearTimeout(syncTimerLo); syncTimerLo = setTimeout(pushLoadouts, 1200); }
+  // Coming back to the tab: send anything unsent, and pick up changes made
+  // on other devices (at most once a minute).
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || !PROFILE_PATH) return;
+    if (Date.now() - syncPulledAt > 60000) pullLoadouts(); else pushLoadouts();
+  });
   const gearPower = items => items.length === BUCKETS.length ? items.reduce((n, i) => n + i.power, 0) / items.length : null;
   const fmtPower = n => n == null ? "—" : (Math.round(n * 10) / 10).toFixed(1);
   const equippedOn = charId => BUCKETS.map(b => ITEMS.find(i => i.owner === charId && i.equipped && i.def.b === b.hash)).filter(Boolean);
@@ -893,7 +1014,8 @@
     }).join("") : '<p class="muted">Nothing saved yet. Save what a character wears now, or import a DIM link.</p>';
     box.innerHTML = (loReview ? reviewHtml() : "") +
       '<section class="lo-section" aria-labelledby="lo-h-saved"><h2 class="dlg-label" id="lo-h-saved">Saved in this browser</h2>' +
-        '<p class="muted lo-help">Gear, subclass, mods, shaders and ornaments. Kept in this browser only, so they won\'t show on your other devices.</p>' +
+        '<p class="muted lo-help">Gear, subclass, mods, shaders and ornaments. ' + (DEMO ? "" : "Saved in this browser and to Rally Flag's sync service under your Bungie account, so they're on any device where you sign in. ") +
+          '<span id="lo-sync" role="status">' + esc(syncText()) + "</span></p>" +
         '<div class="lo-tools">' +
           '<div class="lo-tool"><label class="lo-name"><span>Name</span><input type="text" id="lo-name" maxlength="40" placeholder="e.g. Raid DPS" autocomplete="off"></label>' +
             '<div class="act-row">' + OWNERS.map(o => '<button type="button" class="act-btn" data-lo-save="' + o.id + '">Save ' + esc(o.name) + "'s loadout</button>").join("") + "</div></div>" +
@@ -1901,6 +2023,7 @@
       render();
       resolvePostmasterNames();
       setFarmTimer();
+      pullLoadouts();
       if (location.hash.length > 1) showView(location.hash.slice(1));
       window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
     } catch (e){
