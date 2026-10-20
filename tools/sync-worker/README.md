@@ -1,6 +1,6 @@
 # Loadout sync (Cloudflare Worker + D1)
 
-Keeps each signed-in player's Locker loadouts on Cloudflare, under their
+Keeps each signed-in player's Locker loadouts and Favorite/Junk tags on Cloudflare, under their
 Destiny account id, so they survive clearing site data and show up on every
 device where they sign in. The Locker calls
 `https://rallyflag-sync.rallyflag.workers.dev/loadouts/<destinyMembershipId>`
@@ -10,7 +10,8 @@ device where they sign in. The Locker calls
 
 One row per Destiny account: the loadout list (names, item instance ids and
 hashes, subclass/mod/shader/ornament plug hashes, timestamps), recent
-deletions, a version number and when it was last saved. No names, emails
+deletions, Favorite/Junk tags (item instance id, tag, when it was set;
+removed tags kept 60 days), a version number and when it was last saved. No names, emails
 or tokens. The player's Bungie sign-in token is sent with each request so
 the worker can ask Bungie which account it belongs to; it is used for that
 one check (remembered for 10 minutes under a SHA-256 hash of the token) and
@@ -54,8 +55,8 @@ capped at 256KB (a few hundred loadouts).
 
 ## API
 
-    GET /loadouts/<id>  → { version, loadouts, deleted }
-    PUT /loadouts/<id>  { base, loadouts, deleted } → { version } or 409 + the newer copy
+    GET /loadouts/<id>  → { version, loadouts, deleted, tags }
+    PUT /loadouts/<id>  { base, loadouts, deleted, tags } → { version } or 409 + the newer copy
     DELETE /loadouts/<id>  → { version: 0 } (row removed; the Locker's "Delete all my saved loadouts")
 
 Requests need `Authorization: Bearer <Bungie access token>` and an Origin

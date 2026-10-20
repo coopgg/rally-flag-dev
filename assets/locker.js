@@ -130,9 +130,16 @@
   // Favorite / Junk tags, per item, kept in this browser (no server to sync them).
   const TAG_KEY = "rallyflag_locker_tags";
   const TAGS = (() => { try { return JSON.parse(localStorage.getItem(TAG_KEY) || "{}"); } catch (e){ return {}; } })();
+  // When each tag was last set or removed (removed = no TAGS entry), so
+  // tags can be merged with the player's other devices (sync, below).
+  const TAG_TIME_KEY = "rallyflag_locker_tag_times";
+  const TAG_AT = (() => { try { return JSON.parse(localStorage.getItem(TAG_TIME_KEY) || "{}"); } catch (e){ return {}; } })();
+  function saveTags(){ try { localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); localStorage.setItem(TAG_TIME_KEY, JSON.stringify(TAG_AT)); } catch (e){} }
   function toggleTag(id, tag){
     TAGS[id] === tag ? delete TAGS[id] : (TAGS[id] = tag);
-    try { localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); } catch (e){}
+    TAG_AT[id] = Date.now();
+    saveTags();
+    tagsChanged();
   }
   // Which view is open: gear (default), loadouts (#loadouts) or armor sets (#sets).
   const VIEWS = ["gear", "loadouts", "sets"];
@@ -153,7 +160,7 @@
   function showStatus(html){ $("locker-status").innerHTML = html ? '<div class="locker-panel panel-card">' + html + "</div>" : ""; }
   function showSignedOut(){
     showStatus(
-      "<p>Sign in with Bungie.net to see your weapons and armor here, matched against our God Rolls and armor sets. Rally Flag only moves or equips something when you press a button. Your tags stay in your browser; loadouts you save are also kept under your Bungie account so they're on every device (see <a href=\"" + PUBLIC_SITE + "privacy.html\"" + NEW_TAB + ">Privacy" + NEW_TAB_NOTE + "</a>).</p>" +
+      "<p>Sign in with Bungie.net to see your weapons and armor here, matched against our God Rolls and armor sets. Rally Flag only moves or equips something when you press a button. Your Favorite/Junk tags and saved loadouts are kept in this browser and under your Bungie account, so they're on every device where you sign in (see <a href=\"" + PUBLIC_SITE + "privacy.html\"" + NEW_TAB + ">Privacy" + NEW_TAB_NOTE + "</a>).</p>" +
       '<div class="locker-actions"><button class="locker-btn" type="button" id="locker-signin">Sign in with Bungie.net</button>' +
       '<a class="locker-btn ghost" href="locker.html?demo">Try it with sample data</a></div>');
     $("locker-signin").addEventListener("click", () => RallyFlagAuth.signIn());
@@ -411,14 +418,15 @@
     syncGen++; schedulePush();
   }
 
-  // ---------------- loadout sync ----------------
-  // Signed-in players' loadouts also live on Rally Flag's sync service (a
+  // ---------------- loadout and tag sync ----------------
+  // Signed-in players' loadouts and Favorite/Junk tags also live on Rally Flag's sync service (a
   // Cloudflare Worker + D1 database, tools/sync-worker), under their
   // Destiny account, so clearing site data or switching devices keeps
   // them. This browser's copy stays the working copy; changes go up a
   // moment later, and the service's copy is merged in on load and when
   // the tab comes back. Merge: per loadout the newest `at` wins, and a
-  // deletion wins over anything older than it.
+  // deletion wins over anything older than it; per item, the newest tag
+  // change wins (a removal is a change too).
   const SYNC_URL = "https://rallyflag-sync.rallyflag.workers.dev/loadouts/";
   const SYNC_KEEP_DELETED = 60 * 24 * 3600 * 1000;
   const syncMetaKey = () => "rallyflag_locker_loadouts_sync:" + (PROFILE_PATH.split("/").pop() || "demo");
@@ -427,6 +435,29 @@
   let syncGen = 0, syncTimerLo = 0, syncBusy = false, syncPulledAt = 0;
   let SYNC = { state: DEMO ? "demo" : "off", at: 0, msg: "" };
   const syncOn = () => !DEMO && !!PROFILE_PATH && window.RallyFlagAuth && RallyFlagAuth.isSignedIn();
+  // Tags as synced: itemId -> { t: "favorite" | "junk" | "" (removed), at }.
+  function readTagState(){
+    const out = {};
+    for (const id in TAG_AT) out[id] = { t: TAGS[id] || "", at: TAG_AT[id] };
+    for (const id in TAGS) if (!out[id]) out[id] = { t: TAGS[id], at: 1 }; // tagged before tags synced
+    return out;
+  }
+  function writeTagState(map){
+    for (const id of Object.keys(TAGS)) if (!map[id] || !map[id].t) delete TAGS[id];
+    for (const id of Object.keys(TAG_AT)) delete TAG_AT[id];
+    for (const id in map){ if (map[id].t) TAGS[id] = map[id].t; TAG_AT[id] = map[id].at; }
+    saveTags();
+  }
+  function mergeTags(a, b){
+    const out = Object.assign({}, a), cut = Date.now() - SYNC_KEEP_DELETED;
+    for (const id in b) if (!out[id] || (b[id].at || 0) > (out[id].at || 0)) out[id] = b[id];
+    for (const id in out) if (!out[id].t && out[id].at < cut) delete out[id];
+    return out;
+  }
+  const tagKey = tags => JSON.stringify(Object.keys(tags).sort().map(id => id + ":" + tags[id].t + ":" + tags[id].at));
+  function tagsChanged(){ const m = readSyncMeta(); m.dirty = true; writeSyncMeta(m); syncGen++; schedulePush(); }
+  const localState = () => ({ loadouts: readLoadouts(), deleted: readSyncMeta().deleted, tags: readTagState() });
+  const serverState = d => ({ loadouts: d.loadouts || [], deleted: d.deleted || {}, tags: d.tags || {} });
   function mergeLoadouts(a, b){
     const deleted = Object.assign({}, a.deleted);
     for (const id in b.deleted) deleted[id] = Math.max(deleted[id] || 0, b.deleted[id]);
@@ -437,10 +468,10 @@
     // Keep this browser's order; loadouts new from the other copy go last.
     const order = [...new Set(a.loadouts.concat(b.loadouts).map(lo => lo.id))];
     const loadouts = order.map(id => by.get(id)).filter(lo => !(deleted[lo.id] >= (lo.at || 0)));
-    return { loadouts, deleted };
+    return { loadouts, deleted, tags: mergeTags(a.tags || {}, b.tags || {}) };
   }
   const sameSet = (a, b) => JSON.stringify(a.loadouts.map(x => x.id + ":" + x.at).sort()) === JSON.stringify(b.loadouts.map(x => x.id + ":" + x.at).sort()) &&
-    JSON.stringify(Object.keys(a.deleted).sort()) === JSON.stringify(Object.keys(b.deleted).sort());
+    JSON.stringify(Object.keys(a.deleted).sort()) === JSON.stringify(Object.keys(b.deleted).sort()) && tagKey(a.tags || {}) === tagKey(b.tags || {});
   function setSync(state, msg){
     SYNC = { state, at: state === "ok" ? Date.now() : SYNC.at, msg: msg || "" };
     // After a failure, try again in a minute (and whenever the tab comes back).
@@ -469,11 +500,13 @@
   }
   // Puts the merged copy in this browser; redraws the tab if it changed.
   function adoptMerged(merged, version, dirty){
-    const local = { loadouts: readLoadouts(), deleted: readSyncMeta().deleted };
-    const changed = !sameSet(local, merged);
+    const local = localState();
+    const changed = !sameSet(local, merged), tagsMoved = tagKey(local.tags) !== tagKey(merged.tags || {});
     setLoadoutsRaw(merged.loadouts);
+    if (tagsMoved) writeTagState(merged.tags || {});
     writeSyncMeta({ version, deleted: merged.deleted, dirty });
-    if (changed){ renderLoadoutCount(); if (loadoutsShown()) renderLoadouts(); }
+    if (tagsMoved) render(); // tiles, filters and junk counts show tags
+    else if (changed){ renderLoadoutCount(); if (loadoutsShown()) renderLoadouts(); }
   }
   async function pullLoadouts(){
     if (!syncOn() || syncBusy) return;
@@ -481,8 +514,8 @@
     try {
       const { data } = await syncFetch("GET");
       syncPulledAt = Date.now();
-      const server = { loadouts: data.loadouts || [], deleted: data.deleted || {} };
-      const local = erasedElsewhere(data.version || 0) ? { loadouts: [], deleted: {} } : { loadouts: readLoadouts(), deleted: readSyncMeta().deleted };
+      const server = serverState(data);
+      const local = erasedElsewhere(data.version || 0) ? { loadouts: [], deleted: {}, tags: {} } : localState();
       const merged = mergeLoadouts(local, server);
       const ahead = !sameSet(merged, server);
       adoptMerged(merged, data.version || 0, ahead);
@@ -497,12 +530,12 @@
     try {
       for (let tries = 0; tries < 4; tries++){
         const gen = syncGen, meta = readSyncMeta();
-        const r = await syncFetch("PUT", { base: meta.version, loadouts: readLoadouts(), deleted: meta.deleted });
+        const r = await syncFetch("PUT", { base: meta.version, loadouts: readLoadouts(), deleted: meta.deleted, tags: readTagState() });
         if (r.conflict){
           // Another device saved first: merge its copy in and try again.
-          const server = { loadouts: r.data.loadouts || [], deleted: r.data.deleted || {} };
+          const server = serverState(r.data);
           if (erasedElsewhere(r.data.version || 0)){ adoptMerged(server, r.data.version || 0, false); syncBusy = false; return setSync("ok"); }
-          adoptMerged(mergeLoadouts({ loadouts: readLoadouts(), deleted: meta.deleted }, server), r.data.version || 0, true);
+          adoptMerged(mergeLoadouts(localState(), server), r.data.version || 0, true);
           continue;
         }
         const m = readSyncMeta(); m.version = r.data.version; m.dirty = gen !== syncGen; writeSyncMeta(m);
@@ -514,22 +547,22 @@
     } catch (e){ syncBusy = false; setSync("error", e.message); }
   }
   // The service's copy is older than one this browser already synced:
-  // the player deleted their synced loadouts on another device (the row
-  // starts again from version 0). Clear them here too instead of
+  // the player deleted their synced loadouts and tags on another device
+  // (the row starts again from version 0). Clear them here too instead of
   // uploading them again.
   function erasedElsewhere(version){
     if (version >= readSyncMeta().version) return false;
-    setLoadoutsRaw([]); writeSyncMeta({ version: 0, deleted: {}, dirty: false });
-    renderLoadoutCount(); if (loadoutsShown()) renderLoadouts();
-    toast("Your saved loadouts were deleted on another device, so they've been removed here too.", "ok");
+    setLoadoutsRaw([]); writeTagState({}); writeSyncMeta({ version: 0, deleted: {}, dirty: false });
+    render();
+    toast("Your saved loadouts and tags were deleted on another device, so they've been removed here too.", "ok");
     return true;
   }
-  // "Delete all my saved loadouts": the sync service's copy first (so a
-  // failure leaves everything as it was), then this browser's.
+  // "Delete my saved loadouts and tags": the sync service's copy first (so
+  // a failure leaves everything as it was), then this browser's.
   async function eraseLoadouts(){
     clearTimeout(syncTimerLo);
     if (syncOn()) await syncFetch("DELETE");
-    setLoadoutsRaw([]); writeSyncMeta({ version: 0, deleted: {}, dirty: false });
+    setLoadoutsRaw([]); writeTagState({}); writeSyncMeta({ version: 0, deleted: {}, dirty: false });
     syncGen++; loOpen = null; loReview = null;
   }
   function schedulePush(){ if (!syncOn()) return; clearTimeout(syncTimerLo); syncTimerLo = setTimeout(pushLoadouts, 1200); }
@@ -1047,7 +1080,7 @@
           '<div class="lo-tool"><label class="lo-name"><span>DIM link</span><input type="url" id="lo-dim" placeholder="https://dim.gg/…" autocomplete="off" inputmode="url" spellcheck="false"></label>' +
             '<div class="act-row"><button type="button" class="act-btn" id="lo-dim-go">Import</button></div></div>' +
         "</div>" + saved +
-        (list.length ? '<div class="lo-erase"><button type="button" class="act-btn" id="lo-erase">Delete all my saved loadouts</button>' +
+        (list.length || Object.keys(TAGS).length ? '<div class="lo-erase"><button type="button" class="act-btn" id="lo-erase">Delete my saved loadouts and tags</button>' +
           '<span class="muted">' + (syncOn() ? "From this browser and Rally Flag's sync service. Your other devices clear theirs the next time they sync." : "From this browser.") + "</span></div>" : "") +
         "</section>" +
       '<section class="lo-section" aria-labelledby="lo-h-game"><h2 class="dlg-label" id="lo-h-game">In-game loadouts</h2><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first.</p>' + gameSection() + "</section>" +
@@ -1110,16 +1143,17 @@
     const erase = $("lo-erase");
     if (erase) erase.addEventListener("click", async () => {
       // Two taps: the first asks, the second deletes.
-      if (erase.dataset.confirm !== "1"){ erase.dataset.confirm = "1"; erase.textContent = "Tap again to delete all " + list.length + " loadout" + (list.length === 1 ? "" : "s"); return; }
+      const nTags = Object.keys(TAGS).length, plural = (n, w) => n + " " + w + (n === 1 ? "" : "s");
+      if (erase.dataset.confirm !== "1"){ erase.dataset.confirm = "1"; erase.textContent = "Tap again to delete " + plural(list.length, "loadout") + " and " + plural(nTags, "tag"); return; }
       erase.setAttribute("aria-disabled", "true"); erase.textContent = "Deleting…";
       try {
         await eraseLoadouts();
-        renderLoadoutCount(); renderLoadouts(); setSync(syncOn() ? "ok" : SYNC.state);
-        toast("Deleted all your saved loadouts" + (syncOn() ? ", here and on Rally Flag's sync service." : "."), "ok");
+        render(); setSync(syncOn() ? "ok" : SYNC.state);
+        toast("Deleted your saved loadouts and tags" + (syncOn() ? ", here and on Rally Flag's sync service." : "."), "ok");
         $("lo-name").focus();
       } catch (e){
         toast((e && e.message) || "Couldn't delete them. Nothing was changed.", "error");
-        erase.removeAttribute("aria-disabled"); erase.dataset.confirm = ""; erase.textContent = "Delete all my saved loadouts";
+        erase.removeAttribute("aria-disabled"); erase.dataset.confirm = ""; erase.textContent = "Delete my saved loadouts and tags";
       }
     });
     const dimGo = $("lo-dim-go"), dimIn = $("lo-dim");

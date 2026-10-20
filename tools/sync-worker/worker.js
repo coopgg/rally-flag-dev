@@ -1,15 +1,16 @@
 /* ============================================================
    Rally Flag loadout sync (Cloudflare Worker + D1).
 
-   Keeps each player's Locker loadouts on Cloudflare so they survive
-   clearing site data and follow them to other devices, like DIM's sync.
+   Keeps each player's Locker loadouts and Favorite/Junk tags on
+   Cloudflare so they survive clearing site data and follow them to other
+   devices, like DIM's sync.
 
    GET  /loadouts/<destinyMembershipId>
-        → 200 { version, loadouts: [...], deleted: { id: at } }
+        → 200 { version, loadouts: [...], deleted: { id: at }, tags: { itemId: { t, at } } }
           (version 0 and empty lists when nothing is stored yet)
-   PUT  /loadouts/<destinyMembershipId>   body { base, loadouts, deleted }
+   PUT  /loadouts/<destinyMembershipId>   body { base, loadouts, deleted, tags }
         → 200 { version }                 saved
-        → 409 { version, loadouts, deleted }  someone else saved first:
+        → 409 { version, loadouts, deleted, tags }  someone else saved first:
           merge with this copy and PUT again with its version as base
    DELETE /loadouts/<destinyMembershipId>
         → 200 { version: 0 }   the account's row is removed entirely
@@ -71,9 +72,9 @@ async function membershipsFor(token, origin){
 
 async function readRow(db, id){
   const row = await db.prepare("SELECT data, version FROM loadouts WHERE membership_id = ?").bind(id).first();
-  if (!row) return { version: 0, loadouts: [], deleted: {} };
+  if (!row) return { version: 0, loadouts: [], deleted: {}, tags: {} };
   const data = JSON.parse(row.data);
-  return { version: row.version, loadouts: data.loadouts || [], deleted: data.deleted || {} };
+  return { version: row.version, loadouts: data.loadouts || [], deleted: data.deleted || {}, tags: data.tags || {} };
 }
 
 export default {
@@ -105,12 +106,13 @@ export default {
       if (text.length > MAX_BYTES) return reply({ error: "Too many loadouts to save." }, 413, origin);
       let body;
       try { body = JSON.parse(text); } catch (e){ return reply({ error: "Bad request." }, 400, origin); }
-      if (!body || !Array.isArray(body.loadouts) || typeof body.deleted !== "object" || typeof body.base !== "number")
+      if (!body || !Array.isArray(body.loadouts) || typeof body.deleted !== "object" || typeof body.base !== "number" ||
+          (body.tags != null && (typeof body.tags !== "object" || Array.isArray(body.tags))))
         return reply({ error: "Bad request." }, 400, origin);
 
       // Only save on top of the version the client last saw; otherwise
       // hand back the newer copy to merge with.
-      const data = JSON.stringify({ loadouts: body.loadouts, deleted: body.deleted || {} });
+      const data = JSON.stringify({ loadouts: body.loadouts, deleted: body.deleted || {}, tags: body.tags || {} });
       const next = body.base + 1, now = Date.now();
       const result = body.base === 0
         ? await env.DB.prepare("INSERT INTO loadouts (membership_id, data, version, updated_at) VALUES (?, ?, 1, ?) ON CONFLICT(membership_id) DO NOTHING").bind(id, data, now).run()
