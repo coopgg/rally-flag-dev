@@ -134,18 +134,19 @@
     TAGS[id] === tag ? delete TAGS[id] : (TAGS[id] = tag);
     try { localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); } catch (e){}
   }
-  // Which view is open: gear (default) or armor sets (#sets).
+  // Which view is open: gear (default), loadouts (#loadouts) or armor sets (#sets).
+  const VIEWS = ["gear", "loadouts", "sets"];
   function showView(name, focus){
-    const sets = name === "sets";
-    $("tab-gear").setAttribute("aria-selected", String(!sets));
-    $("tab-sets").setAttribute("aria-selected", String(sets));
-    $("tab-gear").tabIndex = sets ? -1 : 0;
-    $("tab-sets").tabIndex = sets ? 0 : -1;
-    $("view-gear").hidden = sets;
-    $("view-sets").hidden = !sets;
-    $("locker-search").parentElement.hidden = sets; // search is for gear
-    if (focus) $(sets ? "tab-sets" : "tab-gear").focus();
-    history.replaceState(null, "", location.pathname + location.search + (sets ? "#sets" : ""));
+    if (!VIEWS.includes(name)) name = "gear";
+    for (const v of VIEWS){
+      const tab = $("tab-" + v), on = v === name;
+      tab.setAttribute("aria-selected", String(on)); tab.tabIndex = on ? 0 : -1;
+      $("view-" + v).hidden = !on;
+    }
+    $("locker-search").parentElement.hidden = name !== "gear"; // search is for gear
+    if (name === "loadouts" && DB) renderLoadouts();
+    if (focus) $("tab-" + name).focus();
+    history.replaceState(null, "", location.pathname + location.search + (name === "gear" ? "" : "#" + name));
   }
 
   // ---------------- status panels ----------------
@@ -358,7 +359,8 @@
     $("owner-grid").innerHTML = cards.join("");
     renderFarm();
     renderJunk();
-    renderLoadoutRow();
+    renderLoadoutCount();
+    if (loadoutsShown()) renderLoadouts();
   }
 
   // ---------------- junk cleanup ----------------
@@ -528,13 +530,6 @@
     return groups || '<p class="muted">No in-game loadouts saved yet. Make them in Destiny\'s Character screen and they\'ll show here.</p>';
   }
 
-  function renderLoadoutRow(){
-    const row = $("loadout-row");
-    if (!row) return;
-    const n = readLoadouts().length;
-    row.innerHTML = '<span class="farm-label">Loadouts</span><button type="button" class="farm-btn" id="open-loadouts">Loadouts &amp; max Power</button>' +
-      '<span class="farm-note">' + (n ? n + " saved." : "Save what a character has equipped, or equip their highest Power.") + "</span>";
-  }
 
   // A saved loadout item -> the item to use: that exact copy, or (for DIM
   // imports from someone else, or a copy since dismantled) your best copy of
@@ -754,11 +749,34 @@
     return out;
   }
 
-  function openLoadouts(){
-    const dlg = $("item-dialog"), list = readLoadouts();
+  // What a character wears now, as a loadout: gear plus its subclass
+  // choices, armor mods and each slot's shader/ornament (as DIM saves).
+  function snapshot(charId){
+    const items = equippedOn(charId);
+    const sc = subclassesOf(charId).find(x => x.equipped);
+    const sockets = {};
+    if (sc) plugsOf(sc.id).forEach((h, k) => { if (h && DB.items[h]) sockets[k] = h; });
+    const mods = [], cosmetics = {};
+    for (const i of items){
+      for (const h of plugsOf(i.id)){
+        if (i.def.t === 2 && kindOf(h) && !isEmptyPlug(h)) mods.push(h);
+        if (DB.items[h] && (DB.items[h].o || DB.items[h].sh)) (cosmetics[i.def.b] = cosmetics[i.def.b] || []).push(h);
+      }
+    }
+    return { items: items.map(i => ({ id: i.id, hash: i.hash })), subclass: sc ? { hash: sc.hash, sockets } : null, mods, cosmetics };
+  }
+
+  // The Loadouts tab (like DIM's): loadouts saved in this browser, grouped
+  // by class, then Destiny's in-game loadouts, then max Power.
+  const loadoutsShown = () => !$("view-loadouts").hidden;
+  function renderLoadoutCount(){ const n = readLoadouts().length; $("lo-count").textContent = n ? String(n) : ""; }
+  function renderLoadouts(){
+    const box = $("view-loadouts"), list = readLoadouts();
     // A redraw replaces the buttons: keep keyboard focus on the same control.
-    const was = dlg.open && dlg.contains(document.activeElement) ? document.activeElement : null;
-    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean);
+    const was = box.contains(document.activeElement) ? document.activeElement : null;
+    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
+      || (was && was.id ? "#" + was.id : null);
+    const typed = { name: ($("lo-name") || {}).value || "", dim: ($("lo-dim") || {}).value || "" };
     const byId = new Map(ITEMS.map(i => [i.id, i]));
     const mini = (hash, have, item) => { const d = item ? { i: iconOf(item) } : DB.items[hash] || {}; return '<span class="lo-mini' + (have ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
     const maxRows = OWNERS.map(o => {
@@ -769,15 +787,17 @@
         '<button type="button" class="act-btn" data-lo-max="' + o.id + '"' + (done ? ' aria-disabled="true"' : "") + ">" +
           (done ? "At max Power" : 'Equip max Power<span class="sr-only"> on your ' + esc(o.name) + "</span>") + "</button></div>";
     }).join("");
-    const saved = list.length ? loGrid("r", list.map(lo => {
+    const entry = lo => {
       const owners = OWNERS.filter(o => lo.cls === 3 || o.cls === lo.cls);
       const found = lo.items.map(x => loItem(x)), gone = found.filter(i => !i).length;
       const copies = lo.items.filter((x, k) => found[k] && found[k].id !== x.id).length;
       const first = DB.items[(lo.items[0] || {}).hash] || {};
-      // Imported before subclass/mods were kept: say so instead of guessing.
-      const old = lo.dim && !("mods" in lo);
-      const dim = lo.dim ? '<p class="lo-status muted">From DIM' + (lo.dim.id ? ' (<a href="https://dim.gg/' + esc(lo.dim.id) + '/"' + ' target="_blank" rel="noopener">dim.gg/' + esc(lo.dim.id) + '<span class="sr-only"> (opens in a new tab)</span></a>)' : "") +
-        (old ? ". Import it again to bring its subclass and mods too." : lo.subclass || (lo.mods && lo.mods.length) ? ". " + [lo.subclass ? ((DB.items[lo.subclass.hash] || {}).n || "Subclass") + " with " + Object.keys(lo.subclass.sockets).length + " choices" : "", lo.mods && lo.mods.length ? lo.mods.length + " mods" : ""].filter(Boolean).join(", ") + "; the artifact is set in game." : ".") + "</p>" : "";
+      // What it carries besides gear (older saves and imports only had gear).
+      const gearOnly = !("mods" in lo);
+      const carries = gearOnly ? (lo.dim ? "Import it again to bring its subclass and mods too." : "Gear only (saved before loadouts kept subclass and mods).")
+        : [lo.subclass ? ((DB.items[lo.subclass.hash] || {}).n || "Subclass") + " with " + Object.keys(lo.subclass.sockets).length + " choices" : "", lo.mods && lo.mods.length ? lo.mods.length + " mods" : ""].filter(Boolean).join(", ");
+      const from = lo.dim ? 'From DIM' + (lo.dim.id ? ' (<a href="https://dim.gg/' + esc(lo.dim.id) + '/" target="_blank" rel="noopener">dim.gg/' + esc(lo.dim.id) + '<span class="sr-only"> (opens in a new tab)</span></a>)' : "") + ". " : "";
+      const note = from || carries ? '<p class="lo-status muted">' + from + esc(carries) + (lo.dim && !gearOnly ? (carries ? "; the" : "The") + " artifact is set in game." : "") + "</p>" : "";
       // Is it on? Gear equipped on the matching character, plus subclass/mods.
       const who = owners[0];
       const worn = who ? found.filter(i => i && i.owner === who.id && i.equipped).length : 0;
@@ -788,38 +808,39 @@
         detail: '<div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(lo.cls === 3 ? "Any class" : CLASS_NAMES[lo.cls] || "") +
           (gone ? " · " + gone + " item" + (gone === 1 ? "" : "s") + (lo.dim ? " you don't have" : " no longer found") : "") +
           (copies ? " · " + copies + " from your own copies" : "") + "</span></div>" +
-        '<div class="lo-items" aria-hidden="true">' + lo.items.map((x, k) => mini(x.hash, !!found[k], found[k])).join("") + "</div>" + status + dim +
+        '<div class="lo-items" aria-hidden="true">' + lo.items.map((x, k) => mini(x.hash, !!found[k], found[k])).join("") + "</div>" + status + note +
         '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
           '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" };
-    })) : '<p class="muted">No loadouts yet. Save what one of your characters has equipped below.</p>';
-    dlg.dataset.item = ""; dlg.dataset.view = "loadouts";
-    redrawDialog(dlg,
-      '<div class="dlg-head"><div class="dlg-title"><div class="dlg-eyebrow">Your characters</div><h2 class="dlg-name" id="dlg-name">Loadouts</h2></div>' +
-        '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
-      '<div class="dlg-body">' +
-        '<div class="dlg-block"><div class="dlg-label">Max Power</div><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</div>" +
-        '<div class="dlg-block"><div class="dlg-label">In-game loadouts</div><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first.</p>' + gameSection() + "</div>" +
-        '<div class="dlg-block"><div class="dlg-label">Rally Flag loadouts</div>' + saved + "</div>" +
-        '<div class="dlg-block"><div class="dlg-label">Import from DIM</div><p class="muted lo-help">Paste a DIM share link. Items from someone else\'s link use your own copies.</p>' +
-          '<label class="lo-name"><span>Link</span><input type="url" id="lo-dim" placeholder="https://dim.gg/…" autocomplete="off" inputmode="url"></label>' +
-          '<div class="act-row"><button type="button" class="act-btn" id="lo-dim-go">Import</button></div></div>' +
-        '<div class="dlg-block"><div class="dlg-label">Save a loadout</div>' +
-          '<label class="lo-name"><span>Name</span><input type="text" id="lo-name" maxlength="40" placeholder="e.g. Raid DPS" autocomplete="off"></label>' +
-          '<div class="act-row">' + OWNERS.map(o => '<button type="button" class="act-btn" data-lo-save="' + o.id + '">Save ' + esc(o.name) + "'s gear</button>").join("") + "</div></div>" +
-      "</div>");
-    dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
-    if (dlg.open && (was || !dlg.contains(document.activeElement))) (refocus && dlg.querySelector(refocus) || dlg.querySelector(".dlg-close")).focus();
-    const reopen = () => { if (dlg.open && dlg.dataset.view === "loadouts") openLoadouts(); };
-    dlg.querySelectorAll("[data-lo-pick]").forEach(b => b.addEventListener("click", () => {
+    };
+    // Grouped by class like DIM: your characters' classes first, then any class.
+    const classes = [...new Set(OWNERS.map(o => o.cls).concat([0, 1, 2, 3]))];
+    const saved = list.length ? classes.map(c => {
+      const mine = list.filter(lo => lo.cls === c);
+      return mine.length ? '<h3 class="lo-owner">' + esc(c === 3 ? "Any class" : CLASS_NAMES[c] || "Other") + "</h3>" + loGrid("r" + c, mine.map(entry)) : "";
+    }).join("") : '<p class="muted">Nothing saved yet. Save what a character wears now, or import a DIM link.</p>';
+    box.innerHTML =
+      '<section class="lo-section" aria-labelledby="lo-h-saved"><h2 class="dlg-label" id="lo-h-saved">Saved in this browser</h2>' +
+        '<p class="muted lo-help">Gear, subclass, mods, shaders and ornaments. Kept in this browser only, so they won\'t show on your other devices.</p>' +
+        '<div class="lo-tools">' +
+          '<div class="lo-tool"><label class="lo-name"><span>Name</span><input type="text" id="lo-name" maxlength="40" placeholder="e.g. Raid DPS" autocomplete="off"></label>' +
+            '<div class="act-row">' + OWNERS.map(o => '<button type="button" class="act-btn" data-lo-save="' + o.id + '">Save ' + esc(o.name) + "'s loadout</button>").join("") + "</div></div>" +
+          '<div class="lo-tool"><label class="lo-name"><span>DIM link</span><input type="url" id="lo-dim" placeholder="https://dim.gg/…" autocomplete="off" inputmode="url"></label>' +
+            '<div class="act-row"><button type="button" class="act-btn" id="lo-dim-go">Import</button></div></div>' +
+        "</div>" + saved + "</section>" +
+      '<section class="lo-section" aria-labelledby="lo-h-game"><h2 class="dlg-label" id="lo-h-game">In-game loadouts</h2><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first.</p>' + gameSection() + "</section>" +
+      '<section class="lo-section" aria-labelledby="lo-h-max"><h2 class="dlg-label" id="lo-h-max">Max Power</h2><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</section>";
+    $("lo-name").value = typed.name; $("lo-dim").value = typed.dim;
+    if (was) { const t = refocus && box.querySelector(refocus); if (t) t.focus(); }
+    box.querySelectorAll("[data-lo-pick]").forEach(b => b.addEventListener("click", () => {
       loOpen = loOpen === b.dataset.loPick ? null : b.dataset.loPick;
-      openLoadouts();
+      renderLoadouts();
     }));
-    dlg.querySelectorAll("[data-lo-max]").forEach(b => b.addEventListener("click", () => {
+    box.querySelectorAll("[data-lo-max]").forEach(b => b.addEventListener("click", () => {
       if (b.getAttribute("aria-disabled") === "true" || busyNotice()) return;
       const o = ownerOf(b.dataset.loMax), plan = maxPowerPlan(o.id);
-      run("Equipping max Power on your " + o.name, "Your " + o.name + " is at max gear Power (" + fmtPower(plan.power) + ").", () => equipSet(plan.items, o.id), reopen);
+      run("Equipping max Power on your " + o.name, "Your " + o.name + " is at max gear Power (" + fmtPower(plan.power) + ").", () => equipSet(plan.items, o.id));
     }));
-    dlg.querySelectorAll("[data-lo-equip]").forEach(b => b.addEventListener("click", () => {
+    box.querySelectorAll("[data-lo-equip]").forEach(b => b.addEventListener("click", () => {
       if (busyNotice()) return;
       const lo = readLoadouts().find(x => x.id === b.dataset.loEquip), o = ownerOf(b.dataset.to);
       if (!lo || !o) return;
@@ -828,19 +849,19 @@
       let extra = "";
       run("Equipping " + lo.name + " on your " + o.name,
         () => "Equipped " + lo.name + " on your " + o.name + "." + (missing ? " " + missing + " item" + (missing === 1 ? " was" : "s were") + " missing and skipped." : "") + (extra ? " " + extra : ""),
-        async () => { await equipSet(items, o.id); extra = await applyExtras(lo, o.id); }, reopen);
+        async () => { await equipSet(items, o.id); extra = await applyExtras(lo, o.id); });
     }));
-    dlg.querySelectorAll("[data-game-lo]").forEach(b => b.addEventListener("click", () => {
+    box.querySelectorAll("[data-game-lo]").forEach(b => b.addEventListener("click", () => {
       if (busyNotice()) return;
       const o = ownerOf(b.dataset.to), lo = gameLoadouts(o.id).find(x => x.index === +b.dataset.gameLo);
       if (!lo) return;
-      run("Equipping " + lo.name + " on your " + o.name, "Equipped " + lo.name + " on your " + o.name + "." + (lo.missing ? " " + lo.missing + " item" + (lo.missing === 1 ? " wasn't" : "s weren't") + " found." : ""), () => equipGameLoadout(o.id, lo), reopen);
+      run("Equipping " + lo.name + " on your " + o.name, "Equipped " + lo.name + " on your " + o.name + "." + (lo.missing ? " " + lo.missing + " item" + (lo.missing === 1 ? " wasn't" : "s weren't") + " found." : ""), () => equipGameLoadout(o.id, lo));
     }));
-    dlg.querySelectorAll("[data-lo-del]").forEach(b => b.addEventListener("click", () => {
+    box.querySelectorAll("[data-lo-del]").forEach(b => b.addEventListener("click", () => {
       // Two taps: the first asks, the second deletes.
       if (b.dataset.confirm !== "1"){ b.dataset.confirm = "1"; b.firstChild.textContent = "Tap again to delete"; return; }
       writeLoadouts(readLoadouts().filter(x => x.id !== b.dataset.loDel));
-      renderLoadoutRow(); openLoadouts(); toast("Loadout deleted.", "ok");
+      renderLoadoutCount(); renderLoadouts(); toast("Loadout deleted.", "ok");
     }));
     const dimGo = $("lo-dim-go"), dimIn = $("lo-dim");
     const importDim = async () => {
@@ -854,10 +875,10 @@
         all.push(lo); writeLoadouts(all);
         const have = lo.items.filter(x => loItem(x)).length;
         loOpen = "r-" + lo.id;
-        renderLoadoutRow();
-        if (dlg.open && dlg.dataset.view === "loadouts") openLoadouts();
+        $("lo-dim").value = "";
+        renderLoadoutCount(); renderLoadouts();
         toast("Imported " + lo.name + ": you have " + have + " of its " + lo.items.length + " items.", "ok");
-        const tile = dlg.querySelector('[data-lo-pick="r-' + lo.id + '"]');
+        const tile = box.querySelector('[data-lo-pick="r-' + lo.id + '"]');
         if (tile){ tile.focus(); tile.scrollIntoView({ block: "nearest" }); }
       } catch (e){
         toast((e && e.message) || "Couldn't import that link.", "error");
@@ -866,16 +887,18 @@
     };
     dimGo.addEventListener("click", importDim);
     dimIn.addEventListener("keydown", e => { if (e.key === "Enter"){ e.preventDefault(); importDim(); } });
-    dlg.querySelectorAll("[data-lo-save]").forEach(b => b.addEventListener("click", () => {
-      const o = ownerOf(b.dataset.loSave), items = equippedOn(o.id);
-      if (!items.length) return toast("Your " + o.name + " has nothing equipped to save.", "error");
+    box.querySelectorAll("[data-lo-save]").forEach(b => b.addEventListener("click", () => {
+      const o = ownerOf(b.dataset.loSave), snap = snapshot(o.id);
+      if (!snap.items.length) return toast("Your " + o.name + " has nothing equipped to save.", "error");
       const all = readLoadouts(), typed = $("lo-name").value.trim();
       const name = typed || o.name + " loadout " + (all.filter(x => x.cls === o.cls).length + 1);
-      all.push({ id: Date.now().toString(36), name, cls: o.cls, items: items.map(i => ({ id: i.id, hash: i.hash })) });
-      writeLoadouts(all);
-      renderLoadoutRow(); openLoadouts(); toast("Saved " + name + ".", "ok");
+      const lo = Object.assign({ id: Date.now().toString(36), name, cls: o.cls }, snap);
+      all.push(lo); writeLoadouts(all);
+      loOpen = "r-" + lo.id; $("lo-name").value = "";
+      renderLoadoutCount(); renderLoadouts(); toast("Saved " + name + ".", "ok");
+      const tile = box.querySelector('[data-lo-pick="r-' + lo.id + '"]');
+      if (tile) tile.focus();
     }));
-    if (!dlg.open) dlg.showModal();
   }
 
   function renderJunk(){
@@ -1313,8 +1336,7 @@
     try {
       PROFILE = await loadProfile(); buildModel(); render(); resolvePostmasterNames();
       const dlg = $("item-dialog");
-      if (dlg.open && dlg.dataset.view === "loadouts") openLoadouts();
-      else if (dlg.open && dlg.dataset.item) ITEMS.some(i => i.id === dlg.dataset.item) ? openItem(dlg.dataset.item) : dlg.close();
+      if (dlg.open && dlg.dataset.item) ITEMS.some(i => i.id === dlg.dataset.item) ? openItem(dlg.dataset.item) : dlg.close();
     } catch (e){ /* a missed sync is harmless: the journal keeps the page right */ }
     finally {
       document.body.classList.remove("locker-busy");
@@ -1654,7 +1676,6 @@
       $("farm-row").querySelector('[data-farm="' + id + '"]').focus();
       if (farming.has(id)) farmTick(); // first check right away
     });
-    $("loadout-row").addEventListener("click", e => { if (e.target.closest("#open-loadouts")) openLoadouts(); });
     $("junk-row").addEventListener("click", e => {
       const b = e.target.closest("[data-junk-to]");
       if (!b || busyNotice()) return;
@@ -1689,14 +1710,15 @@
     });
     document.querySelector(".view-tabs").addEventListener("click", e => {
       const t = e.target.closest(".view-tab");
-      if (t) showView(t.id === "tab-sets" ? "sets" : "gear");
+      if (t) showView(t.id.slice(4));
     });
     // Arrow keys move between the two tabs (WAI-ARIA tabs pattern).
     document.querySelector(".view-tabs").addEventListener("keydown", e => {
       if (e.key !== "ArrowLeft" && e.key !== "ArrowRight" && e.key !== "Home" && e.key !== "End") return;
       e.preventDefault();
-      const toSets = e.key === "End" || ((e.key === "ArrowRight" || e.key === "ArrowLeft") && $("tab-gear").getAttribute("aria-selected") === "true");
-      showView(toSets ? "sets" : "gear", true);
+      const cur = VIEWS.findIndex(v => $("tab-" + v).getAttribute("aria-selected") === "true");
+      const next = e.key === "Home" ? 0 : e.key === "End" ? VIEWS.length - 1 : (cur + (e.key === "ArrowRight" ? 1 : VIEWS.length - 1)) % VIEWS.length;
+      showView(VIEWS[next], true);
     });
     // Click on the backdrop closes the dialog.
     $("item-dialog").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
@@ -1722,8 +1744,8 @@
       render();
       resolvePostmasterNames();
       setFarmTimer();
-      if (location.hash === "#sets") showView("sets");
-      window.addEventListener("hashchange", () => showView(location.hash === "#sets" ? "sets" : "gear"));
+      if (location.hash.length > 1) showView(location.hash.slice(1));
+      window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
     } catch (e){
       showError(e.message || String(e));
     }

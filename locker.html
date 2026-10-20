@@ -365,7 +365,16 @@
   .farm-btn[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; box-shadow:0 0 14px -4px var(--glow); }
   .farm-row .farm-btn[aria-pressed="true"]::before{ content:""; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:currentColor; animation:toast-pulse 0.9s ease-in-out infinite alternate; }
   .farm-note{ font-size:13px; color:var(--text-dim); }
-  #junk-row, #loadout-row{ margin-top:8px; }
+  #junk-row{ margin-top:8px; }
+  .lo-view{ padding-top:6px; }
+  .lo-section{ padding-top:18px; }
+  .lo-section h2.dlg-label{ font-weight:400; margin-top:0; }
+  .lo-view h3.lo-owner{ font-weight:400; }
+  .lo-tools{ display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:10px 24px; margin-bottom:14px; }
+  .lo-tool .lo-name{ margin-bottom:8px; }
+  .lo-view .lo-grid{ grid-template-columns:repeat(auto-fill, minmax(180px, 1fr)); }
+  .lo-view .lo-detail{ max-width:720px; }
+  .lo-view .lo-row{ max-width:720px; }
   /* Loadouts panel (in the item popup) */
   .lo-help{ margin:0 0 8px; font-size:13px; }
   .lo-row{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 10px; padding:8px 0; border-top:1px solid var(--panel-border); }
@@ -483,10 +492,10 @@
     </div>
     <div class="farm-row" id="farm-row" role="group" aria-label="Farming mode"></div>
     <div class="farm-row" id="junk-row" role="group" aria-label="Junk cleanup"></div>
-    <div class="farm-row" id="loadout-row" role="group" aria-label="Loadouts"></div>
 
     <div class="view-tabs" role="tablist" aria-label="Locker views">
       <button class="view-tab" type="button" role="tab" id="tab-gear" aria-controls="view-gear" aria-selected="true">Gear</button>
+      <button class="view-tab" type="button" role="tab" id="tab-loadouts" aria-controls="view-loadouts" aria-selected="false" tabindex="-1">Loadouts <span id="lo-count"></span></button>
       <button class="view-tab" type="button" role="tab" id="tab-sets" aria-controls="view-sets" aria-selected="false" tabindex="-1">Armor Sets <span id="sets-count"></span></button>
     </div>
 
@@ -512,6 +521,8 @@
     <div id="buckets"></div>
     <div class="drop-bar" id="drop-bar" hidden></div>
     </div>
+
+    <div id="view-loadouts" class="lo-view" role="tabpanel" aria-labelledby="tab-loadouts" hidden></div>
 
     <div id="view-sets" role="tabpanel" aria-labelledby="tab-sets" hidden>
       <p class="sets-intro" id="sets-hint"></p>

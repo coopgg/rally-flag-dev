@@ -137,8 +137,10 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   onto a card, a character cell (wide) or the
   "Move to" bar (shown a tick after dragstart; changing the DOM inside
   dragstart cancels the drag in Chrome).
-  Loadouts + max Power: `maxPowerPlan` / `equipSet` / `makeRoom` (shared
-  `spareFirst` ordering with farming); saved per account in localStorage.
+  Loadouts tab (`renderLoadouts`, `#loadouts`): loadouts saved in the
+  browser (per account, localStorage; `snapshot` keeps gear, subclass, mods,
+  shaders, ornaments), in-game loadouts and max Power: `maxPowerPlan` /
+  `equipSet` / `makeRoom` (shared `spareFirst` ordering with farming).
   In-game loadouts: component 206 + Actions/Loadouts/EquipLoadout (also
   sets subclass and mods); missing items are moved onto the character first.
   DIM import: dim.gg links go through the Cloudflare Worker in
