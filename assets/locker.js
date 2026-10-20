@@ -766,6 +766,78 @@
     return { items: items.map(i => ({ id: i.id, hash: i.hash })), subclass: sc ? { hash: sc.hash, sockets } : null, mods, cosmetics };
   }
 
+  // Choosing your copies. An imported loadout (or a saved one whose item
+  // is gone) names items you may not have exactly: DIM greys those out.
+  // Instead, before saving, ask which of your copies goes in each slot,
+  // showing each copy's perks (weapons) or stats (armor). With no copy of
+  // that item, offer others of the same type in that slot, or leave it empty.
+  let loReview = null; // { lo, isNew, slots: [{ k, want, cands, similar, pick }] }
+  const fitsClass = (i, cls) => cls === 3 || i.def.t !== 2 || i.def.c === 3 || i.def.c === cls;
+  const rollRank = (a, b) => ((b.roll && b.roll.full) - (a.roll && a.roll.full)) || ((b.roll ? b.roll.matched : 0) - (a.roll ? a.roll.matched : 0)) || b.power - a.power;
+  function startReview(lo, isNew){
+    const slots = [];
+    lo.items.forEach((want, k) => {
+      if (want.id && ITEMS.some(i => i.id === want.id)) return;
+      const d = DB.items[want.hash] || {};
+      let cands = ITEMS.filter(i => i.hash === want.hash && fitsClass(i, lo.cls)).sort(rollRank), similar = false;
+      if (!cands.length && d.b){
+        cands = ITEMS.filter(i => i.def.b === d.b && (i.def.y || "") === (d.y || "") && fitsClass(i, lo.cls)).sort(rollRank).slice(0, 8);
+        similar = true;
+      }
+      // Your best copy is picked to start with; a different item never is.
+      slots.push({ k, want, cands, similar, pick: !similar && cands[0] ? cands[0].id : "" });
+    });
+    if (!slots.length) return false;
+    loReview = { lo, isNew, slots };
+    return true;
+  }
+  function pickHtml(slot, i){
+    const on = slot.pick === i.id;
+    let detail;
+    if (i.def.t === 3){
+      const perks = i.plugs.filter(h => showPlug(h) && !isMod(DB.items[h]));
+      detail = '<span class="pick-perks">' + perks.map(h => { const p = DB.items[h]; return '<span class="pick-perk' + (i.roll && i.roll.weapon.perkHashes.includes(h) ? " ours" : "") + '">' + (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="18" height="18" loading="lazy">' : "") + esc(p.n) + "</span>"; }).join("") + "</span>";
+    } else {
+      const st = ARMOR_STATS.map(h => (i.stats[h] || {}).value || 0), total = st.reduce((a, b) => a + b, 0);
+      detail = '<span class="pick-perks"><span class="pick-perk">Stats ' + total + "</span>" + ARMOR_STATS.map((h, k) => st[k] ? '<span class="pick-perk">' + esc(STAT_SHORT[DB.stats[h]] || DB.stats[h] || "") + " " + st[k] + "</span>" : "").join("") + "</span>";
+    }
+    const roll = i.roll ? (i.roll.full ? " · ★ our God Roll" : " · " + i.roll.matched + "/" + i.roll.total + " God Roll perks") : "";
+    return '<button type="button" class="pick' + (on ? " on" : "") + '" data-pick-slot="' + slot.k + '" data-pick="' + i.id + '" aria-pressed="' + on + '">' +
+      '<img class="pick-icon" src="' + esc(img(iconOf(i))) + '" alt="" width="40" height="40" loading="lazy">' +
+      '<span class="pick-main"><b>' + esc(i.def.n) + (on ? ' <span class="pick-chosen">Chosen</span>' : "") + "</b><small>" + i.power + " · " + esc(ownerLabel(i.owner)) + (i.equipped ? ", equipped" : "") + (i.tier ? " · tier " + i.tier : "") + esc(roll) + "</small>" + detail + "</span></button>";
+  }
+  function reviewHtml(){
+    const r = loReview, lo = r.lo;
+    return '<section class="lo-review panel-card" aria-labelledby="lo-h-review"><h2 class="lo-review-title" id="lo-h-review" tabindex="-1">Choose your copies for ' + esc(lo.name) + "</h2>" +
+      '<p class="muted lo-help">' + (lo.dim ? "This loadout names items that aren't in your inventory. " : "Some of this loadout's items are gone. ") + "Pick which of yours goes in each slot. Perks are shown so you can compare rolls.</p>" +
+      r.slots.map(slot => {
+        const d = DB.items[slot.want.hash] || {}, label = d.n || "Unknown item";
+        return '<div class="pick-slot" role="group" aria-labelledby="pick-h-' + slot.k + '"><h3 class="pick-head" id="pick-h-' + slot.k + '">' + esc(d.y || "Item") + ": " + esc(label) + "</h3>" +
+          (slot.similar ? '<p class="pick-note">' + (slot.cands.length ? "You don't have " + esc(label) + ". Use another " + esc(d.y || "item") + ", or leave it empty." : "You don't have " + esc(label) + " or anything like it. It'll be left empty.") + "</p>"
+            : slot.cands.length > 1 ? '<p class="pick-note">You have ' + slot.cands.length + " copies.</p>" : "") +
+          '<div class="pick-list">' + slot.cands.map(i => pickHtml(slot, i)).join("") +
+            '<button type="button" class="pick pick-empty' + (slot.pick === "" ? " on" : "") + '" data-pick-slot="' + slot.k + '" data-pick="" aria-pressed="' + (slot.pick === "") + '">Leave this slot empty' + (slot.pick === "" ? ' <span class="pick-chosen">Chosen</span>' : "") + "</button></div></div>";
+      }).join("") +
+      '<div class="act-row"><button type="button" class="act-btn" id="lo-review-save">Save loadout</button><button type="button" class="act-btn" id="lo-review-cancel">' + (r.isNew ? "Don't import" : "Cancel") + "</button></div></section>";
+  }
+  function finishReview(){
+    const r = loReview, lo = r.lo, byK = new Map(r.slots.map(x => [x.k, x]));
+    const items = [];
+    lo.items.forEach((x, k) => {
+      const slot = byK.get(k);
+      if (!slot) return items.push(x);
+      const i = slot.pick && ITEMS.find(y => y.id === slot.pick);
+      if (i) items.push({ id: i.id, hash: i.hash });
+    });
+    const saved = Object.assign({}, lo, { items });
+    const all = readLoadouts(), at = all.findIndex(x => x.id === saved.id);
+    if (at >= 0) all[at] = saved; else all.push(saved);
+    writeLoadouts(all);
+    loReview = null; loOpen = "r-" + saved.id;
+    const empty = lo.items.length - items.length;
+    return saved.name + " saved" + (empty ? " with " + empty + " empty slot" + (empty === 1 ? "" : "s") : "") + ".";
+  }
+
   // The Loadouts tab (like DIM's): loadouts saved in this browser, grouped
   // by class, then Destiny's in-game loadouts, then max Power.
   const loadoutsShown = () => !$("view-loadouts").hidden;
@@ -810,6 +882,7 @@
           (copies ? " · " + copies + " from your own copies" : "") + "</span></div>" +
         '<div class="lo-items" aria-hidden="true">' + lo.items.map((x, k) => mini(x.hash, !!found[k], found[k])).join("") + "</div>" + status + note +
         '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
+          (gone || copies ? '<button type="button" class="act-btn" data-lo-review="' + lo.id + '">Choose copies<span class="sr-only"> for ' + esc(lo.name) + "</span></button>" : "") +
           '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" };
     };
     // Grouped by class like DIM: your characters' classes first, then any class.
@@ -818,7 +891,7 @@
       const mine = list.filter(lo => lo.cls === c);
       return mine.length ? '<h3 class="lo-owner">' + esc(c === 3 ? "Any class" : CLASS_NAMES[c] || "Other") + "</h3>" + loGrid("r" + c, mine.map(entry)) : "";
     }).join("") : '<p class="muted">Nothing saved yet. Save what a character wears now, or import a DIM link.</p>';
-    box.innerHTML =
+    box.innerHTML = (loReview ? reviewHtml() : "") +
       '<section class="lo-section" aria-labelledby="lo-h-saved"><h2 class="dlg-label" id="lo-h-saved">Saved in this browser</h2>' +
         '<p class="muted lo-help">Gear, subclass, mods, shaders and ornaments. Kept in this browser only, so they won\'t show on your other devices.</p>' +
         '<div class="lo-tools">' +
@@ -863,6 +936,27 @@
       writeLoadouts(readLoadouts().filter(x => x.id !== b.dataset.loDel));
       renderLoadoutCount(); renderLoadouts(); toast("Loadout deleted.", "ok");
     }));
+    box.querySelectorAll("[data-pick]").forEach(b => b.addEventListener("click", () => {
+      const slot = loReview.slots.find(x => x.k === +b.dataset.pickSlot);
+      slot.pick = b.dataset.pick;
+      renderLoadouts();
+      box.querySelector('[data-pick-slot="' + slot.k + '"][data-pick="' + slot.pick + '"]').focus();
+    }));
+    if (loReview){
+      $("lo-review-save").addEventListener("click", () => {
+        const msg = finishReview();
+        renderLoadoutCount(); renderLoadouts(); toast(msg, "ok");
+        const tile = box.querySelector('[data-lo-pick="' + loOpen + '"]');
+        if (tile){ tile.focus(); tile.scrollIntoView({ block: "nearest" }); }
+      });
+      $("lo-review-cancel").addEventListener("click", () => { loReview = null; renderLoadouts(); $("lo-dim").focus(); });
+    }
+    box.querySelectorAll("[data-lo-review]").forEach(b => b.addEventListener("click", () => {
+      const lo = readLoadouts().find(x => x.id === b.dataset.loReview);
+      if (!lo || !startReview(lo, false)) return;
+      renderLoadouts();
+      const h = $("lo-h-review"); h.scrollIntoView({ block: "start" }); h.focus();
+    }));
     const dimGo = $("lo-dim-go"), dimIn = $("lo-dim");
     const importDim = async () => {
       if (!dimIn.value.trim() || dimGo.getAttribute("aria-disabled") === "true") return;
@@ -870,14 +964,20 @@
       try {
         const lo = await readDimLoadout(dimIn.value);
         if (!lo.items.length) throw new Error("That loadout has no weapons or armor.");
-        // Importing the same link again replaces the earlier copy.
+        $("lo-dim").value = "";
+        // Items you don't have exactly: choose your copies first. Importing
+        // the same link again replaces the earlier copy.
+        if (startReview(lo, true)){
+          renderLoadouts();
+          const h = $("lo-h-review"); h.scrollIntoView({ block: "start" }); h.focus();
+          toast("Imported " + lo.name + ". Choose your copies, then save.", "ok");
+          return;
+        }
         const all = readLoadouts().filter(x => x.id !== lo.id);
         all.push(lo); writeLoadouts(all);
-        const have = lo.items.filter(x => loItem(x)).length;
         loOpen = "r-" + lo.id;
-        $("lo-dim").value = "";
         renderLoadoutCount(); renderLoadouts();
-        toast("Imported " + lo.name + ": you have " + have + " of its " + lo.items.length + " items.", "ok");
+        toast("Imported " + lo.name + ": you have all " + lo.items.length + " items.", "ok");
         const tile = box.querySelector('[data-lo-pick="r-' + lo.id + '"]');
         if (tile){ tile.focus(); tile.scrollIntoView({ block: "nearest" }); }
       } catch (e){
