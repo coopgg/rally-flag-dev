@@ -14,14 +14,15 @@
                  or { type:"error", message }
    items: hash -> { n name, i icon, w watermark, t itemType, s subType,
      r tierType, b bucketHash, c classType, d damageTypeHash,
-     y itemTypeDisplayName, x description (plugs), o 1 = ornament }; currencies keep n, i.
+     y itemTypeDisplayName, x description (plugs), o 1 = ornament, sh 1 = shader,
+     k armor mod kind }; currencies keep n, i.
    buckets: hash -> { n name, c capacity } (vault space in the banner).
    loadouts: { names: hash -> name, icons: hash -> path, colors: hash -> path }.
    ============================================================ */
 const BUNGIE = "https://www.bungie.net";
 const DB_NAME = "rallyflag-locker", STORE = "manifest", KEY = "lite";
 // Bump when the stored shape changes, so cached copies are rebuilt.
-const SCHEMA = 4;
+const SCHEMA = 5;
 
 function idb(){
   return new Promise((resolve, reject) => {
@@ -81,6 +82,14 @@ function trimItems(lite){
       e.y = v.itemTypeDisplayName || "";
       if (dp.description) e.x = dp.description.slice(0, 300);
       if (v.itemSubType === 21) e.o = 1;
+      if (v.itemSubType === 20) e.sh = 1;
+      // Armor mod kind (k): the socket kind a mod fits. Slot mods and their
+      // empty sockets share a type name ("Helmet Armor Mod"); tuning mods
+      // and their socket call themselves "General Armor Mod" but lack the
+      // armor-mod category (4104513227), so they get their own kind.
+      const cats = v.itemCategoryHashes || [];
+      if (cats.includes(4104513227)) e.k = e.y || "General Armor Mod";
+      else if (cats.includes(59) && e.y === "General Armor Mod") e.k = "Tuning";
     }
     out[hash] = e;
   }

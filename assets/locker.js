@@ -100,6 +100,8 @@
     for (const key in j){
       const e = j[key];
       if (e.at <= minted) continue;
+      if (key.startsWith("sock:")){ for (const k in e.plugs) patchPlug(key.slice(5), +k, e.plugs[k]); applied++; continue; }
+      if (key.startsWith("sc:")){ patchSubclass(key.slice(3), e.id); applied++; continue; }
       if (key.startsWith("pm:")){
         const pm = POSTMASTER.find(p => p.id === key.slice(3));
         if (pm){ POSTMASTER = POSTMASTER.filter(p => p !== pm); if (pm.gear) ITEMS.push(pm.gear); applied++; }
@@ -445,7 +447,11 @@
     const raw = (data(PROFILE, "characterLoadouts")[charId] || {}).loadouts || [];
     const L = (DB && DB.loadouts) || { names: {}, icons: {}, colors: {} };
     return raw.map((lo, index) => {
-      const ids = (lo.items || []).map(x => String(x.itemInstanceId)).filter(id => id && id !== "0");
+      const all = (lo.items || []).map(x => String(x.itemInstanceId)).filter(id => id && id !== "0");
+      // Loadouts hold the subclass too; it isn't Locker gear, so it's
+      // checked on its own.
+      const isSub = id => { const d = DB.items[INSTANCE_HASH.get(id)]; return !!d && /Subclass$/.test(d.y || ""); };
+      const ids = all.filter(id => !isSub(id)), sub = all.find(isSub) || "";
       // The ornament the loadout puts on each item (0 = the default look);
       // items whose loadout entry has no ornament plug aren't checked.
       const orn = new Map();
@@ -453,7 +459,7 @@
         const h = (x.plugItemHashes || []).find(isOrnamentPlug);
         if (h) orn.set(String(x.itemInstanceId), isOrnament(h) ? h : 0);
       }
-      return { index, ids, orn, name: L.names[lo.nameHash] || "Loadout " + (index + 1), icon: L.icons[lo.iconHash] || "", color: L.colors[lo.colorHash] || "",
+      return { index, ids, sub, orn, name: L.names[lo.nameHash] || "Loadout " + (index + 1), icon: L.icons[lo.iconHash] || "", color: L.colors[lo.colorHash] || "",
         missing: ids.filter(id => !INSTANCE_HASH.has(id)).length };
     }).filter(lo => lo.ids.length);
   }
@@ -467,6 +473,7 @@
     }
     await post("Loadouts/EquipLoadout", { loadoutIndex: lo.index, characterId: charId });
     for (const item of gear) if (lo.orn.has(item.id)) item.ornament = lo.orn.get(item.id);
+    if (lo.sub && subclassesOf(charId).some(x => x.id === lo.sub && !x.equipped)){ patchSubclass(charId, lo.sub); remember([["sc:" + charId, { id: lo.sub }]]); }
     // Bungie equipped the whole set: show it now (the auto-sync confirms it).
     for (const item of gear){
       for (const i of ITEMS) if (i.owner === charId && i.equipped && i.def.b === item.def.b) i.equipped = false;
@@ -508,9 +515,10 @@
           const tip = i ? d.n + (lo.orn.has(id) ? " · " + (off ? "wants " + ornName(lo.orn.get(id)) + ", has " + ornName(i.ornament) : "ornament matches") : "") : "Not found";
           return '<span class="lo-mini' + (INSTANCE_HASH.has(id) ? "" : " gone") + (off ? " orn-off" : "") + '" title="' + esc(tip) + '">' + (icon ? '<img src="' + esc(img(icon)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>";
         };
-        const status = "Equipped " + worn + " of " + lo.ids.length + (checked ? " · ornaments " + (checked - ornOff.length) + " of " + checked + " match" : "");
+        const subOn = !lo.sub || subclassesOf(o.id).some(x => x.id === lo.sub && x.equipped);
+        const status = "Equipped " + worn + " of " + lo.ids.length + (lo.sub ? " · subclass " + (subOn ? "on" : "not on") : "") + (checked ? " · ornaments " + (checked - ornOff.length) + " of " + checked + " match" : "");
         return {
-        key: "g-" + o.id + "-" + lo.index, name: lo.name, gone: lo.missing, on: !lo.missing && worn === lo.ids.length && !ornOff.length, badge: loBadge(lo.icon, lo.color),
+        key: "g-" + o.id + "-" + lo.index, name: lo.name, gone: lo.missing, on: !lo.missing && worn === lo.ids.length && !ornOff.length && subOn, badge: loBadge(lo.icon, lo.color),
         detail: '<div class="lo-main"><b>' + esc(lo.name) + "</b>" + (lo.missing ? ' <span class="muted">· ' + lo.missing + " not found</span>" : "") + "</div>" +
           '<div class="lo-items" aria-hidden="true">' + lo.ids.map(mini).join("") + "</div>" +
           '<p class="lo-status">' + esc(status) + (ornOff.length ? '<span class="muted"> · wrong ornament: ' + esc(ornOff.map(i => i.def.n).join(", ")) + "</span>" : "") + "</p>" +
@@ -541,8 +549,9 @@
   // DIM loadouts: a dim.gg link goes through our Cloudflare Worker
   // (tools/dim-relay; dim.gg doesn't let browsers read it), an
   // app.destinyitemmanager.com link carries the loadout itself, and pasted
-  // loadout JSON is read as is. Weapons and armor are kept; subclass,
-  // artifact and mods are counted but not applied yet.
+  // loadout JSON is read as is. Weapons, armor, subclass (with its super,
+  // abilities, aspects and fragments), armor mods and per-slot shaders and
+  // ornaments are kept; the artifact can't be set through Bungie's API.
   const DIM_RELAY = "https://rallyflag-dim.hoffmn-cb2.workers.dev/";
   async function readDimLoadout(text){
     text = text.trim();
@@ -563,11 +572,183 @@
     const all = json.equipped.concat(json.unequipped || []);
     const gear = all.filter(x => DB.items[x.hash] && (DB.items[x.hash].t === 2 || DB.items[x.hash].t === 3));
     const params = json.parameters || {};
+    const sub = all.find(x => DB.items[x.hash] && /Subclass$/.test(DB.items[x.hash].y || ""));
     return {
       id: "dim-" + (json.id || Date.now().toString(36)), name: String(json.name || "DIM loadout").slice(0, 60), cls: json.classType == null ? 3 : json.classType,
       items: gear.map(x => ({ id: String(x.id || ""), hash: x.hash })),
-      dim: { id: json.id || "", mods: (params.mods || []).length, subclass: all.some(x => DB.items[x.hash] && /Subclass$/.test(DB.items[x.hash].y || "")) }
+      dim: { id: json.id || "" },
+      subclass: sub ? { hash: sub.hash, sockets: sub.socketOverrides || {} } : null,
+      mods: (params.mods || []).filter(h => DB.items[h] && DB.items[h].k),
+      cosmetics: params.modsByBucket || {}
     };
+  }
+
+  // ---------------- sockets: subclass, mods, cosmetics ----------------
+  // Bungie's InsertSocketPlugFree swaps "free" plugs (subclass choices,
+  // armor mods, shaders, ornaments) on an item that's on a character.
+  // Changes go into the journal like moves, so a lagging profile keeps them.
+  const socketData = id => {
+    const all = (PROFILE.itemComponents && PROFILE.itemComponents.sockets && PROFILE.itemComponents.sockets.data) || {};
+    return (all[id] && all[id].sockets) || [];
+  };
+  const plugsOf = id => socketData(id).map(x => x.plugHash || 0);
+  function patchPlug(id, k, h){
+    const sk = socketData(id);
+    if (sk[k]) sk[k].plugHash = h;
+    const item = ITEMS.find(i => i.id === id);
+    if (item) item.plugs[k] = h;
+  }
+  function rememberPlug(id, k, h){
+    const old = readJournal()["sock:" + id];
+    remember([["sock:" + id, { plugs: Object.assign({}, old && old.plugs, { [k]: h }) }]]);
+  }
+  async function insertPlug(itemId, charId, k, h){
+    const body = { plug: { socketIndex: k, socketArrayType: 0, plugItemHash: h }, itemId, characterId: charId };
+    // Bungie rate-limits socket changes; on "slow down", wait and retry once.
+    try { await post("InsertSocketPlugFree", body); }
+    catch (e){ if (!/Throttle/.test(e.status || "")) throw e; await sleep(2000); await post("InsertSocketPlugFree", body); }
+    patchPlug(itemId, k, h); rememberPlug(itemId, k, h);
+  }
+  // Subclasses aren't Locker gear: read them from the profile.
+  function subclassesOf(charId){
+    const take = (list, equipped) => (list || []).filter(it => it.itemInstanceId && DB.items[it.itemHash] && /Subclass$/.test(DB.items[it.itemHash].y || ""))
+      .map(it => ({ id: String(it.itemInstanceId), hash: it.itemHash, equipped }));
+    return take((data(PROFILE, "characterEquipment")[charId] || {}).items, true).concat(take((data(PROFILE, "characterInventories")[charId] || {}).items, false));
+  }
+  function patchSubclass(charId, id){
+    const eq = (data(PROFILE, "characterEquipment")[charId] || {}).items || [], inv = (data(PROFILE, "characterInventories")[charId] || {}).items || [];
+    const isSub = it => DB.items[it.itemHash] && /Subclass$/.test(DB.items[it.itemHash].y || "");
+    const k = inv.findIndex(it => String(it.itemInstanceId) === id && isSub(it)), cur = eq.findIndex(isSub);
+    if (k < 0) return;
+    const next = inv.splice(k, 1)[0];
+    if (cur >= 0) inv.push(eq.splice(cur, 1, next)[0]); else eq.push(next);
+  }
+  // Errors that would fail every other step too: stop instead of retrying.
+  const FATAL = /Scope|NotInTower|CannotPerformActionAtThisLocation|Throttle|SystemDisabled|NotFound/;
+
+  // Set several sockets of one item. A plug can't sit in two sockets at
+  // once (two aspects, two copies of a fragment; armor mods may stack, so
+  // `stack` turns that off), so a plug that's still
+  // in another socket we're changing waits for that one; what's left
+  // after that is only reordering and is skipped.
+  async function setSockets(itemId, charId, wants, failed, stack){
+    const once = h => !stack && !isEmptyPlug(h); // empty sockets repeat freely
+    let todo = Object.keys(wants).map(Number).filter(k => plugsOf(itemId)[k] !== wants[k]);
+    while (todo.length){
+      const cur = plugsOf(itemId);
+      const k = todo.find(k => !once(wants[k]) || !cur.some((h, j) => j !== k && h === wants[k] && todo.includes(j)));
+      if (k == null) break;
+      todo = todo.filter(x => x !== k);
+      if (once(wants[k]) && cur.some((h, j) => j !== k && h === wants[k] && !(j in wants))) continue; // already elsewhere: same result
+      try { await insertPlug(itemId, charId, k, wants[k]); }
+      catch (e){ if (FATAL.test(e.status || "")) throw e; failed.push({ itemId, k, h: wants[k], err: e }); }
+    }
+  }
+
+  // Armor mods: DIM lists them without saying which piece holds which, so
+  // match them by kind (slot, general, tuning, artifice, raid) to the
+  // sockets of the armor the character wears: keep any already in place,
+  // then fill the rest. If Bungie refuses one (usually not enough energy),
+  // clear that piece's other mods and try once more.
+  let EMPTY_BY_KIND = null;
+  function emptyPlug(kind){
+    if (!EMPTY_BY_KIND){
+      EMPTY_BY_KIND = {};
+      for (const h in DB.items){ const d = DB.items[h]; if (d.k && /^Empty .*Socket$/.test(d.n) && !EMPTY_BY_KIND[d.k]) EMPTY_BY_KIND[d.k] = +h; }
+    }
+    return EMPTY_BY_KIND[kind] || 0;
+  }
+  const kindOf = h => (DB.items[h] && DB.items[h].k) || "";
+  const isEmptyPlug = h => !DB.items[h] || /^Empty /.test(DB.items[h].n);
+  function planMods(armor, mods){
+    const sockets = [];
+    for (const item of armor) plugsOf(item.id).forEach((h, k) => { if (kindOf(h)) sockets.push({ item, k, kind: kindOf(h), cur: h, want: null }); });
+    const left = [];
+    for (const h of mods){
+      const keep = sockets.find(s => s.want == null && s.cur === h);
+      if (keep) keep.want = h; else left.push(h);
+    }
+    const unplaced = [];
+    for (const h of left){
+      // An empty socket first, then one holding a mod the loadout doesn't want.
+      const open = sockets.filter(s => s.want == null && s.kind === kindOf(h)).sort((a, b) => isEmptyPlug(b.cur) - isEmptyPlug(a.cur));
+      if (open.length) open[0].want = h; else unplaced.push(h);
+    }
+    return { sockets, unplaced };
+  }
+  async function applyMods(armor, mods, charId, failed){
+    const plan = planMods(armor, mods);
+    const first = [];
+    for (const s of plan.sockets) if (s.want != null && s.cur !== s.want) await setSockets(s.item.id, charId, { [s.k]: s.want }, first, true);
+    for (const f of first){
+      const item = ITEMS.find(i => i.id === f.itemId);
+      for (const s of plan.sockets) if (s.item === item && s.want == null && !isEmptyPlug(plugsOf(item.id)[s.k]) && emptyPlug(s.kind))
+        await setSockets(item.id, charId, { [s.k]: emptyPlug(s.kind) }, [], true);
+      await setSockets(f.itemId, charId, { [f.k]: f.h }, failed, true);
+    }
+    return plan.unplaced;
+  }
+
+  // Everything past the gear: equip the loadout's subclass and set its
+  // choices, put shaders/ornaments on each slot, then the armor mods.
+  // Returns a sentence for the toast.
+  async function applyExtras(lo, charId){
+    const notes = [], failed = [];
+    if (lo.subclass){
+      const sc = subclassesOf(charId).find(x => x.hash === lo.subclass.hash), name = (DB.items[lo.subclass.hash] || {}).n || "its subclass";
+      if (!sc) notes.push("Your " + ownerLabel(charId) + " doesn't have " + name + ".");
+      else {
+        if (!sc.equipped){
+          await post("EquipItem", { itemId: sc.id, characterId: charId });
+          patchSubclass(charId, sc.id); remember([["sc:" + charId, { id: sc.id }]]);
+        }
+        const wants = {};
+        for (const k in lo.subclass.sockets) wants[k] = lo.subclass.sockets[k];
+        await setSockets(sc.id, charId, wants, failed);
+      }
+    }
+    const worn = BUCKETS.map(b => ITEMS.find(i => i.owner === charId && i.equipped && i.def.b === b.hash)).filter(Boolean);
+    for (const bucket in lo.cosmetics || {}){
+      const item = worn.find(i => String(i.def.b) === bucket);
+      if (!item) continue;
+      const cur = plugsOf(item.id), wants = {};
+      for (const h of lo.cosmetics[bucket]){
+        const k = cur.findIndex(c => DB.items[h] && (DB.items[h].o ? isOrnamentPlug(c) : DB.items[h].sh && DB.items[c] && DB.items[c].sh));
+        if (k >= 0) wants[k] = h;
+      }
+      const before = failed.length;
+      await setSockets(item.id, charId, wants, failed);
+      const orn = Object.values(wants).find(isOrnamentPlug);
+      if (orn && failed.length === before){ item.ornament = isOrnament(orn) ? orn : 0; rememberItems([item]); }
+    }
+    if (lo.mods && lo.mods.length){
+      const unplaced = await applyMods(worn.filter(i => i.def.t === 2), lo.mods, charId, failed);
+      if (unplaced.length) notes.push(unplaced.length + " mod" + (unplaced.length === 1 ? " had" : "s had") + " no matching socket.");
+    }
+    if (failed.length){
+      const names = [...new Set(failed.map(f => (DB.items[f.h] || {}).n).filter(Boolean))];
+      notes.push("Bungie refused " + failed.length + (failed.length === 1 ? " change" : " changes") + (names.length ? " (" + names.slice(0, 3).join(", ") + (names.length > 3 ? "…" : "") + ")" : "") +
+        ": not unlocked, or not enough armor energy.");
+    }
+    return notes.join(" ");
+  }
+
+  // How much of a loadout's subclass and mods a character has on now.
+  function extrasStatus(lo, charId){
+    const out = [];
+    if (lo.subclass){
+      const sc = subclassesOf(charId).find(x => x.hash === lo.subclass.hash);
+      const ok = sc && sc.equipped && Object.keys(lo.subclass.sockets).every(k => plugsOf(sc.id).includes(lo.subclass.sockets[k]));
+      out.push({ ok: !!ok, text: "subclass " + (ok ? "set" : sc ? "not set" : "missing") });
+    }
+    if (lo.mods && lo.mods.length){
+      const have = [];
+      for (const b of BUCKETS){ const i = ITEMS.find(x => x.owner === charId && x.equipped && x.def.b === b.hash && x.def.t === 2); if (i) have.push(...plugsOf(i.id)); }
+      let n = 0;
+      for (const h of lo.mods){ const k = have.indexOf(h); if (k >= 0){ n++; have.splice(k, 1); } }
+      out.push({ ok: n === lo.mods.length, text: "mods " + n + " of " + lo.mods.length });
+    }
+    return out;
   }
 
   function openLoadouts(){
@@ -590,13 +771,21 @@
       const found = lo.items.map(x => loItem(x)), gone = found.filter(i => !i).length;
       const copies = lo.items.filter((x, k) => found[k] && found[k].id !== x.id).length;
       const first = DB.items[(lo.items[0] || {}).hash] || {};
+      // Imported before subclass/mods were kept: say so instead of guessing.
+      const old = lo.dim && !("mods" in lo);
       const dim = lo.dim ? '<p class="lo-status muted">From DIM' + (lo.dim.id ? ' (<a href="https://dim.gg/' + esc(lo.dim.id) + '/"' + ' target="_blank" rel="noopener">dim.gg/' + esc(lo.dim.id) + '<span class="sr-only"> (opens in a new tab)</span></a>)' : "") +
-        ". Weapons and armor only for now" + (lo.dim.subclass || lo.dim.mods ? ": its " + [lo.dim.subclass ? "subclass" : "", lo.dim.mods ? lo.dim.mods + " mods" : ""].filter(Boolean).join(" and ") + " aren't applied" : "") + ".</p>" : "";
-      return { key: "r-" + lo.id, name: lo.name, gone, badge: loBadge(first.i, ""),
+        (old ? ". Import it again to bring its subclass and mods too." : lo.subclass || (lo.mods && lo.mods.length) ? ". " + [lo.subclass ? ((DB.items[lo.subclass.hash] || {}).n || "Subclass") + " with " + Object.keys(lo.subclass.sockets).length + " choices" : "", lo.mods && lo.mods.length ? lo.mods.length + " mods" : ""].filter(Boolean).join(", ") + "; the artifact is set in game." : ".") + "</p>" : "";
+      // Is it on? Gear equipped on the matching character, plus subclass/mods.
+      const who = owners[0];
+      const worn = who ? found.filter(i => i && i.owner === who.id && i.equipped).length : 0;
+      const extra = who ? extrasStatus(lo, who.id) : [];
+      const on = !!who && !gone && worn === lo.items.length && extra.every(x => x.ok);
+      const status = who ? '<p class="lo-status">On your ' + esc(who.name) + ": equipped " + worn + " of " + lo.items.length + extra.map(x => " · " + esc(x.text)).join("") + "</p>" : "";
+      return { key: "r-" + lo.id, name: lo.name, gone, on, badge: loBadge(first.i, ""),
         detail: '<div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(lo.cls === 3 ? "Any class" : CLASS_NAMES[lo.cls] || "") +
           (gone ? " · " + gone + " item" + (gone === 1 ? "" : "s") + (lo.dim ? " you don't have" : " no longer found") : "") +
           (copies ? " · " + copies + " from your own copies" : "") + "</span></div>" +
-        '<div class="lo-items" aria-hidden="true">' + lo.items.map((x, k) => mini(x.hash, !!found[k], found[k])).join("") + "</div>" + dim +
+        '<div class="lo-items" aria-hidden="true">' + lo.items.map((x, k) => mini(x.hash, !!found[k], found[k])).join("") + "</div>" + status + dim +
         '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
           '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" };
     })) : '<p class="muted">No loadouts yet. Save what one of your characters has equipped below.</p>';
@@ -633,7 +822,10 @@
       if (!lo || !o) return;
       const items = lo.items.map(x => loItem(x, o.id)).filter(i => i && classOk(i, o.id));
       const missing = lo.items.length - items.length;
-      run("Equipping " + lo.name + " on your " + o.name, "Equipped " + lo.name + " on your " + o.name + "." + (missing ? " " + missing + " item" + (missing === 1 ? " was" : "s were") + " missing and skipped." : ""), () => equipSet(items, o.id), reopen);
+      let extra = "";
+      run("Equipping " + lo.name + " on your " + o.name,
+        () => "Equipped " + lo.name + " on your " + o.name + "." + (missing ? " " + missing + " item" + (missing === 1 ? " was" : "s were") + " missing and skipped." : "") + (extra ? " " + extra : ""),
+        async () => { await equipSet(items, o.id); extra = await applyExtras(lo, o.id); }, reopen);
     }));
     dlg.querySelectorAll("[data-game-lo]").forEach(b => b.addEventListener("click", () => {
       if (busyNotice()) return;
@@ -1092,7 +1284,7 @@
     return enqueue(attempt).then(() => {
       computeSets(); render();
       if (after) after(); // redraws the popup first, so the message isn't wiped
-      toast(done, "ok");
+      toast(typeof done === "function" ? done() : done, "ok");
     }, err => {
       computeSets(); render(); // partial progress (e.g. reached the vault) still shows
       if (after) after();

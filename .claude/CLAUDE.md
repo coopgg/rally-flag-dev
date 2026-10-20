@@ -144,6 +144,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   DIM import: dim.gg links go through the Cloudflare Worker in
   `tools/dim-relay/` (dim.gg has no CORS); deployed by the owner from the
   Cloudflare dashboard, so changing it means pasting the file there again.
+  Their subclass, mods and shaders/ornaments go on with
+  Actions/Items/InsertSocketPlugFree (see HANDOFF item 41).
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

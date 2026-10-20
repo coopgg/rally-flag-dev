@@ -241,6 +241,35 @@ for (const it of allItems.filter(it => it.itemInstanceId && [2, 3].includes((def
   it.overrideStyleItemHash = orn;
   sockets[it.itemInstanceId].sockets[k] = { plugHash: orn, isEnabled: true, isVisible: true };
 }
+// Subclasses: each character wears its class's first subclass (by hash)
+// and carries two more, with the default super/abilities/aspects/fragments
+// from the definition. In-game loadouts pick the worn one up through
+// equipItems, as real ones include it. No rand() calls.
+const SUBCLASS_BUCKET = 3284755031;
+for (const c of characters){
+  const subs = Object.values(ITEMS).filter(d => d.itemType === 16 && d.classType === c.classType && d.sockets && d.displayProperties && d.displayProperties.icon && /Subclass$/.test(d.itemTypeDisplayName || "") && d.inventory && d.inventory.bucketTypeHash === SUBCLASS_BUCKET)
+    .sort((a, b) => a.hash - b.hash).slice(0, 3);
+  subs.forEach((d, k) => {
+    const id = String(nextInstance++);
+    instances[id] = { isEquipped: k === 0, canEquip: true, equipRequiredLevel: 0 };
+    // Aspect and fragment sockets start empty in the definition; worn
+    // subclasses have them filled, so take the next unused one from the
+    // socket's plug set (each aspect/fragment can only be in one socket).
+    const used = new Set();
+    sockets[id] = { sockets: d.sockets.socketEntries.map(e => {
+      let plug = e.singleInitialItemHash || 0;
+      if (/^Empty (Aspect|Fragment) Socket$/.test((def(plug) || {}).displayProperties?.name || "")){
+        const set = PLUGSETS[String(e.reusablePlugSetHash || e.randomizedPlugSetHash)];
+        const next = set && set.reusablePlugItems.map(p => p.plugItemHash).find(h => def(h) && !used.has(h) && !/^Empty/.test(def(h).displayProperties.name));
+        if (next){ plug = next; used.add(next); }
+      }
+      return { plugHash: plug || undefined, isEnabled: true, isVisible: !!plug };
+    }) };
+    const item = { itemHash: d.hash, itemInstanceId: id, quantity: 1, bindStatus: 0, location: 1, bucketHash: SUBCLASS_BUCKET, transferStatus: 0, lockable: false, state: 0 };
+    (k === 0 ? equipItems : invItems)[c.id].push(item);
+  });
+}
+
 // A loadout item's plugs, one per socket (2166136261 = leave as is), with
 // its ornament socket set to the ornament it wears, or `orn` if given.
 const NO_CHANGE = 2166136261;
