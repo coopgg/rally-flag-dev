@@ -91,7 +91,7 @@
 </div>
 
 <section class="legal">
-  <div class="legal-updated">Last updated: August 2026</div>
+  <div class="legal-updated">Last updated: October 2026</div>
 
   <h2>RallyBot (Discord)</h2>
   <p>RallyBot posts Destiny 2 rotation info (the Distortion tracker and featured weekly raid/dungeon) to Discord, either when you run a slash command or on a fixed schedule. It's intentionally minimal:</p>
@@ -105,10 +105,21 @@
 
   <h2>rallyflag.gg (the website)</h2>
   <ul>
-    <li>The site itself doesn't have a server or database — it's static pages plus client-side JavaScript.</li>
+    <li>The site itself is static pages plus client-side JavaScript. The one exception is the Locker preview, which uses two small Cloudflare services described in its own section below.</li>
     <li>Pages that show Destiny data (raids, dungeons, builds, etc.) call Bungie's public API directly from your browser using a shared, non-personal API key. No account or personal info is required to use them.</li>
-    <li>The optional "sign in with Bungie.net" feature on <a href="vendors.html">Vendors</a> uses Bungie's own OAuth login to show your loadouts. The resulting access token is kept in your browser's <code>sessionStorage</code> only — it's never sent to us, because there's no "us" to send it to. It's cleared automatically when you close the tab.</li>
+    <li>The optional "sign in with Bungie.net" feature on <a href="vendors.html">Vendors</a> uses Bungie's own OAuth login to show your loadouts. The resulting access token is kept in your browser's <code>sessionStorage</code> only — it's never sent to us, because there's no "us" to send it to. It's cleared automatically when you close the tab. (The Locker is different; see below.)</li>
     <li>We use <a href="https://www.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Cloudflare Web Analytics</a> to see aggregate traffic (page views, referrers, rough location by country). It's cookieless and doesn't fingerprint or track you individually — Cloudflare's own privacy policy covers exactly what it collects. We don't run any other analytics, tracking pixels, or advertising on the site.</li>
+  </ul>
+
+  <h2>Locker (preview)</h2>
+  <p>The Locker shows your weapons and armor after you sign in with Bungie.net, and lets you move, equip and save loadouts. Here's what it keeps and where.</p>
+  <ul>
+    <li><strong>In your browser:</strong> your sign-in token, farming mode and a short note of your recent moves (<code>sessionStorage</code>, cleared when the tab closes); your Favorite/Junk tags, saved loadouts and layout choices (<code>localStorage</code>); and a trimmed copy of Bungie's public item database (IndexedDB) so the page loads faster next time.</li>
+    <li><strong>Loadout sync:</strong> when you're signed in, your saved loadouts are also stored on Rally Flag's sync service (a Cloudflare Worker with a Cloudflare D1 database) so they survive clearing your browser and show up on your other devices. What's stored is your Destiny account id and, per loadout: its name, the ids and types of its items, and its subclass, mod, shader and ornament choices. Also stored: when it was last saved, and for 60 days, the ids of loadouts you deleted, so your other devices delete them too. No name, email or other personal details.</li>
+    <li><strong>Your sign-in token and the sync service:</strong> each sync request includes your Bungie sign-in token so the service can ask Bungie which account it belongs to. That's how it makes sure only you can read or change your loadouts. It uses the token for that check only. It doesn't store or log the token; it remembers the answer for up to 10 minutes under a one-way hash of the token.</li>
+    <li><strong>Importing a DIM link:</strong> when you import a <code>dim.gg</code> link, the link goes through a small Rally Flag Cloudflare Worker that fetches that public DIM page and returns its loadout (dim.gg doesn't allow browsers to read it directly). No sign-in or account information is sent with it. The answer may be cached for 10 minutes.</li>
+    <li><strong>Deleting your synced loadouts:</strong> delete them in the Locker's Loadouts tab while signed in, and they're removed from the sync service as well. For 60 days afterwards, the service keeps only the ids of the deleted loadouts (so your other devices remove them too). To have your account's entry removed entirely, contact us (below).</li>
+    <li>The Locker only moves, equips or changes your gear when you press a button, and every change goes straight from your browser to Bungie.</li>
   </ul>
 
   <h2>Changes</h2>
