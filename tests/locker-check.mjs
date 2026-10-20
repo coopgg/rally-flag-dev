@@ -190,6 +190,18 @@ await section("Loadouts", async () => {
   check("loadouts: equipping the saved loadout puts it all back", /equipped 8 of 8 · subclass set/.test(await status(p)), await status(p));
   await p.click('[data-lo-max="' + TITAN + '"]'); await idle(p);
   check("max Power: Titan reaches max", /At max Power/.test(await p.textContent('[data-lo-max="' + TITAN + '"]')), await toastText(p));
+  // Rename: Enter saves (and the grid follows), Escape cancels, empty is refused.
+  await p.click('[data-lo-rename="' + id + '"]');
+  check("rename: the name box opens with the name selected", await p.evaluate(() => { const i = document.getElementById("lo-rename-input"); return document.activeElement === i && i.value === "Check Titan" && i.selectionEnd - i.selectionStart === i.value.length; }));
+  await p.fill("#lo-rename-input", "Raid DPS"); await p.keyboard.press("Enter");
+  const renamed = await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id), id);
+  check("rename: Enter saves the new name", renamed.name === "Raid DPS" && /Raid DPS/.test(await p.textContent('[data-lo-pick="r-' + id + '"]')) && !(await p.locator("#lo-rename-input").count()), JSON.stringify(renamed && renamed.name));
+  check("rename: focus returns to Rename", await p.evaluate(id => document.activeElement.dataset.loRename === id, id));
+  await p.click('[data-lo-rename="' + id + '"]'); await p.fill("#lo-rename-input", "Nope"); await p.keyboard.press("Escape");
+  await p.click('[data-lo-rename="' + id + '"]'); await p.fill("#lo-rename-input", "  "); await p.keyboard.press("Enter");
+  const still = await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id).name, id);
+  check("rename: Escape cancels and an empty name is refused", still === "Raid DPS" && /name first/.test(await toastText(p)), still);
+  await p.click("[data-lo-rename-cancel]");
   const del = p.locator("[data-lo-del]").first(); await del.click(); await del.click();
   check("loadouts: two-tap delete", await p.locator('[data-lo-pick^="r-"]').count() === 0);
   check("loadouts: no script errors", !p.errors.length, p.errors.join("; "));
@@ -306,6 +318,11 @@ await section("Sync", async () => {
   const names = p => p.evaluate(() => [...document.querySelectorAll('[data-lo-pick^="r-"]')].map(x => x.textContent.trim().replace(/\s*\(.*$/, "")).sort().join());
   await comeBack(B);
   check("sync: a delete on one device and a save on the other both land", await names(A) === "Second" && await names(B) === "Second", (await names(A)) + " / " + (await names(B)));
+  const secondId = (await A.getAttribute('[data-lo-pick^="r-"]', "data-lo-pick")).slice(2);
+  if (!(await A.isVisible('[data-lo-rename="' + secondId + '"]'))) await A.click('[data-lo-pick="r-' + secondId + '"]');
+  await A.click('[data-lo-rename="' + secondId + '"]'); await A.fill("#lo-rename-input", "Renamed"); await A.keyboard.press("Enter"); await A.waitForTimeout(2000);
+  await comeBack(B);
+  check("sync: a rename reaches the other device", await names(B) === "Renamed", await names(B));
   await A.click("#lo-erase"); await A.click("#lo-erase"); await A.waitForTimeout(800);
   await comeBack(B);
   check("sync: Delete my saved loadouts and tags clears every device", !env.DB.rows.size && await names(B) === "" && await B.evaluate(id => !/tag-/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').className), item));

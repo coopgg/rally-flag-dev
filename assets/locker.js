@@ -994,6 +994,7 @@
   // showing each copy's perks (weapons) or stats (armor). With no copy of
   // that item, offer others of the same type in that slot, or leave it empty.
   let loReview = null; // { lo, isNew, slots: [{ k, want, cands, similar, pick }] }
+  let loRenaming = null; // id of the saved loadout whose name box is open
   const fitsClass = (i, cls) => cls === 3 || i.def.t !== 2 || i.def.c === 3 || i.def.c === cls;
   const rollRank = (a, b) => ((b.roll && b.roll.full) - (a.roll && a.roll.full)) || ((b.roll ? b.roll.matched : 0) - (a.roll ? a.roll.matched : 0)) || b.power - a.power;
   function startReview(lo, isNew){
@@ -1068,9 +1069,9 @@
     const box = $("view-loadouts"), list = readLoadouts();
     // A redraw replaces the buttons: keep keyboard focus on the same control.
     const was = box.contains(document.activeElement) ? document.activeElement : null;
-    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
+    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
       || (was && was.id ? "#" + was.id : null);
-    const typed = { name: ($("lo-name") || {}).value || "", dim: ($("lo-dim") || {}).value || "" };
+    const typed = { name: ($("lo-name") || {}).value || "", dim: ($("lo-dim") || {}).value || "", rename: $("lo-rename-input") ? $("lo-rename-input").value : null };
     const byId = new Map(ITEMS.map(i => [i.id, i]));
     const mini = (hash, have, item) => { const d = item ? { i: iconOf(item) } : DB.items[hash] || {}; return '<span class="lo-mini' + (have ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
     const maxRows = OWNERS.map(o => {
@@ -1103,12 +1104,17 @@
       const on = !!who && !gone && worn === lo.items.length && extra.every(x => x.ok);
       const status = who ? '<p class="lo-status">On your ' + esc(who.name) + ": equipped " + worn + " of " + lo.items.length + extra.map(x => " · " + esc(x.text)).join("") + "</p>" : "";
       return { key: "r-" + lo.id, name: lo.name, gone, on, badge: loBadge(first.i, ""),
-        detail: '<div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(lo.cls === 3 ? "Any class" : CLASS_NAMES[lo.cls] || "") +
+        detail: (loRenaming === lo.id
+            ? '<form class="lo-rename" data-lo-rename-form="' + lo.id + '"><label class="lo-name"><span>Name</span><input type="text" id="lo-rename-input" maxlength="40" value="' + esc(lo.name) + '" autocomplete="off" spellcheck="false"></label>' +
+              '<div class="act-row"><button type="submit" class="act-btn">Save name</button><button type="button" class="act-btn" data-lo-rename-cancel>Cancel</button></div></form>'
+            : "") +
+          '<div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(lo.cls === 3 ? "Any class" : CLASS_NAMES[lo.cls] || "") +
           (gone ? " · " + gone + " item" + (gone === 1 ? "" : "s") + (lo.dim ? " you don't have" : " no longer found") : "") +
           (copies ? " · " + copies + " from your own copies" : "") + "</span></div>" +
         '<div class="lo-items" aria-hidden="true">' + lo.items.map((x, k) => mini(x.hash, !!found[k], found[k])).join("") + "</div>" + status + note +
         '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
           (gone || copies ? '<button type="button" class="act-btn" data-lo-review="' + lo.id + '">Choose copies<span class="sr-only"> for ' + esc(lo.name) + "</span></button>" : "") +
+          (loRenaming === lo.id ? "" : '<button type="button" class="act-btn" data-lo-rename="' + lo.id + '">Rename<span class="sr-only"> ' + esc(lo.name) + "</span></button>") +
           '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" };
     };
     // Grouped by class like DIM: your characters' classes first, then any class.
@@ -1133,6 +1139,7 @@
       '<section class="lo-section" aria-labelledby="lo-h-game"><h2 class="dlg-label" id="lo-h-game">In-game loadouts</h2><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first.</p>' + gameSection() + "</section>" +
       '<section class="lo-section" aria-labelledby="lo-h-max"><h2 class="dlg-label" id="lo-h-max">Max Power</h2><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</section>";
     $("lo-name").value = typed.name; $("lo-dim").value = typed.dim;
+    if (typed.rename != null && $("lo-rename-input")) $("lo-rename-input").value = typed.rename;
     if (was) { const t = refocus && box.querySelector(refocus); if (t) t.focus(); }
     box.querySelectorAll("[data-lo-pick]").forEach(b => b.addEventListener("click", () => {
       loOpen = loOpen === b.dataset.loPick ? null : b.dataset.loPick;
@@ -1160,6 +1167,27 @@
       if (!lo) return;
       run("Equipping " + lo.name + " on your " + o.name, "Equipped " + lo.name + " on your " + o.name + "." + (lo.missing ? " " + lo.missing + " item" + (lo.missing === 1 ? " wasn't" : "s weren't") + " found." : ""), () => equipGameLoadout(o.id, lo));
     }));
+    // Rename: the name box opens in the loadout's details; Enter saves,
+    // Escape or Cancel closes it. A new name syncs like any other change.
+    box.querySelectorAll("[data-lo-rename]").forEach(b => b.addEventListener("click", () => {
+      loRenaming = b.dataset.loRename; renderLoadouts();
+      const input = $("lo-rename-input"); if (input){ input.focus(); input.select(); }
+    }));
+    const renameForm = box.querySelector("[data-lo-rename-form]");
+    if (renameForm){
+      const id = renameForm.dataset.loRenameForm, input = $("lo-rename-input");
+      const close = () => { loRenaming = null; renderLoadouts(); const b = box.querySelector('[data-lo-rename="' + id + '"]'); if (b) b.focus(); };
+      renameForm.addEventListener("submit", e => {
+        e.preventDefault();
+        const name = input.value.trim();
+        if (!name){ toast("Give the loadout a name first.", "error"); input.focus(); return; }
+        const all = readLoadouts(), lo = all.find(x => x.id === id);
+        if (lo && lo.name !== name){ const old = lo.name; lo.name = name.slice(0, 40); writeLoadouts(all); toast("Renamed " + old + " to " + lo.name + ".", "ok"); }
+        close();
+      });
+      renameForm.querySelector("[data-lo-rename-cancel]").addEventListener("click", close);
+      input.addEventListener("keydown", e => { if (e.key === "Escape"){ e.preventDefault(); close(); } });
+    }
     box.querySelectorAll("[data-lo-del]").forEach(b => b.addEventListener("click", () => {
       // Two taps: the first asks, the second deletes.
       if (b.dataset.confirm !== "1"){ b.dataset.confirm = "1"; b.firstChild.textContent = "Tap again to delete"; return; }
