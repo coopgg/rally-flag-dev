@@ -102,6 +102,7 @@
       if (e.at <= minted) continue;
       if (key.startsWith("sock:")){ for (const k in e.plugs) patchPlug(key.slice(5), +k, e.plugs[k]); applied++; continue; }
       if (key.startsWith("sc:")){ patchSubclass(key.slice(3), e.id); applied++; continue; }
+      if (key.startsWith("gls:")){ const [, ch, ix] = key.split(":"); setGameSlot(ch, +ix, e.lo); applied++; continue; }
       if (key.startsWith("glo:")){ const [, ch, ix] = key.split(":"); patchGameIdentifiers(ch, +ix, { nameHash: e.nameHash, iconHash: e.iconHash, colorHash: e.colorHash }); applied++; continue; }
       if (key.startsWith("art:")){ patchSubclass(key.slice(4), e.id, isArtifact); applied++; continue; }
       if (key.startsWith("pm:")){
@@ -645,8 +646,8 @@
       }
       return { index, ids, sub, orn, nameHash: lo.nameHash, iconHash: lo.iconHash, colorHash: lo.colorHash,
         name: L.names[lo.nameHash] || "Loadout " + (index + 1), icon: L.icons[lo.iconHash] || "", color: L.colors[lo.colorHash] || "",
-        missing: ids.filter(id => !INSTANCE_HASH.has(id)).length };
-    }).filter(lo => lo.ids.length);
+        missing: ids.filter(id => !INSTANCE_HASH.has(id)).length, empty: !all.length };
+    });
   }
   // Name, icon and colour of an in-game loadout: Destiny only offers its
   // own lists (DIM works the same way), set with UpdateLoadoutIdentifiers.
@@ -660,6 +661,27 @@
     patchGameIdentifiers(charId, index, ids);
     remember([["glo:" + charId + ":" + index, ids]]);
   }
+  // Save what the character wears into a slot (Destiny's own Snapshot:
+  // weapons, armor, subclass and mods), or clear a slot. The profile copy
+  // is updated here and journalled until Bungie's catches up.
+  function setGameSlot(charId, index, lo){
+    const list = ((data(PROFILE, "characterLoadouts")[charId] || {}).loadouts || []);
+    if (list[index]) list[index] = lo;
+  }
+  async function snapshotGameLoadout(charId, index, ids){
+    await post("Loadouts/SnapshotLoadout", Object.assign({ loadoutIndex: index, characterId: charId }, ids));
+    const sc = subclassesOf(charId).find(x => x.equipped);
+    const items = equippedOn(charId).map(i => ({ itemInstanceId: i.id, plugItemHashes: plugsOf(i.id) }))
+      .concat(sc ? [{ itemInstanceId: sc.id, plugItemHashes: plugsOf(sc.id) }] : []);
+    const lo = Object.assign({}, ids, { items });
+    setGameSlot(charId, index, lo); remember([["gls:" + charId + ":" + index, { lo }]]);
+  }
+  async function clearGameLoadout(charId, index){
+    await post("Loadouts/ClearLoadout", { loadoutIndex: index, characterId: charId });
+    const cur = ((data(PROFILE, "characterLoadouts")[charId] || {}).loadouts || [])[index] || {};
+    const lo = { colorHash: cur.colorHash, iconHash: cur.iconHash, nameHash: cur.nameHash, items: [] };
+    setGameSlot(charId, index, lo); remember([["gls:" + charId + ":" + index, { lo }]]);
+  }
   function gameEditorHtml(o, lo){
     const L = DB.loadouts, ed = gameEditing, order = L.order || {};
     const list = (kind, map) => (order[kind] && order[kind].length ? order[kind] : Object.keys(map).map(Number)).filter(h => map[h]);
@@ -671,7 +693,7 @@
       '<label class="lo-name"><span>Name</span><select id="ge-name">' + list("names", L.names).map(h => '<option value="' + h + '"' + (h === ed.nameHash ? " selected" : "") + ">" + esc(L.names[h]) + "</option>").join("") + "</select></label>" +
       '<div class="ge-label">Icon</div>' + swatches("icons", L.icons, ed.iconHash, "Icon") +
       '<div class="ge-label">Colour</div>' + swatches("colors", L.colors, ed.colorHash, "Colour") +
-      '<div class="act-row"><button type="submit" class="act-btn">Save in Destiny<span class="sr-only"> (' + esc(o.name) + " loadout " + (lo.index + 1) + ")</span></button>" +
+      '<div class="act-row"><button type="submit" class="act-btn">' + (ed.mode === "snapshot" ? "Save " + esc(o.name) + "'s current gear here" : "Save in Destiny") + '<span class="sr-only"> (' + esc(o.name) + " loadout " + (lo.index + 1) + ")</span></button>" +
         '<button type="button" class="act-btn" data-ge-cancel>Cancel</button></div></form>';
   }
 
@@ -700,7 +722,7 @@
   function loGrid(group, entries){
     const open = entries.find(e => e.key === loOpen);
     return '<div class="lo-grid">' + entries.map(e =>
-      '<button type="button" class="lo-tile' + (e.gone ? " warn" : e.on ? " on" : "") + '" data-lo-pick="' + esc(e.key) + '" aria-expanded="' + (e === open) + '" aria-controls="lo-detail-' + group + '">' +
+      '<button type="button" class="lo-tile' + (e.empty ? " empty" : "") + (e.gone ? " warn" : e.on ? " on" : "") + '" data-lo-pick="' + esc(e.key) + '" aria-expanded="' + (e === open) + '" aria-controls="lo-detail-' + group + '">' +
         e.badge + '<span class="lo-tile-name">' + esc(e.name) + (e.on ? '<span class="sr-only"> (equipped now)</span>' : "") + "</span>" +
         (e.on && !e.gone ? '<span class="lo-check" aria-hidden="true"><svg viewBox="0 0 16 16" width="16" height="16"><circle cx="8" cy="8" r="8"/><path d="M4.5 8.2l2.3 2.3 4.7-4.9" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : "") + "</button>").join("") + "</div>" +
       '<div class="lo-detail" id="lo-detail-' + group + '"' + (open ? "" : " hidden") + ">" + (open ? open.detail : "") + "</div>";
@@ -715,6 +737,14 @@
       const list = gameLoadouts(o.id);
       if (!list.length) return "";
       return '<div class="lo-owner">' + esc(o.name) + "</div>" + loGrid("g" + o.id, list.map(lo => {
+        const key = o.id + ":" + lo.index, editing = gameEditing && gameEditing.key === key;
+        if (lo.empty){
+          // An empty slot opens straight into "save what you wear here".
+          if (loOpen === "g-" + o.id + "-" + lo.index && !editing) gameEditing = { key, charId: o.id, index: lo.index, nameHash: lo.nameHash, iconHash: lo.iconHash, colorHash: lo.colorHash, mode: "snapshot" };
+          return { key: "g-" + o.id + "-" + lo.index, name: "Empty slot " + (lo.index + 1), empty: true, badge: '<span class="lo-badge lo-badge-empty" aria-hidden="true">+</span>',
+            detail: '<p class="lo-status muted">Empty slot. Save what your ' + esc(o.name) + " is wearing now (weapons, armor, subclass and mods) into it, with a name, icon and colour from Destiny's lists.</p>" +
+              (gameEditing && gameEditing.key === key ? gameEditorHtml(o, lo) : "") };
+        }
         // Is it on? Which items are equipped on this character, and which
         // carry the ornament the loadout sets (Destiny applies those too).
         const gear = lo.ids.map(id => byId.get(id)).filter(Boolean);
@@ -734,12 +764,14 @@
         detail: '<div class="lo-main"><b>' + esc(lo.name) + "</b>" + (lo.missing ? ' <span class="muted">· ' + lo.missing + " not found</span>" : "") + "</div>" +
           '<div class="lo-items" aria-hidden="true">' + lo.ids.map(mini).join("") + "</div>" +
           '<p class="lo-status">' + esc(status) + (ornOff.length ? '<span class="muted"> · wrong ornament: ' + esc(ornOff.map(i => i.def.n).join(", ")) + "</span>" : "") + "</p>" +
-          (gameEditing && gameEditing.key === o.id + ":" + lo.index ? gameEditorHtml(o, lo) : "") +
+          (editing ? gameEditorHtml(o, lo) : "") +
           '<div class="act-row"><button type="button" class="act-btn" data-game-lo="' + lo.index + '" data-to="' + o.id + '">Equip<span class="sr-only"> ' + esc(lo.name) + " on your " + esc(o.name) + "</span></button>" +
-            (gameEditing && gameEditing.key === o.id + ":" + lo.index ? "" : '<button type="button" class="act-btn" data-game-edit="' + o.id + ":" + lo.index + '">Edit name &amp; look<span class="sr-only"> of ' + esc(lo.name) + "</span></button>") + "</div>"
+            (editing ? "" : '<button type="button" class="act-btn" data-game-edit="' + key + '">Edit name &amp; look<span class="sr-only"> of ' + esc(lo.name) + "</span></button>" +
+              '<button type="button" class="act-btn" data-game-snap="' + key + '">Replace with current gear<span class="sr-only"> (' + esc(lo.name) + ")</span></button>" +
+              '<button type="button" class="act-btn" data-game-clear="' + key + '">Clear slot<span class="sr-only"> ' + esc(lo.name) + "</span></button>") + "</div>"
       }; }));
     }).join("");
-    return groups || '<p class="muted">No in-game loadouts saved yet. Make them in Destiny\'s Character screen and they\'ll show here.</p>';
+    return groups || '<p class="muted">No in-game loadout slots found.</p>';
   }
 
 
@@ -1100,7 +1132,7 @@
     const box = $("view-loadouts"), list = readLoadouts();
     // A redraw replaces the buttons: keep keyboard focus on the same control.
     const was = box.contains(document.activeElement) ? document.activeElement : null;
-    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename", "data-game-edit"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
+    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename", "data-game-edit", "data-game-snap"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
       || (was && was.id ? "#" + was.id : null);
     const typed = { name: ($("lo-name") || {}).value || "", dim: ($("lo-dim") || {}).value || "", rename: $("lo-rename-input") ? $("lo-rename-input").value : null };
     const byId = new Map(ITEMS.map(i => [i.id, i]));
@@ -1167,7 +1199,7 @@
         (list.length || Object.keys(TAGS).length ? '<div class="lo-erase"><button type="button" class="act-btn" id="lo-erase">Delete my saved loadouts and tags</button>' +
           '<span class="muted">' + (syncOn() ? "From this browser and Rally Flag's sync service. Your other devices clear theirs the next time they sync." : "From this browser.") + "</span></div>" : "") +
         "</section>" +
-      '<section class="lo-section" aria-labelledby="lo-h-game"><h2 class="dlg-label" id="lo-h-game">In-game loadouts</h2><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first.</p>' + gameSection() + "</section>" +
+      '<section class="lo-section" aria-labelledby="lo-h-game"><h2 class="dlg-label" id="lo-h-game">In-game loadouts</h2><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first. Empty slots can save what a character wears now.</p>' + gameSection() + "</section>" +
       '<section class="lo-section" aria-labelledby="lo-h-max"><h2 class="dlg-label" id="lo-h-max">Max Power</h2><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</section>";
     $("lo-name").value = typed.name; $("lo-dim").value = typed.dim;
     if (typed.rename != null && $("lo-rename-input")) $("lo-rename-input").value = typed.rename;
@@ -1209,15 +1241,32 @@
         renderLoadouts();
         const again = box.querySelector("[data-ge-" + kind + '="' + (b.dataset.geIcons || b.dataset.geColors) + '"]'); if (again) again.focus();
       }));
-      geForm.querySelector("[data-ge-cancel]").addEventListener("click", close);
+      geForm.querySelector("[data-ge-cancel]").addEventListener("click", () => {
+        // Cancel on an empty slot closes the slot itself.
+        if (ed.mode === "snapshot"){ gameEditing = null; loOpen = null; renderLoadouts(); const t = box.querySelector('[data-lo-pick="g-' + ed.charId + "-" + ed.index + '"]'); if (t) t.focus(); }
+        else close();
+      });
       geForm.addEventListener("keydown", e => { if (e.key === "Escape"){ e.preventDefault(); close(); } });
       geForm.addEventListener("submit", e => {
         e.preventDefault();
         if (busyNotice()) return;
         const o = ownerOf(ed.charId), ids = { nameHash: ed.nameHash, iconHash: ed.iconHash, colorHash: ed.colorHash }, name = DB.loadouts.names[ed.nameHash] || "the loadout";
-        run("Saving " + name + " in Destiny", "Saved " + name + " on your " + o.name + " in Destiny.", async () => { await updateGameIdentifiers(ed.charId, ed.index, ids); gameEditing = null; });
+        if (ed.mode === "snapshot") run("Saving your " + o.name + "'s gear as " + name, "Saved your " + o.name + "'s current gear as " + name + " in Destiny.", async () => { await snapshotGameLoadout(ed.charId, ed.index, ids); gameEditing = null; });
+        else run("Saving " + name + " in Destiny", "Saved " + name + " on your " + o.name + " in Destiny.", async () => { await updateGameIdentifiers(ed.charId, ed.index, ids); gameEditing = null; });
       });
     }
+    // Replace with current gear / Clear slot: two taps, like Delete.
+    const twoTap = (b, label) => { if (b.dataset.confirm === "1") return true; b.dataset.confirm = "1"; b.firstChild.textContent = label; return false; };
+    box.querySelectorAll("[data-game-snap]").forEach(b => b.addEventListener("click", () => {
+      if (busyNotice() || !twoTap(b, "Tap again to replace")) return;
+      const [charId, ix] = b.dataset.gameSnap.split(":"), o = ownerOf(charId), lo = gameLoadouts(charId).find(x => x.index === +ix);
+      run("Saving your " + o.name + "'s gear to " + lo.name, "Replaced " + lo.name + " with your " + o.name + "'s current gear.", () => snapshotGameLoadout(charId, +ix, { nameHash: lo.nameHash, iconHash: lo.iconHash, colorHash: lo.colorHash }));
+    }));
+    box.querySelectorAll("[data-game-clear]").forEach(b => b.addEventListener("click", () => {
+      if (busyNotice() || !twoTap(b, "Tap again to clear")) return;
+      const [charId, ix] = b.dataset.gameClear.split(":"), o = ownerOf(charId), lo = gameLoadouts(charId).find(x => x.index === +ix);
+      run("Clearing " + lo.name, "Cleared " + lo.name + " from your " + o.name + ".", async () => { await clearGameLoadout(charId, +ix); loOpen = null; });
+    }));
     box.querySelectorAll("[data-game-lo]").forEach(b => b.addEventListener("click", () => {
       if (busyNotice()) return;
       const o = ownerOf(b.dataset.to), lo = gameLoadouts(o.id).find(x => x.index === +b.dataset.gameLo);

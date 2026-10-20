@@ -235,6 +235,31 @@ await section("In-game loadouts", async () => {
   if (!(await p.isVisible('[data-game-edit="' + TITAN + ':1"]'))) await p.click('[data-lo-pick="g-' + TITAN + '-1"]');
   await p.click('[data-game-edit="' + TITAN + ':1"]'); await p.selectOption("#ge-name", opts[0].v); p.calls.length = 0; await p.keyboard.press("Escape");
   check("in-game edit: Escape cancels without saving", !(await p.locator(".ge-editor").count()) && !p.calls.length && await p.evaluate(k => document.activeElement.dataset.gameEdit === k, TITAN + ":1"));
+  // All 10 slots show; an empty one saves what the character wears now.
+  check("in-game slots: all 10 slots show, empty ones too", await p.locator('[data-lo-pick^="g-' + TITAN + '-"]').count() === 10 && await p.locator('.lo-tile.empty[data-lo-pick^="g-' + TITAN + '-"]').count() >= 7);
+  await p.click('[data-lo-pick="g-' + TITAN + '-5"]');
+  check("in-game slots: an empty slot opens on Save current gear", /current gear here/.test(await p.textContent(".ge-editor [type=submit]")));
+  const nm = await p.$$eval("#ge-name option", o => o.map(x => ({ v: x.value, t: x.textContent })));
+  await p.selectOption("#ge-name", nm[6].v);
+  p.calls.length = 0;
+  await p.click(".ge-editor [type=submit]"); await idle(p);
+  const snap = p.calls.find(c => c.ep === "Loadouts/SnapshotLoadout");
+  check("in-game slots: Save sends SnapshotLoadout with the name", snap && snap.body.loadoutIndex === 5 && snap.body.characterId === TITAN && String(snap.body.nameHash) === nm[6].v, JSON.stringify(snap && snap.body));
+  const tile5 = () => p.textContent('[data-lo-pick="g-' + TITAN + '-5"]');
+  check("in-game slots: the slot now holds the gear", (await tile5()).includes(nm[6].t) && await p.locator('.lo-tile.empty[data-lo-pick="g-' + TITAN + '-5"]').count() === 0);
+  if (!(await p.isVisible('[data-game-snap="' + TITAN + ':5"]'))) await p.click('[data-lo-pick="g-' + TITAN + '-5"]');
+  check("in-game slots: it reads as on", /Equipped 8 of 8 · subclass on/.test(await p.evaluate(() => document.querySelector("#view-loadouts .lo-detail:not([hidden]) .lo-status").textContent)));
+  p.calls.length = 0;
+  await p.click('[data-game-snap="' + TITAN + ':5"]');
+  check("in-game slots: Replace asks first", !p.calls.length && /Tap again/.test(await p.textContent('[data-game-snap="' + TITAN + ':5"]')));
+  await p.click('[data-game-snap="' + TITAN + ':5"]'); await idle(p);
+  check("in-game slots: Replace sends SnapshotLoadout keeping the name", p.calls.some(c => c.ep === "Loadouts/SnapshotLoadout" && c.body.loadoutIndex === 5 && String(c.body.nameHash) === nm[6].v));
+  if (!(await p.isVisible('[data-game-clear="' + TITAN + ':5"]'))) await p.click('[data-lo-pick="g-' + TITAN + '-5"]');
+  p.calls.length = 0;
+  await p.click('[data-game-clear="' + TITAN + ':5"]'); await p.click('[data-game-clear="' + TITAN + ':5"]'); await idle(p);
+  check("in-game slots: Clear sends ClearLoadout and empties the slot", p.calls.some(c => c.ep === "Loadouts/ClearLoadout" && c.body.loadoutIndex === 5) && await p.locator('.lo-tile.empty[data-lo-pick="g-' + TITAN + '-5"]').count() === 1);
+  await p.waitForTimeout(2500); await idle(p);
+  check("in-game slots: still empty after a re-sync with Bungie's older copy", await p.locator('.lo-tile.empty[data-lo-pick="g-' + TITAN + '-5"]').count() === 1);
   await p.context_.close();
 });
 
