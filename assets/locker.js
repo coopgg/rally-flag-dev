@@ -102,6 +102,7 @@
       if (e.at <= minted) continue;
       if (key.startsWith("sock:")){ for (const k in e.plugs) patchPlug(key.slice(5), +k, e.plugs[k]); applied++; continue; }
       if (key.startsWith("sc:")){ patchSubclass(key.slice(3), e.id); applied++; continue; }
+      if (key.startsWith("glo:")){ const [, ch, ix] = key.split(":"); patchGameIdentifiers(ch, +ix, { nameHash: e.nameHash, iconHash: e.iconHash, colorHash: e.colorHash }); applied++; continue; }
       if (key.startsWith("art:")){ patchSubclass(key.slice(4), e.id, isArtifact); applied++; continue; }
       if (key.startsWith("pm:")){
         const pm = POSTMASTER.find(p => p.id === key.slice(3));
@@ -642,10 +643,38 @@
         const h = (x.plugItemHashes || []).find(isOrnamentPlug);
         if (h) orn.set(String(x.itemInstanceId), isOrnament(h) ? h : 0);
       }
-      return { index, ids, sub, orn, name: L.names[lo.nameHash] || "Loadout " + (index + 1), icon: L.icons[lo.iconHash] || "", color: L.colors[lo.colorHash] || "",
+      return { index, ids, sub, orn, nameHash: lo.nameHash, iconHash: lo.iconHash, colorHash: lo.colorHash,
+        name: L.names[lo.nameHash] || "Loadout " + (index + 1), icon: L.icons[lo.iconHash] || "", color: L.colors[lo.colorHash] || "",
         missing: ids.filter(id => !INSTANCE_HASH.has(id)).length };
     }).filter(lo => lo.ids.length);
   }
+  // Name, icon and colour of an in-game loadout: Destiny only offers its
+  // own lists (DIM works the same way), set with UpdateLoadoutIdentifiers.
+  let gameEditing = null; // { key, charId, index, nameHash, iconHash, colorHash }
+  function patchGameIdentifiers(charId, index, ids){
+    const lo = ((data(PROFILE, "characterLoadouts")[charId] || {}).loadouts || [])[index];
+    if (lo) Object.assign(lo, ids);
+  }
+  async function updateGameIdentifiers(charId, index, ids){
+    await post("Loadouts/UpdateLoadoutIdentifiers", Object.assign({ loadoutIndex: index, characterId: charId }, ids));
+    patchGameIdentifiers(charId, index, ids);
+    remember([["glo:" + charId + ":" + index, ids]]);
+  }
+  function gameEditorHtml(o, lo){
+    const L = DB.loadouts, ed = gameEditing, order = L.order || {};
+    const list = (kind, map) => (order[kind] && order[kind].length ? order[kind] : Object.keys(map).map(Number)).filter(h => map[h]);
+    const swatches = (kind, map, cur, label) => '<div class="ge-swatches" role="group" aria-label="' + label + '">' +
+      list(kind, map).map((h, k) => '<button type="button" class="ge-swatch" data-ge-' + kind + '="' + h + '" aria-pressed="' + (h === cur) + '" aria-label="' + label + " " + (k + 1) + '">' +
+        '<img src="' + esc(img(map[h])) + '" alt="" width="32" height="32" loading="lazy"></button>').join("") + "</div>";
+    return '<form class="ge-editor" data-ge-form="' + ed.key + '">' +
+      '<div class="ge-preview" aria-hidden="true">' + loBadge(L.icons[ed.iconHash], L.colors[ed.colorHash]) + "<b>" + esc(L.names[ed.nameHash] || lo.name) + "</b></div>" +
+      '<label class="lo-name"><span>Name</span><select id="ge-name">' + list("names", L.names).map(h => '<option value="' + h + '"' + (h === ed.nameHash ? " selected" : "") + ">" + esc(L.names[h]) + "</option>").join("") + "</select></label>" +
+      '<div class="ge-label">Icon</div>' + swatches("icons", L.icons, ed.iconHash, "Icon") +
+      '<div class="ge-label">Colour</div>' + swatches("colors", L.colors, ed.colorHash, "Colour") +
+      '<div class="act-row"><button type="submit" class="act-btn">Save in Destiny<span class="sr-only"> (' + esc(o.name) + " loadout " + (lo.index + 1) + ")</span></button>" +
+        '<button type="button" class="act-btn" data-ge-cancel>Cancel</button></div></form>';
+  }
+
   async function equipGameLoadout(charId, lo){
     const gear = lo.ids.map(id => ITEMS.find(i => i.id === id)).filter(Boolean);
     const keep = new Set(gear.map(i => i.id));
@@ -705,7 +734,9 @@
         detail: '<div class="lo-main"><b>' + esc(lo.name) + "</b>" + (lo.missing ? ' <span class="muted">· ' + lo.missing + " not found</span>" : "") + "</div>" +
           '<div class="lo-items" aria-hidden="true">' + lo.ids.map(mini).join("") + "</div>" +
           '<p class="lo-status">' + esc(status) + (ornOff.length ? '<span class="muted"> · wrong ornament: ' + esc(ornOff.map(i => i.def.n).join(", ")) + "</span>" : "") + "</p>" +
-          '<div class="act-row"><button type="button" class="act-btn" data-game-lo="' + lo.index + '" data-to="' + o.id + '">Equip<span class="sr-only"> ' + esc(lo.name) + " on your " + esc(o.name) + "</span></button></div>"
+          (gameEditing && gameEditing.key === o.id + ":" + lo.index ? gameEditorHtml(o, lo) : "") +
+          '<div class="act-row"><button type="button" class="act-btn" data-game-lo="' + lo.index + '" data-to="' + o.id + '">Equip<span class="sr-only"> ' + esc(lo.name) + " on your " + esc(o.name) + "</span></button>" +
+            (gameEditing && gameEditing.key === o.id + ":" + lo.index ? "" : '<button type="button" class="act-btn" data-game-edit="' + o.id + ":" + lo.index + '">Edit name &amp; look<span class="sr-only"> of ' + esc(lo.name) + "</span></button>") + "</div>"
       }; }));
     }).join("");
     return groups || '<p class="muted">No in-game loadouts saved yet. Make them in Destiny\'s Character screen and they\'ll show here.</p>';
@@ -1069,7 +1100,7 @@
     const box = $("view-loadouts"), list = readLoadouts();
     // A redraw replaces the buttons: keep keyboard focus on the same control.
     const was = box.contains(document.activeElement) ? document.activeElement : null;
-    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
+    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename", "data-game-edit"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
       || (was && was.id ? "#" + was.id : null);
     const typed = { name: ($("lo-name") || {}).value || "", dim: ($("lo-dim") || {}).value || "", rename: $("lo-rename-input") ? $("lo-rename-input").value : null };
     const byId = new Map(ITEMS.map(i => [i.id, i]));
@@ -1161,6 +1192,32 @@
         () => "Equipped " + lo.name + " on your " + o.name + "." + (missing ? " " + missing + " item" + (missing === 1 ? " was" : "s were") + " missing and skipped." : "") + (extra ? " " + extra : ""),
         async () => { await equipSet(items, o.id); extra = await applyExtras(lo, o.id); });
     }));
+    // In-game loadout name, icon and colour.
+    box.querySelectorAll("[data-game-edit]").forEach(b => b.addEventListener("click", () => {
+      const [charId, ix] = b.dataset.gameEdit.split(":"), lo = gameLoadouts(charId).find(x => x.index === +ix);
+      if (!lo) return;
+      gameEditing = { key: b.dataset.gameEdit, charId, index: +ix, nameHash: lo.nameHash, iconHash: lo.iconHash, colorHash: lo.colorHash };
+      renderLoadouts(); const n = $("ge-name"); if (n) n.focus();
+    }));
+    const geForm = box.querySelector("[data-ge-form]");
+    if (geForm){
+      const ed = gameEditing, close = () => { gameEditing = null; renderLoadouts(); const b = box.querySelector('[data-game-edit="' + ed.key + '"]'); if (b) b.focus(); };
+      $("ge-name").addEventListener("change", e => { ed.nameHash = +e.target.value; renderLoadouts(); $("ge-name").focus(); });
+      geForm.querySelectorAll("[data-ge-icons], [data-ge-colors]").forEach(b => b.addEventListener("click", () => {
+        const kind = b.dataset.geIcons ? "icons" : "colors";
+        ed[kind === "icons" ? "iconHash" : "colorHash"] = +(b.dataset.geIcons || b.dataset.geColors);
+        renderLoadouts();
+        const again = box.querySelector("[data-ge-" + kind + '="' + (b.dataset.geIcons || b.dataset.geColors) + '"]'); if (again) again.focus();
+      }));
+      geForm.querySelector("[data-ge-cancel]").addEventListener("click", close);
+      geForm.addEventListener("keydown", e => { if (e.key === "Escape"){ e.preventDefault(); close(); } });
+      geForm.addEventListener("submit", e => {
+        e.preventDefault();
+        if (busyNotice()) return;
+        const o = ownerOf(ed.charId), ids = { nameHash: ed.nameHash, iconHash: ed.iconHash, colorHash: ed.colorHash }, name = DB.loadouts.names[ed.nameHash] || "the loadout";
+        run("Saving " + name + " in Destiny", "Saved " + name + " on your " + o.name + " in Destiny.", async () => { await updateGameIdentifiers(ed.charId, ed.index, ids); gameEditing = null; });
+      });
+    }
     box.querySelectorAll("[data-game-lo]").forEach(b => b.addEventListener("click", () => {
       if (busyNotice()) return;
       const o = ownerOf(b.dataset.to), lo = gameLoadouts(o.id).find(x => x.index === +b.dataset.gameLo);

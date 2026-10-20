@@ -216,6 +216,25 @@ await section("In-game loadouts", async () => {
   const eq = p.calls.find(c => c.ep === "Loadouts/EquipLoadout");
   check("in-game: missing items move over, then EquipLoadout", p.calls.some(c => c.ep === "TransferItem") && eq && eq.body.loadoutIndex === 1 && eq.body.characterId === TITAN, JSON.stringify(p.calls.map(c => c.ep)));
   check("in-game: Beta shows as on", /Equipped 8 of 8/.test(await p.evaluate(() => document.querySelector("#view-loadouts .lo-detail:not([hidden]) .lo-status").textContent)));
+  // Name, icon and colour (Destiny's own choices).
+  await p.click('[data-game-edit="' + TITAN + ':1"]');
+  check("in-game edit: the editor opens on the name list", await p.evaluate(() => document.activeElement && document.activeElement.id === "ge-name"));
+  const opts = await p.$$eval("#ge-name option", o => o.map(x => ({ v: x.value, t: x.textContent })));
+  const icons = await p.$$eval("[data-ge-icons]", b => b.map(x => x.dataset.geIcons)), colors = await p.$$eval("[data-ge-colors]", b => b.map(x => x.dataset.geColors));
+  check("in-game edit: Destiny's lists are offered", opts.length >= 20 && icons.length >= 20 && colors.length >= 20, opts.length + "/" + icons.length + "/" + colors.length);
+  const pick = { name: opts[3], icon: icons[4], color: colors[5] };
+  await p.selectOption("#ge-name", pick.name.v); await p.click('[data-ge-icons="' + pick.icon + '"]'); await p.click('[data-ge-colors="' + pick.color + '"]');
+  check("in-game edit: the preview follows the picks", (await p.textContent(".ge-preview")).includes(pick.name.t) && await p.getAttribute('[data-ge-colors="' + pick.color + '"]', "aria-pressed") === "true");
+  p.calls.length = 0;
+  await p.click(".ge-editor [type=submit]"); await idle(p);
+  const upd = p.calls.find(c => c.ep === "Loadouts/UpdateLoadoutIdentifiers");
+  check("in-game edit: Save sends UpdateLoadoutIdentifiers with the picks", upd && upd.body.loadoutIndex === 1 && upd.body.characterId === TITAN && String(upd.body.nameHash) === pick.name.v && String(upd.body.iconHash) === pick.icon && String(upd.body.colorHash) === pick.color, JSON.stringify(upd && upd.body));
+  check("in-game edit: the tile shows the new name", (await p.textContent('[data-lo-pick="g-' + TITAN + '-1"]')).includes(pick.name.t) && !(await p.locator(".ge-editor").count()));
+  await p.waitForTimeout(2500); await idle(p);
+  check("in-game edit: kept after a re-sync with Bungie's older copy", (await p.textContent('[data-lo-pick="g-' + TITAN + '-1"]')).includes(pick.name.t));
+  if (!(await p.isVisible('[data-game-edit="' + TITAN + ':1"]'))) await p.click('[data-lo-pick="g-' + TITAN + '-1"]');
+  await p.click('[data-game-edit="' + TITAN + ':1"]'); await p.selectOption("#ge-name", opts[0].v); p.calls.length = 0; await p.keyboard.press("Escape");
+  check("in-game edit: Escape cancels without saving", !(await p.locator(".ge-editor").count()) && !p.calls.length && await p.evaluate(k => document.activeElement.dataset.gameEdit === k, TITAN + ":1"));
   await p.context_.close();
 });
 

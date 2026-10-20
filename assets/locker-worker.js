@@ -3,7 +3,7 @@
 
    Downloads Bungie's DestinyInventoryItemLiteDefinition (~3MB over the
    wire, ~61MB of JSON) plus the small stat, damage-type, armor-set,
-   inventory-bucket and in-game loadout (name/icon/colour) tables, keeps only what the Locker shows (~6MB) and stores that in
+   inventory-bucket and in-game loadout (name/icon/colour/constants) tables, keeps only what the Locker shows (~6MB) and stores that in
    IndexedDB under the manifest version. Later visits make one small
    request to check the version and read the rest from IndexedDB.
    Runs in a Worker so parsing 61MB of JSON never blocks the page.
@@ -17,12 +17,13 @@
      y itemTypeDisplayName, x description (plugs), o 1 = ornament, sh 1 = shader,
      k armor mod kind }; currencies keep n, i.
    buckets: hash -> { n name, c capacity } (vault space in the banner).
-   loadouts: { names: hash -> name, icons: hash -> path, colors: hash -> path }.
+   loadouts: { names: hash -> name, icons: hash -> path, colors: hash -> path,
+     order: { names, icons, colors: [hash] } (the choices, in Destiny's order) }.
    ============================================================ */
 const BUNGIE = "https://www.bungie.net";
 const DB_NAME = "rallyflag-locker", STORE = "manifest", KEY = "lite";
 // Bump when the stored shape changes, so cached copies are rebuilt.
-const SCHEMA = 5;
+const SCHEMA = 6;
 
 function idb(){
   return new Promise((resolve, reject) => {
@@ -108,7 +109,7 @@ self.onmessage = async (msg) => {
 
     const paths = manifest.jsonWorldComponentContentPaths.en;
     self.postMessage({ type: "progress", step: "Downloading Bungie's item database (first visit or after a game update, about 3MB)…" });
-    const [lite, statDefs, damageDefs, setDefs, bucketDefs, loNames, loIcons, loColors] = await Promise.all([
+    const [lite, statDefs, damageDefs, setDefs, bucketDefs, loNames, loIcons, loColors, loConsts] = await Promise.all([
       getJson(BUNGIE + paths.DestinyInventoryItemLiteDefinition),
       getJson(BUNGIE + paths.DestinyStatDefinition),
       getJson(BUNGIE + paths.DestinyDamageTypeDefinition),
@@ -116,7 +117,8 @@ self.onmessage = async (msg) => {
       getJson(BUNGIE + paths.DestinyInventoryBucketDefinition),
       getJson(BUNGIE + paths.DestinyLoadoutNameDefinition),
       getJson(BUNGIE + paths.DestinyLoadoutIconDefinition),
-      getJson(BUNGIE + paths.DestinyLoadoutColorDefinition)
+      getJson(BUNGIE + paths.DestinyLoadoutColorDefinition),
+      getJson(BUNGIE + paths.DestinyLoadoutConstantsDefinition)
     ]);
     self.postMessage({ type: "progress", step: "Preparing the item database…" });
     const stats = {}, statIcons = {};
@@ -132,7 +134,10 @@ self.onmessage = async (msg) => {
     const sets = {};
     for (const h in setDefs){ const s = setDefs[h]; if (s.setItems && s.setItems.length) sets[h] = { n: (s.displayProperties && s.displayProperties.name) || "", items: s.setItems }; }
     const pickField = (defs, field) => { const out = {}; for (const h in defs) if (defs[h][field]) out[h] = defs[h][field]; return out; };
-    const loadouts = { names: pickField(loNames, "name"), icons: pickField(loIcons, "iconImagePath"), colors: pickField(loColors, "colorImagePath") };
+    // The constants list the choices Destiny offers, in its own order.
+    const c = Object.values(loConsts)[0] || {};
+    const loadouts = { names: pickField(loNames, "name"), icons: pickField(loIcons, "iconImagePath"), colors: pickField(loColors, "colorImagePath"),
+      order: { names: c.loadoutNameHashes || [], icons: c.loadoutIconHashes || [], colors: c.loadoutColorHashes || [] } };
     const db = { schema: SCHEMA, version, items: trimItems(lite), stats, statIcons, damage, sets, buckets, loadouts };
     await idbPut(db);
     self.postMessage({ type: "done", db, cached: false });
