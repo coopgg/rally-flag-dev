@@ -373,8 +373,15 @@
   .tile-badges{ position:absolute; top:2px; right:2px; display:flex; gap:2px; }
   .tile-badges .tile-badge{ position:static; }
   .tile-badge.fav{ background:#ff8fb1; }
-  .tile-badge.junk{ background:#c9ced8; display:flex; align-items:center; justify-content:center; }
-  .tile-badge.junk .ico{ width:12px; height:12px; stroke-width:2.4; }
+  .tile-badge.tag-junk, .tile-badge.tag-keep, .tile-badge.tag-infuse, .tile-badge.tag-archive, .tile-badge.note{ display:flex; align-items:center; justify-content:center; }
+  .tile-badge.tag-junk{ background:#c9ced8; }
+  .tile-badge.tag-keep{ background:#8fd4ff; }
+  .tile-badge.tag-infuse{ background:#ffd76a; }
+  .tile-badge.tag-archive{ background:#b8a4e6; }
+  .tile-badge.note{ background:#f2f2f2; }
+  .tile-badges .ico{ width:12px; height:12px; stroke-width:2.4; }
+  .chip-select{ appearance:auto; padding-right:10px; color:var(--text); background:var(--panel); font:inherit; font-size:13px; }
+  .note-row input{ flex:1; min-width:0; padding:7px 10px; border-radius:8px; border:1px solid var(--panel-border); background:var(--bg); color:var(--text); font:inherit; font-size:14px; }
   .ico{ flex-shrink:0; vertical-align:-3px; }
   .chip .ico{ vertical-align:-2px; }
   .act-btn .ico{ width:16px; height:16px; }
@@ -566,8 +573,16 @@
         <button class="chip" type="button" data-kind="flag" data-value="godroll" aria-pressed="false">★ Our God Rolls</button>
         <button class="chip" type="button" data-kind="flag" data-value="set" aria-pressed="false">Set pieces</button>
         <button class="chip" type="button" data-kind="flag" data-value="equipped" aria-pressed="false">Equipped</button>
-        <button class="chip" type="button" data-kind="flag" data-value="favorite" aria-pressed="false">♥ Favorites</button>
-        <button class="chip" type="button" data-kind="flag" data-value="junk" aria-pressed="false"><svg class="ico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg> Junk</button>
+        <select class="chip chip-select" id="tag-filter" aria-label="Show items with this tag">
+          <option value="">All tags</option>
+          <option value="favorite">♥ Favorite</option>
+          <option value="keep">Keep</option>
+          <option value="junk">Junk</option>
+          <option value="infuse">Infuse</option>
+          <option value="archive">Archive</option>
+          <option value="any">Any tag</option>
+          <option value="note">Has a note</option>
+        </select>
         <div class="chip-meta">
           <span class="locker-count" id="locker-count" aria-live="polite"></span>
           <span class="chip-actions"><button type="button" class="fold-all" id="locker-refresh">Refresh</button><button type="button" class="fold-all" id="fold-all">Collapse all</button></span>

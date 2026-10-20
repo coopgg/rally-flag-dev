@@ -160,6 +160,24 @@ await section("Gear", async () => {
   await p.click(tile); await p.click('#item-dialog [data-tag="favorite"]'); await p.keyboard.press("Escape");
   check("gear: Favorite marks the tile", /tag-favorite/.test(await p.getAttribute(tile, "class")));
   check("gear: tagging redraws one tile, not the page", await p.locator("#buckets .item-tile").count() === before);
+  for (const t of ["keep", "infuse", "archive"]){
+    await p.click(tile); await p.click('#item-dialog [data-tag="' + t + '"]');
+    const pressed = await p.getAttribute('#item-dialog [data-tag="' + t + '"]', "aria-pressed"); await p.keyboard.press("Escape");
+    check("tags: " + t + " marks the tile", pressed === "true" && new RegExp("tag-" + t).test(await p.getAttribute(tile, "class")) && await p.locator(tile + " .tile-badge.tag-" + t).count() === 1);
+  }
+  await p.selectOption("#tag-filter", "archive");
+  check("tags: the tag filter shows only that tag", await p.locator("#buckets .item-tile[data-id]").count() === 1);
+  await p.selectOption("#tag-filter", "");
+  await p.click(tile); await p.fill("#item-note", "Quillwick roll"); await p.click("#note-form [type=submit]");
+  check("notes: saving a note marks the tile", /Note saved/.test(await toastText(p)) && await p.locator(tile + " .tile-badge.note").count() === 1 && /note: Quillwick roll/.test(await p.getAttribute(tile, "aria-label")));
+  await p.keyboard.press("Escape");
+  await p.fill("#locker-search", "quillwick"); await p.waitForTimeout(300);
+  check("notes: search finds notes", await p.locator("#buckets .item-tile[data-id]:not([hidden])").count() === 1);
+  await p.fill("#locker-search", ""); await p.waitForTimeout(300);
+  await p.selectOption("#tag-filter", "note");
+  check("tags: Has a note filter", await p.locator("#buckets .item-tile[data-id]").count() === 1);
+  await p.selectOption("#tag-filter", "");
+  await p.click(tile); await p.click('#item-dialog [data-tag="favorite"]'); await p.keyboard.press("Escape");
   // Actions keep the popup open (redrawn), so its buttons can be pressed in turn.
   await p.click(tile); await p.click('#item-dialog [data-act="move"][data-to="vault"]'); await idle(p);
   check("gear: Move to vault", /vault/i.test(await toastText(p)) && /Vault/.test(await p.textContent("#item-dialog .dlg-sub")), await toastText(p));
@@ -356,6 +374,9 @@ await section("Sync", async () => {
   const B = await open({ real: true, env, hash: "#loadouts" });
   check("sync: a fresh browser gets the loadout", /Synced/.test(await B.textContent("#view-loadouts")));
   check("sync: and the tag", await B.evaluate(id => /tag-favorite/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').className), item));
+  await A.click("#tab-gear"); await A.click('#buckets .item-tile[data-id="' + item + '"]'); await A.fill("#item-note", "synced note"); await A.click("#note-form [type=submit]"); await A.keyboard.press("Escape"); await A.waitForTimeout(2000);
+  await comeBack(B);
+  check("sync: notes reach the other device", await B.evaluate(id => /note: synced note/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').getAttribute("aria-label")), item));
   // Both change at once: B deletes the loadout, A saves another.
   await B.click('[data-lo-pick^="r-"]'); const del = B.locator("[data-lo-del]").first(); await del.click(); await del.click(); await B.waitForTimeout(2000);
   await A.click("#tab-loadouts"); await A.fill("#lo-name", "Second"); await A.click('[data-lo-save="' + TITAN + '"]'); await A.waitForTimeout(2200);

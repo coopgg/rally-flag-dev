@@ -49,6 +49,13 @@
   // Small line icons (stroke follows the text colour).
   const svg = d => '<svg class="ico" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + "</svg>";
   const ICON_TRASH = svg('<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/>');
+  const ICON_KEEP = svg('<path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/>');
+  const ICON_INFUSE = svg('<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>');
+  const ICON_ARCHIVE = svg('<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v11h14V9M10 13h4"/>');
+  const ICON_NOTE = svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>');
+  // DIM's tags. Junk sorts last and is what Junk cleanup sends; Favorite
+  // and Keep protect an item when farming or loadouts need room.
+  const TAG_LIST = [["favorite", "Favorite", "♥"], ["keep", "Keep", ICON_KEEP], ["junk", "Junk", ICON_TRASH], ["infuse", "Infuse", ICON_INFUSE], ["archive", "Archive", ICON_ARCHIVE]];
   const ICON_LOCK = svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>');
   const ICON_UNLOCK = svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>');
   const INVENTORY_CAP = 9; // Bungie: 9 unequipped items per weapon/armor slot on a character
@@ -124,7 +131,7 @@
   // focus: whose gear is shown, one character or the vault (like DIM on a
   // phone); remembered per browser, first time the last-played character.
   const FOCUS_KEY = "rallyflag_locker_focus";
-  const state = { type: null, flags: new Set(), q: "", focus: (() => { try { return localStorage.getItem(FOCUS_KEY); } catch (e){ return null; } })() };
+  const state = { type: null, flags: new Set(), tag: "", q: "", focus: (() => { try { return localStorage.getItem(FOCUS_KEY); } catch (e){ return null; } })() };
   // Folded slots and opened vault lists, remembered per browser.
   const FOLD_KEY = "rallyflag_locker_folds";
   const folds = (() => { try { const f = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}"); return { slots: new Set(f.slots || []), vaults: new Set(f.vaults || []), pmOpen: !!f.pmOpen }; } catch (e){ return { slots: new Set(), vaults: new Set(), pmOpen: false }; } })();
@@ -137,7 +144,18 @@
   // tags can be merged with the player's other devices (sync, below).
   const TAG_TIME_KEY = "rallyflag_locker_tag_times";
   const TAG_AT = (() => { try { return JSON.parse(localStorage.getItem(TAG_TIME_KEY) || "{}"); } catch (e){ return {}; } })();
-  function saveTags(){ try { localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); localStorage.setItem(TAG_TIME_KEY, JSON.stringify(TAG_AT)); } catch (e){} }
+  // A short note per item (like DIM's), stored and synced with its tag.
+  const NOTE_KEY = "rallyflag_locker_notes";
+  const NOTES = (() => { try { return JSON.parse(localStorage.getItem(NOTE_KEY) || "{}"); } catch (e){ return {}; } })();
+  function saveTags(){ try { localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); localStorage.setItem(TAG_TIME_KEY, JSON.stringify(TAG_AT)); localStorage.setItem(NOTE_KEY, JSON.stringify(NOTES)); } catch (e){} }
+  function setNote(id, text){
+    text = String(text || "").trim().slice(0, 120);
+    if ((NOTES[id] || "") === text) return false;
+    text ? (NOTES[id] = text) : delete NOTES[id];
+    TAG_AT[id] = Date.now();
+    saveTags(); tagsChanged();
+    return true;
+  }
   function toggleTag(id, tag){
     TAGS[id] === tag ? delete TAGS[id] : (TAGS[id] = tag);
     TAG_AT[id] = Date.now();
@@ -395,7 +413,7 @@
   // Which items to send to the vault first when a slot needs room (farming,
   // loadouts): junk, then unlocked, then non-favourites, then lowest Power.
   const spareFirst = (x, y) => ((TAGS[y.id] === "junk") - (TAGS[x.id] === "junk")) || ((x.state & STATE_LOCKED) - (y.state & STATE_LOCKED)) ||
-    ((TAGS[x.id] === "favorite") - (TAGS[y.id] === "favorite")) || (x.power - y.power);
+    (/^(favorite|keep)$/.test(TAGS[x.id] || "") - /^(favorite|keep)$/.test(TAGS[y.id] || "")) || (x.power - y.power);
 
   // ---------------- loadouts + max Power ----------------
   // A loadout is the 8 weapon/armor items a character had equipped, saved in
@@ -441,23 +459,24 @@
   // Tags as synced: itemId -> { t: "favorite" | "junk" | "" (removed), at }.
   function readTagState(){
     const out = {};
-    for (const id in TAG_AT) out[id] = { t: TAGS[id] || "", at: TAG_AT[id] };
-    for (const id in TAGS) if (!out[id]) out[id] = { t: TAGS[id], at: 1 }; // tagged before tags synced
+    for (const id in TAG_AT) out[id] = { t: TAGS[id] || "", n: NOTES[id] || "", at: TAG_AT[id] };
+    for (const id in TAGS) if (!out[id]) out[id] = { t: TAGS[id], n: NOTES[id] || "", at: 1 }; // tagged before tags synced
     return out;
   }
   function writeTagState(map){
     for (const id of Object.keys(TAGS)) if (!map[id] || !map[id].t) delete TAGS[id];
+    for (const id of Object.keys(NOTES)) if (!map[id] || !map[id].n) delete NOTES[id];
     for (const id of Object.keys(TAG_AT)) delete TAG_AT[id];
-    for (const id in map){ if (map[id].t) TAGS[id] = map[id].t; TAG_AT[id] = map[id].at; }
+    for (const id in map){ if (map[id].t) TAGS[id] = map[id].t; if (map[id].n) NOTES[id] = map[id].n; TAG_AT[id] = map[id].at; }
     saveTags();
   }
   function mergeTags(a, b){
     const out = Object.assign({}, a), cut = Date.now() - SYNC_KEEP_DELETED;
     for (const id in b) if (!out[id] || (b[id].at || 0) > (out[id].at || 0)) out[id] = b[id];
-    for (const id in out) if (!out[id].t && out[id].at < cut) delete out[id];
+    for (const id in out) if (!out[id].t && !out[id].n && out[id].at < cut) delete out[id];
     return out;
   }
-  const tagKey = tags => JSON.stringify(Object.keys(tags).sort().map(id => id + ":" + tags[id].t + ":" + tags[id].at));
+  const tagKey = tags => JSON.stringify(Object.keys(tags).sort().map(id => id + ":" + tags[id].t + ":" + (tags[id].n || "") + ":" + tags[id].at));
   function tagsChanged(){ const m = readSyncMeta(); m.dirty = true; writeSyncMeta(m); syncGen++; schedulePush(); }
   const localState = () => ({ loadouts: readLoadouts(), deleted: readSyncMeta().deleted, tags: readTagState() });
   const serverState = d => ({ loadouts: d.loadouts || [], deleted: d.deleted || {}, tags: d.tags || {} });
@@ -1535,8 +1554,7 @@
     if (state.flags.has("godroll") && !(item.roll && item.roll.full)) return false;
     if (state.flags.has("set") && !item.set) return false;
     if (state.flags.has("equipped") && !item.equipped) return false;
-    if (state.flags.has("favorite") && TAGS[item.id] !== "favorite") return false;
-    if (state.flags.has("junk") && TAGS[item.id] !== "junk") return false;
+    if (state.tag === "any" ? !TAGS[item.id] : state.tag === "note" ? !NOTES[item.id] : state.tag && TAGS[item.id] !== state.tag) return false;
     return true;
   }
 
@@ -1550,7 +1568,7 @@
     let shown = 0;
     root.querySelectorAll(".item-tile[data-id]").forEach(t => {
       const item = byId.get(t.dataset.id);
-      const hit = !words.length || !!(item && words.every(w => item.text.includes(w)));
+      const hit = !words.length || !!(item && words.every(w => item.text.includes(w) || (NOTES[item.id] || "").toLowerCase().includes(w)));
       if (t.hidden === hit) t.hidden = !hit; // touch only tiles that change
       if (hit) shown++;
     });
@@ -1572,15 +1590,16 @@
     const orn = item.ornament && DB.items[item.ornament];
     const label = [d.n, d.y, orn ? "ornament " + orn.n : "", item.power ? "power " + item.power : "", item.tier ? "tier " + item.tier : "", mw ? "masterworked" : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
       item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : "",
-      TAGS[item.id] ? "tagged " + TAGS[item.id] : ""].filter(Boolean).join(", ");
+      TAGS[item.id] ? "tagged " + TAGS[item.id] : "", NOTES[item.id] ? "note: " + NOTES[item.id] : ""].filter(Boolean).join(", ");
     const tag = TAGS[item.id];
     return '<button type="button" class="item-tile ' + tierClass(d) + (mw ? " mw" : "") + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
       '<img class="icon" src="' + esc(img(iconOf(item))) + '" alt="" loading="lazy" width="64" height="64">' +
       (d.w ? '<img class="wm" src="' + esc(img(d.w)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (mw ? '<img class="ov" src="' + esc(img(MW_OVERLAY[d.r === 6 ? 6 : 5])) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (item.tier >= 1 && item.tier <= 5 ? tierPips(item.tier) : "") +
-      (item.roll && item.roll.full || tag ? '<span class="tile-badges" aria-hidden="true">' + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
-        (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag === "junk" ? '<span class="tile-badge junk">' + ICON_TRASH + "</span>" : "") + "</span>" : "") +
+      (item.roll && item.roll.full || tag || NOTES[item.id] ? '<span class="tile-badges" aria-hidden="true">' + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
+        (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag ? '<span class="tile-badge tag-' + tag + '">' + (TAG_LIST.find(t => t[0] === tag) || [, , ""])[2] + "</span>" : "") +
+        (NOTES[item.id] ? '<span class="tile-badge note">' + ICON_NOTE + "</span>" : "") + "</span>" : "") +
       '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") + (item.power || "") + "</span>" +
     "</button>";
   }
@@ -2025,8 +2044,10 @@
         // Icon shows what a tap does: a closed lock locks it, an open lock unlocks it.
         '<button type="button" class="act-btn lock icon-only" data-act="lock" aria-label="' + (item.state & STATE_LOCKED ? "Unlock (it's locked)" : "Lock") + '" title="' + (item.state & STATE_LOCKED ? "Unlock" : "Lock") + '">' + (item.state & STATE_LOCKED ? ICON_UNLOCK : ICON_LOCK) + "</button></div>" +
       '<div class="act-row"><span class="act-label">Tag</span>' +
-        '<button type="button" class="act-btn tag" data-tag="favorite" aria-pressed="' + (TAGS[item.id] === "favorite") + '">♥ Favorite</button>' +
-        '<button type="button" class="act-btn tag" data-tag="junk" aria-pressed="' + (TAGS[item.id] === "junk") + '">' + ICON_TRASH + "Junk</button></div></div>";
+        TAG_LIST.map(([t, name, ico]) => '<button type="button" class="act-btn tag" data-tag="' + t + '" aria-pressed="' + (TAGS[item.id] === t) + '">' + (ico.charAt(0) === "<" ? ico : ico + " ") + name + "</button>").join("") + "</div>" +
+      '<form class="act-row note-row" id="note-form"><label class="act-label" for="item-note">Note</label>' +
+        '<input type="text" id="item-note" maxlength="120" value="' + esc(NOTES[item.id] || "") + '" placeholder="e.g. PvE roll, keep for Onslaught" autocomplete="off">' +
+        '<button type="submit" class="act-btn">Save note</button></form></div>';
     const orn = item.ornament && DB.items[item.ornament];
     const blocks = [
       notes ? '<div class="rf-notes">' + notes + "</div>" : "",
@@ -2059,16 +2080,26 @@
     // Tags are local (no Bungie call), so they apply instantly: redraw just
     // that tile (rebuilding a 1,000+ item vault froze the page ~0.7s). With
     // a Favorites/Junk filter on, the tile may need to come or go: rebuild.
+    // With a tag filter on, the tile may need to come or go: rebuild.
+    const redrawTile = () => {
+      const old = document.querySelectorAll('#buckets .item-tile[data-id="' + item.id + '"]');
+      if (state.tag || !old.length) renderItems();
+      else old.forEach(t => { const hidden = t.hidden; t.outerHTML = tileHtml(item); if (hidden) document.querySelector('#buckets .item-tile[data-id="' + item.id + '"]:not([hidden])').hidden = true; });
+    };
     dlg.querySelectorAll("[data-tag]").forEach(b => b.addEventListener("click", () => {
       toggleTag(item.id, b.dataset.tag);
-      const old = document.querySelectorAll('#buckets .item-tile[data-id="' + item.id + '"]');
-      if (state.flags.has("favorite") || state.flags.has("junk") || !old.length) renderItems();
-      else old.forEach(t => { const hidden = t.hidden; t.outerHTML = tileHtml(item); if (hidden) document.querySelector('#buckets .item-tile[data-id="' + item.id + '"]:not([hidden])').hidden = true; });
-      renderJunk();
+      redrawTile(); renderJunk();
       openItem(item.id);
       const again = dlg.querySelector('[data-tag="' + b.dataset.tag + '"]');
       if (again) again.focus();
     }));
+    $("note-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const text = $("item-note").value;
+      if (setNote(item.id, text)){ redrawTile(); toast(text.trim() ? "Note saved." : "Note removed.", "ok"); }
+      openItem(item.id);
+      const again = $("item-note"); if (again) again.focus();
+    });
     dlg.querySelectorAll("[data-act]").forEach(b => b.addEventListener("click", () => {
       if (b.getAttribute("aria-disabled") === "true" || busyNotice()) return;
       const to = b.dataset.to, where = ownerLabel(to), name = d.n;
@@ -2113,6 +2144,7 @@
       try { localStorage.setItem(FOCUS_KEY, state.focus); } catch (e){}
       render();
     });
+    $("tag-filter").addEventListener("change", e => { state.tag = e.target.value; renderItems(); });
     $("locker-chips").addEventListener("click", e => {
       const b = e.target.closest(".chip");
       if (!b) return;
