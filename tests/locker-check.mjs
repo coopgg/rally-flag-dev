@@ -35,8 +35,8 @@ async function section(name, fn){
 // The workers are ES modules with `export default`; load them from source.
 const loadWorker = async file => (await import("data:text/javascript," + encodeURIComponent(fs.readFileSync(path.join(ROOT, file), "utf8")))).default;
 function fakeD1(){
-  const rows = new Map();
-  return { rows, prepare(sql){ return { bind(...a){ return {
+  const rows = new Map(), shares = new Map();
+  return { rows, shares, prepare(sql){ return { bind(...a){ return /\bshares\b/.test(sql) ? shareSql(shares, sql, a) : {
     async first(){ const r = rows.get(a[0]); return r ? { data: r.data, version: r.version } : null; },
     async run(){
       if (/^INSERT/.test(sql)){ if (rows.has(a[0])) return { meta: { changes: 0 } }; rows.set(a[0], { data: a[1], version: 1 }); return { meta: { changes: 1 } }; }
@@ -44,6 +44,23 @@ function fakeD1(){
       if (/^DELETE/.test(sql)) return { meta: { changes: rows.delete(a[0]) ? 1 : 0 } };
       throw new Error("unexpected SQL: " + sql);
     } }; } }; } };
+}
+// The share-link table: id -> { owner, data, created_at }.
+function shareSql(shares, sql, a){
+  const mine = owner => [...shares.values()].filter(r => r.owner === owner);
+  return {
+    async first(){
+      if (/^SELECT data, created_at FROM shares WHERE id = \?$/.test(sql)){ const r = shares.get(a[0]); return r ? { data: r.data, created_at: r.created_at } : null; }
+      if (/^SELECT COUNT\(\*\) AS n FROM shares WHERE owner = \?$/.test(sql)) return { n: mine(a[0]).length };
+      if (/^SELECT id FROM shares WHERE owner = \? AND data = \?$/.test(sql)){ const r = mine(a[0]).find(x => x.data === a[1]); return r ? { id: r.id } : null; }
+      throw new Error("unexpected SQL: " + sql);
+    },
+    async run(){
+      if (/^INSERT INTO shares/.test(sql)){ if (shares.has(a[0])) return { meta: { changes: 0 } }; shares.set(a[0], { id: a[0], owner: a[1], data: a[2], created_at: a[3] }); return { meta: { changes: 1 } }; }
+      if (/^DELETE FROM shares WHERE owner = \?$/.test(sql)){ const gone = mine(a[0]); gone.forEach(r => shares.delete(r.id)); return { meta: { changes: gone.length } }; }
+      throw new Error("unexpected SQL: " + sql);
+    }
+  };
 }
 // The workers call fetch (Bungie for sign-in checks, dim.gg for shares) and
 // caches.default; answer those here instead of the network.
@@ -103,8 +120,8 @@ async function open(opts = {}){
   const page = await context.newPage();
   page.errors = []; page.on("pageerror", e => page.errors.push(e.message));
   page.calls = calls; page.context_ = context;
-  await page.goto(BASE + "locker.html" + (opts.real ? "" : "?demo") + (opts.hash || ""));
-  if (!opts.down) await page.waitForSelector("#locker-app:not([hidden])", { timeout: 90000 });
+  await page.goto(opts.url || BASE + "locker.html" + (opts.real ? "" : "?demo") + (opts.hash || ""));
+  if (!opts.down && !opts.signedOut) await page.waitForSelector("#locker-app:not([hidden])", { timeout: 90000 });
   await page.waitForTimeout(opts.real ? 2200 : 600);
   return page;
 }
@@ -122,6 +139,14 @@ const comeBack = p => p.evaluate(() => { const now = Date.now; Date.now = () => 
 const allItems = [].concat(DEMO.profileInventory.data.items, ...Object.values(DEMO.characterInventories.data).map(c => c.items), ...Object.values(DEMO.characterEquipment.data).map(c => c.items));
 const hashOf = id => (allItems.find(i => i.itemInstanceId === id) || {}).itemHash;
 const SUBCLASS_BUCKET = 3284755031;
+// axe on what's showing now (site-check.js covers the Locker's other states).
+const AXE = fs.readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
+async function axe(p){
+  await p.evaluate(AXE);
+  return p.evaluate(async () => (await axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"] })).violations.map(v => v.id + "×" + v.nodes.length));
+}
+const SHOTS = process.env.SHOTS; // a folder: save screenshots of the share states there
+const shot = (p, name) => SHOTS ? p.screenshot({ path: path.join(SHOTS, name + ".png"), fullPage: true }) : null;
 
 // ---------- 1. Workers ----------
 await section("Sync worker", async () => {
@@ -140,6 +165,28 @@ await section("Sync worker", async () => {
   r = await call("PUT", { body: { base: 1, loadouts: [], deleted: {}, tags: [] } }); check("sync: malformed tags are refused", r.status === 400);
   r = await call("PUT", { body: { base: 1, loadouts: [{ id: "z", pad: "x".repeat(300000) }], deleted: {} } }); check("sync: oversized saves are refused", r.status === 413);
   r = await call("DELETE"); const after = await call("GET"); check("sync: DELETE removes the account's row", r.status === 200 && after.body.version === 0 && !env.DB.rows.size);
+});
+await section("Share worker", async () => {
+  const env = { DB: fakeD1() };
+  const call = async (method, path, { token = "GOOD", origin = "https://coopgg.github.io", body } = {}) => {
+    const res = await SyncWorker.fetch(new Request(SYNC + path, { method, headers: Object.assign({ Origin: origin }, token ? { Authorization: "Bearer " + token } : {}), body: body ? JSON.stringify(body) : undefined }), env);
+    return { status: res.status, cors: res.headers.get("access-control-allow-origin"), body: await res.json() };
+  };
+  const lo = { name: "Shared", cls: 0, items: [{ id: "6917529000000000001", hash: 1234567 }, { id: "x", hash: 7654321 }], subclass: { hash: 99, sockets: { 0: 5, 1: "bad" } }, mods: [11, "x"], cosmetics: {}, dim: { id: "abc" }, note: "secret" };
+  let r = await call("POST", "shares/" + MEMBER, { token: null, body: { loadout: lo } }); check("share: making a link needs a sign-in", r.status === 401);
+  r = await call("POST", "shares/4611686018499999999", { body: { loadout: lo } }); check("share: not for someone else's account", r.status === 403);
+  r = await call("POST", "shares/" + MEMBER, { body: { loadout: { name: "x", items: [] } } }); check("share: a loadout with no gear is refused", r.status === 400);
+  r = await call("POST", "shares/" + MEMBER, { body: { loadout: lo } });
+  const id = r.body.id;
+  check("share: a link gets a short id", r.status === 200 && /^[a-z0-9]{8}$/.test(id) && !/[01lio]/.test(id), JSON.stringify(r.body));
+  r = await call("POST", "shares/" + MEMBER, { body: { loadout: lo } }); check("share: sharing the same loadout again keeps its link", r.body.id === id && env.DB.shares.size === 1);
+  const row = env.DB.shares.get(id);
+  check("share: stores the loadout only (no instance ids, notes or DIM id; owner hashed)", !/6917529000000000001|secret|abc|bad/.test(row.data) && row.owner !== MEMBER && /^[0-9a-f]{64}$/.test(row.owner) && JSON.parse(row.data).mods.join() === "11", row.data);
+  r = await call("GET", "share/" + id, { token: null }); check("share: opening a link needs no sign-in", r.status === 200 && r.body.loadout.name === "Shared" && r.body.loadout.items.length === 2 && r.cors === "https://coopgg.github.io");
+  r = await call("GET", "share/" + id, { token: null, origin: "https://example.com" }); check("share: other websites can't read links", r.status === 403 && !r.cors);
+  r = await call("GET", "shares/" + MEMBER); check("share: counts your links", r.body.count === 1);
+  r = await call("DELETE", "shares/" + MEMBER); const gone = await call("GET", "share/" + id, { token: null });
+  check("share: Delete my share links removes them all", r.body.deleted === 1 && gone.status === 404 && /deleted/.test(gone.body.error), JSON.stringify(gone));
 });
 await section("DIM relay worker", async () => {
   const call = async (q, origin = "https://rallyflag.gg") => { const res = await RelayWorker.fetch(new Request(RELAY + q, { headers: { Origin: origin } }), {}); return { status: res.status, cors: res.headers.get("access-control-allow-origin"), body: await res.json() }; };
@@ -421,6 +468,56 @@ await section("Sync", async () => {
   await comeBack(B);
   check("sync: Delete my saved loadouts and tags clears every device", !env.DB.rows.size && await names(B) === "" && await B.evaluate(id => !/tag-/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').className), item));
   check("sync: no script errors", !A.errors.length && !B.errors.length, A.errors.concat(B.errors).join("; "));
+  await A.context_.close(); await B.context_.close();
+});
+
+// ---------- 7b. Share links ----------
+await section("Share links", async () => {
+  const env = { DB: fakeD1() };
+  const A = await open({ real: true, env, hash: "#loadouts" });
+  await A.context_.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await A.fill("#lo-name", "Raid share"); await A.click('[data-lo-save="' + TITAN + '"]');
+  const loId = (await A.getAttribute('[data-lo-pick^="r-"]', "data-lo-pick")).slice(2);
+  await A.click('[data-lo-share="' + loId + '"]'); await A.waitForSelector("#lo-share-url");
+  const url = await A.inputValue("#lo-share-url");
+  check("share links: Share makes a rallyflag link and copies it", /locker\.html\?share=[a-z0-9]{8}$/.test(url) && url.startsWith(BASE) && await A.evaluate(() => navigator.clipboard.readText()) === url && /Link copied/.test(await toastText(A)), url);
+  await shot(A, "share-box");
+  await A.waitForTimeout(800);
+  check("share links: Delete my share links shows with the count", /made 1 share link\./.test(await A.textContent("#view-loadouts")) && await A.isVisible("#lo-shares-del"));
+  // Signed out: a preview with names, and a sign-in that comes back here.
+  const C = await open({ signedOut: true, env, url });
+  await C.waitForSelector(".share-items li", { timeout: 30000 }); await C.waitForTimeout(500);
+  const names = await C.$$eval(".share-items b", b => b.map(x => x.textContent));
+  check("share links: signed out, the link shows what's in it", /Raid share/.test(await C.textContent(".share-title")) && names.length >= 8 && names.every(n => n && n !== "Item") && /Sign in to import/.test(await C.textContent("#locker-status")), names.join(", "));
+  check("share links: the preview has no script errors", !C.errors.length, C.errors.join("; "));
+  let v = await axe(C); check("share links: the preview passes axe", !v.length, v.join(", "));
+  await shot(C, "share-preview-1280");
+  await C.setViewportSize({ width: 390, height: 844 }); await C.waitForTimeout(300);
+  v = await axe(C); check("share links: the preview passes axe on a phone", !v.length && await C.evaluate(() => document.documentElement.scrollWidth <= innerWidth), v.join(", "));
+  await shot(C, "share-preview-390");
+  await C.context_.close();
+  // Signed in: Choose your copies first, then it's saved as your own.
+  const B = await open({ real: true, env, url });
+  check("share links: signed in, the link opens Choose your copies", await B.isVisible("#lo-h-review") && /Someone shared this loadout/.test(await B.textContent(".lo-review")) && await B.locator(".pick-slot").count() === 8 && !/share=/.test(await B.evaluate(() => location.search)));
+  await B.click("#lo-review-save");
+  const got = await B.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:4611686018400000000")).find(x => x.id.startsWith("share-")));
+  check("share links: saving keeps your own copies", got && got.name === "Raid share" && got.items.length === 8 && got.items.every(x => x.id) && /From a share link/.test(await B.textContent("#view-loadouts")), JSON.stringify(got && got.items.slice(0, 2)));
+  // The note says what deleting means; Escape keeps them.
+  await A.click("#lo-shares-del");
+  const note = await A.textContent(".lo-confirm");
+  check("share links: deleting asks first and says what it means", await A.evaluate(() => document.activeElement.id === "lo-h-shares") && await A.locator(".lo-confirm li").count() === 4 &&
+    /stops working, for everyone/.test(note) && /already imported .* stay in their Locker/.test(note) && /saved loadouts, tags and in-game loadouts aren't touched/.test(note) && /can't be undone/.test(note), note);
+  v = await axe(A); check("share links: the share box and delete note pass axe", !v.length, v.join(", "));
+  await shot(A, "share-confirm");
+  await A.keyboard.press("Escape");
+  check("share links: Escape keeps them", env.DB.shares.size === 1 && !(await A.locator(".lo-confirm").count()) && await A.evaluate(() => document.activeElement.id === "lo-shares-del"));
+  await A.click("#lo-shares-del"); await A.click("#lo-shares-go"); await A.waitForTimeout(600);
+  check("share links: Delete removes them; your loadouts stay", env.DB.shares.size === 0 && /Deleted 1 share link/.test(await toastText(A)) && await A.locator('[data-lo-pick="r-' + loId + '"]').count() === 1 && !(await A.locator("#lo-shares-del").count()));
+  const D = await open({ signedOut: true, env, url });
+  await D.waitForFunction(() => /deleted/.test(document.getElementById("locker-status").textContent), null, { timeout: 15000 });
+  check("share links: a deleted link says so", true);
+  await D.context_.close();
+  check("share links: no script errors", !A.errors.length && !B.errors.length, A.errors.concat(B.errors).join("; "));
   await A.context_.close(); await B.context_.close();
 });
 

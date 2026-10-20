@@ -17,6 +17,14 @@ the worker can ask Bungie which account it belongs to; it is used for that
 one check (remembered for 10 minutes under a SHA-256 hash of the token) and
 never stored or logged.
 
+Share links (`locker.html?share=<id>`) live in a second table, `shares`:
+one row per link, holding a copy of that one loadout (name, class, item
+hashes, subclass/artifact/mod/shader/ornament plug hashes; no item instance
+ids), when it was made, and a SHA-256 of the sharer's Destiny account id
+(only so "Delete my share links" can find them; never returned). Opening a
+link needs no sign-in; making or deleting them does. Up to 200 links per
+account, 16KB each.
+
 ## Setup (Cloudflare dashboard, about 5 minutes)
 
 1. **Create the database.** Storage & Databases → D1 SQL Database →
@@ -30,7 +38,17 @@ never stored or logged.
      version INTEGER NOT NULL,
      updated_at INTEGER NOT NULL
    );
+   CREATE TABLE shares (
+     id TEXT PRIMARY KEY,
+     owner TEXT NOT NULL,
+     data TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   );
+   CREATE INDEX shares_owner ON shares (owner);
    ```
+
+   (Added later: if `loadouts` already exists, run just the `shares` table
+   and index.)
 3. **Create the worker.** Workers & Pages → Create → Create Worker
    ("Hello World") → name it `rallyflag-sync` → Deploy.
 4. **Paste the code.** Edit code → replace everything with `worker.js` →
@@ -59,5 +77,11 @@ capped at 256KB (a few hundred loadouts).
     PUT /loadouts/<id>  { base, loadouts, deleted, tags } → { version } or 409 + the newer copy
     DELETE /loadouts/<id>  → { version: 0 } (row removed; the Locker's "Delete all my saved loadouts")
 
-Requests need `Authorization: Bearer <Bungie access token>` and an Origin
-of coopgg.github.io, rallyflag.gg or www.rallyflag.gg.
+    POST /shares/<id>  { loadout } → { id }   (the same loadout again → the same id)
+    GET /shares/<id>  → { count }
+    DELETE /shares/<id>  → { deleted }   ("Delete my share links": every link stops working)
+    GET /share/<shareId>  → { loadout, created } or 404   (no sign-in)
+
+Requests need an Origin of coopgg.github.io, rallyflag.gg or
+www.rallyflag.gg, and all but `GET /share/…` need
+`Authorization: Bearer <Bungie access token>`.

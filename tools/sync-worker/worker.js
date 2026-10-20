@@ -16,6 +16,18 @@
         → 200 { version: 0 }   the account's row is removed entirely
           (devices that synced before see version 0 and clear theirs)
 
+   Share links (locker.html?share=<id>):
+   POST   /shares/<destinyMembershipId>  body { loadout }
+        → 200 { id }   a short id for a copy of that one loadout (sharing
+          the same loadout again gives the same id)
+   GET    /shares/<destinyMembershipId>  → 200 { count }  how many links you have
+   DELETE /shares/<destinyMembershipId>  → 200 { deleted } every link you made stops working
+   GET    /share/<id>   (no sign-in) → 200 { loadout, created } or 404
+   A share holds the loadout only: name, class, item hashes and plug
+   choices (no item instance ids). Its owner column is a SHA-256 of the
+   account id, only so "Delete my share links" can find them; it is never
+   sent back.
+
    Every request carries the player's Bungie sign-in:
      Authorization: Bearer <Bungie access token>
    The worker asks Bungie which account that token belongs to (one
@@ -36,12 +48,16 @@ const SITES = {
 // Bungie checks the Origin against the app's registered site.
 const BUNGIE_ORIGIN = { "https://www.rallyflag.gg": "https://rallyflag.gg" };
 const MAX_BYTES = 256 * 1024;  // a few hundred loadouts; stops abuse
+const SHARE_MAX_BYTES = 16 * 1024;
+const SHARE_MAX_PER_ACCOUNT = 200;
+// No 0/o/1/l/i: ids get read aloud and typed.
+const SHARE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
 const AUTH_CACHE_SECONDS = 600;
 
 function cors(origin){
   return SITES[origin] ? {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin"
@@ -70,11 +86,81 @@ async function membershipsFor(token, origin){
   return ids;
 }
 
+async function sha256(text){
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+const shareOwner = id => sha256("rallyflag-share:" + id);
+function newShareId(){
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return [...bytes].map(b => SHARE_ALPHABET[b % SHARE_ALPHABET.length]).join("");
+}
+// Keep only what a loadout is made of, as numbers, so a share can't carry
+// anything else (instance ids, notes, the DIM link it came from).
+const isHash = h => Number.isInteger(h) && h > 0 && h < 2 ** 32;
+function plugMap(o){
+  const out = {};
+  if (o && typeof o === "object" && !Array.isArray(o)) for (const k in o) if (/^\d{1,2}$/.test(k) && isHash(o[k])) out[k] = o[k];
+  return out;
+}
+function cleanLoadout(lo){
+  if (!lo || typeof lo !== "object" || !Array.isArray(lo.items)) return null;
+  const items = lo.items.filter(x => x && isHash(x.hash)).slice(0, 20).map(x => ({ hash: x.hash }));
+  if (!items.length) return null;
+  const part = p => p && isHash(p.hash) ? { hash: p.hash, sockets: plugMap(p.sockets) } : null;
+  const cosmetics = {};
+  if (lo.cosmetics && typeof lo.cosmetics === "object") for (const b in lo.cosmetics)
+    if (/^\d{1,10}$/.test(b) && Array.isArray(lo.cosmetics[b])) cosmetics[b] = lo.cosmetics[b].filter(isHash).slice(0, 10);
+  return {
+    name: String(lo.name || "Shared loadout").slice(0, 60),
+    cls: [0, 1, 2, 3].includes(lo.cls) ? lo.cls : 3,
+    items, subclass: part(lo.subclass), artifact: part(lo.artifact),
+    mods: Array.isArray(lo.mods) ? lo.mods.filter(isHash).slice(0, 60) : [],
+    cosmetics
+  };
+}
+
 async function readRow(db, id){
   const row = await db.prepare("SELECT data, version FROM loadouts WHERE membership_id = ?").bind(id).first();
   if (!row) return { version: 0, loadouts: [], deleted: {}, tags: {} };
   const data = JSON.parse(row.data);
   return { version: row.version, loadouts: data.loadouts || [], deleted: data.deleted || {}, tags: data.tags || {} };
+}
+
+// One account's share links: make one, count them, or delete them all.
+async function shares(request, env, id, origin){
+  try {
+    const owner = await shareOwner(id);
+    if (request.method === "GET"){
+      const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM shares WHERE owner = ?").bind(owner).first();
+      return reply({ count: row ? row.n : 0 }, 200, origin);
+    }
+    if (request.method === "DELETE"){
+      const result = await env.DB.prepare("DELETE FROM shares WHERE owner = ?").bind(owner).run();
+      return reply({ deleted: (result.meta && result.meta.changes) || 0 }, 200, origin);
+    }
+    if (request.method !== "POST") return reply({ error: "Use GET, POST or DELETE." }, 405, origin);
+    const text = await request.text();
+    if (text.length > SHARE_MAX_BYTES) return reply({ error: "That loadout is too big to share." }, 413, origin);
+    let body;
+    try { body = JSON.parse(text); } catch (e){ return reply({ error: "Bad request." }, 400, origin); }
+    const lo = cleanLoadout(body && body.loadout);
+    if (!lo) return reply({ error: "That loadout has no weapons or armor to share." }, 400, origin);
+    const data = JSON.stringify(lo);
+    // The same loadout shared again keeps its link.
+    const same = await env.DB.prepare("SELECT id FROM shares WHERE owner = ? AND data = ?").bind(owner, data).first();
+    if (same) return reply({ id: same.id }, 200, origin);
+    const count = await env.DB.prepare("SELECT COUNT(*) AS n FROM shares WHERE owner = ?").bind(owner).first();
+    if (count && count.n >= SHARE_MAX_PER_ACCOUNT) return reply({ error: "You have " + SHARE_MAX_PER_ACCOUNT + " share links, the most there can be. Delete your share links to make new ones." }, 429, origin);
+    for (let tries = 0; tries < 4; tries++){
+      const shareId = newShareId();
+      const result = await env.DB.prepare("INSERT INTO shares (id, owner, data, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO NOTHING").bind(shareId, owner, data, Date.now()).run();
+      if (result.meta && result.meta.changes) return reply({ id: shareId }, 200, origin);
+    }
+    return reply({ error: "Couldn't make a link. Try again." }, 500, origin);
+  } catch (e){
+    return reply({ error: "Sharing failed on our side. Try again in a moment." }, 500, origin);
+  }
 }
 
 export default {
@@ -83,9 +169,20 @@ export default {
     if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(origin) });
     if (!SITES[origin]) return reply({ error: "This service is only for Rally Flag." }, 403, origin);
 
-    const m = new URL(request.url).pathname.match(/^\/loadouts\/(\d{1,20})\/?$/);
+    const pathname = new URL(request.url).pathname;
+    // Opening a share link needs no sign-in.
+    const open = pathname.match(/^\/share\/([a-z0-9]{4,16})\/?$/);
+    if (open){
+      if (request.method !== "GET") return reply({ error: "Use GET." }, 405, origin);
+      try {
+        const row = await env.DB.prepare("SELECT data, created_at FROM shares WHERE id = ?").bind(open[1]).first();
+        if (!row) return reply({ error: "This share link was deleted, or it was never made." }, 404, origin);
+        return reply({ loadout: JSON.parse(row.data), created: row.created_at }, 200, origin);
+      } catch (e){ return reply({ error: "Couldn't read that share link. Try again in a moment." }, 500, origin); }
+    }
+    const m = pathname.match(/^\/(loadouts|shares)\/(\d{1,20})\/?$/);
     if (!m) return reply({ error: "Not found." }, 404, origin);
-    const id = m[1];
+    const id = m[2];
 
     const token = (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     if (!token) return reply({ error: "Sign in with Bungie.net first." }, 401, origin);
@@ -94,6 +191,7 @@ export default {
     if (!ids) return reply({ error: "Bungie didn't accept your sign-in. Sign in again." }, 401, origin);
     if (!ids.includes(id)) return reply({ error: "That isn't your account." }, 403, origin);
 
+    if (m[1] === "shares") return shares(request, env, id, origin);
     try {
       if (request.method === "GET") return reply(await readRow(env.DB, id), 200, origin);
       if (request.method === "DELETE"){

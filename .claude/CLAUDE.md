@@ -150,6 +150,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   Actions/Items/InsertSocketPlugFree (see HANDOFF item 41).
   Saved loadouts sync to a second Worker + D1 (`tools/sync-worker/`,
   HANDOFF item 45), keyed by Destiny account, checked against Bungie.
+  Share links (`?share=<id>`, HANDOFF item 55) use the same Worker's
+  `shares` table; opening one needs no sign-in.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

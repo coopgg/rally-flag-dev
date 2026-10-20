@@ -448,7 +448,7 @@
   // the tab comes back. Merge: per loadout the newest `at` wins, and a
   // deletion wins over anything older than it; per item, the newest tag
   // change wins (a removal is a change too).
-  const SYNC_URL = "https://rallyflag-sync.rallyflag.workers.dev/loadouts/";
+  const SYNC_HOST = "https://rallyflag-sync.rallyflag.workers.dev/";
   const SYNC_KEEP_DELETED = 60 * 24 * 3600 * 1000;
   const syncMetaKey = () => "rallyflag_locker_loadouts_sync:" + (PROFILE_PATH.split("/").pop() || "demo");
   function readSyncMeta(){ try { return Object.assign({ version: 0, deleted: {}, dirty: false }, JSON.parse(localStorage.getItem(syncMetaKey()) || "{}")); } catch (e){ return { version: 0, deleted: {}, dirty: false }; } }
@@ -508,12 +508,13 @@
     if (SYNC.state === "error") return SYNC.msg + " They're still saved in this browser, and syncing will try again.";
     return "";
   }
-  async function syncFetch(method, body){
+  // kind: "loadouts" (sync) or "shares" (this account's share links).
+  async function syncFetch(method, body, kind = "loadouts"){
     const token = RallyFlagAuth.peekAccessToken();
-    if (!token) throw new Error("Sign in again to sync your loadouts.");
+    if (!token) throw new Error(kind === "shares" ? "Sign in again to use share links." : "Sign in again to sync your loadouts.");
     let res;
     try {
-      res = await fetch(SYNC_URL + PROFILE_PATH.split("/").pop(), { method, headers: Object.assign({ "Authorization": "Bearer " + token }, body ? { "Content-Type": "application/json" } : {}), body: body ? JSON.stringify(body) : undefined });
+      res = await fetch(SYNC_HOST + kind + "/" + PROFILE_PATH.split("/").pop(), { method, headers: Object.assign({ "Authorization": "Bearer " + token }, body ? { "Content-Type": "application/json" } : {}), body: body ? JSON.stringify(body) : undefined });
     } catch (e){ throw new Error("Couldn't reach Rally Flag's sync service."); }
     const data = await res.json().catch(() => ({}));
     if (res.status === 409) return { conflict: true, data };
@@ -594,6 +595,87 @@
     if (document.visibilityState !== "visible" || !PROFILE_PATH) return;
     if (Date.now() - syncPulledAt > 60000) pullLoadouts(); else pushLoadouts();
   });
+
+  // ---------------- share links ----------------
+  // locker.html?share=<id> opens a copy of one saved loadout kept on the
+  // sync service. Making a link needs a sign-in; opening one doesn't. The
+  // copy is the loadout only (name, class, item hashes, subclass, artifact,
+  // mod and cosmetic choices): no item instance ids, name or account, so
+  // whoever opens it chooses their own copies. "Delete my share links"
+  // removes every link this account made.
+  const SHARE_ID = (new URLSearchParams(location.search).get("share") || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
+  const SHARES = { count: null, asked: false, made: null, confirm: false }; // made: { lo, url } for the open loadout
+  const shareLink = id => location.origin + location.pathname + "?share=" + id;
+  const shareable = lo => ({ name: lo.name, cls: lo.cls, items: lo.items.map(x => ({ hash: x.hash })), subclass: lo.subclass || null, artifact: lo.artifact || null, mods: lo.mods || [], cosmetics: lo.cosmetics || {} });
+  async function makeShare(lo){
+    const { data } = await syncFetch("POST", { loadout: shareable(lo) }, "shares");
+    SHARES.count = null; SHARES.asked = false; // count again (sharing the same loadout twice keeps one link)
+    return shareLink(data.id);
+  }
+  // How many links this account has, for "Delete my share links" (asked once per visit).
+  async function countShares(){
+    if (SHARES.asked || !syncOn()) return;
+    SHARES.asked = true;
+    try { SHARES.count = (await syncFetch("GET", null, "shares")).data.count || 0; } catch (e){ SHARES.count = null; return; }
+    if (loadoutsShown()) renderLoadouts();
+  }
+  async function deleteShares(){
+    const { data } = await syncFetch("DELETE", null, "shares");
+    SHARES.count = 0; SHARES.made = null; SHARES.confirm = false;
+    return data.deleted || 0;
+  }
+  async function fetchShare(id){
+    let res;
+    try { res = await fetch(SYNC_HOST + "share/" + encodeURIComponent(id)); }
+    catch (e){ throw new Error("Couldn't reach Rally Flag's sync service to open the share link. Check your connection and try again."); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.loadout) throw new Error(data.error || "Couldn't open that share link (HTTP " + res.status + ").");
+    return data.loadout;
+  }
+  const fromShare = (id, x) => Object.assign({}, x, { id: "share-" + id, items: x.items.map(i => ({ id: "", hash: i.hash })), share: { id } });
+  // Signed in: the shared loadout goes straight to Choose your copies.
+  async function openShare(){
+    if (!SHARE_ID) return;
+    history.replaceState(null, "", location.pathname + (DEMO ? "?demo" : "") + location.hash);
+    let lo;
+    try { lo = fromShare(SHARE_ID, await fetchShare(SHARE_ID)); }
+    catch (e){ showView("loadouts"); toast(e.message, "error"); return; }
+    startReview(lo, true);
+    showView("loadouts");
+    const h = $("lo-h-review"); if (h){ h.scrollIntoView({ block: "start" }); h.focus(); }
+    toast("Opened " + lo.name + " from a share link. Choose your copies, then save.", "ok");
+  }
+  // Signed out: what's in it, by name (from Bungie's item definitions, one
+  // small request per item), and a sign-in that comes back to this link.
+  async function showSharePreview(){
+    showStatus('<p>Loading the shared loadout…</p>');
+    let lo;
+    try { lo = await fetchShare(SHARE_ID); }
+    catch (e){
+      showStatus("<p>" + esc(e.message) + "</p>" + '<div class="locker-actions"><button class="locker-btn" type="button" id="locker-signin">Sign in to see your own gear</button></div>');
+      $("locker-signin").addEventListener("click", () => RallyFlagAuth.signIn(location.pathname));
+      return;
+    }
+    const hashes = lo.items.map(x => x.hash).concat(lo.subclass ? [lo.subclass.hash] : [], lo.artifact ? [lo.artifact.hash] : []);
+    const defs = {};
+    await Promise.all(hashes.map(async h => {
+      try {
+        const res = await fetch("https://www.bungie.net/Platform/Destiny2/Manifest/DestinyInventoryItemDefinition/" + h + "/", { headers: { "X-API-Key": window.RallyFlagAPI.BUNGIE_API_KEY } });
+        const d = (await res.json()).Response;
+        if (d) defs[h] = { n: d.displayProperties.name, i: d.displayProperties.icon, y: d.itemTypeDisplayName };
+      } catch (e){}
+    }));
+    const row = h => { const d = defs[h] || {}; return '<li>' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="40" height="40" loading="lazy">' : '<span class="share-noicon"></span>') + "<span><b>" + esc(d.n || "Item") + "</b><small>" + esc(d.y || "") + "</small></span></li>"; };
+    const extras = [lo.subclass && lo.subclass.hash, lo.artifact && lo.artifact.hash].filter(Boolean);
+    const mods = (lo.mods || []).length;
+    showStatus('<h2 class="share-title">' + esc(lo.name) + "</h2>" +
+      '<p class="share-sub">Shared loadout · ' + esc(lo.cls === 3 ? "Any class" : CLASS_NAMES[lo.cls] || "") + " · " + lo.items.length + " item" + (lo.items.length === 1 ? "" : "s") + (mods ? " · " + mods + " mod" + (mods === 1 ? "" : "s") : "") + "</p>" +
+      '<ul class="share-items">' + lo.items.map(x => row(x.hash)).concat(extras.map(row)).join("") + "</ul>" +
+      "<p>Sign in with Bungie.net to import it. You'll choose which of your own copies go in each slot, with their perks shown, before it's saved.</p>" +
+      '<div class="locker-actions"><button class="locker-btn" type="button" id="locker-signin">Sign in to import</button>' +
+      '<a class="locker-btn ghost" href="' + PUBLIC_SITE + 'privacy.html"' + NEW_TAB + ">Privacy" + NEW_TAB_NOTE + "</a></div>");
+    $("locker-signin").addEventListener("click", () => RallyFlagAuth.signIn());
+  }
   const gearPower = items => items.length === BUCKETS.length ? items.reduce((n, i) => n + i.power, 0) / items.length : null;
   const fmtPower = n => n == null ? "—" : (Math.round(n * 10) / 10).toFixed(1);
   const equippedOn = charId => BUCKETS.map(b => ITEMS.find(i => i.owner === charId && i.equipped && i.def.b === b.hash)).filter(Boolean);
@@ -1114,7 +1196,7 @@
   function reviewHtml(){
     const r = loReview, lo = r.lo;
     return '<section class="lo-review panel-card" aria-labelledby="lo-h-review"><h2 class="lo-review-title" id="lo-h-review" tabindex="-1">Choose your copies for ' + esc(lo.name) + "</h2>" +
-      '<p class="muted lo-help">' + (lo.dim ? "This loadout names items that aren't in your inventory. " : "Some of this loadout's items are gone. ") + "Pick which of yours goes in each slot. Perks are shown so you can compare rolls.</p>" +
+      '<p class="muted lo-help">' + (lo.share ? "Someone shared this loadout with you. " : lo.dim ? "This loadout names items that aren't in your inventory. " : "Some of this loadout's items are gone. ") + "Pick which of yours goes in each slot. Perks are shown so you can compare rolls.</p>" +
       r.slots.map(slot => {
         const d = DB.items[slot.want.hash] || {}, label = d.n || "Unknown item";
         return '<div class="pick-slot" role="group" aria-labelledby="pick-h-' + slot.k + '"><h3 class="pick-head" id="pick-h-' + slot.k + '">' + esc(d.y || "Item") + ": " + esc(label) + "</h3>" +
@@ -1146,12 +1228,29 @@
   // The Loadouts tab (like DIM's): loadouts saved in this browser, grouped
   // by class, then Destiny's in-game loadouts, then max Power.
   const loadoutsShown = () => !$("view-loadouts").hidden;
+  // "Delete my share links", and the note that says what that means before it happens.
+  function sharesHtml(){
+    if (!syncOn()) return "";
+    countShares();
+    const n = SHARES.count;
+    if (!n) return "";
+    const links = n + " share link" + (n === 1 ? "" : "s");
+    if (!SHARES.confirm) return '<div class="lo-erase"><button type="button" class="act-btn" id="lo-shares-del">Delete my share links</button><span class="muted">You\'ve made ' + links + ".</span></div>";
+    return '<div class="lo-confirm panel-card" role="group" aria-labelledby="lo-h-shares"><h3 id="lo-h-shares" tabindex="-1">Delete your ' + links + "?</h3>" +
+      "<ul>" +
+        "<li>Every link you've shared stops working, for everyone you sent it to. Opening one will say it was deleted.</li>" +
+        "<li>Loadouts people already imported from your links stay in their Locker. Deleting can't take those back.</li>" +
+        "<li>Your own saved loadouts, tags and in-game loadouts aren't touched.</li>" +
+        "<li>This can't be undone. To share a loadout again, press Share on it for a new link.</li>" +
+      "</ul>" +
+      '<div class="act-row"><button type="button" class="act-btn" id="lo-shares-go">Delete ' + links + '</button><button type="button" class="act-btn" id="lo-shares-keep">Keep them</button></div></div>';
+  }
   function renderLoadoutCount(){ const n = readLoadouts().length; $("lo-count").textContent = n ? String(n) : ""; }
   function renderLoadouts(){
     const box = $("view-loadouts"), list = readLoadouts();
     // A redraw replaces the buttons: keep keyboard focus on the same control.
     const was = box.contains(document.activeElement) ? document.activeElement : null;
-    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename", "data-game-edit", "data-game-snap"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
+    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename", "data-game-edit", "data-game-snap", "data-lo-share", "data-lo-copy"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
       || (was && was.id ? "#" + was.id : null);
     const typed = { name: ($("lo-name") || {}).value || "", dim: ($("lo-dim") || {}).value || "", rename: $("lo-rename-input") ? $("lo-rename-input").value : null };
     const byId = new Map(ITEMS.map(i => [i.id, i]));
@@ -1175,7 +1274,12 @@
         : [lo.subclass ? ((DB.items[lo.subclass.hash] || {}).n || "Subclass") + " with " + Object.keys(lo.subclass.sockets).length + " choices" : "",
            lo.artifact ? ((DB.items[lo.artifact.hash] || {}).n || "Artifact") + " with " + Object.keys(lo.artifact.sockets).length + " perks" : "",
            lo.mods && lo.mods.length ? lo.mods.length + " mods" : ""].filter(Boolean).join(", ");
-      const from = lo.dim ? 'From DIM' + (lo.dim.id ? ' (<a href="https://dim.gg/' + esc(lo.dim.id) + '/" target="_blank" rel="noopener">dim.gg/' + esc(lo.dim.id) + '<span class="sr-only"> (opens in a new tab)</span></a>)' : "") + ". " : "";
+      const from = lo.dim ? 'From DIM' + (lo.dim.id ? ' (<a href="https://dim.gg/' + esc(lo.dim.id) + '/" target="_blank" rel="noopener">dim.gg/' + esc(lo.dim.id) + '<span class="sr-only"> (opens in a new tab)</span></a>)' : "") + ". " : lo.share ? "From a share link. " : "";
+      // Share: the link appears here, copied, with what it shows.
+      const made = SHARES.made && SHARES.made.lo === lo.id ? SHARES.made.url : "";
+      const share = made ? '<div class="lo-share"><label class="lo-name"><span>Share link</span><input type="text" id="lo-share-url" readonly value="' + esc(made) + '" autocomplete="off" spellcheck="false"></label>' +
+          '<div class="act-row"><button type="button" class="act-btn" data-lo-copy="' + lo.id + '">Copy link</button></div>' +
+          '<p class="muted lo-help">Anyone with this link can see this loadout and import it into their own Locker. It doesn\'t show your name or account. Changes you make later aren\'t in it; press Share again for a new link.</p></div>' : "";
       // DIM imports from before artifacts were kept: say how to get it.
       const noArtifact = lo.dim && !gearOnly && !("artifact" in lo) ? (carries ? ". " : "") + "Import it again to bring its artifact too." : "";
       const note = from || carries || noArtifact ? '<p class="lo-status muted">' + from + esc(carries) + esc(noArtifact) + "</p>" : "";
@@ -1197,7 +1301,8 @@
         '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
           (gone || copies ? '<button type="button" class="act-btn" data-lo-review="' + lo.id + '">Choose copies<span class="sr-only"> for ' + esc(lo.name) + "</span></button>" : "") +
           (loRenaming === lo.id ? "" : '<button type="button" class="act-btn" data-lo-rename="' + lo.id + '">Rename<span class="sr-only"> ' + esc(lo.name) + "</span></button>") +
-          '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" };
+          '<button type="button" class="act-btn" data-lo-share="' + lo.id + '">Share<span class="sr-only"> ' + esc(lo.name) + "</span></button>" +
+          '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" + share };
     };
     // Grouped by class like DIM: your characters' classes first, then any class.
     const classes = [...new Set(OWNERS.map(o => o.cls).concat([0, 1, 2, 3]))];
@@ -1216,7 +1321,8 @@
             '<div class="act-row"><button type="button" class="act-btn" id="lo-dim-go">Import</button></div></div>' +
         "</div>" + saved +
         (list.length || Object.keys(TAGS).length ? '<div class="lo-erase"><button type="button" class="act-btn" id="lo-erase">Delete my saved loadouts and tags</button>' +
-          '<span class="muted">' + (syncOn() ? "From this browser and Rally Flag's sync service. Your other devices clear theirs the next time they sync." : "From this browser.") + "</span></div>" : "") +
+          '<span class="muted">' + (syncOn() ? "From this browser and Rally Flag's sync service. Your other devices clear theirs the next time they sync. Share links stay until you delete them." : "From this browser.") + "</span></div>" : "") +
+        sharesHtml() +
         "</section>" +
       '<section class="lo-section" aria-labelledby="lo-h-game"><h2 class="dlg-label" id="lo-h-game">In-game loadouts</h2><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first. Empty slots can save what a character wears now.</p>' + gameSection() + "</section>" +
       '<section class="lo-section" aria-labelledby="lo-h-max"><h2 class="dlg-label" id="lo-h-max">Max Power</h2><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</section>";
@@ -1340,6 +1446,52 @@
       renderLoadouts();
       const h = $("lo-h-review"); h.scrollIntoView({ block: "start" }); h.focus();
     }));
+    box.querySelectorAll("[data-lo-share]").forEach(b => b.addEventListener("click", async () => {
+      const lo = readLoadouts().find(x => x.id === b.dataset.loShare);
+      if (!lo || b.getAttribute("aria-disabled") === "true") return;
+      if (!syncOn()) return toast(DEMO ? "Sample loadouts can't be shared. Sign in to share your own." : "Sign in to share loadouts.", "error");
+      b.setAttribute("aria-disabled", "true"); b.firstChild.textContent = "Sharing…";
+      try {
+        const url = await makeShare(lo);
+        SHARES.made = { lo: lo.id, url };
+        let copied = false;
+        try { await navigator.clipboard.writeText(url); copied = true; } catch (e){}
+        renderLoadouts();
+        const input = $("lo-share-url");
+        if (!copied && input){ input.focus(); input.select(); }
+        toast(copied ? "Link copied. Anyone with it can see " + lo.name + " and import it." : "Here's the link to " + lo.name + ". Copy it from the box.", "ok");
+      } catch (e){
+        toast((e && e.message) || "Couldn't make a share link.", "error");
+        b.removeAttribute("aria-disabled"); b.firstChild.textContent = "Share";
+      }
+    }));
+    box.querySelectorAll("[data-lo-copy]").forEach(b => b.addEventListener("click", async () => {
+      const input = $("lo-share-url");
+      try { await navigator.clipboard.writeText(input.value); toast("Link copied.", "ok"); }
+      catch (e){ input.focus(); input.select(); toast("Copy it from the box (it's selected).", "error"); }
+    }));
+    const sharesDel = $("lo-shares-del");
+    if (sharesDel) sharesDel.addEventListener("click", () => { SHARES.confirm = true; renderLoadouts(); $("lo-h-shares").focus(); });
+    const sharesBox = box.querySelector(".lo-confirm");
+    if (sharesBox){
+      const keep = () => { SHARES.confirm = false; renderLoadouts(); const b = $("lo-shares-del"); if (b) b.focus(); };
+      $("lo-shares-keep").addEventListener("click", keep);
+      sharesBox.addEventListener("keydown", e => { if (e.key === "Escape"){ e.preventDefault(); keep(); } });
+      const go = $("lo-shares-go");
+      go.addEventListener("click", async () => {
+        if (go.getAttribute("aria-disabled") === "true") return;
+        go.setAttribute("aria-disabled", "true"); go.textContent = "Deleting…";
+        try {
+          const n = await deleteShares();
+          renderLoadouts();
+          toast("Deleted " + n + " share link" + (n === 1 ? "" : "s") + ". They no longer open for anyone.", "ok");
+          $("lo-name").focus();
+        } catch (e){
+          toast((e && e.message) || "Couldn't delete them. Your links still work.", "error");
+          go.removeAttribute("aria-disabled"); go.textContent = "Try again";
+        }
+      });
+    }
     const erase = $("lo-erase");
     if (erase) erase.addEventListener("click", async () => {
       // Two taps: the first asks, the second deletes.
@@ -2383,7 +2535,7 @@
   }
 
   async function init(){
-    if (!DEMO && !RallyFlagAuth.isSignedIn()){ showSignedOut(); return; }
+    if (!DEMO && !RallyFlagAuth.isSignedIn()){ if (SHARE_ID) showSharePreview(); else showSignedOut(); return; }
     try {
       step(DEMO ? "Loading sample gear…" : "Loading your gear from Bungie.net…", false);
       const [db, profile] = await Promise.all([loadDatabase(), loadProfile()]);
@@ -2404,6 +2556,7 @@
       pullLoadouts();
       if (location.hash.length > 1) showView(location.hash.slice(1));
       window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
+      openShare();
     } catch (e){
       showError(e.message || String(e));
     }
