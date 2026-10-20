@@ -427,6 +427,7 @@
   .cmp td.best{ color:var(--accent-text); font-weight:700; }
   .cmp-perk{ display:block; }
   .cmp-perk.ours{ color:var(--accent-text); font-weight:600; }
+  .sort-label{ display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); }
   .lo-erase{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:18px; padding-top:12px; border-top:1px solid var(--panel-border); font-size:13px; }
   .lo-erase .muted{ color:var(--text-dim); }
   .lo-review{ margin-top:12px; padding:14px 16px; display:flex; flex-direction:column; gap:12px; }
@@ -597,6 +598,13 @@
         </select>
         <div class="chip-meta">
           <span class="locker-count" id="locker-count" aria-live="polite"></span>
+          <label class="sort-label"><span>Sort</span><select class="chip chip-select" id="sort-by">
+            <option value="power">Power</option>
+            <option value="name">Name</option>
+            <option value="rarity">Rarity</option>
+            <option value="newest">Newest</option>
+            <option value="stats">Armor stat total</option>
+          </select></label>
           <span class="chip-actions"><button type="button" class="fold-all" id="locker-refresh">Refresh</button><button type="button" class="fold-all" id="fold-all">Collapse all</button></span>
         </div>
       </div>

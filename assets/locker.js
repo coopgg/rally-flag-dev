@@ -131,7 +131,7 @@
   // focus: whose gear is shown, one character or the vault (like DIM on a
   // phone); remembered per browser, first time the last-played character.
   const FOCUS_KEY = "rallyflag_locker_focus";
-  const state = { type: null, flags: new Set(), tag: "", q: "", focus: (() => { try { return localStorage.getItem(FOCUS_KEY); } catch (e){ return null; } })() };
+  const state = { type: null, flags: new Set(), tag: "", sort: (() => { try { return localStorage.getItem("rallyflag_locker_sort") || "power"; } catch (e){ return "power"; } })(), q: "", focus: (() => { try { return localStorage.getItem(FOCUS_KEY); } catch (e){ return null; } })() };
   // Folded slots and opened vault lists, remembered per browser.
   const FOLD_KEY = "rallyflag_locker_folds";
   const folds = (() => { try { const f = JSON.parse(localStorage.getItem(FOLD_KEY) || "{}"); return { slots: new Set(f.slots || []), vaults: new Set(f.vaults || []), pmOpen: !!f.pmOpen }; } catch (e){ return { slots: new Set(), vaults: new Set(), pmOpen: false }; } })();
@@ -1546,6 +1546,24 @@
 
   // Owner, type and chip filters decide which tiles get built; the search
   // text doesn't (applySearch hides and shows built tiles instead).
+  // Sort order for tiles (DIM's sort menu): the equipped item first and
+  // Junk last as always, then Power, name, rarity, newest (instance ids
+  // grow over time) or armor stat total. Remembered in this browser.
+  const SORT_KEY = "rallyflag_locker_sort";
+  const statTotal = i => i.def.t === 2 ? ARMOR_STATS.reduce((t, h) => t + ((i.stats[h] || {}).value || 0), 0) : -1;
+  const newerFirst = (x, y) => (y.id.length - x.id.length) || (y.id > x.id ? 1 : y.id < x.id ? -1 : 0);
+  function tileOrder(x, y){
+    const base = (y.equipped - x.equipped) || ((TAGS[x.id] === "junk") - (TAGS[y.id] === "junk"));
+    if (base) return base;
+    const byName = x.def.n.localeCompare(y.def.n);
+    switch (state.sort){
+      case "name": return byName || (y.power - x.power);
+      case "rarity": return ((y.def.r === 6) - (x.def.r === 6)) || (y.power - x.power) || byName;
+      case "newest": return newerFirst(x, y);
+      case "stats": return (statTotal(y) - statTotal(x)) || (y.power - x.power) || byName;
+      default: return (y.power - x.power) || byName;
+    }
+  }
   // Copies of the same item you own (weapons and armor), for the
   // Duplicates filter and the compare view.
   const copiesOf = item => ITEMS.filter(i => i.hash === item.hash).sort((a, b) => b.power - a.power || (b.equipped - a.equipped));
@@ -1639,9 +1657,8 @@
   // vault items full width, armor split by class. Nothing is clipped.
   function renderAll(){
     const shown = ITEMS.filter(matches);
-    const isJunk = i => TAGS[i.id] === "junk" ? 1 : 0;
-    const byPower = (x, y) => (y.equipped - x.equipped) || (isJunk(x) - isJunk(y)) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
-    const filtering = !!(state.type || state.flags.size);
+    const byPower = tileOrder;
+    const filtering = !!(state.type || state.flags.size || state.tag);
     const slot = b => {
       const items = shown.filter(i => i.def.b === b.hash).sort(byPower);
       if (filtering && !items.length) return "";
@@ -1680,11 +1697,10 @@
   // desktop widths, weapons and armor sit side by side.
   function renderOne(){
     const shown = ITEMS.filter(matches), owner = state.focus, vault = owner === "vault";
-    const isJunk = i => TAGS[i.id] === "junk" ? 1 : 0;
-    const byPower = (x, y) => (y.equipped - x.equipped) || (isJunk(x) - isJunk(y)) || (y.power - x.power) || x.def.n.localeCompare(y.def.n);
+    const byPower = tileOrder;
     // Long vault lists show a preview, but never while searching or
     // filtering, so a match can't end up hidden.
-    const filtering = !!(state.type || state.flags.size);
+    const filtering = !!(state.type || state.flags.size || state.tag);
     const slot = b => {
       const items = shown.filter(i => i.def.b === b.hash).sort(byPower);
       if (filtering && !items.length) return "";
@@ -2209,6 +2225,8 @@
       render();
     });
     $("tag-filter").addEventListener("change", e => { state.tag = e.target.value; renderItems(); });
+    $("sort-by").value = state.sort;
+    $("sort-by").addEventListener("change", e => { state.sort = e.target.value; try { localStorage.setItem(SORT_KEY, state.sort); } catch (err){} renderItems(); });
     $("locker-chips").addEventListener("click", e => {
       const b = e.target.closest(".chip");
       if (!b) return;

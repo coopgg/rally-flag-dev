@@ -189,6 +189,17 @@ await section("Gear", async () => {
   await p.keyboard.press("Escape");
   await p.fill("#locker-search", "zzzzqq"); await p.waitForTimeout(300);
   check("gear: search with no match says so", await p.isVisible("#search-empty"));
+  // Sort menu: equipped first, then the chosen order; remembered.
+  const slotNames = () => p.evaluate(() => { const sec = [...document.querySelectorAll("#buckets .bucket:not(.postmaster) .owner-group")].find(x => x.querySelectorAll(".item-tile[data-id]").length > 4); return [...sec.querySelectorAll(".item-tile[data-id]")].map(t => ({ id: t.dataset.id, name: t.getAttribute("aria-label").split(",")[0], eq: t.classList.contains("equipped") })); });
+  await p.selectOption("#sort-by", "name");
+  const byName = await slotNames(), rest = byName.filter(x => !x.eq).map(x => x.name);
+  check("sort: Name sorts A to Z after the equipped item", byName[0].eq && rest.join("|") === rest.slice().sort((a, b) => a.localeCompare(b)).join("|"), rest.slice(0, 5).join(", "));
+  await p.selectOption("#sort-by", "newest");
+  const byNew = (await slotNames()).filter(x => !x.eq).map(x => x.id);
+  check("sort: Newest puts the newest items first", byNew.join() === byNew.slice().sort((a, b) => b.length - a.length || (b > a ? 1 : -1)).join());
+  await p.reload(); await p.waitForSelector("#locker-app:not([hidden])"); await p.waitForTimeout(600);
+  check("sort: the choice is remembered", await p.inputValue("#sort-by") === "newest");
+  await p.selectOption("#sort-by", "power");
   // Duplicates filter and compare.
   await p.fill("#locker-search", ""); await p.waitForTimeout(200);
   const counts = {}; allItems.filter(i => i.itemInstanceId).forEach(i => { counts[i.itemHash] = (counts[i.itemHash] || 0) + 1; });
