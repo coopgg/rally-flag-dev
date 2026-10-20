@@ -55,6 +55,7 @@ async function idbPut(value){
 
 async function getJson(url, headers){
   const res = await fetch(url, { headers });
+  if (res.status === 503) throw new Error("Bungie's servers are down for maintenance. Try again when Bungie finishes.");
   if (!res.ok) throw new Error("HTTP " + res.status + " from Bungie");
   return res.json();
 }

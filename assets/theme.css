@@ -453,3 +453,25 @@ a.panel-card:hover, a.panel-card:focus-visible, .featured-card:hover{
   .nav-links-wrap, .nav-right-wrap{ gap:8px; }
   .hero.has-art{ margin:16px 12px 0; padding:110px 16px 22px; border-radius:18px; }
 }
+
+/* Bungie maintenance notice (nav.js): fixed to the bottom so the page
+   doesn't move when it appears. */
+.maint-notice{
+  position:fixed; z-index:60; left:50%; bottom:16px; transform:translateX(-50%);
+  width:min(680px, calc(100% - 32px)); box-sizing:border-box;
+  display:flex; align-items:flex-start; gap:12px; padding:14px 14px 14px 18px;
+  background:var(--bg); color:var(--text); border:1px solid var(--accent); border-radius:12px;
+  box-shadow:0 10px 40px -10px rgba(0,0,0,0.6), 0 0 22px -8px var(--glow);
+  font-family:var(--font-sans); font-size:14px; line-height:1.5;
+}
+.maint-notice p{ margin:0; }
+.maint-notice strong{ color:var(--accent-text); }
+.maint-notice a{ color:var(--accent-text); white-space:nowrap; }
+.maint-close{
+  flex:none; width:32px; height:32px; margin-top:-4px; border-radius:8px;
+  border:1px solid var(--panel-border); background:transparent; color:var(--text);
+  font-size:20px; line-height:1; cursor:pointer;
+}
+.maint-close:hover, .maint-close:focus-visible{ border-color:var(--accent); }
+/* Text for screen readers only. */
+.sr-only{ position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }

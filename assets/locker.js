@@ -159,12 +159,15 @@
     $("locker-signin").addEventListener("click", () => RallyFlagAuth.signIn());
   }
   const steps = [];
+  let loadFailed = false; // once the error shows, late progress mustn't replace it
   function step(text, done){
+    if (loadFailed) return;
     if (done && steps.length) steps[steps.length - 1].done = true;
     if (text) steps.push({ text, done: false });
     showStatus('<ul class="locker-steps">' + steps.map(s => '<li class="' + (s.done ? "done" : "") + '">' + esc(s.text) + "</li>").join("") + "</ul>");
   }
   function showError(message){
+    loadFailed = true;
     showStatus("<p>Couldn't load your gear: " + esc(message) + "</p>" +
       '<div class="locker-actions"><button class="locker-btn" type="button" id="locker-retry">Try again</button></div>');
     $("locker-retry").addEventListener("click", () => location.reload());
@@ -188,6 +191,7 @@
     // no-store: never a browser-cached copy of the profile after a move.
     const res = await RallyFlagAuth.authedFetch(path, { cache: "no-store" });
     const data = await res.json();
+    if (data && data.ErrorStatus === "SystemDisabled") throw new Error(FRIENDLY.SystemDisabled);
     if (!res.ok || data.ErrorCode !== 1) throw new Error((data && data.Message) || ("HTTP " + res.status));
     return data.Response;
   }
@@ -1516,6 +1520,7 @@
   const FRIENDLY = {
     DestinyNoRoomInDestination: "There's no room there: that character already has 9 items in this slot, or the vault is full.",
     DestinyItemUniqueEquipRestricted: "You can only equip one Exotic weapon and one Exotic armor piece at a time.",
+    SystemDisabled: "Bungie's servers are down for maintenance. Your gear will be here again when Bungie finishes.",
     DestinyCannotPerformActionAtThisLocation: "Bungie only allows this while that character is in orbit or a social space.",
     DestinyCharacterNotInTower: "Bungie only allows this while that character is in orbit or a social space.",
     DestinyItemNotTransferrable: "Bungie doesn't allow this item to be moved.",

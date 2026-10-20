@@ -452,6 +452,58 @@
     });
   }
 
+  // ---------------- Bungie maintenance notice ----------------
+  // During Bungie's maintenance its API answers every call with
+  // ErrorStatus "SystemDisabled" (ErrorCode 5). The site itself stays up,
+  // so rather than each page showing its own error, watch Bungie's replies
+  // here (nav.js loads before every page's own code) and, the first time
+  // one says so, explain it in a notice fixed to the bottom of the screen
+  // (fixed, so nothing on the page moves). Dismissed notices stay away for
+  // 30 minutes. ?maintenance shows it, for checking how it looks.
+  const MAINT_DISMISS_KEY = "rallyflag_maintenance_dismissed";
+  function showMaintenanceNotice(){
+    if (document.getElementById("bungie-maintenance")) return;
+    let dismissed = 0;
+    try { dismissed = +sessionStorage.getItem(MAINT_DISMISS_KEY) || 0; } catch (e) {}
+    if (Date.now() - dismissed < 30 * 60 * 1000 && !/[?&]maintenance\b/.test(location.search)) return;
+    const box = document.createElement("div");
+    box.id = "bungie-maintenance";
+    box.className = "maint-notice";
+    box.setAttribute("role", "status");
+    box.innerHTML =
+      '<p><strong>Bungie\'s servers are down for maintenance.</strong> ' +
+        "Anything that needs live Destiny data (sign-in, vendors, what you own, the Locker) will work again when Bungie finishes. " +
+        "Guides, rotations and the rest of Rally Flag work as normal. " +
+        '<a href="https://x.com/BungieHelp" target="_blank" rel="noopener">Updates from Bungie Help<span class="sr-only"> (opens in a new tab)</span></a></p>' +
+      '<button type="button" class="maint-close" aria-label="Dismiss this notice">×</button>';
+    box.querySelector(".maint-close").addEventListener("click", () => {
+      try { sessionStorage.setItem(MAINT_DISMISS_KEY, String(Date.now())); } catch (e) {}
+      box.remove();
+    });
+    document.body.appendChild(box);
+  }
+  function watchForMaintenance(){
+    const realFetch = window.fetch;
+    if (!realFetch) return;
+    window.fetch = function(input){
+      const pending = realFetch.apply(this, arguments);
+      const url = typeof input === "string" ? input : (input && input.url) || "";
+      if (url.indexOf("bungie.net/Platform/") !== -1){
+        pending.then(res => {
+          // Maintenance replies are small errors; don't re-read big profiles.
+          const len = +res.headers.get("content-length");
+          if (res.ok && !(len > 0 && len < 4096)) return;
+          res.clone().json().then(data => {
+            if (data && (data.ErrorCode === 5 || data.ErrorStatus === "SystemDisabled")) showMaintenanceNotice();
+          }).catch(() => {});
+        }).catch(() => {});
+      }
+      return pending;
+    };
+    if (/[?&]maintenance\b/.test(location.search)) showMaintenanceNotice();
+  }
+
+  watchForMaintenance();
   setupPWA();
   setupAnalytics();
   buildNav();
