@@ -967,11 +967,18 @@
     renderFarm();
   }
 
+  // Short status for a set row. Only an equipped bonus counts as active;
+  // owning the pieces is "ready". The next goal names the missing slot
+  // when only one is left.
+  const SLOT_NAMES = ["helmet", "arms", "chest", "legs", "class item"];
+  const missingSlots = p => ARMOR_SLOTS.map((s, k) => p.slots.has(s) ? "" : SLOT_NAMES[k]).filter(Boolean);
+  // Non-breaking hyphens keep "4-piece" on one line.
   function setStatus(p){
-    const n = p.slots.size;
-    if (n >= 4) return p.equipped.size >= 4 ? "4-piece bonus active" : "4-piece bonus ready";
-    if (n >= 2) return (p.equipped.size >= 2 ? "2-piece bonus active" : "2-piece bonus ready") + " · " + (4 - n) + " more for 4-piece";
-    return (2 - n) + " more for the 2-piece bonus";
+    const n = p.slots.size, miss = missingSlots(p);
+    if (n >= 4) return { active: p.equipped.size >= 4, text: "4‑piece " + (p.equipped.size >= 4 ? "active" : "ready") };
+    if (n < 2) return { active: false, text: "need 1 more for 2‑piece" };
+    const two = "2‑piece " + (p.equipped.size >= 2 ? "active" : "ready") + " · ";
+    return { active: p.equipped.size >= 2, text: two + (n === 3 ? "need " + miss[0] : "need 2 more") + " for 4‑piece" };
   }
   // The Locker is shared on its own (no site menu), so its links go to the
   // public site in a new tab rather than around the dev site.
@@ -980,24 +987,62 @@
   const NEW_TAB_NOTE = '<span class="sr-only"> (opens rallyflag.gg in a new tab)</span>';
   function setHref(p){ return p.set.ours ? PUBLIC_SITE + "armor-set-bonuses.html?highlight=" + p.set.ours.slug : null; }
 
+  // Armor Sets: one compact row per set, grouped by class, then by
+  // progress (sets with a bonus first; single pieces folded away). Five
+  // slot icons show which pieces you have; tapping a row lists them and
+  // where they are.
+  const SLOT_ICONS = [
+    '<path d="M5 15a7 7 0 0 1 14 0v4H5z"/>',
+    '<path d="M8 21v-7L5 10l2-2 3 3V4h2v6V3h2v7V5h2v9l-2 7z"/>',
+    '<path d="M4 7l4-3h8l4 3-2 4v9H6v-9z"/>',
+    '<path d="M7 3h10l-1 18h-3l-1-10-1 10H8z"/>',
+    '<path d="M7 3h10v18l-5-4-5 4z"/>'
+  ];
+  let setOpen = null, setsShowStarted = false;
   function renderSets(){
     // Sets follow the chosen character's class (every class for the vault).
     const chosen = isWide() ? [] : OWNERS.filter(o => o.id === state.focus);
     const list = chosen.length ? SETS.filter(p => chosen.some(o => o.cls === p.cls)) : SETS;
     $("sets-count").textContent = list.length;
     $("sets-hint").textContent = list.length
-      ? "Armor sets you own pieces of" + (chosen.length ? " for your " + chosen.map(o => o.name).join(" and ") : ", per class") + ". Pieces in your vault count too."
+      ? "Armor sets you own pieces of" + (chosen.length ? " for your " + chosen.map(o => o.name).join(" and ") : ", per class") + ". Pieces in your vault count too. Tap a set to see its pieces."
       : "You don't own any set pieces for " + (chosen.length > 1 ? "these characters" : "this character") + " yet.";
-    $("set-grid").innerHTML = list.map(p => {
-      const pips = ARMOR_SLOTS.map(s => '<span class="set-pip' + (p.slots.has(s) ? " on" : "") + '"></span>').join("");
-      const href = setHref(p);
-      return '<div class="set-card panel-card">' +
-        '<div><div class="set-card-name">' + esc(p.set.ours ? p.set.ours.name : p.set.name) + '</div><div class="set-card-class">' + esc(CLASS_NAMES[p.cls] || "") + " · " + p.slots.size + ' of 5 slots</div></div>' +
-        '<div class="set-pips" role="img" aria-label="' + p.slots.size + ' of 5 armor slots owned">' + pips + "</div>" +
-        '<div class="set-card-status">' + esc(setStatus(p)) + "</div>" +
-        (href ? '<a href="' + href + '"' + NEW_TAB + ">Set bonuses →" + NEW_TAB_NOTE + "</a>" : "") +
-      "</div>";
+    const keyOf = p => p.set.hash + ":" + p.cls;
+    const row = p => {
+      const key = keyOf(p), open = setOpen === key, st = setStatus(p), href = setHref(p), id = "set-more-" + p.set.hash + "-" + p.cls;
+      const name = p.set.ours ? p.set.ours.name : p.set.name;
+      const slots = ARMOR_SLOTS.map((s, k) => '<svg class="set-slot' + (p.slots.has(s) ? " on" : "") + '" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">' + SLOT_ICONS[k] + "</svg>").join("");
+      const owned = SLOT_NAMES.filter((n, k) => p.slots.has(ARMOR_SLOTS[k]));
+      let more = "";
+      if (open){
+        const pieces = ITEMS.filter(i => i.setProgress === p)
+          .sort((a, b) => ARMOR_SLOTS.indexOf(a.def.b) - ARMOR_SLOTS.indexOf(b.def.b) || b.power - a.power);
+        more = '<ul class="set-pieces">' + pieces.map(i => '<li><button type="button" class="set-piece" data-id="' + i.id + '">' +
+            '<img src="' + esc(img(iconOf(i))) + '" alt="" width="32" height="32" loading="lazy"><span><b>' + esc(i.def.n) + "</b><small>" + esc(i.def.y || "") + " · " + esc(ownerLabel(i.owner)) + (i.equipped ? ", equipped" : "") + " · " + i.power + "</small></span></button></li>").join("") + "</ul>" +
+          (missingSlots(p).length ? '<p class="set-missing">Missing: ' + esc(missingSlots(p).join(", ")) + "</p>" : "") +
+          (href ? '<a class="set-link" href="' + href + '"' + NEW_TAB + ">Set bonuses →" + NEW_TAB_NOTE + "</a>" : "");
+      }
+      return '<li class="set-row' + (st.active ? " active" : "") + (open ? " open" : "") + '">' +
+        '<button type="button" class="set-row-btn" data-set="' + key + '" aria-expanded="' + open + '" aria-controls="' + id + '">' +
+          '<span class="set-name">' + esc(name) + '</span><span class="set-slots">' + slots + "</span>" +
+          '<span class="set-state">' + esc(st.text) + "</span>" +
+          '<span class="sr-only">. Have ' + esc(owned.join(", ")) + ".</span></button>" +
+        '<div class="set-more" id="' + id + '"' + (open ? "" : " hidden") + ">" + more + "</div></li>";
+    };
+    const classes = [...new Set(OWNERS.map(o => o.cls).concat([0, 1, 2]))].filter(c => list.some(p => p.cls === c));
+    let started = 0;
+    const groups = classes.map(c => {
+      const mine = list.filter(p => p.cls === c), bonus = mine.filter(p => p.slots.size >= 2), single = mine.filter(p => p.slots.size < 2);
+      started += single.length;
+      // One class on a phone: the hint names it, so no heading (and the
+      // "started" heading moves up a level).
+      const titled = classes.length > 1 || !chosen.length, sub = titled ? "h3" : "h2";
+      return '<section class="set-class" aria-label="' + esc(CLASS_NAMES[c] || "") + ' sets">' + (titled ? '<h2 class="set-class-name">' + esc(CLASS_NAMES[c] || "") + "</h2>" : "") +
+        (bonus.length ? '<ul class="set-rows">' + bonus.map(row).join("") + "</ul>" : '<p class="set-none">No set bonuses yet.</p>') +
+        (single.length && setsShowStarted ? '<' + sub + ' class="set-sub">Started (one piece)</' + sub + '><ul class="set-rows">' + single.map(row).join("") + "</ul>" : "") + "</section>";
     }).join("");
+    $("set-grid").innerHTML = groups + (started ? '<button type="button" class="fold-all set-started" id="set-started" aria-expanded="' + setsShowStarted + '">' +
+      (setsShowStarted ? "Hide" : "Show") + " " + started + " started set" + (started === 1 ? "" : "s") + " (one piece)</button>" : "");
   }
 
   // Owner, type and chip filters decide which tiles get built; the search
@@ -1453,7 +1498,7 @@
     }
     if (item.set){
       const p = item.setProgress, ours = item.set.ours;
-      notes += '<div class="callout"><span><strong>' + esc(ours ? ours.name : item.set.name) + "</strong> " + p.slots.size + '/5 · <span class="muted">' + esc(setStatus(p)) + "</span></span>" +
+      notes += '<div class="callout"><span><strong>' + esc(ours ? ours.name : item.set.name) + "</strong> " + p.slots.size + '/5 · <span class="muted">' + esc(setStatus(p).text) + "</span></span>" +
         (ours ? '<a href="' + setHref(p) + '"' + NEW_TAB + ">Set bonuses →" + NEW_TAB_NOTE + "</a>" : "") + "</div>";
     }
 
@@ -1707,6 +1752,18 @@
       BUCKETS.forEach(b => all ? folds.slots.delete(b.hash) : folds.slots.add(b.hash));
       saveFolds();
       renderItems();
+    });
+    $("set-grid").addEventListener("click", e => {
+      const piece = e.target.closest(".set-piece");
+      if (piece) return openItem(piece.dataset.id);
+      const rowBtn = e.target.closest("[data-set]");
+      if (rowBtn){
+        setOpen = setOpen === rowBtn.dataset.set ? null : rowBtn.dataset.set;
+        renderSets();
+        $("set-grid").querySelector('[data-set="' + rowBtn.dataset.set + '"]').focus();
+        return;
+      }
+      if (e.target.closest("#set-started")){ setsShowStarted = !setsShowStarted; renderSets(); $("set-started").focus(); }
     });
     document.querySelector(".view-tabs").addEventListener("click", e => {
       const t = e.target.closest(".view-tab");
