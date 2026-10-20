@@ -478,7 +478,8 @@
       const { data } = await syncFetch("GET");
       syncPulledAt = Date.now();
       const server = { loadouts: data.loadouts || [], deleted: data.deleted || {} };
-      const merged = mergeLoadouts({ loadouts: readLoadouts(), deleted: readSyncMeta().deleted }, server);
+      const local = erasedElsewhere(data.version || 0) ? { loadouts: [], deleted: {} } : { loadouts: readLoadouts(), deleted: readSyncMeta().deleted };
+      const merged = mergeLoadouts(local, server);
       const ahead = !sameSet(merged, server);
       adoptMerged(merged, data.version || 0, ahead);
       syncBusy = false;
@@ -496,6 +497,7 @@
         if (r.conflict){
           // Another device saved first: merge its copy in and try again.
           const server = { loadouts: r.data.loadouts || [], deleted: r.data.deleted || {} };
+          if (erasedElsewhere(r.data.version || 0)){ adoptMerged(server, r.data.version || 0, false); syncBusy = false; return setSync("ok"); }
           adoptMerged(mergeLoadouts({ loadouts: readLoadouts(), deleted: meta.deleted }, server), r.data.version || 0, true);
           continue;
         }
@@ -506,6 +508,25 @@
       }
       throw new Error("Couldn't save: your loadouts kept changing on another device.");
     } catch (e){ syncBusy = false; setSync("error", e.message); }
+  }
+  // The service's copy is older than one this browser already synced:
+  // the player deleted their synced loadouts on another device (the row
+  // starts again from version 0). Clear them here too instead of
+  // uploading them again.
+  function erasedElsewhere(version){
+    if (version >= readSyncMeta().version) return false;
+    setLoadoutsRaw([]); writeSyncMeta({ version: 0, deleted: {}, dirty: false });
+    renderLoadoutCount(); if (loadoutsShown()) renderLoadouts();
+    toast("Your saved loadouts were deleted on another device, so they've been removed here too.", "ok");
+    return true;
+  }
+  // "Delete all my saved loadouts": the sync service's copy first (so a
+  // failure leaves everything as it was), then this browser's.
+  async function eraseLoadouts(){
+    clearTimeout(syncTimerLo);
+    if (syncOn()) await syncFetch("DELETE");
+    setLoadoutsRaw([]); writeSyncMeta({ version: 0, deleted: {}, dirty: false });
+    syncGen++; loOpen = null; loReview = null;
   }
   function schedulePush(){ if (!syncOn()) return; clearTimeout(syncTimerLo); syncTimerLo = setTimeout(pushLoadouts, 1200); }
   // Coming back to the tab: send anything unsent, and pick up changes made
@@ -1021,7 +1042,10 @@
             '<div class="act-row">' + OWNERS.map(o => '<button type="button" class="act-btn" data-lo-save="' + o.id + '">Save ' + esc(o.name) + "'s loadout</button>").join("") + "</div></div>" +
           '<div class="lo-tool"><label class="lo-name"><span>DIM link</span><input type="url" id="lo-dim" placeholder="https://dim.gg/…" autocomplete="off" inputmode="url"></label>' +
             '<div class="act-row"><button type="button" class="act-btn" id="lo-dim-go">Import</button></div></div>' +
-        "</div>" + saved + "</section>" +
+        "</div>" + saved +
+        (list.length ? '<div class="lo-erase"><button type="button" class="act-btn" id="lo-erase">Delete all my saved loadouts</button>' +
+          '<span class="muted">' + (syncOn() ? "From this browser and Rally Flag's sync service. Your other devices clear theirs the next time they sync." : "From this browser.") + "</span></div>" : "") +
+        "</section>" +
       '<section class="lo-section" aria-labelledby="lo-h-game"><h2 class="dlg-label" id="lo-h-game">In-game loadouts</h2><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first.</p>' + gameSection() + "</section>" +
       '<section class="lo-section" aria-labelledby="lo-h-max"><h2 class="dlg-label" id="lo-h-max">Max Power</h2><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</section>";
     $("lo-name").value = typed.name; $("lo-dim").value = typed.dim;
@@ -1079,6 +1103,21 @@
       renderLoadouts();
       const h = $("lo-h-review"); h.scrollIntoView({ block: "start" }); h.focus();
     }));
+    const erase = $("lo-erase");
+    if (erase) erase.addEventListener("click", async () => {
+      // Two taps: the first asks, the second deletes.
+      if (erase.dataset.confirm !== "1"){ erase.dataset.confirm = "1"; erase.textContent = "Tap again to delete all " + list.length + " loadout" + (list.length === 1 ? "" : "s"); return; }
+      erase.setAttribute("aria-disabled", "true"); erase.textContent = "Deleting…";
+      try {
+        await eraseLoadouts();
+        renderLoadoutCount(); renderLoadouts(); setSync(syncOn() ? "ok" : SYNC.state);
+        toast("Deleted all your saved loadouts" + (syncOn() ? ", here and on Rally Flag's sync service." : "."), "ok");
+        $("lo-name").focus();
+      } catch (e){
+        toast((e && e.message) || "Couldn't delete them. Nothing was changed.", "error");
+        erase.removeAttribute("aria-disabled"); erase.dataset.confirm = ""; erase.textContent = "Delete all my saved loadouts";
+      }
+    });
     const dimGo = $("lo-dim-go"), dimIn = $("lo-dim");
     const importDim = async () => {
       if (!dimIn.value.trim() || dimGo.getAttribute("aria-disabled") === "true") return;

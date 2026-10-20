@@ -11,6 +11,9 @@
         → 200 { version }                 saved
         → 409 { version, loadouts, deleted }  someone else saved first:
           merge with this copy and PUT again with its version as base
+   DELETE /loadouts/<destinyMembershipId>
+        → 200 { version: 0 }   the account's row is removed entirely
+          (devices that synced before see version 0 and clear theirs)
 
    Every request carries the player's Bungie sign-in:
      Authorization: Bearer <Bungie access token>
@@ -37,7 +40,7 @@ const AUTH_CACHE_SECONDS = 600;
 function cors(origin){
   return SITES[origin] ? {
     "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, PUT, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Authorization, Content-Type",
     "Access-Control-Max-Age": "86400",
     "Vary": "Origin"
@@ -92,7 +95,11 @@ export default {
 
     try {
       if (request.method === "GET") return reply(await readRow(env.DB, id), 200, origin);
-      if (request.method !== "PUT") return reply({ error: "Use GET or PUT." }, 405, origin);
+      if (request.method === "DELETE"){
+        await env.DB.prepare("DELETE FROM loadouts WHERE membership_id = ?").bind(id).run();
+        return reply({ version: 0 }, 200, origin);
+      }
+      if (request.method !== "PUT") return reply({ error: "Use GET, PUT or DELETE." }, 405, origin);
 
       const text = await request.text();
       if (text.length > MAX_BYTES) return reply({ error: "Too many loadouts to save." }, 413, origin);

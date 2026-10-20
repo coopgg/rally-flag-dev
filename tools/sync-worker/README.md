@@ -56,6 +56,7 @@ capped at 256KB (a few hundred loadouts).
 
     GET /loadouts/<id>  → { version, loadouts, deleted }
     PUT /loadouts/<id>  { base, loadouts, deleted } → { version } or 409 + the newer copy
+    DELETE /loadouts/<id>  → { version: 0 } (row removed; the Locker's "Delete all my saved loadouts")
 
 Requests need `Authorization: Bearer <Bungie access token>` and an Origin
 of coopgg.github.io, rallyflag.gg or www.rallyflag.gg.
