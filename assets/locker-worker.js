@@ -14,14 +14,14 @@
                  or { type:"error", message }
    items: hash -> { n name, i icon, w watermark, t itemType, s subType,
      r tierType, b bucketHash, c classType, d damageTypeHash,
-     y itemTypeDisplayName, x description (plugs) }; currencies keep n, i.
+     y itemTypeDisplayName, x description (plugs), o 1 = ornament }; currencies keep n, i.
    buckets: hash -> { n name, c capacity } (vault space in the banner).
    loadouts: { names: hash -> name, icons: hash -> path, colors: hash -> path }.
    ============================================================ */
 const BUNGIE = "https://www.bungie.net";
 const DB_NAME = "rallyflag-locker", STORE = "manifest", KEY = "lite";
 // Bump when the stored shape changes, so cached copies are rebuilt.
-const SCHEMA = 3;
+const SCHEMA = 4;
 
 function idb(){
   return new Promise((resolve, reject) => {
@@ -60,14 +60,15 @@ async function getJson(url, headers){
 
 // Weapons, armor, the plugs (perks, mods, intrinsics) they carry,
 // currencies (Glimmer, Bright Dust, Silver) for the vault card, and
-// subclasses (shown in in-game loadouts).
+// subclasses (shown in in-game loadouts), and ornaments (item sub type 21,
+// a few of them filed as dummies, type 20), flagged o.
 const KEEP_TYPES = new Set([0, 1, 2, 3, 16, 19]);
 function trimItems(lite){
   const out = {};
   for (const hash in lite){
     const v = lite[hash];
     const dp = v.displayProperties;
-    if (!dp || !dp.name || !KEEP_TYPES.has(v.itemType)) continue;
+    if (!dp || !dp.name || !(KEEP_TYPES.has(v.itemType) || v.itemSubType === 21)) continue;
     const e = { n: dp.name };
     if (dp.icon) e.i = dp.icon;
     if (v.itemType === 2 || v.itemType === 3){
@@ -79,6 +80,7 @@ function trimItems(lite){
     } else {
       e.y = v.itemTypeDisplayName || "";
       if (dp.description) e.x = dp.description.slice(0, 300);
+      if (v.itemSubType === 21) e.o = 1;
     }
     out[hash] = e;
   }

@@ -221,13 +221,46 @@ for (const c of characters){
     stats: Object.fromEntries([2996146975, 392767087, 1943323491, 1735777505, 144602215, 4244567218].map((h, k) => [h, [[105, 70, 110, 55, 90, 30], [116, 66, 91, 101, 66, 56], [38, 29, 63, 160, 57, 150]][c.classType][k]])) };
 }
 
+// Ornaments: about a third of the armor wears a universal ornament for its
+// class and slot (plug category armor_skins_<class>_<slot>), shown as the
+// item's overrideStyleItemHash and in its ornament socket, as Bungie does.
+// Picked from the instance id, so no rand() calls and the rest of the
+// sample is unchanged.
+const SLOT_NAME = { [BUCKET.helmet]: "head", [BUCKET.arms]: "arms", [BUCKET.chest]: "chest", [BUCKET.legs]: "legs", [BUCKET.classItem]: "class" };
+const ORNAMENTS = {};
+for (const d of Object.values(ITEMS)) if (d.itemSubType === 21 && d.plug && d.displayProperties && d.displayProperties.icon && !/^Default/.test(d.displayProperties.name))
+  (ORNAMENTS[d.plug.plugCategoryIdentifier] = ORNAMENTS[d.plug.plugCategoryIdentifier] || []).push(d.hash);
+for (const list of Object.values(ORNAMENTS)) list.sort((a, b) => a - b);
+const ornSocket = d => ((d.sockets && d.sockets.socketEntries) || []).findIndex(e => (def(e.singleInitialItemHash) || {}).itemSubType === 21);
+const ornPool = d => d.itemType === 2 && d.classType < 3 ? ORNAMENTS["armor_skins_" + ["titan", "hunter", "warlock"][d.classType] + "_" + SLOT_NAME[bucketOf(d)]] || [] : [];
+const allItems = vaultItems.concat(...Object.values(invItems), ...Object.values(equipItems));
+for (const it of allItems.filter(it => it.itemInstanceId && [2, 3].includes((def(it.itemHash) || {}).itemType))){
+  const d = def(it.itemHash), k = ornSocket(d), pool = ornPool(d), n = Number(BigInt(it.itemInstanceId) % 1000n);
+  if (k < 0 || !pool.length || n % 3) continue;
+  const orn = pool[n % pool.length];
+  it.overrideStyleItemHash = orn;
+  sockets[it.itemInstanceId].sockets[k] = { plugHash: orn, isEnabled: true, isVisible: true };
+}
+// A loadout item's plugs, one per socket (2166136261 = leave as is), with
+// its ornament socket set to the ornament it wears, or `orn` if given.
+const NO_CHANGE = 2166136261;
+function loPlugs(it, orn){
+  const d = def(it.itemHash), k = ornSocket(d);
+  const plugs = ((d.sockets && d.sockets.socketEntries) || []).map(() => NO_CHANGE);
+  if (k >= 0 && d.itemType <= 3) plugs[k] = orn || it.overrideStyleItemHash || d.sockets.socketEntries[k].singleInitialItemHash;
+  return plugs;
+}
+
 // In-game loadouts (component 206): 10 slots per character. Alpha = what's
 // equipped, Beta = the best other gear from inventory and vault (so applying
 // it has to move things), and the Titan's Crucible borrows the Hunter's
 // equipped kinetic weapon. The rest are empty, as in game. No rand() calls.
 const LC = Object.values(JSON.parse(fs.readFileSync(path.join(dir, "DestinyLoadoutConstantsDefinition.json"), "utf8")))[0];
 const loSlot = (k, items) => ({ colorHash: LC.loadoutColorHashes[k], iconHash: LC.loadoutIconHashes[k], nameHash: LC.loadoutNameHashes[k],
-  items: items.map(it => ({ itemInstanceId: it.itemInstanceId, plugItemHashes: [] })) });
+  items: items.map(it => ({ itemInstanceId: it.itemInstanceId, plugItemHashes: loPlugs(it, wants.get(it)) })) });
+// Beta asks for a different ornament on its first armor piece that has
+// one to spare, so applying it visibly changes an ornament.
+const wants = new Map();
 const bucketOfItem = it => bucketOf(def(it.itemHash));
 const characterLoadouts = {};
 for (const c of characters){
@@ -241,6 +274,8 @@ for (const c of characters){
       .sort((x, y) => instances[y.itemInstanceId].primaryStat.value - instances[x.itemInstanceId].primaryStat.value || x.itemInstanceId.localeCompare(y.itemInstanceId))[0];
     if (best){ beta.push(best); if (def(best.itemHash).inventory.tierType === 6) exo[def(best.itemHash).itemType]++; }
   }
+  const swap = beta.find(it => ornPool(def(it.itemHash)).length > 1 && ornSocket(def(it.itemHash)) >= 0);
+  if (swap){ const pool = ornPool(def(swap.itemHash)); wants.set(swap, pool.find(h => h !== swap.overrideStyleItemHash)); }
   const slots = [loSlot(0, alpha), loSlot(1, beta)];
   if (c.classType === 0){
     const hunterKinetic = equipItems[characters[1].id].find(it => bucketOfItem(it) === bucketOfItem(alpha[0]));

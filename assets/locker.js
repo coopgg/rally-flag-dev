@@ -55,6 +55,12 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const img = p => p ? (p.charAt(0) === "/" ? BUNGIE + p : p) : "";
+  // Ornaments: plugs flagged o by the worker. "Default Ornament" is the
+  // plug that takes one off, so it counts as none.
+  const isOrnamentPlug = h => !!(DB.items[h] && DB.items[h].o);
+  const isOrnament = h => isOrnamentPlug(h) && !/^Default /.test(DB.items[h].n);
+  // What the item looks like in game: the ornament's icon when one is on (as DIM shows it).
+  const iconOf = item => (item.ornament && DB.items[item.ornament] && DB.items[item.ornament].i) || item.def.i;
   // Masterworked: Bungie's own gold frame (DestinyInventoryItemConstants-
   // Definition; a brighter one for Exotics). Gear tier: gold diamonds down
   // the left edge, as in game and DIM, drawn bolder than Bungie's overlay so
@@ -83,7 +89,7 @@
     for (const [key, value] of entries) j[key] = Object.assign({ at }, value);
     try { sessionStorage.setItem(JOURNAL_KEY, JSON.stringify(j)); } catch (e){}
   }
-  const rememberItems = items => remember(items.map(i => [i.id, { owner: i.owner, equipped: i.equipped, locked: !!(i.state & STATE_LOCKED) }]));
+  const rememberItems = items => remember(items.map(i => [i.id, { owner: i.owner, equipped: i.equipped, locked: !!(i.state & STATE_LOCKED), orn: i.ornament || 0 }]));
   // Returns how many journal entries were newer than the profile.
   function applyJournal(){
     // The older of Bungie's two stamps: inventory ("secondary") data can
@@ -104,6 +110,7 @@
       if (e.equipped) for (const i of ITEMS) if (i !== item && i.owner === e.owner && i.def.b === item.def.b) i.equipped = false;
       item.owner = e.owner; item.equipped = e.equipped;
       item.state = e.locked ? (item.state | STATE_LOCKED) : (item.state & ~STATE_LOCKED);
+      if ("orn" in e) item.ornament = e.orn;
       applied++;
     }
     return applied;
@@ -248,6 +255,8 @@
         power: (inst.primaryStat && inst.primaryStat.value) || 0,
         damage: inst.damageTypeHash || def.d || 0,
         plugs, alts, stats: (stats[it.itemInstanceId] && stats[it.itemInstanceId].stats) || {},
+        // Bungie names the applied ornament on the item; the socket says the same.
+        ornament: it.overrideStyleItemHash || plugs.find(isOrnament) || 0,
         roll: null, set: def.t === 2 ? setByItem.get(it.itemHash) || null : null
       };
       const roll = rollByHash.get(it.itemHash);
@@ -258,7 +267,8 @@
         item.roll = { weapon: roll, matched, total: roll.perkHashes.length, full: matched === roll.perkHashes.length };
       }
       // Searchable text: name, type and every visible perk.
-      item.text = (def.n + " " + (def.y || "") + " " + plugs.map(h => DB.items[h] ? DB.items[h].n : "").join(" ")).toLowerCase();
+      item.text = (def.n + " " + (def.y || "") + " " + plugs.map(h => DB.items[h] && !isOrnamentPlug(h) ? DB.items[h].n : "").join(" ") +
+        (item.ornament && DB.items[item.ornament] ? " " + DB.items[item.ornament].n : "")).toLowerCase();
       return item;
     };
     const add = (it, owner, equipped) => { const g = gearItem(it, owner, equipped); if (g) ITEMS.push(g); };
@@ -436,7 +446,14 @@
     const L = (DB && DB.loadouts) || { names: {}, icons: {}, colors: {} };
     return raw.map((lo, index) => {
       const ids = (lo.items || []).map(x => String(x.itemInstanceId)).filter(id => id && id !== "0");
-      return { index, ids, name: L.names[lo.nameHash] || "Loadout " + (index + 1), icon: L.icons[lo.iconHash] || "", color: L.colors[lo.colorHash] || "",
+      // The ornament the loadout puts on each item (0 = the default look);
+      // items whose loadout entry has no ornament plug aren't checked.
+      const orn = new Map();
+      for (const x of lo.items || []){
+        const h = (x.plugItemHashes || []).find(isOrnamentPlug);
+        if (h) orn.set(String(x.itemInstanceId), isOrnament(h) ? h : 0);
+      }
+      return { index, ids, orn, name: L.names[lo.nameHash] || "Loadout " + (index + 1), icon: L.icons[lo.iconHash] || "", color: L.colors[lo.colorHash] || "",
         missing: ids.filter(id => !INSTANCE_HASH.has(id)).length };
     }).filter(lo => lo.ids.length);
   }
@@ -449,6 +466,7 @@
       await moveTo(item, charId);
     }
     await post("Loadouts/EquipLoadout", { loadoutIndex: lo.index, characterId: charId });
+    for (const item of gear) if (lo.orn.has(item.id)) item.ornament = lo.orn.get(item.id);
     // Bungie equipped the whole set: show it now (the auto-sync confirms it).
     for (const item of gear){
       for (const i of ITEMS) if (i.owner === charId && i.equipped && i.def.b === item.def.b) i.equipped = false;
@@ -463,24 +481,41 @@
   function loGrid(group, entries){
     const open = entries.find(e => e.key === loOpen);
     return '<div class="lo-grid">' + entries.map(e =>
-      '<button type="button" class="lo-tile' + (e.gone ? " warn" : "") + '" data-lo-pick="' + esc(e.key) + '" aria-expanded="' + (e === open) + '" aria-controls="lo-detail-' + group + '">' +
-        e.badge + '<span class="lo-tile-name">' + esc(e.name) + "</span></button>").join("") + "</div>" +
+      '<button type="button" class="lo-tile' + (e.gone ? " warn" : e.on ? " on" : "") + '" data-lo-pick="' + esc(e.key) + '" aria-expanded="' + (e === open) + '" aria-controls="lo-detail-' + group + '">' +
+        e.badge + '<span class="lo-tile-name">' + esc(e.name) + (e.on ? '<span class="sr-only"> (equipped now)</span>' : "") + "</span>" +
+        (e.on && !e.gone ? '<span class="lo-check" aria-hidden="true"><svg viewBox="0 0 16 16" width="16" height="16"><circle cx="8" cy="8" r="8"/><path d="M4.5 8.2l2.3 2.3 4.7-4.9" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>' : "") + "</button>").join("") + "</div>" +
       '<div class="lo-detail" id="lo-detail-' + group + '"' + (open ? "" : " hidden") + ">" + (open ? open.detail : "") + "</div>";
   }
   function loBadge(icon, color){
     return '<span class="lo-badge" aria-hidden="true"' + (color ? ' style="background-image:url(\'' + esc(img(color)) + '\')"' : "") + ">" + (icon ? '<img src="' + esc(img(icon)) + '" alt="" width="28" height="28" loading="lazy">' : "") + "</span>";
   }
   function gameSection(){
-    const mini = id => { const d = DB.items[INSTANCE_HASH.get(id)] || {}; return '<span class="lo-mini' + (INSTANCE_HASH.has(id) ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
+    const byId = new Map(ITEMS.map(i => [i.id, i]));
+    const ornName = h => h ? (DB.items[h] ? DB.items[h].n : "an unknown ornament") : "the default look";
     const groups = OWNERS.map(o => {
       const list = gameLoadouts(o.id);
       if (!list.length) return "";
-      return '<div class="lo-owner">' + esc(o.name) + "</div>" + loGrid("g" + o.id, list.map(lo => ({
-        key: "g-" + o.id + "-" + lo.index, name: lo.name, gone: lo.missing, badge: loBadge(lo.icon, lo.color),
+      return '<div class="lo-owner">' + esc(o.name) + "</div>" + loGrid("g" + o.id, list.map(lo => {
+        // Is it on? Which items are equipped on this character, and which
+        // carry the ornament the loadout sets (Destiny applies those too).
+        const gear = lo.ids.map(id => byId.get(id)).filter(Boolean);
+        const worn = gear.filter(i => i.owner === o.id && i.equipped).length;
+        const ornOff = gear.filter(i => lo.orn.has(i.id) && (i.ornament || 0) !== lo.orn.get(i.id));
+        const checked = gear.filter(i => lo.orn.has(i.id)).length;
+        const mini = id => {
+          const i = byId.get(id), d = DB.items[INSTANCE_HASH.get(id)] || {}, icon = i ? iconOf(i) : d.i;
+          const off = i && ornOff.includes(i);
+          const tip = i ? d.n + (lo.orn.has(id) ? " · " + (off ? "wants " + ornName(lo.orn.get(id)) + ", has " + ornName(i.ornament) : "ornament matches") : "") : "Not found";
+          return '<span class="lo-mini' + (INSTANCE_HASH.has(id) ? "" : " gone") + (off ? " orn-off" : "") + '" title="' + esc(tip) + '">' + (icon ? '<img src="' + esc(img(icon)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>";
+        };
+        const status = "Equipped " + worn + " of " + lo.ids.length + (checked ? " · ornaments " + (checked - ornOff.length) + " of " + checked + " match" : "");
+        return {
+        key: "g-" + o.id + "-" + lo.index, name: lo.name, gone: lo.missing, on: !lo.missing && worn === lo.ids.length && !ornOff.length, badge: loBadge(lo.icon, lo.color),
         detail: '<div class="lo-main"><b>' + esc(lo.name) + "</b>" + (lo.missing ? ' <span class="muted">· ' + lo.missing + " not found</span>" : "") + "</div>" +
           '<div class="lo-items" aria-hidden="true">' + lo.ids.map(mini).join("") + "</div>" +
+          '<p class="lo-status">' + esc(status) + (ornOff.length ? '<span class="muted"> · wrong ornament: ' + esc(ornOff.map(i => i.def.n).join(", ")) + "</span>" : "") + "</p>" +
           '<div class="act-row"><button type="button" class="act-btn" data-game-lo="' + lo.index + '" data-to="' + o.id + '">Equip<span class="sr-only"> ' + esc(lo.name) + " on your " + esc(o.name) + "</span></button></div>"
-      })));
+      }; }));
     }).join("");
     return groups || '<p class="muted">No in-game loadouts saved yet. Make them in Destiny\'s Character screen and they\'ll show here.</p>';
   }
@@ -499,7 +534,7 @@
     const was = dlg.open && dlg.contains(document.activeElement) ? document.activeElement : null;
     const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean);
     const byId = new Map(ITEMS.map(i => [i.id, i]));
-    const mini = (hash, have) => { const d = DB.items[hash] || {}; return '<span class="lo-mini' + (have ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
+    const mini = (hash, have, item) => { const d = item ? { i: iconOf(item) } : DB.items[hash] || {}; return '<span class="lo-mini' + (have ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
     const maxRows = OWNERS.map(o => {
       const plan = maxPowerPlan(o.id), now = gearPower(equippedOn(o.id));
       const done = plan.items.every(i => i.owner === o.id && i.equipped);
@@ -514,7 +549,7 @@
       return { key: "r-" + lo.id, name: lo.name, gone, badge: loBadge(first.i, ""),
         detail: '<div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(CLASS_NAMES[lo.cls] || "") +
           (gone ? " · " + gone + " item" + (gone === 1 ? "" : "s") + " no longer found" : "") + "</span></div>" +
-        '<div class="lo-items" aria-hidden="true">' + lo.items.map(x => mini(x.hash, byId.has(x.id))).join("") + "</div>" +
+        '<div class="lo-items" aria-hidden="true">' + lo.items.map(x => mini(x.hash, byId.has(x.id), byId.get(x.id))).join("") + "</div>" +
         '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
           '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" };
     })) : '<p class="muted">No loadouts yet. Save what one of your characters has equipped below.</p>';
@@ -717,12 +752,13 @@
   function tileHtml(item){
     const d = item.def, dmg = DB.damage[item.damage];
     const mw = item.state & STATE_MASTERWORK;
-    const label = [d.n, d.y, item.power ? "power " + item.power : "", item.tier ? "tier " + item.tier : "", mw ? "masterworked" : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
+    const orn = item.ornament && DB.items[item.ornament];
+    const label = [d.n, d.y, orn ? "ornament " + orn.n : "", item.power ? "power " + item.power : "", item.tier ? "tier " + item.tier : "", mw ? "masterworked" : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
       item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : "",
       TAGS[item.id] ? "tagged " + TAGS[item.id] : ""].filter(Boolean).join(", ");
     const tag = TAGS[item.id];
     return '<button type="button" class="item-tile ' + tierClass(d) + (mw ? " mw" : "") + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
-      '<img class="icon" src="' + esc(img(d.i)) + '" alt="" loading="lazy" width="64" height="64">' +
+      '<img class="icon" src="' + esc(img(iconOf(item))) + '" alt="" loading="lazy" width="64" height="64">' +
       (d.w ? '<img class="wm" src="' + esc(img(d.w)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (mw ? '<img class="ov" src="' + esc(img(MW_OVERLAY[d.r === 6 ? 6 : 5])) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (item.tier >= 1 && item.tier <= 5 ? tierPips(item.tier) : "") +
@@ -1174,8 +1210,11 @@
       '<div class="act-row"><span class="act-label">Tag</span>' +
         '<button type="button" class="act-btn tag" data-tag="favorite" aria-pressed="' + (TAGS[item.id] === "favorite") + '">♥ Favorite</button>' +
         '<button type="button" class="act-btn tag" data-tag="junk" aria-pressed="' + (TAGS[item.id] === "junk") + '">' + ICON_TRASH + "Junk</button></div></div>";
+    const orn = item.ornament && DB.items[item.ornament];
     const blocks = [
       notes ? '<div class="rf-notes">' + notes + "</div>" : "",
+      label("Ornament") + (orn ? '<div class="orn-row">' + (orn.i ? '<img src="' + esc(img(orn.i)) + '" alt="" width="42" height="42">' : "") + "<div><b>" + esc(orn.n) + "</b><small>" + esc(orn.y || "Ornament") + "</small></div></div>"
+        : item.ornament ? '<p class="muted orn-none">An ornament Rally Flag doesn\'t know yet</p>' : '<p class="muted orn-none">None (default look)</p>'),
       stats ? label("Stats") + stats : "",
       intrinsic ? label(d.t === 3 ? "Frame" : "Archetype") + intrinsic : "",
       cols.length ? label("Perks") + '<div class="perk-cols" role="group" aria-label="Perks">' + cols.join("") + "</div>" : "",
@@ -1186,7 +1225,7 @@
     const dlg = $("item-dialog");
     dlg.dataset.item = item.id; dlg.dataset.view = "item";
     redrawDialog(dlg,
-      '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-icon"><img src="' + esc(img(d.i)) + '" alt="">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="">' : "") + "</div>" +
+      '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-icon"><img src="' + esc(img(iconOf(item))) + '" alt="">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="">' : "") + "</div>" +
         '<div class="dlg-title"><div class="dlg-eyebrow">' + esc(eyebrow) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub">' + sub + "</div></div>" +
         (item.power ? '<div class="dlg-power"><small>Power</small><b>' + item.power + "</b></div>" : "") +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
