@@ -62,3 +62,21 @@ pass is left to the daily live check.
 
 Live Bungie data is fetched during the run, so a Bungie outage can show up
 as a failure; re-run before digging in.
+
+## The Locker's behaviour
+
+`locker-check.mjs` (`npm run locker`, also run by the Site checks workflow)
+checks what the Locker does rather than how it looks. It drives
+`locker.html` (sample data, and a signed-in session with Bungie's profile
+and write endpoints mocked) through: tagging (one tile redrawn), move to
+vault, equip, lock, search; saving a loadout and getting it back, max
+Power, two-tap delete; in-game loadouts (moves, then EquipLoadout); DIM
+import with Choose your copies; DIM apply (subclass equip, only the changed
+subclass socket, armor mods with a refused insert retried); loadout and tag
+sync between two browsers (fresh restore, a delete on one device vs a save
+on the other, delete everywhere); and Bungie maintenance. The two Cloudflare
+Workers (`tools/sync-worker`, `tools/dim-relay`) run in-process against an
+in-memory database and a saved dim.gg page (`fixtures/dim-share.html`), and
+their rules (auth, CORS, conflicts, limits) are checked directly. Bungie's
+public item database still loads live, as in `site-check.js`. About 3
+minutes.

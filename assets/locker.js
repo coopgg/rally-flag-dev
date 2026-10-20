@@ -1875,10 +1875,15 @@
       $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(+b.dataset.plug) ? " · in our God Roll" : "") +
         (p.x ? "<br>" + esc(p.x) : "");
     }));
-    // Tags are local (no Bungie call), so they apply instantly.
+    // Tags are local (no Bungie call), so they apply instantly: redraw just
+    // that tile (rebuilding a 1,000+ item vault froze the page ~0.7s). With
+    // a Favorites/Junk filter on, the tile may need to come or go: rebuild.
     dlg.querySelectorAll("[data-tag]").forEach(b => b.addEventListener("click", () => {
       toggleTag(item.id, b.dataset.tag);
-      renderItems(); renderJunk();
+      const old = document.querySelectorAll('#buckets .item-tile[data-id="' + item.id + '"]');
+      if (state.flags.has("favorite") || state.flags.has("junk") || !old.length) renderItems();
+      else old.forEach(t => { const hidden = t.hidden; t.outerHTML = tileHtml(item); if (hidden) document.querySelector('#buckets .item-tile[data-id="' + item.id + '"]:not([hidden])').hidden = true; });
+      renderJunk();
       openItem(item.id);
       const again = dlg.querySelector('[data-tag="' + b.dataset.tag + '"]');
       if (again) again.focus();

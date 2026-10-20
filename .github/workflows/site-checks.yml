@@ -2,7 +2,8 @@
 # page at desktop/phone × dark/light in headless Chromium (script errors,
 # axe accessibility, sideways scroll, broken images, text under 12px,
 # layout shift), plus generated guide pages, old-link forwarding and
-# internal links. Dev-only: .github/ and tests/ are never promoted to prod.
+# internal links; then tests/locker-check.mjs for the Locker's behaviour.
+# Dev-only: .github/ and tests/ are never promoted to prod.
 name: Site checks
 
 on:
@@ -37,3 +38,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run check
+      # The Locker's behaviour (moves, loadouts, DIM import/apply, sync,
+      # maintenance) against sample data, a mocked Bungie and the workers'
+      # own code: see tests/locker-check.mjs.
+      - run: npm run locker

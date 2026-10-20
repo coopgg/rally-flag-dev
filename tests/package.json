@@ -3,7 +3,8 @@
   "private": true,
   "description": "Dev-only browser checks for the Rally Flag site (see tests/README.md).",
   "scripts": {
-    "check": "node site-check.js"
+    "check": "node site-check.js",
+    "locker": "node locker-check.mjs"
   },
   "devDependencies": {
     "axe-core": "4.10.2",
