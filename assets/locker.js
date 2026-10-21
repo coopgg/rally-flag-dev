@@ -77,6 +77,7 @@
   const MW_OVERLAY = { 5: "/img/destiny_content/items/masterwork-overlay-border.png", 6: "/img/destiny_content/items/masterwork-overlay-exotic-border.png" };
   const slugify = s => s.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
+  let SHOWN = []; // items the gear view shows right now (filters + search), for bulk actions
   let DB = null, PROFILE = null, ITEMS = [], OWNERS = [], SETS = [], POSTMASTER = [], MEMBERSHIP_TYPE = 0, PROFILE_PATH = "", INSTANCE_HASH = new Map();
 
   // Bungie's profile can lag a moment behind a move, so a reload or
@@ -1012,6 +1013,8 @@
   }
   const kindOf = h => (DB.items[h] && DB.items[h].k) || "";
   const isEmptyPlug = h => !DB.items[h] || /^Empty /.test(DB.items[h].n);
+  // "Locked Armor Mod" and retired mods fill sockets but can't be put anywhere.
+  const isPlaceholderMod = h => !!DB.items[h] && /^(locked|deprecated) /i.test(DB.items[h].n);
   function planMods(armor, mods){
     const sockets = [];
     for (const item of armor) plugsOf(item.id).forEach((h, k) => { if (kindOf(h)) sockets.push({ item, k, kind: kindOf(h), cur: h, want: null }); });
@@ -1142,7 +1145,7 @@
     const mods = [], cosmetics = {};
     for (const i of items){
       for (const h of plugsOf(i.id)){
-        if (i.def.t === 2 && kindOf(h) && !isEmptyPlug(h)) mods.push(h);
+        if (i.def.t === 2 && kindOf(h) && !isEmptyPlug(h) && !isPlaceholderMod(h)) mods.push(h);
         if (DB.items[h] && (DB.items[h].o || DB.items[h].sh)) (cosmetics[i.def.b] = cosmetics[i.def.b] || []).push(h);
       }
     }
@@ -1178,7 +1181,7 @@
     loReview = { lo, isNew, slots };
     return true;
   }
-  function pickHtml(slot, i){
+  function pickHtml(slot, i, attr = "pick"){
     const on = slot.pick === i.id;
     let detail;
     if (i.def.t === 3){
@@ -1189,7 +1192,7 @@
       detail = '<span class="pick-perks"><span class="pick-perk">Stats ' + total + "</span>" + ARMOR_STATS.map((h, k) => st[k] ? '<span class="pick-perk">' + esc(STAT_SHORT[DB.stats[h]] || DB.stats[h] || "") + " " + st[k] + "</span>" : "").join("") + "</span>";
     }
     const roll = i.roll ? (i.roll.full ? " · ★ our God Roll" : " · " + i.roll.matched + "/" + i.roll.total + " God Roll perks") : "";
-    return '<button type="button" class="pick' + (on ? " on" : "") + '" data-pick-slot="' + slot.k + '" data-pick="' + i.id + '" aria-pressed="' + on + '">' +
+    return '<button type="button" class="pick' + (on ? " on" : "") + '" data-' + attr + '-slot="' + slot.k + '" data-' + attr + '="' + i.id + '" aria-pressed="' + on + '">' +
       '<img class="pick-icon" src="' + esc(img(iconOf(i))) + '" alt="" width="40" height="40" loading="lazy">' +
       '<span class="pick-main"><b>' + esc(i.def.n) + (on ? ' <span class="pick-chosen">Chosen</span>' : "") + "</b><small>" + i.power + " · " + esc(ownerLabel(i.owner)) + (i.equipped ? ", equipped" : "") + (i.tier ? " · tier " + i.tier : "") + esc(roll) + "</small>" + detail + "</span></button>";
   }
@@ -1227,6 +1230,119 @@
 
   // The Loadouts tab (like DIM's): loadouts saved in this browser, grouped
   // by class, then Destiny's in-game loadouts, then max Power.
+  // Editing a saved loadout (like DIM's loadout editor): swap or clear the
+  // item in each slot, take the subclass, artifact, mods or shaders and
+  // ornaments from what a character wears now, remove or add single mods.
+  // Changes stay in a draft until Save.
+  let loEditing = null; // { id, draft, slot (bucket hash with its picker open), q }
+  const bucketOfHash = h => (DB.items[h] || {}).b;
+  const plural = (n, w) => n + " " + w + (n === 1 ? "" : "s");
+  function armorModOptions(){
+    const owned = ownedPlugs(), seen = new Set(), byKind = {};
+    for (const h of Object.keys(DB.items).map(Number)){
+      const m = DB.items[h];
+      if (!m.k || isEmptyPlug(h) || isPlaceholderMod(h) || (owned && !owned.has(h)) || seen.has(m.k + m.n)) continue;
+      seen.add(m.k + m.n); (byKind[m.k] = byKind[m.k] || []).push(h);
+    }
+    return Object.keys(byKind).sort().map(k => '<optgroup label="' + esc(k) + '">' + byKind[k].sort((a, b) => DB.items[a].n.localeCompare(DB.items[b].n)).map(h => '<option value="' + h + '">' + esc(DB.items[h].n) + "</option>").join("") + "</optgroup>").join("");
+  }
+  function editPicks(){
+    const ed = loEditing, cur = ed.draft.items.find(x => bucketOfHash(x.hash) === ed.slot), q = ed.q.trim().toLowerCase();
+    const list = ITEMS.filter(i => i.def.b === ed.slot && fitsClass(i, ed.draft.cls) && (!q || i.text.includes(q) || (NOTES[i.id] || "").toLowerCase().includes(q)))
+      .sort((a, b) => (b.equipped - a.equipped) || rollRank(a, b) || a.def.n.localeCompare(b.def.n));
+    const shown = list.slice(0, 24);
+    return (shown.length ? shown.map(i => pickHtml({ k: ed.slot, pick: cur ? cur.id : "" }, i, "ed-pick")).join("") : '<p class="muted">Nothing here matches.</p>') +
+      (list.length > shown.length ? '<p class="muted ed-more">' + (list.length - shown.length) + " more: type to narrow it down.</p>" : "");
+  }
+  function editorHtml(){
+    const ed = loEditing, lo = ed.draft;
+    const owners = OWNERS.filter(o => lo.cls === 3 || o.cls === lo.cls);
+    const useBtns = what => owners.map(o => '<button type="button" class="act-btn" data-ed-use="' + what + '" data-to="' + o.id + '">Use your ' + esc(o.name) + "'s</button>").join("");
+    const slots = BUCKETS.map(b => {
+      const x = lo.items.find(y => bucketOfHash(y.hash) === b.hash), i = x && loItem(x), d = x && (DB.items[x.hash] || {});
+      const open = ed.slot === b.hash;
+      return '<div class="ed-slot"><span class="ed-label">' + esc(b.label.replace(/ Weapons$/, "")) + "</span>" +
+        '<span class="ed-item">' + (x ? '<img src="' + esc(img(i ? iconOf(i) : d.i)) + '" alt="" width="36" height="36" loading="lazy"><span><b>' + esc(d.n || "Unknown item") + "</b><small>" + (i ? i.power + " · " + esc(ownerLabel(i.owner)) : "You don't have it") + "</small></span>" : '<span class="muted">Empty</span>') + "</span>" +
+        '<span class="ed-btns"><button type="button" class="act-btn" data-ed-slot="' + b.hash + '" aria-expanded="' + open + '">' + (x ? "Change" : "Add") + '<span class="sr-only"> ' + esc(b.label) + "</span></button>" +
+        (x ? '<button type="button" class="act-btn" data-ed-clear="' + b.hash + '">Clear<span class="sr-only"> ' + esc(b.label) + "</span></button>" : "") + "</span>" +
+        (open ? '<div class="ed-picker"><label class="lo-name"><span>Filter</span><input type="text" id="ed-q" value="' + esc(ed.q) + '" placeholder="Name or perk…" autocomplete="off" spellcheck="false"></label>' +
+          '<div class="pick-list" id="ed-pick-list">' + editPicks() + "</div></div>" : "") + "</div>";
+    }).join("");
+    const nm = h => (DB.items[h] || {}).n || "Unknown";
+    const cos = Object.values(lo.cosmetics || {}).reduce((n, l) => n + l.length, 0);
+    const row = (label, value, what, removable) => '<div class="ed-extra"><span class="ed-label">' + label + '</span><span class="ed-value">' + value + '</span><span class="ed-btns">' + useBtns(what) +
+      (removable ? '<button type="button" class="act-btn" data-ed-drop="' + what + '">Remove<span class="sr-only"> ' + label + "</span></button>" : "") + "</span></div>";
+    const mods = (lo.mods || []).map((h, k) => '<span class="ed-mod">' + (DB.items[h] && DB.items[h].i ? '<img src="' + esc(img(DB.items[h].i)) + '" alt="" width="20" height="20" loading="lazy">' : "") + esc(nm(h)) +
+      '<button type="button" class="ed-x" data-ed-mod-del="' + k + '" aria-label="Remove ' + esc(nm(h)) + '">×</button></span>').join("");
+    return '<section class="lo-edit" aria-labelledby="lo-edit-h"><h3 class="lo-edit-title" id="lo-edit-h" tabindex="-1">Edit ' + esc(lo.name) + "</h3>" +
+      '<div class="ed-slots">' + slots + "</div>" +
+      row("Subclass", lo.subclass ? esc(nm(lo.subclass.hash)) + " with " + plural(Object.keys(lo.subclass.sockets || {}).length, "choice") : '<span class="muted">None</span>', "subclass", !!lo.subclass) +
+      row("Artifact", lo.artifact ? esc(nm(lo.artifact.hash)) + " with " + plural(Object.keys(lo.artifact.sockets || {}).length, "perk") : '<span class="muted">None</span>', "artifact", !!lo.artifact) +
+      row("Shaders &amp; ornaments", cos ? (cos === 1 ? "1 shader or ornament" : cos + " shaders and ornaments") : '<span class="muted">None</span>', "cosmetics", cos > 0) +
+      row("Armor mods", (lo.mods || []).length ? plural(lo.mods.length, "mod") : '<span class="muted">None</span>', "mods", (lo.mods || []).length > 0) +
+      ((lo.mods || []).length ? '<div class="ed-mods">' + mods + "</div>" : "") +
+      '<div class="ed-add"><label class="lo-name"><span>Add mod</span><select id="ed-mod-add" class="chip chip-select">' + armorModOptions() + "</select></label>" +
+        '<button type="button" class="act-btn" id="ed-mod-go">Add</button></div>' +
+      '<div class="act-row"><button type="button" class="act-btn" id="ed-save">Save changes</button><button type="button" class="act-btn" id="ed-cancel">Cancel</button></div></section>';
+  }
+  // Wire the open editor (called from renderLoadouts).
+  function wireEditor(box){
+    const ed = loEditing, lo = ed.draft;
+    const again = sel => { renderLoadouts(); const t = box.querySelector(sel); if (t) t.focus(); };
+    const close = () => { const id = ed.id; loEditing = null; again('[data-lo-edit="' + id + '"]'); };
+    box.querySelector(".lo-edit").addEventListener("keydown", e => { if (e.key === "Escape" && e.target.id !== "ed-q"){ e.preventDefault(); close(); } });
+    box.querySelectorAll("[data-ed-slot]").forEach(b => b.addEventListener("click", () => {
+      const h = +b.dataset.edSlot; ed.slot = ed.slot === h ? null : h; ed.q = "";
+      again(ed.slot ? "#ed-q" : '[data-ed-slot="' + h + '"]');
+    }));
+    const q = $("ed-q");
+    if (q){
+      q.addEventListener("input", () => { ed.q = q.value; $("ed-pick-list").innerHTML = editPicks(); wirePicks(); });
+      q.addEventListener("keydown", e => { if (e.key === "Escape"){ e.preventDefault(); const h = ed.slot; ed.slot = null; again('[data-ed-slot="' + h + '"]'); } });
+    }
+    const wirePicks = () => box.querySelectorAll("[data-ed-pick]").forEach(b => b.addEventListener("click", () => {
+      const i = ITEMS.find(x => x.id === b.dataset.edPick), h = ed.slot;
+      lo.items = lo.items.filter(x => bucketOfHash(x.hash) !== h).concat([{ id: i.id, hash: i.hash }]);
+      lo.items.sort((a, c) => BUCKETS.findIndex(x => x.hash === bucketOfHash(a.hash)) - BUCKETS.findIndex(x => x.hash === bucketOfHash(c.hash)));
+      ed.slot = null; again('[data-ed-slot="' + h + '"]');
+    }));
+    wirePicks();
+    box.querySelectorAll("[data-ed-clear]").forEach(b => b.addEventListener("click", () => {
+      const h = +b.dataset.edClear; lo.items = lo.items.filter(x => bucketOfHash(x.hash) !== h); if (ed.slot === h) ed.slot = null;
+      again('[data-ed-slot="' + h + '"]');
+    }));
+    box.querySelectorAll("[data-ed-use]").forEach(b => b.addEventListener("click", () => {
+      const what = b.dataset.edUse, snap = snapshot(b.dataset.to);
+      lo[what] = snap[what];
+      again('[data-ed-use="' + what + '"][data-to="' + b.dataset.to + '"]');
+      toast("Took " + (what === "cosmetics" ? "the shaders and ornaments" : what === "mods" ? "the armor mods" : "the " + what) + " your " + ownerLabel(b.dataset.to) + " wears now.", "ok");
+    }));
+    box.querySelectorAll("[data-ed-drop]").forEach(b => b.addEventListener("click", () => {
+      const what = b.dataset.edDrop;
+      lo[what] = what === "mods" ? [] : what === "cosmetics" ? {} : null;
+      again('[data-ed-use="' + what + '"], #ed-save');
+    }));
+    box.querySelectorAll("[data-ed-mod-del]").forEach(b => b.addEventListener("click", () => {
+      lo.mods = lo.mods.filter((x, k) => k !== +b.dataset.edModDel);
+      again(lo.mods.length ? '[data-ed-mod-del="' + Math.min(+b.dataset.edModDel, lo.mods.length - 1) + '"]' : "#ed-mod-add");
+    }));
+    $("ed-mod-go").addEventListener("click", () => {
+      const h = +$("ed-mod-add").value; if (!h) return;
+      lo.mods = (lo.mods || []).concat([h]);
+      again("#ed-mod-go");
+      toast("Added " + DB.items[h].n + ". Equipping the loadout puts it on a piece with a free socket for it.", "ok");
+    });
+    $("ed-cancel").addEventListener("click", close);
+    $("ed-save").addEventListener("click", () => {
+      const all = readLoadouts(), at = all.findIndex(x => x.id === ed.id);
+      if (at >= 0) all[at] = lo; else all.push(lo);
+      writeLoadouts(all);
+      loEditing = null; renderLoadoutCount();
+      again('[data-lo-edit="' + lo.id + '"]');
+      toast("Saved your changes to " + lo.name + ".", "ok");
+    });
+  }
+
   const loadoutsShown = () => !$("view-loadouts").hidden;
   // "Delete my share links", and the note that says what that means before it happens.
   function sharesHtml(){
@@ -1250,7 +1366,7 @@
     const box = $("view-loadouts"), list = readLoadouts();
     // A redraw replaces the buttons: keep keyboard focus on the same control.
     const was = box.contains(document.activeElement) ? document.activeElement : null;
-    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename", "data-game-edit", "data-game-snap", "data-lo-share", "data-lo-copy"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
+    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename", "data-game-edit", "data-game-snap", "data-lo-share", "data-lo-copy", "data-lo-edit"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
       || (was && was.id ? "#" + was.id : null);
     const typed = { name: ($("lo-name") || {}).value || "", dim: ($("lo-dim") || {}).value || "", rename: $("lo-rename-input") ? $("lo-rename-input").value : null };
     const byId = new Map(ITEMS.map(i => [i.id, i]));
@@ -1289,6 +1405,7 @@
       const extra = who ? extrasStatus(lo, who.id) : [];
       const on = !!who && !gone && worn === lo.items.length && extra.every(x => x.ok);
       const status = who ? '<p class="lo-status">On your ' + esc(who.name) + ": equipped " + worn + " of " + lo.items.length + extra.map(x => " · " + esc(x.text)).join("") + "</p>" : "";
+      if (loEditing && loEditing.id === lo.id) return { key: "r-" + lo.id, name: lo.name, gone, on, badge: loBadge(first.i, ""), detail: editorHtml() };
       return { key: "r-" + lo.id, name: lo.name, gone, on, badge: loBadge(first.i, ""),
         detail: (loRenaming === lo.id
             ? '<form class="lo-rename" data-lo-rename-form="' + lo.id + '"><label class="lo-name"><span>Name</span><input type="text" id="lo-rename-input" maxlength="40" value="' + esc(lo.name) + '" autocomplete="off" spellcheck="false"></label>' +
@@ -1300,6 +1417,7 @@
         '<div class="lo-items" aria-hidden="true">' + lo.items.map((x, k) => mini(x.hash, !!found[k], found[k])).join("") + "</div>" + status + note +
         '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
           (gone || copies ? '<button type="button" class="act-btn" data-lo-review="' + lo.id + '">Choose copies<span class="sr-only"> for ' + esc(lo.name) + "</span></button>" : "") +
+          '<button type="button" class="act-btn" data-lo-edit="' + lo.id + '">Edit<span class="sr-only"> ' + esc(lo.name) + "</span></button>" +
           (loRenaming === lo.id ? "" : '<button type="button" class="act-btn" data-lo-rename="' + lo.id + '">Rename<span class="sr-only"> ' + esc(lo.name) + "</span></button>") +
           '<button type="button" class="act-btn" data-lo-share="' + lo.id + '">Share<span class="sr-only"> ' + esc(lo.name) + "</span></button>" +
           '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" + share };
@@ -1446,6 +1564,14 @@
       renderLoadouts();
       const h = $("lo-h-review"); h.scrollIntoView({ block: "start" }); h.focus();
     }));
+    box.querySelectorAll("[data-lo-edit]").forEach(b => b.addEventListener("click", () => {
+      const lo = readLoadouts().find(x => x.id === b.dataset.loEdit);
+      if (!lo) return;
+      loEditing = { id: lo.id, draft: JSON.parse(JSON.stringify(Object.assign({ mods: [], cosmetics: {}, subclass: null, artifact: null }, lo))), slot: null, q: "" };
+      loRenaming = null; loOpen = "r-" + lo.id;
+      renderLoadouts(); $("lo-edit-h").focus();
+    }));
+    if (loEditing && box.querySelector(".lo-edit")) wireEditor(box);
     box.querySelectorAll("[data-lo-share]").forEach(b => b.addEventListener("click", async () => {
       const lo = readLoadouts().find(x => x.id === b.dataset.loShare);
       if (!lo || b.getAttribute("aria-disabled") === "true") return;
@@ -1736,17 +1862,244 @@
     return true;
   }
 
+  // ---------------- search filters (like DIM's) ----------------
+  // Plain words match name, type, perks and notes. Filters: is:/not:,
+  // in:, tag:, class:, slot:, type:, name:, perk:, note:, power:, tier:,
+  // stat:<name|total>:. Terms are ANDed; "or", "-"/"not" and brackets
+  // work too. Unknown filters are ignored and named under the box.
+  const RARITY = { exotic: 6, legendary: 5, rare: 4, uncommon: 3, common: 2 };
+  const SLOT_WORDS = { kinetic: 1498876634, energy: 2465295065, power: 953998645, heavy: 953998645, helmet: 3448274439, gauntlets: 3551918588, arms: 3551918588, chest: 14239492, legs: 20886954, leg: 20886954, classitem: 1585787867, class: 1585787867, mark: 1585787867, bond: 1585787867, cloak: 1585787867 };
+  const CLASS_WORDS = { titan: 0, hunter: 1, warlock: 2 };
+  const STATE_CRAFTED = 8;
+  const squash = t => t.toLowerCase().replace(/[^a-z0-9]/g, "");
+  // Every perk an item has or can switch to (perk: matches either).
+  const perkNames = item => item.perkText || (item.perkText = [...new Set(item.plugs.concat(...Object.values(item.alts).map(a => a.map(x => x.plugItemHash))))]
+    .map(h => DB.items[h] && showPlug(h) && !isMod(DB.items[h]) ? DB.items[h].n.toLowerCase() : "").filter(Boolean).join("|"));
+  function numTest(text){
+    const m = /^(>=|<=|>|<|=)?(\d+(?:\.\d+)?)$/.exec(text);
+    if (!m) return null;
+    const n = +m[2];
+    return { ">=": v => v >= n, "<=": v => v <= n, ">": v => v > n, "<": v => v < n }[m[1]] || (v => v === n);
+  }
+  function statValue(item, name){
+    if (name === "total") return item.def.t === 2 ? statTotal(item) : null;
+    for (const st of Object.values(item.stats)){ const n = DB.stats[st.statHash]; if (n && squash(n) === name) return st.value; }
+    return null;
+  }
+  // One term -> predicate, or a string naming what's wrong with it.
+  function termTest(raw, ctx){
+    const unq = v => v.replace(/^"|"$/g, "");
+    const m = /^([a-z]+):(.*)$/.exec(raw);
+    if (!m){ const w = unq(raw); return item => item.text.includes(w) || (NOTES[item.id] || "").toLowerCase().includes(w); }
+    const key = m[1], val = unq(m[2]);
+    if (key === "not") { const t = termTest("is:" + val, ctx); return typeof t === "string" ? t : item => !t(item); }
+    if (key === "is"){
+      if (val in RARITY) return item => item.def.r === RARITY[val];
+      if (CLASS_WORDS[val] != null) return item => item.def.t === 2 && item.def.c === CLASS_WORDS[val];
+      const dmg = Object.keys(DB.damage).find(h => squash(DB.damage[h].n) === val);
+      if (dmg) return item => item.def.t === 3 && String(item.damage) === dmg;
+      const tags = TAG_LIST.map(t => t[0]);
+      if (tags.includes(val)) return item => TAGS[item.id] === val;
+      const is = {
+        weapon: i => i.def.t === 3, armor: i => i.def.t === 2,
+        equipped: i => i.equipped, unequipped: i => !i.equipped,
+        locked: i => !!(i.state & STATE_LOCKED), unlocked: i => !(i.state & STATE_LOCKED),
+        masterwork: i => !!(i.state & STATE_MASTERWORK), masterworked: i => !!(i.state & STATE_MASTERWORK),
+        crafted: i => !!(i.state & STATE_CRAFTED),
+        dupe: i => ctx.dupes().get(i.hash) > 1, godroll: i => !!(i.roll && i.roll.full),
+        set: i => !!i.set, tagged: i => !!TAGS[i.id], hasnote: i => !!NOTES[i.id],
+        inloadout: i => ctx.inLoadout().has(i.id), invault: i => i.owner === "vault", ornamented: i => !!i.ornament
+      };
+      return is[val] || ("is:" + val);
+    }
+    if (key === "in"){
+      if (val === "vault") return i => i.owner === "vault";
+      if (CLASS_WORDS[val] != null) return i => i.owner !== "vault" && (ownerOf(i.owner) || {}).cls === CLASS_WORDS[val];
+      return "in:" + val;
+    }
+    if (key === "tag"){
+      if (val === "none") return i => !TAGS[i.id];
+      if (val === "any") return i => !!TAGS[i.id];
+      return TAG_LIST.some(t => t[0] === val) ? i => TAGS[i.id] === val : "tag:" + val;
+    }
+    if (key === "class") return CLASS_WORDS[val] != null ? i => i.def.t === 2 && i.def.c === CLASS_WORDS[val] : val === "any" ? i => i.def.t === 2 && i.def.c === 3 : "class:" + val;
+    if (key === "slot") return SLOT_WORDS[squash(val)] ? i => i.def.b === SLOT_WORDS[squash(val)] : "slot:" + val;
+    if (key === "type"){ const w = squash(val); return w ? i => squash(i.def.y || "").includes(w) : "type:"; }
+    if (key === "name") return val ? i => i.def.n.toLowerCase().includes(val) : "name:";
+    if (key === "perk") return val ? i => perkNames(i).includes(val) : "perk:";
+    if (key === "note") return val ? i => (NOTES[i.id] || "").toLowerCase().includes(val) : "note:";
+    if (key === "power" || key === "tier"){ const t = numTest(val); return t ? i => t(key === "power" ? i.power : i.tier) : key + ":" + val; }
+    if (key === "stat"){
+      const sm = /^([a-z0-9]+):(.+)$/.exec(val), t = sm && numTest(sm[2]);
+      return t ? i => { const v = statValue(i, sm[1]); return v != null && t(v); } : "stat:" + val;
+    }
+    return key + ":";
+  }
+  // "kill clip", perk:"kill clip", -is:junk, ( ), or, not
+  const TOKEN = /-?[a-z]+:"[^"]*"?|-?"[^"]*"?|[()]|[^\s()]+/g;
+  function compileSearch(q){
+    const tokens = (q.toLowerCase().match(TOKEN) || []).filter(t => t !== "and");
+    const bad = [];
+    let dupes = null, loIds = null;
+    const ctx = {
+      dupes: () => dupes || (dupes = ITEMS.reduce((m, i) => m.set(i.hash, (m.get(i.hash) || 0) + 1), new Map())),
+      inLoadout: () => loIds || (loIds = new Set(readLoadouts().flatMap(lo => lo.items.map(x => x.id)).concat(OWNERS.flatMap(o => gameLoadouts(o.id).flatMap(g => g.ids || [])))))
+    };
+    let k = 0;
+    const any = () => true;
+    function orExpr(){
+      const parts = [andExpr()];
+      while (tokens[k] === "or"){ k++; parts.push(andExpr()); }
+      return parts.length === 1 ? parts[0] : i => parts.some(f => f(i));
+    }
+    function andExpr(){
+      const parts = [];
+      while (k < tokens.length && tokens[k] !== ")" && tokens[k] !== "or") parts.push(unary());
+      return parts.length === 1 ? parts[0] : parts.length ? i => parts.every(f => f(i)) : any;
+    }
+    function unary(){
+      const t = tokens[k++];
+      if (t === "not" && k < tokens.length){ const f = unary(); return i => !f(i); }
+      if (t === "("){ const f = orExpr(); if (tokens[k] === ")") k++; return f; }
+      if (t.charAt(0) === "-" && t.length > 1){ const f = term(t.slice(1)); return i => !f(i); }
+      return term(t);
+    }
+    function term(t){ const f = termTest(t, ctx); if (typeof f === "string"){ bad.push(f); return any; } return f; }
+    let test = any;
+    while (k < tokens.length){ const f = orExpr(); const prev = test; test = prev === any ? f : i => prev(i) && f(i); if (tokens[k] === ")") k++; }
+    return { test, bad, empty: !tokens.length };
+  }
+
+  // Suggestions while typing: filter words, then perk names and item types.
+  const FILTER_WORDS = ["is:weapon", "is:armor", "is:exotic", "is:legendary", "is:equipped", "is:locked", "is:unlocked", "is:masterwork", "is:crafted",
+    "is:dupe", "is:godroll", "is:set", "is:tagged", "is:hasnote", "is:inloadout", "is:ornamented", "is:kinetic", "is:solar", "is:arc", "is:void", "is:stasis", "is:strand",
+    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "tag:none", "tag:any",
+    "in:vault", "in:titan", "in:hunter", "in:warlock", "class:titan", "class:hunter", "class:warlock", "class:any",
+    "slot:kinetic", "slot:energy", "slot:power", "slot:helmet", "slot:gauntlets", "slot:chest", "slot:legs", "slot:classitem",
+    "power:>", "power:<", "tier:>=", "tier:5", "stat:total:>=", "stat:weapons:>", "stat:health:>", "stat:class:>", "stat:grenade:>", "stat:super:>", "stat:melee:>",
+    "perk:", "type:", "name:", "note:", "not:", "or"];
+  function suggestionsFor(q){
+    const tail = (q.match(/(?:^|\s|\()(-?[^\s()]*)$/) || [, ""])[1].toLowerCase().replace(/^-/, "");
+    if (tail.length < 2 && !tail.includes(":")) return [];
+    const out = FILTER_WORDS.filter(w => w.startsWith(tail) && w !== tail);
+    const pm = /^(perk|type):"?(.*)$/.exec(tail);
+    if (pm && pm[2].length >= 2){
+      const names = new Set();
+      for (const i of ITEMS){
+        if (pm[1] === "type"){ if (i.def.y) names.add(i.def.y); continue; }
+        for (const n of perkNames(i).split("|")) if (n) names.add(n);
+      }
+      [...names].filter(n => n.toLowerCase().includes(pm[2])).sort((a, b) => a.localeCompare(b)).slice(0, 8)
+        .forEach(n => out.push(pm[1] + ":" + (/\s/.test(n) ? '"' + n.toLowerCase() + '"' : n.toLowerCase())));
+    }
+    return out.slice(0, 8);
+  }
+  const SEARCH_EXAMPLES = [
+    ["is:dupe -is:godroll", "Duplicates that aren't our God Roll"],
+    ["is:weapon is:junk", "Weapons you tagged Junk"],
+    ['perk:"kill clip" type:"hand cannon"', "Hand cannons that have or can switch to Kill Clip"],
+    ["is:armor stat:total:>=65", "Armor with a stat total of 65 or more"],
+    ["in:vault is:exotic is:dupe", "Exotics you have more than one of, in the vault"],
+    ["is:legendary -is:locked -is:inloadout -is:tagged", "Unlocked, untagged legendaries no loadout uses"],
+    ["(is:solar or is:void) slot:energy", "Solar or Void energy weapons"],
+    ["power:>=450 tier:5", "Tier 5 gear at 450 Power or more"]
+  ];
+  function searchHelpHtml(){
+    return '<div class="search-help panel-card" id="search-help" hidden><h2 class="dlg-label">Search filters</h2>' +
+      '<p class="muted">Combine terms with spaces (all must match), <b>or</b>, brackets, and <b>-</b> or <b>not</b> to exclude. Put names with spaces in quotes.</p>' +
+      '<ul class="search-examples">' + SEARCH_EXAMPLES.map(([q, what]) => '<li><button type="button" class="act-btn" data-search="' + esc(q) + '"><code translate="no">' + esc(q) + "</code></button><span>" + esc(what) + "</span></li>").join("") + "</ul>" +
+      '<p class="muted search-words"><b>is:</b> weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive) · ' +
+        "<b>in:</b> vault, titan, hunter, warlock · <b>tag:</b> a tag, none, any · <b>class:</b> titan, hunter, warlock, any · <b>slot:</b> kinetic, energy, power, helmet, gauntlets, chest, legs, classitem · " +
+        "<b>type:</b>, <b>name:</b>, <b>perk:</b>, <b>note:</b> text · <b>power:</b>, <b>tier:</b> a number with &gt;, &lt;, &gt;=, &lt;= · <b>stat:</b>total, weapons, health, class, grenade, super, melee or a weapon stat, then a number (stat:range:&gt;60)</p></div>";
+  }
+
+  // Bulk actions on what's shown (DIM's "act on search results"): tag,
+  // lock, unlock, move. Equipped items aren't moved. More than 5 items
+  // asks for a second tap.
+  function renderBulk(){
+    const row = $("bulk-row");
+    if (!row) return;
+    const active = !!state.q.trim() || !!(state.type || state.flags.size || state.tag);
+    if (!active || !SHOWN.length){ row.hidden = true; row.innerHTML = ""; return; }
+    const was = row.contains(document.activeElement) ? document.activeElement.id : null;
+    const keep = { tag: ($("bulk-tag") || {}).value, move: ($("bulk-move") || {}).value };
+    const n = SHOWN.length, unlocked = SHOWN.filter(i => !(i.state & STATE_LOCKED)).length;
+    const items = n + " item" + (n === 1 ? "" : "s");
+    row.hidden = false;
+    row.innerHTML = '<span class="bulk-count">' + items + " shown:</span>" +
+      '<span class="bulk-group"><label class="bulk-field" for="bulk-tag">Tag as</label><select class="chip chip-select" id="bulk-tag">' +
+        TAG_LIST.map(([t, name]) => '<option value="' + t + '">' + esc(name) + "</option>").join("") + '<option value="">No tag</option></select>' +
+        '<button type="button" class="act-btn" id="bulk-tag-go">Tag ' + items + "</button></span>" +
+      '<span class="bulk-group"><button type="button" class="act-btn" id="bulk-lock"' + (unlocked ? "" : ' aria-disabled="true"') + ">Lock " + unlocked + "</button>" +
+        '<button type="button" class="act-btn" id="bulk-unlock"' + (n - unlocked ? "" : ' aria-disabled="true"') + ">Unlock " + (n - unlocked) + "</button></span>" +
+      '<span class="bulk-group"><label class="bulk-field" for="bulk-move">Move to</label><select class="chip chip-select" id="bulk-move">' +
+        OWNERS.map(o => '<option value="' + o.id + '">' + esc(o.name) + "</option>").join("") + '<option value="vault">Vault</option></select>' +
+        '<button type="button" class="act-btn" id="bulk-move-go">Move</button></span>';
+    if (keep.tag != null) $("bulk-tag").value = keep.tag;
+    if (keep.move) $("bulk-move").value = keep.move;
+    if (was && $(was)) $(was).focus();
+  }
+  // Second tap for big batches: the button says what will happen.
+  function bulkConfirm(b, n, label){
+    if (n <= 5 || b.dataset.confirm === "1") return true;
+    b.dataset.confirm = "1"; b.textContent = "Tap again: " + label;
+    return false;
+  }
+  function bulkClick(e){
+    const b = e.target.closest("button");
+    if (!b || b.getAttribute("aria-disabled") === "true") return;
+    const list = SHOWN.slice(), n = list.length;
+    if (b.id === "bulk-tag-go"){
+      const tag = $("bulk-tag").value, name = tag ? (TAG_LIST.find(t => t[0] === tag) || [, tag])[1] : "";
+      if (!bulkConfirm(b, n, tag ? "tag " + n + " as " + name : "remove tags from " + n)) return;
+      const now = Date.now();
+      for (const i of list){ tag ? (TAGS[i.id] = tag) : delete TAGS[i.id]; TAG_AT[i.id] = now; }
+      saveTags(); tagsChanged(); renderItems();
+      toast(tag ? "Tagged " + n + " item" + (n === 1 ? "" : "s") + " " + name + "." : "Removed tags from " + n + " item" + (n === 1 ? "" : "s") + ".", "ok");
+      return;
+    }
+    if (b.id === "bulk-lock" || b.id === "bulk-unlock"){
+      const lock = b.id === "bulk-lock", todo = list.filter(i => !!(i.state & STATE_LOCKED) !== lock);
+      if (busyNotice() || !bulkConfirm(b, todo.length, (lock ? "lock " : "unlock ") + todo.length)) return;
+      let k = 0;
+      run((lock ? "Locking " : "Unlocking ") + todo.length + " items", () => (lock ? "Locked " : "Unlocked ") + k + " item" + (k === 1 ? "" : "s") + ".",
+        async () => { for (const i of todo){ await setLock(i, lock); k++; toast((lock ? "Locking " : "Unlocking ") + k + " of " + todo.length + "…", "busy"); } });
+      return;
+    }
+    if (b.id === "bulk-move-go"){
+      const dest = $("bulk-move").value, where = dest === "vault" ? "the vault" : "your " + ownerLabel(dest);
+      const todo = list.filter(i => i.owner !== dest && !i.equipped), equipped = list.filter(i => i.owner !== dest && i.equipped).length;
+      if (!todo.length) return toast("Nothing to move" + (equipped ? ": equipped items stay where they are." : ": they're all there already."), "ok");
+      if (busyNotice() || !bulkConfirm(b, todo.length, "move " + todo.length + " to " + (dest === "vault" ? "vault" : ownerLabel(dest)))) return;
+      let moved = 0;
+      const skipped = [];
+      run("Moving " + todo.length + " items to " + where,
+        () => "Moved " + moved + " item" + (moved === 1 ? "" : "s") + " to " + where + "." + (skipped.length ? " " + skipped.length + " didn't fit or couldn't move." : "") + (equipped ? " Equipped items stay where they are." : ""),
+        async () => {
+          for (const i of todo){
+            // A character holds 9 per slot: stop filling a slot that's full.
+            if (dest !== "vault" && ITEMS.filter(x => x.owner === dest && !x.equipped && x.def.b === i.def.b).length >= INVENTORY_CAP){ skipped.push(i); continue; }
+            try { await moveTo(i, dest); moved++; }
+            catch (err){ if (FATAL.test(err.status || "")) throw err; skipped.push(i); }
+            toast("Moving " + (moved + skipped.length) + " of " + todo.length + "…", "busy");
+          }
+        });
+    }
+  }
+
   // Search hides and shows the tiles already on the page instead of
   // rebuilding them (a rebuild of ~1,250 tiles took 200-290ms per keystroke
   // in Firefox). Slots and class rows left empty hide too, the counts follow
   // what's visible, and vault previews open up so no match stays clipped.
   function applySearch(){
-    const root = $("buckets"), words = state.q ? state.q.split(/\s+/) : [];
+    const root = $("buckets"), search = compileSearch(state.q), words = search.empty ? [] : [state.q];
     const byId = new Map(ITEMS.map(i => [i.id, i]));
     let shown = 0;
+    SHOWN = [];
     root.querySelectorAll(".item-tile[data-id]").forEach(t => {
       const item = byId.get(t.dataset.id);
-      const hit = !words.length || !!(item && words.every(w => item.text.includes(w) || (NOTES[item.id] || "").toLowerCase().includes(w)));
+      const hit = !!item && (!words.length || search.test(item));
+      if (hit) SHOWN.push(item);
       if (t.hidden === hit) t.hidden = !hit; // touch only tiles that change
       if (hit) shown++;
     });
@@ -1760,6 +2113,9 @@
     const empty = $("search-empty");
     if (empty) empty.hidden = !(words.length && !shown);
     $("locker-count").textContent = "Showing " + shown + " of " + $("locker-count").dataset.total + " items";
+    const hint = $("search-hint");
+    if (hint){ hint.textContent = search.bad.length ? "Not a filter: " + search.bad.join(", ") + ". Ignored; see Filters for the list." : ""; hint.hidden = !search.bad.length; }
+    renderBulk();
   }
 
   function tileHtml(item){
@@ -2049,6 +2405,23 @@
     if (!$("locker-toast").classList.contains("busy")) toast("One moment, syncing with Bungie…", "busy");
     return true;
   }
+  // After fresh data: redraw an open item popup, keeping the open perk/mod
+  // (and its list) and focus; close it if the item is gone.
+  function refreshDialog(){
+    const dlg = $("item-dialog");
+    if (dlg.open && dlg.dataset.item){
+      if (!ITEMS.some(i => i.id === dlg.dataset.item)) dlg.close();
+      else {
+        // Redraw with fresh data but keep the open perk/mod (and its list) and focus.
+        const pressed = dlg.querySelector('[data-plug][aria-pressed="true"]'), act = document.activeElement;
+        const key = el => el && el.dataset && ["socket", "modPick", "act", "tag"].map(k => el.dataset[k] != null ? "[data-" + k.replace(/[A-Z]/g, c => "-" + c.toLowerCase()) + '="' + el.dataset[k] + '"]' : "").join("") + (el.dataset.plug ? '[data-plug="' + el.dataset.plug + '"]' : "") + (el.dataset.to ? '[data-to="' + el.dataset.to + '"]' : "");
+        const pk = pressed && key(pressed), ak = act && dlg.contains(act) ? (act.id ? "#" + act.id : key(act)) : null;
+        openItem(dlg.dataset.item);
+        const again = pk && dlg.querySelector(pk); if (again) again.click();
+        const f = ak && dlg.querySelector(ak); if (f) f.focus();
+      }
+    }
+  }
   let syncTimer = 0;
   function scheduleSync(){ clearTimeout(syncTimer); syncTimer = setTimeout(sync, 1500); }
   async function sync(){
@@ -2057,7 +2430,7 @@
     try {
       PROFILE = await loadProfile(); buildModel(); render(); resolvePostmasterNames();
       const dlg = $("item-dialog");
-      if (dlg.open && dlg.dataset.item) ITEMS.some(i => i.id === dlg.dataset.item) ? openItem(dlg.dataset.item) : dlg.close();
+      refreshDialog();
     } catch (e){ /* a missed sync is harmless: the journal keeps the page right */ }
     finally {
       document.body.classList.remove("locker-busy");
@@ -2117,6 +2490,32 @@
     return p && p.n && !/^(empty|locked) /i.test(p.n) && !HIDE_PLUG.test(p.y || "") && SHOW_PLUG.test(p.y || "");
   }
   const isIntrinsic = p => /intrinsic|frame|archetype/i.test(p.y || "");
+  // Mods the player has unlocked (Bungie's plug sets, sent with sockets);
+  // null when unknown (sample data), and then every mod of the kind is offered.
+  let OWNED_PLUGS = null, OWNED_FOR = null;
+  function ownedPlugs(){
+    if (OWNED_FOR === PROFILE) return OWNED_PLUGS;
+    const set = new Set(), add = sets => { for (const k in sets || {}) for (const p of sets[k]) if (p.canInsert !== false && p.enabled !== false) set.add(p.plugItemHash); };
+    add(PROFILE.profilePlugSets && PROFILE.profilePlugSets.data && PROFILE.profilePlugSets.data.plugs);
+    const cps = (PROFILE.characterPlugSets && PROFILE.characterPlugSets.data) || {};
+    for (const c in cps) add(cps[c].plugs);
+    OWNED_FOR = PROFILE; OWNED_PLUGS = set.size ? set : null;
+    return OWNED_PLUGS;
+  }
+  // What can go in a mod socket: armor mods of the socket's kind you've
+  // unlocked (plus emptying it), or the socket's own list (weapon mods).
+  function modChoices(item, idx){
+    const cur = item.plugs[idx], kind = kindOf(cur);
+    let list;
+    if (kind){
+      const owned = ownedPlugs(), seen = new Set();
+      list = Object.keys(DB.items).map(Number).filter(h => DB.items[h].k === kind && !isEmptyPlug(h) && !isPlaceholderMod(h) && (!owned || owned.has(h)))
+        .sort((a, b) => DB.items[a].n.localeCompare(DB.items[b].n))
+        .filter(h => !seen.has(DB.items[h].n) && seen.add(DB.items[h].n));
+      if (emptyPlug(kind) && !isEmptyPlug(cur)) list.push(emptyPlug(kind));
+    } else list = (item.alts[idx] || []).filter(a => a.canInsert !== false).map(a => a.plugItemHash).filter(h => DB.items[h]);
+    return list.filter(h => h !== cur);
+  }
   const isMod = p => /mod$/i.test(p.y || "");
 
   // DIM's stat order, with its short labels.
@@ -2146,9 +2545,9 @@
     return '<svg class="recoil-compass" viewBox="0 0 2 1" role="img" aria-label="Recoil direction ' + value + '"><circle class="dial" r="1" cx="1" cy="1"></circle>' + inner + "</svg>";
   }
 
-  function dotHtml(hash, cls, ours){
+  function dotHtml(hash, cls, ours, socket){
     const p = DB.items[hash];
-    return '<button type="button" class="perk-dot ' + cls + '" data-plug="' + hash + '" aria-pressed="false" title="' + esc(p.n) + '" aria-label="' +
+    return '<button type="button" class="perk-dot ' + cls + '" data-plug="' + hash + '" data-socket="' + socket + '" aria-pressed="false" title="' + esc(p.n) + '" aria-label="' +
       esc(p.n + (cls === "sel" ? " (on this copy)" : " (can swap to)") + (ours ? ", in our God Roll" : "")) + '">' +
       (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="44" height="44">' : "") + (ours ? '<span class="ours" aria-hidden="true"></span>' : "") + "</button>";
   }
@@ -2247,6 +2646,11 @@
     let intrinsic = "";
     const cols = [], mods = [];
     item.plugs.forEach((h, idx) => {
+      // An empty armor mod socket shows as a square to fill.
+      if (kindOf(h) && isEmptyPlug(h) && DB.items[h]){
+        mods.push('<button type="button" class="mod-sq empty" data-plug="' + h + '" data-socket="' + idx + '" aria-pressed="false" title="' + esc(DB.items[h].n) + '" aria-label="' + esc(DB.items[h].n) + '"><span aria-hidden="true">+</span></button>');
+        return;
+      }
       if (!showPlug(h)) return;
       const p = DB.items[h];
       if (isIntrinsic(p) && !intrinsic){
@@ -2255,11 +2659,11 @@
         intrinsic = '<div class="intrinsic">' + (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="42" height="42">' : "") + "<div><b>" + esc(p.n) + "</b><small>" + esc(detail) + "</small></div></div>";
       } else if (isMod(p)){
         // Mod slots list every mod you own as an option; show only the one in it.
-        mods.push('<button type="button" class="mod-sq" data-plug="' + h + '" aria-pressed="false" title="' + esc(p.n) + '" aria-label="' + esc(p.n) + '">' +
+        mods.push('<button type="button" class="mod-sq" data-plug="' + h + '" data-socket="' + idx + '" aria-pressed="false" title="' + esc(p.n) + '" aria-label="' + esc(p.n) + '">' +
           (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="44" height="44">' : "") + "</button>");
       } else {
         const alts = (item.alts[idx] || []).map(a => a.plugItemHash).filter(a => a !== h && showPlug(a));
-        cols.push('<div class="perk-col">' + dotHtml(h, "sel", ourPerks.has(h)) + alts.map(a => dotHtml(a, "alt", ourPerks.has(a))).join("") + "</div>");
+        cols.push('<div class="perk-col">' + dotHtml(h, "sel", ourPerks.has(h), idx) + alts.map(a => dotHtml(a, "alt", ourPerks.has(a), idx)).join("") + "</div>");
       }
     });
 
@@ -2299,13 +2703,49 @@
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
       actions +
       '<div class="dlg-body">' + blocks.join("") +
-        (hasPlugs ? '<div class="plug-info" id="plug-info" aria-live="polite">Tap a perk or mod to see what it does.</div>' : "") + "</div>");
+        (hasPlugs ? '<div class="plug-info" id="plug-info" aria-live="polite">Tap a perk or mod to see what it does' + (d.t === 3 ? ", or to switch to it" : "") + ".</div>" +
+          '<div class="plug-change" id="plug-change"></div>' : "") + "</div>");
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
+    // Switching perks and mods (DIM's popup): a perk you can switch to
+    // gets "Use this perk"; a mod socket lists the mods you can put there.
+    // Bungie only changes gear a character holds, so a vault item moves to
+    // your last-played character first.
+    const reopenItem = () => { if (dlg.open && dlg.dataset.item === item.id) openItem(item.id); };
+    const holder = item.owner !== "vault" ? item.owner : (OWNERS.slice().sort((a, b) => b.played - a.played)[0] || {}).id;
+    const vaultNote = item.owner === "vault" ? '<p class="muted plug-note">It\'s in the vault, so it moves to your ' + esc(ownerLabel(holder)) + " first.</p>" : "";
+    const changePlug = (idx, hash) => {
+      if (busyNotice()) return;
+      const p = DB.items[hash] || { n: "that" };
+      const what = isEmptyPlug(hash) ? "Emptying the socket on " + d.n : "Putting " + p.n + " on " + d.n;
+      run(what, isEmptyPlug(hash) ? "Emptied that socket on " + d.n + "." : p.n + " is on " + d.n + ".", async () => {
+        if (item.owner === "vault") await moveTo(item, holder);
+        await insertPlug(item.id, item.owner, idx, hash);
+        item.perkText = null;
+      }, () => { reopenItem(); const again = dlg.querySelector('[data-socket="' + idx + '"][data-plug="' + hash + '"]'); if (again) again.focus(); }, item);
+    };
     dlg.querySelectorAll("[data-plug]").forEach(b => b.addEventListener("click", () => {
       dlg.querySelectorAll("[data-plug]").forEach(o => o.setAttribute("aria-pressed", String(o === b)));
-      const p = DB.items[b.dataset.plug];
-      $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(+b.dataset.plug) ? " · in our God Roll" : "") +
+      const h = +b.dataset.plug, idx = +b.dataset.socket, p = DB.items[h];
+      $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(h) ? " · in our God Roll" : "") +
         (p.x ? "<br>" + esc(p.x) : "");
+      const box = $("plug-change");
+      box.innerHTML = "";
+      if (b.classList.contains("alt")){
+        const alt = (item.alts[idx] || []).find(a => a.plugItemHash === h);
+        box.innerHTML = alt && alt.canInsert === false ? '<p class="muted plug-note">This one isn\'t unlocked on this copy yet.</p>'
+          : '<div class="act-row"><button type="button" class="act-btn" id="plug-use">Use ' + esc(p.n) + "</button></div>" + vaultNote;
+        const use = $("plug-use"); if (use) use.addEventListener("click", () => changePlug(idx, h));
+      } else if (b.classList.contains("mod-sq")){
+        const choices = modChoices(item, idx);
+        if (!choices.length) return;
+        box.innerHTML = '<div class="dlg-label" id="mod-pick-h">Swap ' + esc(p.n) + " for</div>" +
+          '<div class="mod-pick" role="group" aria-labelledby="mod-pick-h">' + choices.map(c => {
+            const m = DB.items[c];
+            return '<button type="button" class="mod-choice" data-mod-pick="' + c + '">' + (m.i ? '<img src="' + esc(img(m.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "<span>" + esc(isEmptyPlug(c) ? "Empty the socket" : m.n) + "</span></button>";
+          }).join("") + "</div>" + vaultNote;
+        box.querySelectorAll("[data-mod-pick]").forEach(x => x.addEventListener("click", () => changePlug(idx, +x.dataset.modPick)));
+        box.scrollIntoView({ block: "nearest" });
+      }
     }));
     // Tags are local (no Bungie call), so they apply instantly: redraw just
     // that tile (rebuilding a 1,000+ item vault froze the page ~0.7s). With
@@ -2392,11 +2832,64 @@
       }
       renderItems();
     });
-    let t = 0;
-    $("locker-search").addEventListener("input", e => {
-      clearTimeout(t);
-      t = setTimeout(() => { state.q = e.target.value.trim().toLowerCase(); applySearch(); }, 120);
+    // Search box: a combobox with filter suggestions (arrows + Enter pick
+    // one, Escape closes), a Filters help panel, and the bulk-action bar.
+    const box = $("locker-search"), list = $("search-suggest");
+    let t = 0, sugg = [], active = -1;
+    const runSearch = () => { state.q = box.value.trim(); applySearch(); };
+    const closeSugg = () => { sugg = []; active = -1; list.hidden = true; list.innerHTML = ""; box.setAttribute("aria-expanded", "false"); box.removeAttribute("aria-activedescendant"); };
+    const showSugg = () => {
+      sugg = suggestionsFor(box.value); active = -1;
+      if (!sugg.length || document.activeElement !== box) return closeSugg();
+      list.innerHTML = sugg.map((w, k) => '<li role="option" id="sg-' + k + '" aria-selected="false" data-k="' + k + '" translate="no">' + esc(w) + "</li>").join("");
+      list.hidden = false; box.setAttribute("aria-expanded", "true"); box.removeAttribute("aria-activedescendant");
+      place();
+    };
+    // Fixed under the box (the pinned header clips anything inside it).
+    const place = () => {
+      if (list.hidden) return;
+      const r = box.getBoundingClientRect();
+      list.style.top = (r.bottom + 4) + "px"; list.style.left = r.left + "px"; list.style.width = Math.min(r.width, 520) + "px";
+    };
+    window.addEventListener("scroll", place, { passive: true });
+    window.addEventListener("resize", place);
+    const mark = k => {
+      active = k;
+      list.querySelectorAll("[role=option]").forEach((o, j) => o.setAttribute("aria-selected", String(j === k)));
+      box.setAttribute("aria-activedescendant", "sg-" + k);
+    };
+    const pickSugg = k => {
+      const w = sugg[k], open = /[:<>=]$/.test(w);
+      box.value = box.value.replace(/(^|[\s(])(-?)[^\s()]*$/, (m, pre, neg) => pre + neg + w) + (open ? "" : " ");
+      closeSugg(); box.focus(); runSearch();
+      if (open) showSugg();
+    };
+    box.addEventListener("input", () => { clearTimeout(t); t = setTimeout(runSearch, 120); showSugg(); });
+    box.addEventListener("keydown", e => {
+      if (e.key === "ArrowDown" || e.key === "ArrowUp"){
+        if (!sugg.length) return showSugg();
+        e.preventDefault();
+        mark(e.key === "ArrowDown" ? (active + 1) % sugg.length : (active <= 0 ? sugg.length : active) - 1);
+      } else if (e.key === "Enter" && active >= 0){ e.preventDefault(); pickSugg(active); }
+      else if (e.key === "Escape" && sugg.length){ e.preventDefault(); closeSugg(); }
     });
+    box.addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== box) closeSugg(); }, 150));
+    list.addEventListener("mousedown", e => e.preventDefault()); // keep focus in the box
+    list.addEventListener("click", e => { const o = e.target.closest("[data-k]"); if (o) pickSugg(+o.dataset.k); });
+    $("search-help-slot").innerHTML = searchHelpHtml();
+    const helpBtn = $("search-help-btn");
+    helpBtn.addEventListener("click", () => {
+      const open = $("search-help").hidden;
+      $("search-help").hidden = !open; helpBtn.setAttribute("aria-expanded", String(open));
+      if (open && !$("view-gear").hidden) $("search-help").scrollIntoView({ block: "nearest" });
+    });
+    $("search-help").addEventListener("click", e => {
+      const b = e.target.closest("[data-search]");
+      if (!b) return;
+      box.value = b.dataset.search; runSearch();
+      toast("Showing " + SHOWN.length + " for " + b.dataset.search, "ok");
+    });
+    $("bulk-row").addEventListener("click", bulkClick);
     $("buckets").addEventListener("click", e => {
       const pmTile = e.target.closest("[data-pm]");
       if (pmTile) return openPostmaster(pmTile.dataset.pm);
@@ -2494,7 +2987,7 @@
       if (busyNotice()) return;
       toast("Refreshing from Bungie…", "busy");
       try {
-        PROFILE = await loadProfile(); buildModel(); render(); resolvePostmasterNames();
+        PROFILE = await loadProfile(); buildModel(); render(); resolvePostmasterNames(); refreshDialog();
         toast(JOURNAL_APPLIED ? "Up to date. Bungie's copy is a few seconds behind, so your latest moves are kept." : "Up to date.", "ok");
       }
       catch (err){ toast("Couldn't refresh: " + (err.message || err), "error"); }

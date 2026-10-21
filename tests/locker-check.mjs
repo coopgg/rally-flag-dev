@@ -27,8 +27,10 @@ const MAINT = { ErrorCode: 5, ThrottleSeconds: 0, ErrorStatus: "SystemDisabled",
 // ---------- results ----------
 const results = [];
 function check(name, ok, detail){ results.push({ name, ok: !!ok, detail }); console.log((ok ? "✅ " : "❌ ") + name + (ok || detail == null ? "" : " — " + detail)); }
+// ONLY=<part of a section name> runs just the matching sections; DEBUG=1 shows more of an error.
 async function section(name, fn){
-  try { await fn(); } catch (e){ check(name + " ran to the end", false, e.message.split("\n")[0]); }
+  if (process.env.ONLY && !name.toLowerCase().includes(process.env.ONLY.toLowerCase())) return;
+  try { await fn(); } catch (e){ check(name + " ran to the end", false, e.message.split("\n").slice(0, process.env.DEBUG ? 30 : 1).join(" | ")); }
 }
 
 // ---------- the workers, in-process ----------
@@ -269,6 +271,111 @@ await section("Gear", async () => {
   await p.context_.close();
 });
 
+// ---------- 2b. Search filters and bulk actions (sample data) ----------
+await section("Search filters", async () => {
+  const p = await open();
+  const shownIds = () => p.$$eval("#buckets .item-tile[data-id]:not([hidden])", t => t.map(x => x.dataset.id));
+  const q = async text => { await p.fill("#locker-search", text); await p.waitForTimeout(350); return shownIds(); };
+  const weapons = await q("is:weapon"), armor = await q("is:armor"), all = await q("");
+  check("filters: is:weapon and is:armor split everything", weapons.length > 50 && armor.length > 40 && weapons.length + armor.length === all.length && !weapons.some(id => armor.includes(id)), weapons.length + "+" + armor.length + "/" + all.length);
+  const locked = await q("is:locked"), notLocked = await q("-is:locked");
+  check("filters: -is:locked is the rest", locked.length && locked.length + notLocked.length === all.length && (await q("not:locked")).length === notLocked.length);
+  const solar = await q("is:solar"), voidW = await q("is:void"), either = await q("is:solar or is:void");
+  check("filters: or combines", either.length === solar.length + voidW.length && solar.length > 0);
+  const grouped = await q("(is:solar or is:void) slot:energy");
+  check("filters: brackets and slot:", grouped.length > 0 && grouped.length < either.length && grouped.every(id => either.includes(id)));
+  const hi = await q("stat:total:>=60"), power = await q("power:>=450");
+  const totals = Object.fromEntries(Object.entries(DEMO.itemComponents.stats.data).map(([id, s]) => [id, Object.values(s.stats).reduce((t, x) => t + x.value, 0)]));
+  check("filters: stat:total and power: compare numbers", hi.length && hi.every(id => totals[id] >= 60) && power.every(id => DEMO.itemComponents.instances.data[id].primaryStat.value >= 450), hi.length + " / " + power.length);
+  check("filters: perk: matches perks you have or can switch to", (await q("perk:outlaw")).length > 0 && (await q('type:"hand cannon"')).length > 0);
+  check("filters: in:vault", (await q("in:vault")).every(id => DEMO.profileInventory.data.items.some(i => i.itemInstanceId === id)));
+  await q("is:nonsense");
+  check("filters: an unknown filter is named and ignored", /Not a filter: is:nonsense/.test(await p.textContent("#search-hint")) && (await shownIds()).length === all.length);
+  // Suggestions: arrows + Enter.
+  await p.fill("#locker-search", ""); await p.type("#locker-search", "is:dup"); await p.waitForTimeout(250);
+  check("suggestions: typing offers filters", await p.getAttribute("#locker-search", "aria-expanded") === "true" && (await p.textContent("#search-suggest")).includes("is:dupe"));
+  await p.keyboard.press("ArrowDown"); const ad = await p.getAttribute("#locker-search", "aria-activedescendant"); await p.keyboard.press("Enter"); await p.waitForTimeout(300);
+  check("suggestions: arrow and Enter pick one", ad === "sg-0" && await p.inputValue("#locker-search") === "is:dupe " && await p.getAttribute("#locker-search", "aria-expanded") === "false");
+  await p.type("#locker-search", "perk:kill"); await p.waitForTimeout(250);
+  check("suggestions: perk names after perk:", /perk:"kill clip"/.test(await p.textContent("#search-suggest")));
+  await p.keyboard.press("Escape");
+  check("suggestions: Escape closes the list, keeps the text", await p.isHidden("#search-suggest") && /perk:kill/.test(await p.inputValue("#locker-search")));
+  await p.click("#search-help-btn");
+  check("filters help: opens with examples", await p.isVisible("#search-help") && await p.getAttribute("#search-help-btn", "aria-expanded") === "true");
+  let v = await axe(p); check("filters help, hint and suggestions pass axe", !v.length, v.join(", "));
+  await p.click('#search-help [data-search="is:weapon is:junk"]'); await p.waitForTimeout(300);
+  check("filters help: an example runs its search", await p.inputValue("#locker-search") === "is:weapon is:junk");
+  await p.click("#search-help-btn");
+  // Bulk: tag, lock, move what's shown.
+  const vaultWeapons = await q("in:vault is:weapon is:legendary -is:locked");
+  check("bulk: the bar shows for a search", await p.isVisible("#bulk-row") && (await p.textContent("#bulk-row")).includes(vaultWeapons.length + " items shown"));
+  v = await axe(p); check("bulk bar passes axe", !v.length, v.join(", "));
+  await p.selectOption("#bulk-tag", "infuse"); await p.click("#bulk-tag-go");
+  check("bulk: more than 5 asks first", /Tap again/.test(await p.textContent("#bulk-tag-go")));
+  await p.click("#bulk-tag-go"); await p.waitForTimeout(300);
+  const tags = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_tags")));
+  check("bulk: tags everything shown", vaultWeapons.every(id => tags[id] === "infuse") && (await q("is:infuse")).length === vaultWeapons.length);
+  await q("is:infuse"); await p.click("#bulk-lock"); await p.click("#bulk-lock"); await idle(p);
+  check("bulk: locks everything shown", (await q("is:infuse is:locked")).length === vaultWeapons.length, await toastText(p));
+  const few = (await q("is:infuse")).slice(0, 4);
+  await q("is:infuse power:>=" + Math.max(...few.map(id => DEMO.itemComponents.instances.data[id].primaryStat.value)));
+  const moving = await shownIds();
+  await p.waitForTimeout(1800); await idle(p); // the re-sync after locking
+  await p.selectOption("#bulk-move", TITAN); await p.click("#bulk-move-go");
+  if (/Tap again/.test(await p.textContent("#bulk-move-go"))) await p.click("#bulk-move-go");
+  await idle(p);
+  check("bulk: moves what's shown to a character (full slots are skipped and counted)", moving.length > 0 && /Moved [1-9]\d* items?/.test(await toastText(p)) && (await q("is:infuse in:titan")).length >= 1, await toastText(p));
+  check("search: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
+// ---------- 2c. Perks and mods in the item popup (mocked Bungie) ----------
+await section("Perks and mods", async () => {
+  const p = await open({ real: true });
+  const reuse = DEMO.itemComponents.reusablePlugs.data;
+  const w = DEMO.characterInventories.data[TITAN].items.find(i => reuse[i.itemInstanceId] && [1498876634, 2465295065, 953998645].includes(i.bucketHash));
+  await p.click('#buckets .item-tile[data-id="' + w.itemInstanceId + '"]');
+  const alt = p.locator("#item-dialog .perk-dot.alt").first();
+  const h = await alt.getAttribute("data-plug"), k = await alt.getAttribute("data-socket");
+  await alt.click();
+  check("perks: a perk you can switch to offers Use", await p.isVisible("#plug-use"));
+  p.calls.length = 0;
+  await p.click("#plug-use"); await idle(p);
+  const ins = p.calls.find(c => c.ep === "InsertSocketPlugFree");
+  check("perks: Use sends InsertSocketPlugFree for that socket", ins && String(ins.body.plug.plugItemHash) === h && String(ins.body.plug.socketIndex) === k && ins.body.itemId === w.itemInstanceId && ins.body.characterId === TITAN, JSON.stringify(ins && ins.body));
+  check("perks: the popup shows it as the perk on", await p.locator('#item-dialog .perk-dot.sel[data-plug="' + h + '"]').count() === 1);
+  await p.keyboard.press("Escape");
+  const helm = DEMO.characterEquipment.data[TITAN].items.find(i => i.bucketHash === 3448274439);
+  await p.click('#buckets .item-tile[data-id="' + helm.itemInstanceId + '"]');
+  await p.locator("#item-dialog .mod-sq.empty").first().click();
+  const choices = await p.locator("[data-mod-pick]").count();
+  check("mods: an empty mod socket lists mods for it", choices > 3 && !/Locked Armor Mod/.test(await p.textContent("#plug-change")), String(choices));
+  let v = await axe(p); check("mods: the mod list passes axe", !v.length, v.join(", "));
+  await p.evaluate(() => document.querySelector("[data-mod-pick]").focus());
+  await p.evaluate(() => document.getElementById("locker-refresh").click()); // a re-sync redraws the popup
+  await p.waitForTimeout(500); await idle(p);
+  check("mods: a re-sync keeps the mod list open and focus in it", await p.locator("[data-mod-pick]").count() === choices && await p.evaluate(() => !!document.activeElement.dataset.modPick));
+  const mod = await p.locator("[data-mod-pick]").nth(1).getAttribute("data-mod-pick"), sock = await p.getAttribute("#item-dialog .mod-sq.empty >> nth=0", "data-socket");
+  p.calls.length = 0;
+  await p.locator("[data-mod-pick]").nth(1).click(); await idle(p);
+  const put = p.calls.find(c => c.ep === "InsertSocketPlugFree");
+  check("mods: picking one puts it in that socket", put && String(put.body.plug.plugItemHash) === mod && String(put.body.plug.socketIndex) === sock && await p.locator('#item-dialog .mod-sq[data-plug="' + mod + '"]').count() === 1, JSON.stringify(put && put.body));
+  await p.keyboard.press("Escape");
+  // A vault item moves to a character first.
+  const vw = DEMO.profileInventory.data.items.find(i => reuse[i.itemInstanceId] && Object.values(reuse[i.itemInstanceId].plugs).some(l => l.length > 1 && l.length < 5));
+  check("perks: the sample has a vault item to switch", !!vw);
+  if (vw){
+    await p.click('#buckets .item-tile[data-id="' + vw.itemInstanceId + '"]');
+    await p.locator("#item-dialog .perk-dot.alt").first().click();
+    check("perks: a vault item says it moves first", /moves to your/.test(await p.textContent("#plug-change")));
+    p.calls.length = 0; await p.click("#plug-use"); await idle(p);
+    check("perks: then moves it and switches", p.calls[0] && p.calls[0].ep === "TransferItem" && p.calls.some(c => c.ep === "InsertSocketPlugFree" && c.body.itemId === vw.itemInstanceId), JSON.stringify(p.calls.map(c => c.ep)));
+    await p.keyboard.press("Escape");
+  }
+  check("perks: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
 // ---------- 3. Loadouts and max Power (sample data) ----------
 await section("Loadouts", async () => {
   const p = await open({ hash: "#loadouts" });
@@ -296,6 +403,23 @@ await section("Loadouts", async () => {
   const still = await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id).name, id);
   check("rename: Escape cancels and an empty name is refused", still === "Raid DPS" && /name first/.test(await toastText(p)), still);
   await p.click("[data-lo-rename-cancel]");
+  // Edit: swap a slot, clear one, take mods, add a mod; Save keeps it, Cancel doesn't.
+  await p.click('[data-lo-edit="' + id + '"]');
+  check("edit: the editor opens on its heading with 8 slots", await p.evaluate(() => document.activeElement.id === "lo-edit-h") && await p.locator(".ed-slot").count() === 8);
+  await p.click('[data-ed-slot="1498876634"]');
+  check("edit: Change opens a filterable list, focus in the filter", await p.evaluate(() => document.activeElement.id === "ed-q") && await p.locator("[data-ed-pick]").count() > 1);
+  await p.fill("#ed-q", "zzzzzz"); check("edit: the filter narrows the list", await p.locator("[data-ed-pick]").count() === 0); await p.fill("#ed-q", "");
+  const swap = await p.locator("[data-ed-pick]:not(.on)").first().getAttribute("data-ed-pick");
+  await p.click('[data-ed-pick="' + swap + '"]');
+  await p.click('[data-ed-clear="3448274439"]');
+  await p.click('[data-ed-drop="mods"]');
+  await p.selectOption("#ed-mod-add", { index: 2 }); await p.click("#ed-mod-go");
+  let v = await axe(p); check("edit: the editor passes axe", !v.length, v.join(", "));
+  await p.click("#ed-save");
+  const edited = await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id), id);
+  check("edit: Save keeps the swap, the cleared slot and the mods", edited.items.length === 7 && edited.items.some(x => x.id === swap) && edited.mods.length === 1 && await p.evaluate(id => document.activeElement.dataset.loEdit === id, id), JSON.stringify(edited.items.length));
+  await p.click('[data-lo-edit="' + id + '"]'); await p.click('[data-ed-clear="1498876634"]'); await p.keyboard.press("Escape");
+  check("edit: Escape cancels without saving", (await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id), id)).items.length === 7 && !(await p.locator(".lo-edit").count()));
   const del = p.locator("[data-lo-del]").first(); await del.click(); await del.click();
   check("loadouts: two-tap delete", await p.locator('[data-lo-pick^="r-"]').count() === 0);
   check("loadouts: no script errors", !p.errors.length, p.errors.join("; "));
