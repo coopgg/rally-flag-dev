@@ -145,11 +145,13 @@
       }).join("");
       return '<div class="tw-subsection-label">' + label + "</div>" + (cards ? '<div class="featured-grid">' + cards + "</div>" : '<p class="muted">Nothing featured.</p>');
     };
-    // Everything not featured, as a compact list with the same chips.
+    // Everything not featured: small art tiles like the home page's, each
+    // a link to its guide with the same chips.
     const rest = (label, kind, slugs, list) => {
-      const rows = list.filter(x => !slugs.includes(x.slug)).map(item =>
-        '<li class="yw-rest-row"><a class="yw-rest-name" href="' + window.rallyFlagGuideHref(kind, item.slug) + '">' + esc(item.name) + "</a>" + charsHtml(cleared(item)) + "</li>").join("");
-      return rows ? '<div class="tw-subsection-label">' + label + '</div><ul class="yw-rest">' + rows + "</ul>" : "";
+      const tiles = list.filter(x => !slugs.includes(x.slug)).map(item =>
+        '<li><a class="yw-tile" href="' + window.rallyFlagGuideHref(kind, item.slug) + '">' + (item.art ? '<img src="' + esc(window.rallyFlagArtUrl(item.art)) + '" alt="" loading="lazy">' : "") +
+          '<span class="yw-tile-name">' + esc(item.name) + "</span>" + charsHtml(cleared(item)) + "</a></li>").join("");
+      return tiles ? '<div class="tw-subsection-label">' + label + '</div><ul class="yw-tiles">' + tiles + "</ul>" : "";
     };
     const missing = OWNERS.some(o => DATA.history[o.id] == null);
     return '<section class="pg-section" aria-labelledby="yw-h-featured"><h2 class="dlg-label" id="yw-h-featured">Featured this week</h2>' +

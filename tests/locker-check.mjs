@@ -537,7 +537,7 @@ await section("Your Week", async () => {
     return /^(Titan|Hunter|Warlock)$/.test(shown) && (c.classList.contains("done") ? bg === "rgb(30, 122, 60)" && mark === "✓" : bg === "rgb(179, 38, 30)" && mark === "✕");
   })));
   const idx = await p.evaluate(() => window.ActivityIndex.raids.length + window.ActivityIndex.dungeons.length);
-  check("week: the rest lists every raid and dungeon not featured, with the same chips", await p.locator(".yw-rest-row").count() === idx - 6 && await p.locator(".yw-rest-row .yw-char").count() === (idx - 6) * 3 && await p.locator(".yw-rest-row .yw-char.done").count() > 0 && await p.locator('.yw-rest-row a[href*="raid-"]').count() > 0);
+  check("week: the rest shows every raid and dungeon not featured as art tiles with the same chips", await p.locator(".yw-tile").count() === idx - 6 && await p.locator(".yw-tile .yw-char").count() === (idx - 6) * 3 && await p.locator(".yw-tile .yw-char.done").count() > 0 && await p.locator('a.yw-tile[href*="raid-"]').count() > 0);
   check("week: links to our guide from each featured card", await p.locator('.featured-card a.featured-link[href*="raid-"]').count() === 3 && await p.locator('.featured-card a.featured-link[href*="dungeon-"]').count() === 3);
   check("week: season pass, milestones, pursuits and seals render", await p.locator(".pg-season").count() === 1 && await p.locator(".pg-ms-row").count() >= 3 && await p.locator(".pg-card").count() > 0 && await p.locator(".pg-seal").count() >= 1);
   check("week: pursuits expiring before reset are marked", await p.locator(".pg-tag").count() >= 1);
