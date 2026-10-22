@@ -273,7 +273,26 @@ await section("Gear", async () => {
   check("compare: the popup offers Compare N copies", (await p.textContent("#open-compare")) === "Compare " + n + " copies");
   await p.click("#open-compare");
   check("compare: one column per copy, focus on this one", await p.locator(".cmp thead th").count() === n && await p.evaluate(id => document.activeElement.dataset.cmpOpen === id, dupe));
-  check("compare: best values are marked", await p.locator(".cmp td.best").count() > 0);
+  check("compare: values better or worse than the other copy are shaded", await p.locator(".cmp td.q4").count() > 0 && await p.locator(".cmp td.q0").count() > 0);
+  check("compare: a scope chip offers similar items", await p.locator("[data-cmp-scope]").count() >= 2 && await p.getAttribute('[data-cmp-scope="same"]', "aria-pressed") === "true");
+  // Sort by a stat: the best copy comes first; again: worst first.
+  const sortKey = await p.getAttribute(".cmp tbody tr:last-child [data-cmp-sort]", "data-cmp-sort");
+  const firstCol = () => p.getAttribute(".cmp thead th:nth-child(2) [data-cmp-open]", "data-cmp-open");
+  const lastRow = () => p.$$eval(".cmp tbody tr:last-child td", t => t.map(x => +x.textContent.replace(/\D+/g, "") || 0));
+  await p.click('[data-cmp-sort="' + sortKey + '"]');
+  const best = await lastRow();
+  await p.click('[data-cmp-sort="' + sortKey + '"]');
+  const worst = await lastRow();
+  check("compare: clicking a row name sorts by it, again reverses", await p.getAttribute('th:has([data-cmp-sort="' + sortKey + '"])', "aria-sort") !== null && best.join() === worst.slice().reverse().join() && await p.evaluate(k => document.activeElement.dataset.cmpSort === k, sortKey), best + " / " + worst);
+  // Act on one copy without leaving.
+  const col = await firstCol();
+  await p.click('[data-cmp-tag="junk"][data-cmp-id="' + col + '"]');
+  check("compare: Junk on a column tags that copy, popup stays", await p.getAttribute('[data-cmp-tag="junk"][data-cmp-id="' + col + '"]', "aria-pressed") === "true" && /tag-junk/.test(await p.getAttribute('#buckets .item-tile[data-id="' + col + '"]', "class")) && await p.evaluate(() => document.getElementById("item-dialog").dataset.view) === "compare");
+  await p.click('[data-cmp-tag="junk"][data-cmp-id="' + col + '"]');
+  await p.click('[data-cmp-lock="' + col + '"]'); await idle(p);
+  check("compare: Lock on a column locks that copy, popup stays", await p.getAttribute('[data-cmp-lock="' + col + '"]', "aria-pressed") !== null && await p.evaluate(() => document.getElementById("item-dialog").dataset.view) === "compare", await toastText(p));
+  check("compare: perks show as icons with our God Roll ringed", await p.locator(".cmp .cmp-perk-ico").count() > 0);
+  const v = await axe(p); check("compare passes axe", !v.length, v.join(", "));
   check("compare: on desktop the popup widens to fit every copy, no sideways scroll", await p.evaluate(() => { const d = document.getElementById("item-dialog"), sc = d.querySelector(".cmp-scroll"); return d.getBoundingClientRect().width > 460 && sc.scrollWidth <= sc.clientWidth; }));
   const other = await p.$$eval("[data-cmp-open]", b => b.map(x => x.dataset.cmpOpen));
   const target = other.find(x => x !== dupe);
