@@ -2631,6 +2631,7 @@
     ].concat(statRows).join("");
     const dlg = $("item-dialog");
     dlg.dataset.item = ""; dlg.dataset.view = "compare";
+    dlg.style.setProperty("--copies", copies.length);
     redrawDialog(dlg,
       '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-title"><div class="dlg-eyebrow">Compare · ' + copies.length + " copies</div><h2 class=\"dlg-name\" id=\"dlg-name\">" + esc(d.n) + "</h2></div>" +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +

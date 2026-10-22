@@ -274,6 +274,7 @@ await section("Gear", async () => {
   await p.click("#open-compare");
   check("compare: one column per copy, focus on this one", await p.locator(".cmp thead th").count() === n && await p.evaluate(id => document.activeElement.dataset.cmpOpen === id, dupe));
   check("compare: best values are marked", await p.locator(".cmp td.best").count() > 0);
+  check("compare: on desktop the popup widens to fit every copy, no sideways scroll", await p.evaluate(() => { const d = document.getElementById("item-dialog"), sc = d.querySelector(".cmp-scroll"); return d.getBoundingClientRect().width > 460 && sc.scrollWidth <= sc.clientWidth; }));
   const other = await p.$$eval("[data-cmp-open]", b => b.map(x => x.dataset.cmpOpen));
   const target = other.find(x => x !== dupe);
   await p.click('[data-cmp-open="' + target + '"]');

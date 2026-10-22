@@ -467,6 +467,13 @@
   .cmp td.best{ color:var(--accent-text); font-weight:700; }
   .cmp-perk{ display:block; }
   .cmp-perk.ours{ color:var(--accent-text); font-weight:600; }
+  /* Compare is as wide as its copies need (about 190px each) on anything
+     bigger than a phone, up to the screen; phones keep the bottom sheet. */
+  @media (min-width:641px){
+    dialog.item-dialog[data-view="compare"]{ width:min(calc(140px + var(--copies, 2) * 190px), calc(100vw - 48px)); }
+    dialog.item-dialog[data-view="compare"] .cmp{ width:100%; }
+    dialog.item-dialog[data-view="compare"] .cmp td, dialog.item-dialog[data-view="compare"] .cmp thead th{ min-width:130px; }
+  }
   .sort-label{ display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); }
   .lo-erase{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:18px; padding-top:12px; border-top:1px solid var(--panel-border); font-size:13px; }
   .lo-erase .muted{ color:var(--text-dim); }
