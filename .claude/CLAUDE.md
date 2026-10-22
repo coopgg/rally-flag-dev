@@ -167,6 +167,9 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   milestones, pursuits, seals). Owner wanted it off the Locker and under
   This Week (HANDOFF item 61). In the site menu's Live section after This
   Week, and linked both ways by the "This week's rotation | Your week" switch.
+- **Master raid surges** (Home, This Week): `assets/master-surges.js` reads
+  Bungie's public milestones; new Master raid or surge → add its hash
+  there (HANDOFF item 67).
 - **Standalone pages:** `<body data-nav="standalone">` (nav.js) hides the
   site menu and Discord/Ko-fi, keeps brand + settings (theme, sign-in). The
   Locker used it while it was a dev-only preview; since going public it has

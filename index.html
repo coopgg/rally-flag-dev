@@ -88,6 +88,10 @@
   .feature-kicker{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; color:var(--accent-text); }
   .feature-name{ font-family:'Oswald', sans-serif; font-weight:700; text-transform:uppercase; font-size:clamp(40px, 7vw, 72px); line-height:1; margin:8px 0 12px; color:var(--text); }
   [data-mode="dark"] .feature-name{ text-shadow:0 0 30px var(--glow); }
+  .feature-surges{ display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; margin-top:12px; }
+  .feature-surges-label{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim); }
+  .tile-surges{ display:inline-flex; vertical-align:-6px; margin-left:8px; min-height:0; gap:4px; }
+  .tile-surges .surge-chip.icon-only{ width:22px; height:22px; }
   .feature-meta{ font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--text-dim); font-variant-numeric:tabular-nums; }
   .feature-cta{
     display:inline-flex; align-items:center; min-height:44px; padding:0 20px; margin-top:16px; border-radius:999px;
@@ -100,7 +104,7 @@
     border:1px solid var(--edge); border-radius:16px; text-decoration:none; transition: border-color 0.2s ease, box-shadow 0.2s ease;
   }
   .feature-tile:hover, .feature-tile:focus-visible{ border-color:var(--accent); box-shadow:0 12px 40px -16px var(--glow); }
-  .feature-tile img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:-2; }
+  .feature-tile > img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:-2; }
   .feature-tile::after{ content:""; position:absolute; inset:0; z-index:-1; background:linear-gradient(0deg, var(--bg) 8%, color-mix(in srgb, var(--bg) 50%, transparent) 65%, transparent); }
   .feature-tile-kind{ display:block; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--accent-text); margin-bottom:2px; }
   .feature-tile-name{ font-family:'Oswald', sans-serif; font-weight:600; font-size:19px; color:var(--text); }
@@ -317,6 +321,8 @@
 <script src="assets/nav.js"></script>
 <script src="assets/activity-index.js"></script>
 <script src="assets/featured-rotation-data.js"></script>
+<script src="assets/api-keys.js"></script>
+<script src="assets/master-surges.js"></script>
 <script>
 (function(){
   const F = window.FeaturedRotationData, RAIDS = window.ActivityIndex.raids, DUNGEONS = window.ActivityIndex.dungeons;
@@ -329,18 +335,21 @@
     ...featured.dungeons.slice(0, 2).map(s => ["Featured dungeon", DUNGEONS.find(d => d.slug === s), "dungeon"])
   ].filter(t => t[1]);
   const ms = F.msUntilNextReset(), days = Math.floor(ms / 864e5), hours = Math.floor(ms / 36e5) % 24;
-  const art = window.rallyFlagArtUrl;
+  const art = window.rallyFlagArtUrl, S = window.RallyFlagSurges;
   document.getElementById("feature").innerHTML =
     '<a class="feature-main" href="' + window.rallyFlagGuideHref("raid", raid.slug) + '">' +
       (raid.art ? '<div class="feature-art"><img src="' + art(raid.art) + '" alt="" fetchpriority="high"></div>' : '') +
       '<div class="feature-body"><div class="feature-kicker">Featured raid this week</div>' +
       '<div class="feature-name">' + raid.name + '</div>' +
       '<div class="feature-meta">' + raid.encounterCount + ' encounters · rotates in ' + days + 'd ' + hours + 'h</div>' +
+      (S.hasMaster(raid.slug) ? '<div class="feature-surges"><span class="feature-surges-label">Master surges</span><span class="surge-row" data-surges="' + raid.slug + '" aria-busy="true"><span class="surge-note">Loading…</span></span></div>' : '') +
       '<span class="feature-cta">Open the guide&nbsp;<span aria-hidden="true">\u2192</span></span></div></a>' +
     '<div class="feature-tiles">' + tiles.map(([kind, a, guideKind]) =>
       '<a class="feature-tile" href="' + window.rallyFlagGuideHref(guideKind, a.slug) + '">' + (a.art ? '<img src="' + art(a.art) + '" alt="" loading="lazy">' : '') +
-      '<span><span class="feature-tile-kind">' + kind + '</span><span class="feature-tile-name">' + a.name + '</span></span></a>').join("") +
+      '<span><span class="feature-tile-kind">' + kind + '</span><span class="feature-tile-name">' + a.name + '</span>' +
+      (guideKind === "raid" && S.hasMaster(a.slug) ? '<span class="surge-row tile-surges" data-surges="' + a.slug + '" data-icons-only aria-busy="true"><span class="sr-only">Master surges: </span></span>' : '') + '</span></a>').join("") +
     '</div>';
+  S.fill();
 })();
 </script>
 </body>

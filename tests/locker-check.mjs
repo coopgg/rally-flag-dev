@@ -135,6 +135,8 @@ async function open(opts = {}){
     clarityCalls.push(file);
     r.fulfill({ status: 200, contentType: "text/plain", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(file === "versions.json" ? { descriptions: CLARITY_FIX.version } : CLARITY_FIX.perks) });
   });
+  // Bungie's public milestones (Master raid surges on Home and This Week).
+  if (opts.milestones) await context.route(/\/Platform\/Destiny2\/Milestones\/$/, r => opts.milestones === "down" ? r.fulfill(maint()) : r.fulfill(json({ ErrorCode: 1, Response: opts.milestones })));
   const syncEnv = opts.env || { DB: fakeD1() }; // shared between pages = one account on two devices
   await context.route(SYNC + "**", r => viaWorker(SyncWorker, r, syncEnv));
   await context.route(RELAY + "**", r => opts.relay ? r.fulfill(json(opts.relay)) : viaWorker(RelayWorker, r, {}));
@@ -691,6 +693,40 @@ await section("Clarity", async () => {
   check("clarity: off on rallyflag.gg: no box, no download, no Tools row", !await q.locator("#plug-info .clarity").count() && !q.clarityCalls.length && await q.isHidden("#clarity-row"), q.clarityCalls.join());
   check("clarity: rallyflag.gg Locker has no script errors", !q.errors.length, q.errors.join("; "));
   await q.context_.close();
+});
+
+// ---------- 2g0. Master raid surges (Home, This Week) ----------
+await section("Master surges", async () => {
+  // Every Master raid listed with Void and Strand Surge (real hashes), so
+  // whichever raids rotate in this week, the ones with a Master version show them.
+  const MASTERS = [3257594522, 2964135793, 1507509200, 3889634515, 4217492330, 3022541210, 1681562271, 2918919505, 4129614942];
+  const ms = { 1: { milestoneHash: 1, activities: MASTERS.map(h => ({ activityHash: h, modifierHashes: [12, 3196075844, 3810297122] })) } };
+  const tw = await open({ url: BASE + "this-week.html", ready: "#featured-raids-content .featured-card", milestones: ms });
+  const want = await tw.evaluate(() => { const F = window.FeaturedRotationData; return F.featuredForWeek(F.currentWeekIndex()).raids.filter(window.RallyFlagSurges.hasMaster); });
+  await tw.waitForFunction(() => [...document.querySelectorAll("[data-surges]")].every(x => x.getAttribute("aria-busy") === "false"));
+  const rows = await tw.$$eval("#featured-raids-content [data-surges]", r => r.map(x => [x.dataset.surges, x.textContent]));
+  check("surges: This Week's featured raids with a Master version show its surges, the rest none", rows.length === want.length && rows.every(([slug, t]) => want.includes(slug) && t === "VoidStrand"), JSON.stringify(rows) + " want " + want);
+  check("surges: next week's cards have no surge row (Bungie only lists this week)", await tw.locator("#next-week-raids-content [data-surges]").count() === 0);
+  const v = await axe(tw); check("surges: This Week passes axe", !v.length, v.join(", "));
+  // Every raid card, as if each had a Master version this week: the row reads right and passes axe.
+  await tw.evaluate(() => document.querySelectorAll("#featured-raids-content .featured-card").forEach(c => c.querySelector(".featured-name").insertAdjacentHTML("afterend", '<div class="surge-row" data-surges="kings-fall" aria-busy="true"></div>')));
+  await tw.evaluate(() => window.RallyFlagSurges.fill()); await tw.waitForTimeout(300);
+  check("surges: a surge row renders as element pills", await tw.locator('#featured-raids-content .surge-chip.surge-void').count() >= 3);
+  await tw.context_.close();
+  const home = await open({ url: BASE + "index.html", ready: "#feature .feature-tile", milestones: ms });
+  await home.evaluate(() => { document.querySelector(".feature-tile-name").insertAdjacentHTML("afterend", '<span class="surge-row tile-surges" data-surges="vault-of-glass" data-icons-only aria-busy="true"></span>'); window.RallyFlagSurges.fill(); });
+  await home.waitForSelector('.tile-surges .surge-chip');
+  check("surges: Home tiles show the icons, named for screen readers", /Master surges: Void surge\s*Strand surge/.test(await home.textContent('.tile-surges')) && await home.locator(".tile-surges").first().locator("img").count() === 2);
+  await home.context_.close();
+  const slot = p => p.evaluate(() => { document.querySelector("#featured-raids-content .featured-name").insertAdjacentHTML("afterend", '<div class="surge-row" id="t-surge" data-surges="kings-fall" aria-busy="true"></div>'); window.RallyFlagSurges.fill(); });
+  const none = await open({ url: BASE + "this-week.html", ready: "#featured-raids-content .featured-card", milestones: {} });
+  await slot(none); await none.waitForSelector('#t-surge[aria-busy="false"]');
+  check("surges: a week Bungie doesn't list says so", /Not listed by Bungie this week/.test(await none.textContent("#t-surge")));
+  await none.context_.close();
+  const down = await open({ url: BASE + "this-week.html", ready: "#featured-raids-content .featured-card", milestones: "down" });
+  await slot(down); await down.waitForSelector('#t-surge[aria-busy="false"]');
+  check("surges: when Bungie is down it says so instead of hanging", /Couldn't load from Bungie/.test(await down.textContent("#t-surge")));
+  await down.context_.close();
 });
 
 // ---------- 2g2. Touch: long-press to move, swipe to switch character ----------

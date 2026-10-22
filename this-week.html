@@ -221,6 +221,8 @@
 <script src="assets/activity-index.js"></script>
 <script src="assets/sets-data.js"></script>
 <script src="assets/featured-rotation-data.js"></script>
+<script src="assets/api-keys.js"></script>
+<script src="assets/master-surges.js"></script>
 <script>
 (function(){
   // Featured raid/dungeon rotation math now lives in
@@ -291,6 +293,7 @@
     const cards = items.map(item => ({
       kind: kind,
       name: item.name,
+      slug: item.slug,
       art: item.art,
       href: window.rallyFlagGuideHref(guideKind, item.slug),
       armorSlugs: item.armorSlugs || [],
@@ -314,6 +317,8 @@
           window.rallyFlagArtThumb(c) +
           '<div class="featured-kind">' + c.kind + alwaysBadge + '</div>' +
           '<div class="featured-name">' + c.name + '</div>' +
+          // This week's Master surges (current week only; Bungie doesn't publish next week's).
+          (!isPrediction && kind === "Raid" && window.RallyFlagSurges.hasMaster(c.slug) ? '<div class="featured-set-label">Master surges</div><div class="surge-row" data-surges="' + c.slug + '" aria-busy="true"><span class="surge-note">Loading from Bungie…</span></div>' : '') +
           (armorLinksHtml ? '<div class="featured-set-label">Armor Set</div><div class="set-links">' + armorLinksHtml + '</div>' : '') +
           '<a class="featured-link" href="' + c.href + '">View the guide \u2192</a>' +
         '</div>';
@@ -362,6 +367,7 @@
   }
 
   renderFeatured();
+  window.RallyFlagSurges.fill();
   tickResetCountdown();
   setInterval(tickResetCountdown, 1000);
 })();
