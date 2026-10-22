@@ -300,6 +300,12 @@ await section("Gear", async () => {
   check("compare: Open goes to that copy", await p.evaluate(() => document.getElementById("item-dialog").dataset.item) === target);
   await p.keyboard.press("Escape");
   await p.click('.chip[data-value="dupes"]');
+  // Compact layout: Farming mode and Junk cleanup sit behind Tools.
+  check("layout: Farming and Junk cleanup start folded behind Tools", await p.isHidden("#farm-row") && await p.getAttribute("#tools-btn", "aria-expanded") === "false");
+  await p.click("#tools-btn");
+  await p.click("[data-farm]");
+  check("layout: Tools opens them; the button says when farming is on", await p.isVisible("#farm-row") && /farming on/.test(await p.textContent("#tools-btn")));
+  await p.click("[data-farm]"); await p.click("#tools-btn");
   check("gear: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
 });

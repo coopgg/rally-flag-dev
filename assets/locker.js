@@ -1736,6 +1736,7 @@
 
   function renderJunk(){
     const row = $("junk-row");
+    renderToolsBtn();
     if (!row) return;
     const n = ITEMS.filter(i => i.owner === "vault" && TAGS[i.id] === "junk").length;
     // The character played most recently first: that's usually who's online.
@@ -1758,8 +1759,22 @@
   const farming = (() => { try { return new Set(JSON.parse(sessionStorage.getItem(FARM_KEY) || "[]")); } catch (e){ return new Set(); } })();
   let farmTimer = 0, farmNote = "";
   function saveFarm(){ try { sessionStorage.setItem(FARM_KEY, JSON.stringify([...farming])); } catch (e){} }
+  // Farming and Junk cleanup sit behind the Tools button (open state
+  // remembered); the button says when farming is on or junk is waiting.
+  const TOOLS_KEY = "rallyflag_locker_tools";
+  function renderToolsBtn(){
+    const b = $("tools-btn");
+    if (!b) return;
+    const junk = ITEMS.filter(i => i.owner === "vault" && TAGS[i.id] === "junk").length;
+    b.textContent = "Tools" + (farming.size ? " · farming on" : "") + (junk ? " · " + junk + " junk" : "");
+  }
+  function setTools(open){
+    $("tools-panel").hidden = !open; $("tools-btn").setAttribute("aria-expanded", String(open));
+    try { localStorage.setItem(TOOLS_KEY, open ? "1" : ""); } catch (e){}
+  }
   function renderFarm(){
     const row = $("farm-row");
+    renderToolsBtn();
     if (!row) return;
     row.innerHTML = '<span class="farm-label">Farming mode</span>' +
       OWNERS.map(o => '<button type="button" class="farm-btn" data-farm="' + o.id + '" aria-pressed="' + farming.has(o.id) + '">' + esc(o.name) + "</button>").join("") +
@@ -3357,6 +3372,8 @@
       const item = d.item, to = d.to, where = to === "vault" ? "the vault" : "your " + ownerLabel(to);
       if (!busyNotice()) run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to), null, item);
     });
+    $("tools-btn").addEventListener("click", () => setTools($("tools-panel").hidden));
+    try { if (localStorage.getItem(TOOLS_KEY) === "1") setTools(true); } catch (e){}
     $("farm-row").addEventListener("click", e => {
       const b = e.target.closest("[data-farm]");
       if (!b) return;

@@ -64,6 +64,10 @@
 <style>
   /* Locker (dev-only preview, stage 1: read-only). Script: assets/locker.js */
   .locker-root{ max-width:1180px; margin:0 auto; padding:0 24px 90px; min-height:100vh; }
+  /* An app, not an article: a one-line title so your gear starts near the top. */
+  .hero-compact{ max-width:1180px; margin:14px auto 0; padding:0 24px; text-align:left; }
+  .hero-compact h1.title{ font-size:26px; margin:0; text-shadow:none; }
+  .hero-compact .preview-tag{ font-family:var(--font-sans); font-size:12px; font-weight:500; letter-spacing:0.04em; }
   .preview-tag{ display:inline-block; margin-left:8px; padding:2px 8px; border:1px solid var(--accent); border-radius:999px; color:var(--accent-text); font-size:12px; letter-spacing:0.08em; vertical-align:middle; }
 
   /* Status panels: signed out, loading, error, sample-data banner */
@@ -82,7 +86,8 @@
   .locker-steps li{ padding:4px 0 4px 22px; position:relative; }
   .locker-steps li::before{ content:"…"; position:absolute; left:0; color:var(--accent-text); }
   .locker-steps li.done::before{ content:"✓"; }
-  .demo-banner{ display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:10px 16px; margin:24px auto 0; padding:12px 18px; max-width:760px; font-size:14px; color:var(--text-dim); text-align:center; }
+  .demo-banner{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 14px; margin:10px 0 0; padding:6px 12px; font-size:13px; color:var(--text-dim); }
+  .demo-banner .locker-btn{ padding:6px 14px; font-size:13px; }
 
   /* Characters + vault: owner filter */
   /* Character + vault toggles: one row of four on wide screens, 2 × 2 on phones */
@@ -149,7 +154,8 @@
   .bulk-count{ font-weight:600; font-variant-numeric:tabular-nums; }
   .bulk-group{ display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px; }
   .bulk-field{ color:var(--text-dim); }
-  .chip-row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .chip-line{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .chip-row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-width:0; }
   .chip{
     font-family:var(--font-sans); font-size:13px; font-weight:500; color:var(--text-dim);
     background:var(--panel); border:1px solid var(--panel-border); padding:7px 14px; border-radius:999px; cursor:pointer;
@@ -471,6 +477,8 @@
   .farm-row .farm-btn[aria-pressed="true"]::before{ content:""; display:inline-block; width:7px; height:7px; margin-right:6px; border-radius:50%; background:currentColor; animation:toast-pulse 0.9s ease-in-out infinite alternate; }
   .farm-note{ font-size:13px; color:var(--text-dim); }
   #junk-row{ margin-top:8px; }
+  .tools-panel{ margin-top:12px; padding:4px 14px 12px; border:1px solid var(--panel-border); border-radius:10px; background:var(--panel); }
+  .tools-panel[hidden]{ display:none; }
   .lo-view{ padding-top:6px; }
   .lo-section{ padding-top:18px; }
   .lo-section h2.dlg-label{ font-weight:400; margin-top:0; }
@@ -655,7 +663,7 @@
      under their cards (the card row has one more column, the vault), then
      each slot's vault items run full width, armor one row per class. */
   @media (min-width:1100px){
-    .locker-root{ max-width:1640px; }
+    .locker-root, .hero-compact{ max-width:1640px; }
     div.owner-card{ cursor:default; }
   }
   .all-chars{ display:grid; grid-template-columns:repeat(var(--n), minmax(0, 1fr)); gap:12px; width:calc((100% + 12px) * var(--n) / (var(--n) + 1) - 12px); }
@@ -675,6 +683,12 @@
   .drop-slot.drop-target{ border-color:var(--accent); background:var(--accent-dim); }
   @media (max-width:640px){
     .locker-root{ padding:0 16px 80px; }
+    .hero-compact{ padding:0 16px; margin-top:10px; }
+    .hero-compact h1.title{ font-size:22px; }
+    /* Filter chips: one swipeable line instead of three rows. */
+    .chip-row{ flex:1 0 100%; flex-wrap:nowrap; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; padding-bottom:2px; }
+    .chip-row::-webkit-scrollbar{ display:none; }
+    .chip-row > *{ flex:none; }
     /* Phones: one compact row of four, so the pinned banner stays short */
     .owner-grid{ gap:6px; }
     .owner-card{ min-height:54px; padding:7px 8px; border-radius:10px; }
@@ -706,10 +720,8 @@
 
 <main id="main-content" tabindex="-1">
 
-<div class="hero">
-  <div class="eyebrow">Destiny 2 · Your Gear <span class="preview-tag">Preview</span></div>
-  <h1 class="title">Locker</h1>
-  <p class="subtitle">Every weapon and armor piece across your characters and vault, with loadouts, our God Roll matches and your armor set progress.</p>
+<div class="hero hero-compact">
+  <h1 class="title">Locker <span class="preview-tag">Preview</span></h1>
 </div>
 
 <div class="locker-root" id="locker-root">
@@ -730,11 +742,14 @@
     </div>
 
     <div id="view-gear" role="tabpanel" aria-labelledby="tab-gear">
-    <div class="farm-row" id="farm-row" role="group" aria-label="Farming mode"></div>
-    <div class="farm-row" id="junk-row" role="group" aria-label="Junk cleanup"></div>
+    <div class="tools-panel" id="tools-panel" hidden>
+      <div class="farm-row" id="farm-row" role="group" aria-label="Farming mode"></div>
+      <div class="farm-row" id="junk-row" role="group" aria-label="Junk cleanup"></div>
+    </div>
     <div class="locker-controls">
       <div id="search-help-slot"></div>
       <p class="search-hint" id="search-hint" role="status" hidden></p>
+      <div class="chip-line">
       <div class="chip-row" id="locker-chips">
         <button class="chip" type="button" data-kind="type" data-value="weapons" aria-pressed="false">Weapons</button>
         <button class="chip" type="button" data-kind="type" data-value="armor" aria-pressed="false">Armor</button>
@@ -757,6 +772,7 @@
           <option value="any">Any tag</option>
           <option value="note">Has a note</option>
         </select>
+      </div>
         <div class="chip-meta">
           <span class="locker-count" id="locker-count" aria-live="polite"></span>
           <label class="sort-label"><span>Sort</span><select class="chip chip-select" id="sort-by">
@@ -766,7 +782,7 @@
             <option value="newest">Newest</option>
             <option value="stats">Armor stat total</option>
           </select></label>
-          <span class="chip-actions"><button type="button" class="fold-all" id="locker-refresh">Refresh</button><button type="button" class="fold-all" id="fold-all">Collapse all</button></span>
+          <span class="chip-actions"><button type="button" class="fold-all" id="tools-btn" aria-expanded="false" aria-controls="tools-panel">Tools</button><button type="button" class="fold-all" id="locker-refresh">Refresh</button><button type="button" class="fold-all" id="fold-all">Collapse all</button></span>
         </div>
       </div>
     </div>
