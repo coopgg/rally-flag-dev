@@ -217,21 +217,23 @@
      tiles) Firefox built a rounded clip mask per tile and repainted the
      lift-and-glow on every pass of the mouse, which made scrolling lag
      (frames >34ms 39 → 6-9 in Firefox with 1,254 tiles). */
+  /* The icon is a full square with its own Power strip underneath (as DIM
+     does), so nothing covers the bottom of the art. */
   .item-tile{
-    position:relative; width:var(--tile); height:var(--tile); padding:0; overflow:hidden; cursor:pointer;
+    position:relative; width:var(--tile); height:calc(var(--tile) + var(--bar)); padding:0; overflow:hidden; cursor:pointer;
     border:2px solid #4f3a72; background:#1a1f2b;
   }
   .item-tile.tier-6{ border-color:#c9a227; }
   .item-tile:hover{ outline:2px solid var(--accent); outline-offset:2px; }
   .item-tile:focus-visible{ outline:2px solid var(--accent-text); outline-offset:2px; }
   .item-tile.equipped{ box-shadow:0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
-  .item-tile img.icon, .item-tile img.wm, .item-tile img.ov{ position:absolute; inset:0; width:100%; height:100%; }
+  .item-tile img.icon, .item-tile img.wm, .item-tile img.ov{ position:absolute; top:0; left:0; width:100%; height:calc(100% - var(--bar)); }
   /* Masterworked: Bungie's gold frame (img.ov) plus a gold power bar, as DIM does */
   .item-tile.mw .tile-power{ background:#e2bf4f; color:#1b1500; }
   /* Centred in the watermark's dark band (14% across, as Bungie draws its
      own pips), from under the season icon to just above the power bar */
-  .tier-pips{ position:absolute; left:8.6%; top:28%; width:11%; height:calc(72% - var(--bar) - 2px); /* % of the tile's inside */ overflow:visible; fill:#f5d65a; stroke:rgba(0,0,0,0.8); stroke-width:1.2; paint-order:stroke; }
-  .tile-power{ position:absolute; left:0; right:0; bottom:0; height:var(--bar); padding:0 4px; font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:700; line-height:var(--bar); text-align:right; color:#fff; background:rgba(0,0,0,0.78); }
+  .tier-pips{ position:absolute; left:8.6%; top:calc((100% - var(--bar)) * 0.28); width:11%; height:calc((100% - var(--bar)) * 0.72 - 3px); /* % of the icon */ overflow:visible; fill:#f5d65a; stroke:rgba(0,0,0,0.8); stroke-width:1.2; paint-order:stroke; }
+  .tile-power{ position:absolute; left:0; right:0; bottom:0; height:var(--bar); padding:0 4px; font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:700; line-height:var(--bar); text-align:right; color:#fff; background:#11141c; }
   .tile-power img{ width:12px; height:12px; float:left; margin-top:2px; }
   .tile-badge{ position:absolute; top:2px; right:2px; min-width:18px; height:18px; padding:0 3px; border-radius:9px; font-size:12px; font-weight:700; line-height:18px; text-align:center; color:#111; background:#ffd76a; box-shadow:0 0 0 1px rgba(0,0,0,0.5); }
   .locker-empty{ margin-top:30px; text-align:center; color:var(--text-dim); }
@@ -243,7 +245,7 @@
   .char-slot{ display:flex; align-items:flex-start; gap:14px; }
   .slot-equipped{ flex:none; padding-right:14px; border-right:1px dashed var(--panel-border); }
   .slot-inv{ flex:1; min-width:0; }
-  .tile-empty{ display:block; width:var(--tile); height:var(--tile); border:2px dashed var(--panel-border); }
+  .tile-empty{ display:block; width:var(--tile); height:calc(var(--tile) + var(--bar)); border:2px dashed var(--panel-border); }
   .slot-count.full::after{ content:" · full"; color:#e5534b; }
   [data-mode="light"] .slot-count.full::after{ color:#b42318; }
   .sr-only{ position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
@@ -403,6 +405,8 @@
   .pm-group{ flex:1 1 280px; min-width:0; }
   .pm-grid{ grid-template-columns:repeat(auto-fill, 44px) !important; gap:6px !important; }
   .pm-grid .item-tile{ width:44px !important; height:44px !important; border-width:1px; }
+  .pm-grid .item-tile img.icon{ height:100%; } /* postmaster: small, the count sits on the icon */
+  .pm-grid .tile-power{ background:rgba(0,0,0,0.78); }
   .pm-tile:not(.tier-5):not(.tier-6){ border-color:var(--panel-border); }
   /* Tags */
   .tile-badges{ position:absolute; top:2px; right:2px; display:flex; gap:2px; }
