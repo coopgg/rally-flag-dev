@@ -541,7 +541,7 @@ await section("Your Week", async () => {
   const chips = await p.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-char")].map(x => x.textContent)));
   check("week: each featured activity shows every character's clear since reset", chips.every(c => c.length === 3) && chips.flat().some(t => /, cleared$/.test(t)) && chips.flat().some(t => /not cleared yet$/.test(t)));
   check("week: chips are the class with a mark, green ✓ when cleared and red ✕ when not", await p.evaluate(() => [...document.querySelectorAll(".yw-char")].every(c => {
-    const mark = c.querySelector(".yw-mark").textContent, shown = c.childNodes[1].textContent, bg = getComputedStyle(c).backgroundColor;
+    const mark = c.querySelector(".yw-mark").textContent, shown = c.querySelector(".yw-cname").textContent, bg = getComputedStyle(c).backgroundColor;
     return /^(Titan|Hunter|Warlock)$/.test(shown) && (c.classList.contains("done") ? bg === "rgb(30, 122, 60)" && mark === "✓" : bg === "rgb(179, 38, 30)" && mark === "✕");
   })));
   const idx = await p.evaluate(() => window.ActivityIndex.raids.length + window.ActivityIndex.dungeons.length);
@@ -556,6 +556,9 @@ await section("Your Week", async () => {
   const v = await axe(p); check("week passes axe", !v.length, v.join(", "));
   check("week: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
+  const ph = await open({ width: 390, url: BASE + "your-week.html?demo", ready: "#yw-app .yw-tile" });
+  check("week: on a phone the small tiles show ✓/✕ and the class initial, all on one line", await ph.evaluate(() => [...document.querySelectorAll(".yw-tile .yw-chars")].every(r => { const t = [...r.children].map(c => c.getBoundingClientRect().top); return Math.max(...t) - Math.min(...t) < 2; }) && /^[THW]$/.test(document.querySelector(".yw-tile .yw-cshort").textContent) && getComputedStyle(document.querySelector(".yw-tile .yw-cname")).display === "none"));
+  await ph.context_.close();
   // Signed out: an explanation, a sign-in and the sample.
   const so = await open({ signedOut: true, url: BASE + "your-week.html" });
   await so.waitForSelector("#yw-signin");

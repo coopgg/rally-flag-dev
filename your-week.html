@@ -89,6 +89,7 @@
   .yw-char{ padding:3px 10px; border-radius:999px; border:1px solid var(--panel-border); font-size:12px; color:var(--text-dim); }
   .yw-char{ display:inline-flex; align-items:center; gap:5px; }
   .yw-mark{ font-weight:700; }
+  .yw-cshort{ display:none; }
   .yw-char.done, .yw-char.todo{ color:#fff; font-weight:600; }
   .yw-char.done{ background:#1e7a3c; border-color:#1e7a3c; }
   .yw-char.todo{ background:#b3261e; border-color:#b3261e; }
@@ -108,7 +109,9 @@
     .yw-tile{ padding:12px; }
     .yw-tile-name{ font-size:16px; }
     .yw-tile .yw-chars{ gap:4px; }
-    .yw-tile .yw-char{ padding:2px 7px; }
+    .yw-tile .yw-char{ padding:2px 8px; }
+    .yw-tile .yw-cname{ display:none; }
+    .yw-tile .yw-cshort{ display:inline; }
   }
   .yw-note{ font-size:13px; color:var(--text-dim); margin:8px 0 0; }
   .pg-tag{ display:inline-block; padding:1px 7px; border-radius:999px; font-size:12px; font-weight:600; background:#ffe1a8; color:#5a3a00; }

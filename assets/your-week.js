@@ -165,7 +165,10 @@
   function charsHtml(c){
     return '<div class="yw-chars">' + OWNERS.map(o => {
       const v = c[o.id], state = v == null ? "unknown" : v ? "done" : "todo";
-      return '<span class="yw-char ' + state + '"><span class="yw-mark" aria-hidden="true">' + (v == null ? "?" : v ? "✓" : "✕") + "</span>" + esc(o.name) + '<span class="sr-only">' + (v == null ? ", unknown" : v ? ", cleared" : ", not cleared yet") + "</span></span>";
+      return '<span class="yw-char ' + state + '"><span class="yw-mark" aria-hidden="true">' + (v == null ? "?" : v ? "✓" : "✕") + "</span>" +
+        // Phones show the initial in the small tiles; screen readers get the whole name either way.
+        '<span class="yw-cname" aria-hidden="true">' + esc(o.name) + '</span><span class="yw-cshort" aria-hidden="true">' + esc(o.name.charAt(0)) + "</span>" +
+        '<span class="sr-only">' + esc(o.name) + (v == null ? ", unknown" : v ? ", cleared" : ", not cleared yet") + "</span></span>";
     }).join("") + "</div>";
   }
   function draw(){
