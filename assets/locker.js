@@ -216,8 +216,8 @@
     saveTags();
     tagsChanged();
   }
-  // Which view is open: gear (default), loadouts (#loadouts) or armor sets (#sets).
-  const VIEWS = ["gear", "loadouts", "sets"];
+  // Which view is open: gear (default), loadouts (#loadouts), armor sets (#sets) or progress (#progress).
+  const VIEWS = ["gear", "loadouts", "sets", "progress"];
   function showView(name, focus){
     if (!VIEWS.includes(name)) name = "gear";
     for (const v of VIEWS){
@@ -227,8 +227,144 @@
     }
     $("locker-search").parentElement.hidden = name !== "gear"; // search is for gear
     if (name === "loadouts" && DB) renderLoadouts();
+    if (name === "progress" && DB) renderProgress();
     if (focus) $("tab-" + name).focus();
     history.replaceState(null, "", location.pathname + location.search + (name === "gear" ? "" : "#" + name));
+  }
+
+  // ---------------- Progress (like Ishtar's) ----------------
+  // Season pass rank, weekly milestones, bounties and quests with their
+  // objectives, and seals. Loaded when the tab first opens (one extra
+  // GetProfile call, and the worker's small progress database), again
+  // after 2 minutes away or on Refresh, so the Gear view isn't slowed.
+  const PROGRESS_COMPONENTS = "100,104,200,201,202,300,301,700", PURSUITS_BUCKET = 1345459588;
+  let PDB = null, PROG = null, progAt = 0, progLoading = null, progError = "", progFocus = null, sealsAll = false;
+  function loadProgressDb(){
+    return new Promise((resolve, reject) => {
+      const w = new Worker("assets/locker-worker.js");
+      w.onmessage = e => {
+        const m = e.data;
+        if (m.type === "progress"){ const n = $("pg-note"); if (n) n.textContent = m.step; }
+        else if (m.type === "done"){ w.terminate(); resolve(m.db); }
+        else if (m.type === "error"){ w.terminate(); reject(new Error(m.message)); }
+      };
+      w.onerror = e => reject(new Error(e.message || "progress database worker failed"));
+      w.postMessage({ kind: "progress", apiKey: window.RallyFlagAPI.BUNGIE_API_KEY });
+    });
+  }
+  async function loadProgressData(){
+    if (!DEMO) return authedGet(PROFILE_PATH + "/?components=" + PROGRESS_COMPONENTS);
+    // Sample data: bounty expiry is stored in hours from now.
+    const p = JSON.parse(JSON.stringify(PROFILE.progress || {}));
+    for (const c of Object.values((p.characterInventories || {}).data || {}))
+      for (const it of c.items) if (it._hours) it.expirationDate = new Date(Date.now() + it._hours * 3600e3).toISOString();
+    return p;
+  }
+  function renderProgress(force){
+    const fresh = PROG && !force && Date.now() - progAt < 120000;
+    if (!fresh && !progLoading){
+      progError = "";
+      progLoading = Promise.all([PDB || loadProgressDb(), loadProgressData()])
+        .then(([db, data]) => { PDB = db; PROG = data; progAt = Date.now(); })
+        .catch(e => { progError = (e && e.message) || String(e); })
+        .finally(() => { progLoading = null; if (!$("view-progress").hidden) drawProgress(); });
+    }
+    drawProgress();
+  }
+  const pct = (a, b) => b ? Math.max(0, Math.min(100, Math.round(a / b * 100))) : 0;
+  const barHtml = (a, b, done) => '<span class="pg-bar' + (done ? " done" : "") + '" aria-hidden="true"><i style="width:' + pct(a, b) + '%"></i></span>';
+  function untilText(iso){
+    const ms = Date.parse(iso) - Date.now();
+    if (!(ms > 0)) return "Expired";
+    const h = Math.round(ms / 3600e3);
+    return h < 1 ? "Expires within the hour" : h < 48 ? "Expires in " + h + "h" : "Expires in " + Math.round(h / 24) + " days";
+  }
+  function objectiveRow(o){
+    const desc = (PDB.objectives || {})[o.objectiveHash] || "Progress", c = o.completionValue || 1;
+    // Most objectives count to a number; one-step ones read as done/not done.
+    const val = c === 1 ? (o.complete ? "Done" : "Not yet") : Math.min(o.progress || 0, c).toLocaleString() + " / " + c.toLocaleString();
+    return '<div class="pg-obj' + (o.complete ? " done" : "") + '"><span class="pg-obj-d">' + esc(desc) + '</span><span class="pg-obj-v">' + val + "</span>" + barHtml(o.progress || 0, c, o.complete) + "</div>";
+  }
+  function drawProgress(){
+    const box = $("view-progress");
+    if (!PROG){
+      box.innerHTML = progError ? '<p class="pg-msg">Couldn\'t load your progress: ' + esc(progError) + ' <button type="button" class="act-btn" id="pg-retry">Try again</button></p>'
+        : '<p class="pg-msg" role="status">Loading your progress from Bungie.net… <span id="pg-note"></span></p>';
+      const r = $("pg-retry"); if (r) r.addEventListener("click", () => renderProgress(true));
+      return;
+    }
+    const was = box.contains(document.activeElement) ? document.activeElement : null;
+    const refocus = was && (was.id ? "#" + was.id : was.dataset.pgOwner ? '[data-pg-owner="' + was.dataset.pgOwner + '"]' : null);
+    const cps = (PROG.characterProgressions && PROG.characterProgressions.data) || {};
+    // Season pass (account-wide; any character's copy).
+    let season = "";
+    const sh = PROG.profile && PROG.profile.data && PROG.profile.data.currentSeasonHash, sdef = PDB.seasons[sh], now = Date.now();
+    const pass = sdef && (sdef.passes.find(p => Date.parse(p.start) <= now && now < Date.parse(p.end)) || sdef.passes[sdef.passes.length - 1]);
+    const pdef = pass && PDB.passes[pass.h], anyCp = Object.values(cps)[0];
+    if (pdef && anyCp){
+      const rp = anyCp.progressions[pdef.r] || {}, pp = anyCp.progressions[pdef.p] || {};
+      const capped = rp.levelCap > 0 && rp.level >= rp.levelCap, cur = capped ? pp : rp;
+      const rank = (rp.level || 0) + (pp.level || 0), days = Math.max(0, Math.ceil((Date.parse(pass.end) - now) / 86400e3));
+      const art = PROG.profileProgression && PROG.profileProgression.data && PROG.profileProgression.data.seasonalArtifact;
+      season = '<section class="pg-section pg-season panel-card" aria-labelledby="pg-h-season"><h2 class="dlg-label" id="pg-h-season">Season pass</h2>' +
+        '<div class="pg-season-row"><div class="pg-rank"><b>' + rank + '</b><small>rank</small></div><div class="pg-season-main"><div><b>' + esc(sdef.n) + "</b>" + (pdef.n && pdef.n !== sdef.n ? " · " + esc(pdef.n) : "") + "</div>" +
+          '<div class="pg-sub">' + (cur.nextLevelAt ? (cur.progressToNextLevel || 0).toLocaleString() + " / " + cur.nextLevelAt.toLocaleString() + " XP to rank " + (rank + 1) : "") +
+          (Number.isFinite(days) && days < 3650 ? " · " + days + " day" + (days === 1 ? "" : "s") + " left" : "") + (art && art.powerBonus ? " · artifact +" + art.powerBonus + " Power" : "") + "</div>" +
+          barHtml(cur.progressToNextLevel || 0, cur.nextLevelAt || 1) + "</div></div></section>";
+    }
+    // Weekly milestones: one row each, a status per character.
+    const ms = new Map();
+    for (const o of OWNERS){
+      const m = (cps[o.id] || {}).milestones || {};
+      for (const h in m){
+        const objs = [].concat(...(m[h].availableQuests || []).map(q => (q.status && q.status.stepObjectives) || []), ...(m[h].activities || []).map(a => (a.challenges || []).map(c => c.objective).filter(Boolean)));
+        if (!objs.length) continue;
+        const def = PDB.milestones[h] || {}, quest = (m[h].availableQuests || [])[0];
+        const name = def.n || (quest && (PDB.pursuits[quest.questItemHash] || {}).n) || "";
+        if (!name) continue;
+        if (!ms.has(h)) ms.set(h, { name, d: def.d, per: {} });
+        ms.get(h).per[o.id] = { done: objs.filter(x => x.complete).length, total: objs.length };
+      }
+    }
+    const msRows = [...ms.values()].sort((a, b) => Object.values(a.per).every(p => p.done === p.total) - Object.values(b.per).every(p => p.done === p.total) || a.name.localeCompare(b.name));
+    const milestones = '<section class="pg-section" aria-labelledby="pg-h-ms"><h2 class="dlg-label" id="pg-h-ms">Milestones</h2>' +
+      (msRows.length ? '<div class="pg-ms">' + msRows.map(r => '<div class="pg-ms-row"><div class="pg-ms-name"><b>' + esc(r.name) + "</b>" + (r.d ? "<small>" + esc(r.d) + "</small>" : "") + "</div>" +
+        '<div class="pg-ms-chars">' + OWNERS.map(o => { const p = r.per[o.id]; return '<span class="pg-ms-char' + (p && p.done === p.total ? " done" : "") + '">' + esc(o.name) + " " + (!p ? "–" : p.done === p.total ? "✓" : p.done + "/" + p.total) + "</span>"; }).join("") + "</div></div>").join("") + "</div>"
+        : '<p class="muted">No milestones with objectives this week.</p>') + "</section>";
+    // Bounties and quests for one character at a time.
+    if (!progFocus || !OWNERS.some(o => o.id === progFocus)) progFocus = (OWNERS.slice().sort((a, b) => b.played - a.played)[0] || {}).id;
+    const objData = (PROG.itemComponents && PROG.itemComponents.objectives && PROG.itemComponents.objectives.data) || {};
+    const inv = (((PROG.characterInventories || {}).data || {})[progFocus] || {}).items || [];
+    const pursuits = inv.filter(it => it.bucketHash === PURSUITS_BUCKET && PDB.pursuits[it.itemHash]).map(it => {
+      const def = PDB.pursuits[it.itemHash];
+      const objs = ((it.itemInstanceId && objData[it.itemInstanceId] && objData[it.itemInstanceId].objectives) || ((cps[progFocus] || {}).uninstancedItemObjectives || {})[it.itemHash] || []).filter(o => o.visible !== false);
+      return { it, def, objs, done: objs.length > 0 && objs.every(o => o.complete), share: objs.length ? objs.reduce((n, o) => n + Math.min(1, (o.progress || 0) / (o.completionValue || 1)), 0) / objs.length : 0 };
+    }).sort((a, b) => b.done - a.done || b.share - a.share);
+    const card = p => '<div class="pg-card' + (p.done ? " done" : "") + '"><div class="pg-card-head">' + (p.def.i ? '<img src="' + esc(img(p.def.i)) + '" alt="" width="40" height="40" loading="lazy">' : "") +
+      '<div><b>' + esc(p.def.n) + '</b><small>' + esc(p.def.y) + (p.done ? ' · <span class="pg-ready">Ready to turn in</span>' : "") + (p.it.expirationDate ? " · " + untilText(p.it.expirationDate) : "") + "</small></div></div>" +
+      (p.objs.length ? p.objs.map(objectiveRow).join("") : p.def.x ? '<p class="pg-sub">' + esc(p.def.x) + "</p>" : "") + "</div>";
+    const bounties = pursuits.filter(p => p.def.t === 26), quests = pursuits.filter(p => p.def.t !== 26);
+    const group = (label, list, empty) => '<h3 class="pg-h3">' + label + " <span>" + list.length + "</span></h3>" + (list.length ? '<div class="pg-cards">' + list.map(card).join("") + "</div>" : '<p class="muted">' + empty + "</p>");
+    const pursuitsHtml = '<section class="pg-section" aria-labelledby="pg-h-pursuits"><h2 class="dlg-label" id="pg-h-pursuits">Bounties &amp; quests</h2>' +
+      '<div class="pg-owners" role="group" aria-label="Whose pursuits">' + OWNERS.map(o => '<button type="button" class="chip" data-pg-owner="' + o.id + '" aria-pressed="' + (o.id === progFocus) + '">' + esc(o.name) + "</button>").join("") + "</div>" +
+      group("Bounties", bounties, "No bounties.") + group("Quests", quests, "No quests.") + "</section>";
+    // Seals: closest to done first; finished ones as a list.
+    const nodes = (PROG.profilePresentationNodes && PROG.profilePresentationNodes.data && PROG.profilePresentationNodes.data.nodes) || {};
+    const sealList = Object.keys(PDB.seals).filter(h => nodes[h] && nodes[h].completionValue > 0).map(h => Object.assign({ h, p: nodes[h].progressValue || 0, c: nodes[h].completionValue }, PDB.seals[h]));
+    const open = sealList.filter(s => s.p < s.c).sort((a, b) => b.p / b.c - a.p / a.c), done = sealList.filter(s => s.p >= s.c);
+    const SEALS_SHOWN = 8, shownSeals = sealsAll ? open : open.slice(0, SEALS_SHOWN);
+    const sealsHtml = '<section class="pg-section" aria-labelledby="pg-h-seals"><h2 class="dlg-label" id="pg-h-seals">Seals</h2>' +
+      (open.length ? '<div class="pg-seals" id="pg-seal-list">' + shownSeals.map(s => '<div class="pg-seal">' + (s.i ? '<img src="' + esc(img(s.i)) + '" alt="" width="40" height="40" loading="lazy">' : "") +
+        '<div><b>' + esc(s.n) + "</b>" + (s.title && s.title !== s.n ? '<small>Title: ' + esc(s.title) + "</small>" : "") + '<span class="pg-sub">' + s.p + " of " + s.c + " triumphs · " + pct(s.p, s.c) + "%</span>" + barHtml(s.p, s.c) + "</div></div>").join("") + "</div>" +
+        (open.length > SEALS_SHOWN ? '<button type="button" class="act-btn" id="pg-seals-more" aria-expanded="' + sealsAll + '" aria-controls="pg-seal-list">' + (sealsAll ? "Show fewer" : "Show all " + open.length + " seals in progress") + "</button>" : "")
+        : '<p class="muted">No seals in progress.</p>') +
+      (done.length ? '<p class="pg-sub pg-done-seals">Done: ' + done.map(s => esc(s.title || s.n)).join(", ") + "</p>" : "") + "</section>";
+    box.innerHTML = '<div class="pg-top"><span class="pg-sub">' + (progLoading ? "Refreshing…" : "Updated " + new Date(progAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })) + '</span><button type="button" class="act-btn" id="pg-refresh">Refresh progress</button></div>' +
+      season + milestones + pursuitsHtml + sealsHtml;
+    $("pg-refresh").addEventListener("click", () => renderProgress(true));
+    box.querySelectorAll("[data-pg-owner]").forEach(b => b.addEventListener("click", () => { progFocus = b.dataset.pgOwner; drawProgress(); box.querySelector('[data-pg-owner="' + progFocus + '"]').focus(); }));
+    const more = $("pg-seals-more"); if (more) more.addEventListener("click", () => { sealsAll = !sealsAll; drawProgress(); $("pg-seals-more").focus(); });
+    if (refocus){ const t = box.querySelector(refocus); if (t) t.focus(); }
   }
 
   // ---------------- status panels ----------------

@@ -152,7 +152,9 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   HANDOFF item 45), keyed by Destiny account, checked against Bungie.
   Share links (`?share=<id>`, HANDOFF item 55) use the same Worker's
   `shares` table; opening one needs no sign-in. Search filters, bulk
-  actions, perk/mod switching and the loadout editor: HANDOFF item 56.
+  actions, perk/mod switching and the loadout editor: HANDOFF item 56. Progress tab
+  (season pass, milestones, pursuits, seals; loaded when the tab opens;
+  sample data from `tools/build-locker-progress-demo.js`): HANDOFF item 60.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

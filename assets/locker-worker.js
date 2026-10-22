@@ -33,22 +33,22 @@ function idb(){
     req.onerror = () => reject(req.error);
   });
 }
-async function idbGet(){
+async function idbGet(key = KEY){
   try {
     const db = await idb();
     return await new Promise((resolve) => {
-      const r = db.transaction(STORE).objectStore(STORE).get(KEY);
+      const r = db.transaction(STORE).objectStore(STORE).get(key);
       r.onsuccess = () => resolve(r.result || null);
       r.onerror = () => resolve(null);
     });
   } catch (e){ return null; } // private browsing etc.: just don't cache
 }
-async function idbPut(value){
+async function idbPut(value, key = KEY){
   try {
     const db = await idb();
     await new Promise((resolve) => {
       const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put(value, KEY);
+      tx.objectStore(STORE).put(value, key);
       tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve;
     });
   } catch (e){}
@@ -98,8 +98,62 @@ function trimItems(lite){
   return out;
 }
 
+// The Progress tab's own small database (message { kind: "progress" }),
+// downloaded the first time it's opened and cached like the item one:
+//   objectives: hash -> progress description
+//   milestones: hash -> { n, d, i }
+//   seasons: hash -> { n, num, passes: [{ h, start, end }] }; passes: hash -> { r, p } (reward / prestige progression)
+//   seals: node hash -> { n, i, title }
+//   pursuits: item hash -> { n, i, y, x, t } (bounties, quests, quest steps)
+const PROGRESS_KEY = "progress", PROGRESS_SCHEMA = 1;
+async function loadProgress(headers){
+  const manifest = (await getJson(BUNGIE + "/Platform/Destiny2/Manifest/", headers)).Response;
+  const version = manifest.version;
+  const cached = await idbGet(PROGRESS_KEY);
+  if (cached && cached.version === version && cached.schema === PROGRESS_SCHEMA) return cached;
+  const paths = manifest.jsonWorldComponentContentPaths.en;
+  self.postMessage({ type: "progress", step: "Downloading Bungie's progress definitions (first time, about 4MB)…" });
+  const [objDefs, msDefs, seasonDefs, passDefs, nodeDefs, recDefs, lite] = await Promise.all([
+    "DestinyObjectiveDefinition", "DestinyMilestoneDefinition", "DestinySeasonDefinition", "DestinySeasonPassDefinition",
+    "DestinyPresentationNodeDefinition", "DestinyRecordDefinition", "DestinyInventoryItemLiteDefinition"
+  ].map(k => getJson(BUNGIE + paths[k])));
+  const objectives = {};
+  for (const h in objDefs){ const d = objDefs[h].progressDescription; if (d) objectives[h] = d; }
+  const milestones = {};
+  for (const h in msDefs){ const dp = msDefs[h].displayProperties || {}; milestones[h] = { n: dp.name || "", d: (dp.description || "").slice(0, 200), i: dp.icon || "" }; }
+  const seasons = {};
+  for (const h in seasonDefs){
+    const s = seasonDefs[h];
+    seasons[h] = { n: (s.displayProperties || {}).name || "", num: s.seasonNumber || 0,
+      passes: (s.seasonPassList || []).map(p => ({ h: p.seasonPassHash, start: p.seasonPassStartDate, end: p.seasonPassEndDate })).concat(s.seasonPassHash ? [{ h: s.seasonPassHash, start: s.startDate, end: s.endDate }] : []) };
+  }
+  const passes = {};
+  for (const h in passDefs) passes[h] = { n: (passDefs[h].displayProperties || {}).name || "", r: passDefs[h].rewardProgressionHash, p: passDefs[h].prestigeProgressionHash };
+  const seals = {};
+  for (const h in nodeDefs){
+    const n = nodeDefs[h];
+    if (!n.completionRecordHash || n.redacted) continue;
+    const rec = recDefs[n.completionRecordHash] || {}, t = rec.titleInfo && rec.titleInfo.hasTitle && rec.titleInfo.titlesByGender ? (rec.titleInfo.titlesByGender.Male || Object.values(rec.titleInfo.titlesByGender)[0]) : "";
+    seals[h] = { n: (n.displayProperties || {}).name || "", i: (n.displayProperties || {}).icon || "", title: t || "" };
+  }
+  const pursuits = {};
+  for (const h in lite){
+    const v = lite[h], dp = v.displayProperties;
+    if (!dp || !dp.name || ![12, 13, 15, 26].includes(v.itemType)) continue;
+    pursuits[h] = { n: dp.name, i: dp.icon || "", y: v.itemTypeDisplayName || "", x: (dp.description || "").slice(0, 160), t: v.itemType };
+  }
+  const db = { schema: PROGRESS_SCHEMA, version, objectives, milestones, seasons, passes, seals, pursuits };
+  await idbPut(db, PROGRESS_KEY);
+  return db;
+}
+
 self.onmessage = async (msg) => {
   const headers = { "X-API-Key": msg.data.apiKey };
+  if (msg.data.kind === "progress"){
+    try { self.postMessage({ type: "done", db: await loadProgress(headers) }); }
+    catch (e){ self.postMessage({ type: "error", message: (e && e.message) || String(e) }); }
+    return;
+  }
   try {
     self.postMessage({ type: "progress", step: "Checking Bungie's item database…" });
     const manifest = (await getJson(BUNGIE + "/Platform/Destiny2/Manifest/", headers)).Response;

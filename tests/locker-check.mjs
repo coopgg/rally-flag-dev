@@ -104,6 +104,8 @@ async function open(opts = {}){
     await context.route("https://www.bungie.net/Platform/User/GetMembershipsForCurrentUser/", r => r.fulfill(opts.down ? maint() : json({ ErrorCode: 1, Response: { destinyMemberships: [{ membershipType: 3, membershipId: MEMBER }] } })));
     await context.route(new RegExp("/Profile/" + MEMBER + "/\\?components"), r => {
       if (opts.down) return r.fulfill(maint());
+      // The Progress tab's own call (milestones, pursuits, seals).
+      if (/components=[^&]*202/.test(r.request().url())){ calls.push({ ep: "Progress profile", body: r.request().url() }); return r.fulfill(json({ ErrorCode: 1, Response: DEMO.progress })); }
       const p = JSON.parse(JSON.stringify(DEMO)); p.responseMintedTimestamp = new Date(Date.now() - 600000).toISOString();
       r.fulfill(json({ ErrorCode: 1, Response: p }));
     });
@@ -477,6 +479,35 @@ await section("Wish list", async () => {
   check("wish: Delete (two taps) removes the roll and the badge", await p.locator(tile + " .tile-wish").count() === 0 && await p.evaluate(() => localStorage.getItem("rallyflag_locker_wishes")) === "{}");
   check("wish: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
+});
+
+// ---------- 2e. Progress tab ----------
+await section("Progress", async () => {
+  const p = await open({ hash: "#progress" });
+  await p.waitForSelector(".pg-season", { timeout: 120000 });
+  const P = DEMO.progress, chars = DEMO.profile.data.characterIds;
+  const lvl = Object.values(Object.values(P.characterProgressions.data)[0].progressions).reduce((n, x) => n + x.level, 0);
+  check("progress: season pass rank and XP", (await p.textContent(".pg-rank b")) === String(lvl) && /XP to rank/.test(await p.textContent(".pg-season")), await p.textContent(".pg-season"));
+  check("progress: milestones with a status per character", await p.locator(".pg-ms-row").count() >= 3 && await p.locator(".pg-ms-row:first-child .pg-ms-char").count() === chars.length);
+  const items = P.characterInventories.data;
+  const focus = await p.getAttribute('[data-pg-owner][aria-pressed="true"]', "data-pg-owner");
+  check("progress: bounties and quests of the last-played character, objectives shown", await p.locator(".pg-card").count() === items[focus].items.length && await p.locator(".pg-card .pg-obj").count() > 0 && /Expires in/.test(await p.textContent(".pg-cards")));
+  check("progress: finished pursuits come first, ready to turn in", await p.locator(".pg-cards .pg-card:first-child.done .pg-ready").count() >= 1);
+  const other = chars.find(c => c !== focus);
+  await p.click('[data-pg-owner="' + other + '"]');
+  check("progress: switching character shows theirs, focus stays", await p.getAttribute('[data-pg-owner="' + other + '"]', "aria-pressed") === "true" && await p.evaluate(c => document.activeElement.dataset.pgOwner === c, other));
+  const open8 = await p.locator(".pg-seal").count();
+  await p.click("#pg-seals-more");
+  check("progress: seals closest to done first, Show all opens the rest", open8 === 8 && await p.locator(".pg-seal").count() > 8 && /Done:/.test(await p.textContent("#view-progress")));
+  const v = await axe(p); check("progress passes axe", !v.length, v.join(", "));
+  check("progress: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+  // Signed in: one extra GetProfile call, only when the tab opens.
+  const q = await open({ real: true });
+  check("progress: nothing extra is loaded until the tab opens", !q.calls.some(c => c.ep === "Progress profile"));
+  await q.click("#tab-progress"); await q.waitForSelector(".pg-season", { timeout: 120000 });
+  check("progress: opening the tab fetches progress components", q.calls.some(c => c.ep === "Progress profile" && /components=100,104,200,201,202,300,301,700/.test(c.body)) && await q.locator(".pg-card").count() > 0);
+  await q.context_.close();
 });
 
 // ---------- 3. Loadouts and max Power (sample data) ----------
