@@ -90,8 +90,9 @@
   [data-mode="dark"] .feature-name{ text-shadow:0 0 30px var(--glow); }
   .feature-surges{ display:flex; align-items:center; flex-wrap:wrap; gap:8px 10px; margin-top:12px; }
   .feature-surges-label{ font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text-dim); }
-  .tile-surges{ display:inline-flex; vertical-align:-6px; margin-left:8px; min-height:0; gap:4px; }
-  .tile-surges .surge-chip.icon-only{ width:22px; height:22px; }
+  /* Surge icons as corner badges (like the Locker's item tiles). */
+  .tile-surges{ position:absolute; top:10px; right:10px; min-height:0; gap:4px; }
+  .tile-surges .surge-chip.icon-only{ width:24px; height:24px; box-shadow:0 0 0 2px var(--bg); }
   .feature-meta{ font-family:'JetBrains Mono', monospace; font-size:13px; color:var(--text-dim); font-variant-numeric:tabular-nums; }
   .feature-cta{
     display:inline-flex; align-items:center; min-height:44px; padding:0 20px; margin-top:16px; border-radius:999px;

@@ -716,7 +716,7 @@ await section("Master surges", async () => {
   const home = await open({ url: BASE + "index.html", ready: "#feature .feature-tile", milestones: ms });
   await home.evaluate(() => { document.querySelector(".feature-tile-name").insertAdjacentHTML("afterend", '<span class="surge-row tile-surges" data-surges="vault-of-glass" data-icons-only aria-busy="true"></span>'); window.RallyFlagSurges.fill(); });
   await home.waitForSelector('.tile-surges .surge-chip');
-  check("surges: Home tiles show the icons, named for screen readers", /Master surges: Void surge\s*Strand surge/.test(await home.textContent('.tile-surges')) && await home.locator(".tile-surges").first().locator("img").count() === 2);
+  check("surges: Home tiles show the icons, named for screen readers", /Master surges: Void surge\s*Strand surge/.test(await home.textContent('.tile-surges')) && await home.locator(".tile-surges").first().locator("img").count() === 2 && await home.locator(".tile-surges").first().getAttribute("title") === "Master surges: Void, Strand");
   await home.context_.close();
   const slot = p => p.evaluate(() => { document.querySelector("#featured-raids-content .featured-name").insertAdjacentHTML("afterend", '<div class="surge-row" id="t-surge" data-surges="kings-fall" aria-busy="true"></div>'); window.RallyFlagSurges.fill(); });
   const none = await open({ url: BASE + "this-week.html", ready: "#featured-raids-content .featured-card", milestones: {} });

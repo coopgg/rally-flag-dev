@@ -73,6 +73,7 @@ window.RallyFlagSurges = (function(){
     load().then(bySlug => slots.forEach(s => {
       const els = bySlug[s.dataset.surges], icons = s.hasAttribute("data-icons-only");
       s.innerHTML = els ? (icons ? '<span class="sr-only">Master surges: </span>' : "") + chipsHtml(els, icons) : (icons ? "" : '<span class="surge-note">Not listed by Bungie this week</span>');
+      if (icons && els) s.title = "Master surges: " + els.map(e => NAMES[e]).join(", ");
       s.setAttribute("aria-busy", "false");
     })).catch(() => slots.forEach(s => {
       s.innerHTML = s.hasAttribute("data-icons-only") ? "" : '<span class="surge-note">Couldn\'t load from Bungie</span>';
