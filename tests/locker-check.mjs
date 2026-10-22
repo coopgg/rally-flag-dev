@@ -459,6 +459,7 @@ await section("Wish list", async () => {
   await p.click('[data-wish-perk="' + mw.find(x => x.mine).n + '"]'); await p.click('[data-wish-perk="' + mw.find(x => !x.mine).n + '"]');
   check("wish: another masterwork stat doesn't match", /^0 of your 1/.test(await p.textContent("#wish-count")));
   await p.click("#wish-cancel");
+  check("wish: the popup shows the copy's masterwork stat and tier", /Masterwork/.test(await p.textContent("#item-dialog .dlg-body")) && /^(?:[A-Z][a-z]+ ?)+(Tier \d+ of 10|Fully masterworked)/.test(await p.textContent("#item-dialog .mw-row")), await p.textContent("#item-dialog .mw-row"));
   const del = p.locator("[data-wish-del]"); await del.click(); await del.click();
   await p.keyboard.press("Escape");
   check("wish: Delete (two taps) removes the roll and the badge", await p.locator(tile + " .tile-badge.wish").count() === 0 && await p.evaluate(() => localStorage.getItem("rallyflag_locker_wishes")) === "{}");

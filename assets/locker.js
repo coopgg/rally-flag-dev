@@ -2839,6 +2839,15 @@
     }).join("");
     return '<div class="dlg-label">Wish list</div>' + list + '<div class="act-row"><button type="button" class="act-btn" id="wish-add">' + (rolls.length ? "Add another roll" : "Pick the perks you want") + "</button></div>";
   }
+  // The popup's Masterwork line: stat and tier, ringed when a wish-list roll wants that stat.
+  function mwHtml(item){
+    const h = item.def.t === 3 && item.plugs.find(x => MW_PLUG.test((DB.items[x] || {}).n || ""));
+    if (!h) return "";
+    const p = DB.items[h], stat = MW_PLUG.exec(p.n)[1], tier = /^tier (\d+)/i.exec(p.n);
+    const wanted = (WISHES[wishName(item)] || []).some(r => r.groups.some(g => g.some(x => x.toLowerCase() === "masterwork: " + stat.toLowerCase())));
+    return '<div class="dlg-label">Masterwork</div><div class="intrinsic mw-row' + (wanted ? " wished" : "") + '">' + (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="42" height="42">' : "") +
+      "<div><b>" + esc(stat) + "</b><small>" + (tier ? "Tier " + tier[1] + " of 10" : "Fully masterworked") + (wanted ? " · on your wish list" : "") + "</small></div></div>";
+  }
   function wireWish(dlg, item){
     const name = wishName(item), rolls = WISHES[name] || [];
     const add = $("wish-add");
@@ -3065,6 +3074,7 @@
       stats ? label("Stats") + stats : "",
       intrinsic ? label(d.t === 3 ? "Frame" : "Archetype") + intrinsic : "",
       cols.length ? label("Perks") + '<div class="perk-cols" role="group" aria-label="Perks">' + cols.join("") + "</div>" : "",
+      mwHtml(item),
       cols.length && d.t === 3 ? wishHtml(item) : "",
       mods.length ? label("Mods") + '<div class="mod-row" role="group" aria-label="Mods">' + mods.join("") + "</div>" : ""
     ].filter(Boolean).map(b => '<div class="dlg-block">' + b + "</div>");
