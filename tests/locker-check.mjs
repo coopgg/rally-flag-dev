@@ -91,6 +91,7 @@ const RelayWorker = await loadWorker("tools/dim-relay/worker.js");
 const browser = await chromium.launch();
 // opts: { real } signs in with a fake session and mocks Bungie's profile and
 // actions; { env } is the sync service's database (shared = two devices).
+const CLARITY_FIX = { version: 1, perks: {} };
 async function open(opts = {}){
   const context = await browser.newContext({ viewport: { width: opts.width || 1280, height: 900 }, serviceWorkers: "block", isMobile: (opts.width || 1280) < 900, hasTouch: !!opts.touch });
   if (opts.real) await context.addInitScript(() => sessionStorage.setItem("rallyflag_bungie_auth", JSON.stringify({ access_token: "GOOD", access_expires_at: Date.now() + 3600e3 })));
@@ -127,12 +128,19 @@ async function open(opts = {}){
     });
     if (opts.down) await context.route("https://www.bungie.net/Platform/Destiny2/Manifest/", r => r.fulfill(maint()));
   }
+  // Clarity's perk descriptions: a small stand-in (CLARITY_FIX), counted.
+  const clarityCalls = [];
+  await context.route(/Live-Clarity-Database\/live\//, r => {
+    const file = r.request().url().split("/live/")[1];
+    clarityCalls.push(file);
+    r.fulfill({ status: 200, contentType: "text/plain", headers: { "access-control-allow-origin": "*" }, body: JSON.stringify(file === "versions.json" ? { descriptions: CLARITY_FIX.version } : CLARITY_FIX.perks) });
+  });
   const syncEnv = opts.env || { DB: fakeD1() }; // shared between pages = one account on two devices
   await context.route(SYNC + "**", r => viaWorker(SyncWorker, r, syncEnv));
   await context.route(RELAY + "**", r => opts.relay ? r.fulfill(json(opts.relay)) : viaWorker(RelayWorker, r, {}));
   const page = await context.newPage();
   page.errors = []; page.on("pageerror", e => page.errors.push(e.message));
-  page.calls = calls; page.context_ = context;
+  page.calls = calls; page.context_ = context; page.clarityCalls = clarityCalls;
   await page.goto(opts.url || BASE + "locker.html" + (opts.real ? "" : "?demo") + (opts.hash || ""));
   if (!opts.down && !opts.signedOut) await page.waitForSelector(opts.ready || "#locker-app:not([hidden])", { timeout: 120000 });
   await page.waitForTimeout(opts.real ? 2200 : 600);
@@ -622,6 +630,45 @@ await section("DIM extras", async () => {
   const kv = await axe(p); check("shortcut list passes axe", !kv.length, kv.join(", "));
   await p.keyboard.press("Escape");
   check("extras: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
+// ---------- 2g1. Clarity perk descriptions (their rules: HANDOFF item 65) ----------
+await section("Clarity", async () => {
+  const p = await open({ hash: "#gear" });
+  await p.click('#buckets .item-tile[data-id]:has(.tile-dmg), #buckets .item-tile[data-id]');
+  const perk = p.locator("#item-dialog [data-plug]:not(.mod-sq)").nth(2), hash = await perk.getAttribute("data-plug");
+  CLARITY_FIX.perks = { [hash]: { hash: +hash, name: "Test", descriptions: { en: [
+    { linesContent: [{ text: "Deals 25% more damage to " }, { classNames: ["solar"] }, { text: "Scorched targets. " }, { text: "Buff rules", link: "https://url.d2clarity.com/DamageBuffs" }] },
+    { classNames: ["spacer"] }, { linesContent: [{ text: "Stacks 3 times.", classNames: ["bold"] }] }] } } };
+  await perk.click(); await p.waitForSelector("#plug-info .clarity", { timeout: 15000 });
+  const box = "#plug-info .clarity";
+  check("clarity: tapping a perk shows Clarity's description as written", /Deals 25% more damage to Scorched targets\. Buff rules/.test(await p.textContent(box)) && await p.locator(box + " b").textContent() === "Stacks 3 times." && await p.locator(box + ' .cl-ico[role="img"][aria-label="Solar"]').count() === 1);
+  check("clarity: credited and linked next to the text, marked as not ours, with their Discord for feedback",
+    await p.locator(box + ' a[href="https://d2clarity.com"]').count() === 1 && /Community Insights/.test(await p.textContent(box)) && /not Rally Flag/.test(await p.textContent(box)) && await p.locator(box + ' a[href="https://d2clarity.com/discord"]').count() === 1);
+  check("clarity: downloads their version file and descriptions once", p.clarityCalls.join() === "versions.json,descriptions/dim.json", p.clarityCalls.join());
+  const v = await axe(p); check("clarity passes axe", !v.length, v.join(", "));
+  await p.keyboard.press("Escape");
+  // Same version next visit: only the version check; a new version: fresh descriptions.
+  await p.reload(); await p.waitForSelector("#locker-app:not([hidden])", { timeout: 90000 }); await p.waitForTimeout(600);
+  p.clarityCalls.length = 0;
+  await p.click('#buckets .item-tile[data-id]'); await p.locator("#item-dialog [data-plug]:not(.mod-sq)").nth(2).click(); await p.waitForSelector("#plug-info .clarity");
+  check("clarity: next visit checks the version and reuses the saved copy", p.clarityCalls.join() === "versions.json", p.clarityCalls.join());
+  await p.keyboard.press("Escape");
+  CLARITY_FIX.version = 2; CLARITY_FIX.perks[hash].descriptions.en[0].linesContent[0].text = "Now deals 30% more damage to ";
+  await p.reload(); await p.waitForSelector("#locker-app:not([hidden])", { timeout: 90000 }); await p.waitForTimeout(600);
+  p.clarityCalls.length = 0;
+  await p.click('#buckets .item-tile[data-id]'); await p.locator("#item-dialog [data-plug]:not(.mod-sq)").nth(2).click(); await p.waitForSelector("#plug-info .clarity");
+  check("clarity: a new version on their side is downloaded and shown", p.clarityCalls.join() === "versions.json,descriptions/dim.json" && /Now deals 30%/.test(await p.textContent("#plug-info .clarity")), p.clarityCalls.join());
+  await p.keyboard.press("Escape");
+  // Credits in Tools, and the off switch.
+  if (await p.isHidden("#tools-panel")) await p.click("#tools-btn");
+  check("clarity: the Tools row credits Clarity with their site, Discord and Ko-fi", await p.locator('#clarity-row a[href="https://d2clarity.com"]').count() === 1 && await p.locator('#clarity-row a[href="https://d2clarity.com/discord"]').count() === 1 && await p.locator('#clarity-row a[href="https://url.d2clarity.com/ko-fi"]').count() === 1);
+  await p.click("#clarity-on");
+  await p.click('#buckets .item-tile[data-id]'); await p.locator("#item-dialog [data-plug]:not(.mod-sq)").nth(2).click(); await p.waitForTimeout(500);
+  check("clarity: turning it off hides the descriptions and is remembered", !await p.locator("#plug-info .clarity").count() && await p.evaluate(() => localStorage.getItem("rallyflag_locker_clarity")) === "off");
+  await p.keyboard.press("Escape"); await p.click("#clarity-on");
+  check("clarity: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
 });
 

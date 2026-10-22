@@ -138,8 +138,37 @@ async function loadWishlist(url, hashes, force){
   return out;
 }
 
+// Clarity's community perk descriptions (d2clarity.com; their usage rules
+// are in HANDOFF item 65). Their versions.json is checked on every load
+// and descriptions/dim.json downloaded again whenever its number changes,
+// so only their latest text is ever shown. English only, otherwise as
+// published (never edited). Kept in IndexedDB ("clarity").
+const CLARITY = "https://raw.githubusercontent.com/Database-Clarity/Live-Clarity-Database/live/";
+async function loadClarity(){
+  const cached = await idbGet("clarity");
+  let version;
+  try {
+    const v = await fetch(CLARITY + "versions.json", { cache: "no-store" });
+    if (!v.ok) throw new Error("HTTP " + v.status + " checking Clarity's version");
+    version = (await v.json()).descriptions;
+  } catch (e){ if (cached) return cached; throw e; } // offline: the newest copy we have
+  if (cached && cached.version === version) return cached;
+  const res = await fetch(CLARITY + "descriptions/dim.json", { cache: "no-store" });
+  if (!res.ok) throw new Error("HTTP " + res.status + " fetching Clarity's descriptions");
+  const all = await res.json(), perks = {};
+  for (const h in all){ const en = all[h].descriptions && all[h].descriptions.en; if (en && en.length) perks[h] = en; }
+  const out = { version, at: Date.now(), perks };
+  await idbPut(out, "clarity");
+  return out;
+}
+
 self.onmessage = async (msg) => {
   const headers = { "X-API-Key": msg.data.apiKey };
+  if (msg.data.kind === "clarity"){
+    try { self.postMessage({ type: "done", db: await loadClarity() }); }
+    catch (e){ self.postMessage({ type: "error", message: (e && e.message) || String(e) }); }
+    return;
+  }
   if (msg.data.kind === "wishlist"){
     try { self.postMessage({ type: "done", db: await loadWishlist(msg.data.url, msg.data.hashes || [], msg.data.force) }); }
     catch (e){ self.postMessage({ type: "error", message: (e && e.message) || String(e) }); }

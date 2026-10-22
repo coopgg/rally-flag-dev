@@ -158,6 +158,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   Armor optimizer: HANDOFF item 60. Materials, touch long-press/swipe,
   keyboard shortcuts and the Compare bottom drawer (`showDialog`; the
   dialog's `close` event is async): HANDOFF item 64.
+  Clarity perk descriptions (their usage rules, versions.json check;
+  rallyflag.gg needs their partnership first): HANDOFF item 65.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

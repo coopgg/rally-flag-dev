@@ -458,6 +458,73 @@
     if (COMMUNITY.on) refreshCommunity();
   }
 
+  // Clarity's community perk descriptions (on unless turned off under
+  // Tools). Their rules (HANDOFF item 65): credit Clarity with a link next
+  // to the text, make it plain it isn't ours, link their Discord for
+  // feedback, show their text unedited and only their latest version.
+  const CL_TAB = ' target="_blank" rel="noopener"', CL_NEW = '<span class="sr-only"> (opens in a new tab)</span>';
+  const CLARITY_KEY = "rallyflag_locker_clarity", CLARITY_SITE = "https://d2clarity.com", CLARITY_DISCORD = "https://d2clarity.com/discord", CLARITY_KOFI = "https://url.d2clarity.com/ko-fi";
+  const CLARITY = { on: (() => { try { return localStorage.getItem(CLARITY_KEY) !== "off"; } catch (e){ return true; } })(), data: null, err: "", job: null };
+  function loadClarity(){
+    if (!CLARITY.on) return Promise.resolve(null);
+    if (CLARITY.data) return Promise.resolve(CLARITY.data);
+    if (CLARITY.job) return CLARITY.job;
+    CLARITY.err = "";
+    CLARITY.job = new Promise(resolve => {
+      const w = new Worker("assets/locker-worker.js");
+      const end = (data, err) => { w.terminate(); CLARITY.data = data; CLARITY.err = err || ""; CLARITY.job = null; renderClarityRow(); resolve(data); };
+      w.onmessage = e => e.data.type === "done" ? end(e.data.db) : e.data.type === "error" ? end(null, e.data.message) : 0;
+      w.onerror = e => end(null, e.message || "worker failed");
+      w.postMessage({ kind: "clarity" });
+    });
+    renderClarityRow();
+    return CLARITY.job;
+  }
+  const CLARITY_ICON = { solar: "Solar", arc: "Arc", void: "Void", stasis: "Stasis", strand: "Strand", kinetic: "Kinetic", primary: "Primary ammo", special: "Special ammo", heavy: "Heavy ammo",
+    barrier: "Barrier", overload: "Overload", unstoppable: "Unstoppable", hunter: "Hunter", titan: "Titan", warlock: "Warlock", enhancedArrow: "Enhanced" };
+  // Their format: blocks of lines (or a spacer); a line is pieces of text,
+  // links, and icon pieces (an element, ammo type, champion or the
+  // enhanced-perk arrow) named only by class.
+  function clarityText(blocks){
+    const piece = s => {
+      const cls = s.classNames || [];
+      if (!s.text){
+        const k = cls.find(c => CLARITY_ICON[c]);
+        return k ? '<span class="cl-ico cl-' + k + '" role="img" aria-label="' + CLARITY_ICON[k] + '"></span>' : "";
+      }
+      let t = esc(s.text);
+      if (s.link && /^https:\/\//.test(s.link)) t = '<a href="' + esc(s.link) + '"' + CL_TAB + ">" + t + CL_NEW + "</a>";
+      return cls.includes("bold") ? "<b>" + t + "</b>" : t;
+    };
+    return blocks.map(b => (b.classNames || []).includes("spacer") && !b.linesContent ? '<div class="cl-gap"></div>'
+      : '<p class="cl-line' + ((b.classNames || []).includes("bold") ? " cl-bold" : "") + '">' + (b.linesContent || []).map(piece).join("") + "</p>").join("");
+  }
+  function clarityHtml(hash){
+    const blocks = CLARITY.data && CLARITY.data.perks[hash];
+    if (!blocks) return "";
+    return '<div class="clarity" lang="en"><div class="cl-head"><span>Community Insights</span><a href="' + CLARITY_SITE + '"' + CL_TAB + ">by Clarity" + CL_NEW + "</a></div>" + clarityText(blocks) +
+      '<p class="cl-foot">Written by Clarity\'s community researchers, not Rally Flag. Something wrong? <a href="' + CLARITY_DISCORD + '"' + CL_TAB + ">Tell Clarity on Discord" + CL_NEW + "</a></p></div>";
+  }
+  // The Tools row doubles as the credits.
+  function renderClarityRow(){
+    const row = $("clarity-row");
+    if (!row) return;
+    row.innerHTML = '<span class="farm-label">Perk insights</span><button type="button" class="farm-btn" id="clarity-on" aria-pressed="' + CLARITY.on + '">Clarity</button>' +
+      '<span class="farm-note">' + (CLARITY.job ? "Loading Clarity's descriptions… " : CLARITY.err ? "Couldn't load them: " + esc(CLARITY.err) + ". " : "") +
+        'Tap a perk to see its real numbers from <a href="' + CLARITY_SITE + '"' + CL_TAB + ">Clarity" + CL_NEW + "</a>, a community research project (not part of Rally Flag)." +
+        ' Feedback on their descriptions goes to <a href="' + CLARITY_DISCORD + '"' + CL_TAB + ">Clarity's Discord" + CL_NEW + '</a>; you can <a href="' + CLARITY_KOFI + '"' + CL_TAB + ">support them on Ko-fi" + CL_NEW + "</a>.</span>";
+  }
+  function wireClarity(){
+    $("clarity-row").addEventListener("click", e => {
+      if (!e.target.closest("#clarity-on")) return;
+      CLARITY.on = !CLARITY.on;
+      try { localStorage.setItem(CLARITY_KEY, CLARITY.on ? "" : "off"); } catch (err){}
+      if (!CLARITY.on) CLARITY.data = null;
+      renderClarityRow(); $("clarity-on").focus();
+    });
+    renderClarityRow();
+  }
+
   // "New" items (like DIM's): anything not in this browser's list of
   // items already seen. The first visit counts everything as seen; opening
   // an item, or Mark as seen, clears the marker.
@@ -3551,8 +3618,11 @@
     dlg.querySelectorAll("[data-plug]").forEach(b => b.addEventListener("click", () => {
       dlg.querySelectorAll("[data-plug]").forEach(o => o.setAttribute("aria-pressed", String(o === b)));
       const h = +b.dataset.plug, idx = +b.dataset.socket, p = DB.items[h];
-      $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(h) ? " · in our God Roll" : "") +
-        (p.x ? "<br>" + esc(p.x) : "");
+      const info = $("plug-info");
+      info.innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(h) ? " · in our God Roll" : "") +
+        (p.x ? "<br>" + esc(p.x) : "") + clarityHtml(h);
+      // Clarity loads the first time a perk is tapped; fill it in if this one's still showing.
+      if (CLARITY.on && !CLARITY.data) loadClarity().then(() => { if (info.isConnected && b.getAttribute("aria-pressed") === "true" && !info.querySelector(".clarity")) info.insertAdjacentHTML("beforeend", clarityHtml(h)); });
       const box = $("plug-change");
       box.innerHTML = "";
       if (b.classList.contains("alt")){
@@ -3811,6 +3881,7 @@
     $("search-help").addEventListener("click", e => { if (e.target.closest("[data-keys]")) openKeys(); });
     $("new-clear").addEventListener("click", () => { markSeen([...NEW]); renderItems(); toast("Marked everything as seen.", "ok"); });
     wireTable();
+    wireClarity();
     $("buckets").addEventListener("click", e => {
       const pmTile = e.target.closest("[data-pm]");
       if (pmTile) return openPostmaster(pmTile.dataset.pm);
