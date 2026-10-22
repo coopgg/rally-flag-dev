@@ -140,15 +140,31 @@
         return '<div class="featured-card panel-card">' + window.rallyFlagArtThumb(item) +
           '<div class="featured-kind">' + kind + (item.slug === always ? '<span class="featured-always-badge">Always Featured</span>' : "") + "</div>" +
           '<div class="featured-name">' + esc(item.name) + "</div>" +
-          '<div class="yw-chars">' + OWNERS.map(o => '<span class="yw-char' + (c[o.id] ? " done" : "") + '">' + esc(o.name) + " " + (c[o.id] == null ? "?" : c[o.id] ? "✓ cleared" : "not yet") + "</span>").join("") + "</div>" +
+          charsHtml(c) +
           '<a class="featured-link" href="' + window.rallyFlagGuideHref(kind === "Raid" ? "raid" : "dungeon", item.slug) + '">View the guide →<span class="sr-only"> for ' + esc(item.name) + "</span></a></div>";
       }).join("");
       return '<div class="tw-subsection-label">' + label + "</div>" + (cards ? '<div class="featured-grid">' + cards + "</div>" : '<p class="muted">Nothing featured.</p>');
     };
+    // Everything not featured, as a compact list with the same chips.
+    const rest = (label, kind, slugs, list) => {
+      const rows = list.filter(x => !slugs.includes(x.slug)).map(item =>
+        '<li class="yw-rest-row"><a class="yw-rest-name" href="' + window.rallyFlagGuideHref(kind, item.slug) + '">' + esc(item.name) + "</a>" + charsHtml(cleared(item)) + "</li>").join("");
+      return rows ? '<div class="tw-subsection-label">' + label + '</div><ul class="yw-rest">' + rows + "</ul>" : "";
+    };
     const missing = OWNERS.some(o => DATA.history[o.id] == null);
     return '<section class="pg-section" aria-labelledby="yw-h-featured"><h2 class="dlg-label" id="yw-h-featured">Featured this week</h2>' +
       group("Raids", "Raid", wk.raids, idx.raids, R.ALWAYS_FEATURED_RAID_SLUG) + group("Dungeons", "Dungeon", wk.dungeons, idx.dungeons, R.ALWAYS_FEATURED_DUNGEON_SLUG) +
-      '<p class="yw-note">Clears since the weekly reset, from each character\'s activity history.' + (missing ? " Bungie didn't share some characters' history (a privacy setting can hide it), shown as ?." : "") + "</p></section>";
+      '<p class="yw-note">Green: cleared since the weekly reset. Red: not yet. From each character\'s activity history.' + (missing ? " Bungie didn't share some characters' history (a privacy setting can hide it), shown grey with a ?." : "") + "</p></section>" +
+      '<section class="pg-section" aria-labelledby="yw-h-rest"><h2 class="dlg-label" id="yw-h-rest">The rest</h2>' +
+      rest("Raids", "raid", wk.raids, idx.raids) + rest("Dungeons", "dungeon", wk.dungeons, idx.dungeons) + "</section>";
+  }
+  // One chip per character: green cleared, red not yet, grey unknown (the
+  // words are there for screen readers).
+  function charsHtml(c){
+    return '<div class="yw-chars">' + OWNERS.map(o => {
+      const v = c[o.id], state = v == null ? "unknown" : v ? "done" : "todo";
+      return '<span class="yw-char ' + state + '">' + esc(o.name) + (v == null ? " ?" : "") + '<span class="sr-only">' + (v == null ? ", unknown" : v ? ", cleared" : ", not cleared yet") + "</span></span>";
+    }).join("") + "</div>";
   }
   function draw(){
     const box = $("yw-app"), P = DATA.progress;

@@ -531,7 +531,13 @@ await section("Your Week", async () => {
   const titles = await p.$$eval(".featured-card .featured-name", n => n.map(x => x.textContent));
   check("week: this week's featured raids and dungeons, three of each", titles.length === 6 && titles.includes("The Desert Perpetual") && titles.includes("Equilibrium"), titles.join(", "));
   const chips = await p.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-char")].map(x => x.textContent)));
-  check("week: each featured activity shows every character's clear since reset", chips.every(c => c.length === 3) && chips.flat().some(t => /cleared/.test(t)) && chips.flat().some(t => /not yet/.test(t)));
+  check("week: each featured activity shows every character's clear since reset", chips.every(c => c.length === 3) && chips.flat().some(t => /, cleared$/.test(t)) && chips.flat().some(t => /not cleared yet$/.test(t)));
+  check("week: chips are just the class, green when cleared and red when not", await p.evaluate(() => [...document.querySelectorAll(".yw-char")].every(c => {
+    const shown = c.firstChild.textContent, bg = getComputedStyle(c).backgroundColor;
+    return /^(Titan|Hunter|Warlock)$/.test(shown) && (c.classList.contains("done") ? bg === "rgb(30, 122, 60)" : bg === "rgb(179, 38, 30)");
+  })));
+  const idx = await p.evaluate(() => window.ActivityIndex.raids.length + window.ActivityIndex.dungeons.length);
+  check("week: the rest lists every raid and dungeon not featured, with the same chips", await p.locator(".yw-rest-row").count() === idx - 6 && await p.locator(".yw-rest-row .yw-char").count() === (idx - 6) * 3 && await p.locator(".yw-rest-row .yw-char.done").count() > 0 && await p.locator('.yw-rest-row a[href*="raid-"]').count() > 0);
   check("week: links to our guide from each featured card", await p.locator('.featured-card a.featured-link[href*="raid-"]').count() === 3 && await p.locator('.featured-card a.featured-link[href*="dungeon-"]').count() === 3);
   check("week: season pass, milestones, pursuits and seals render", await p.locator(".pg-season").count() === 1 && await p.locator(".pg-ms-row").count() >= 3 && await p.locator(".pg-card").count() > 0 && await p.locator(".pg-seal").count() >= 1);
   check("week: pursuits expiring before reset are marked", await p.locator(".pg-tag").count() >= 1);
