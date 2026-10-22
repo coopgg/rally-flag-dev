@@ -102,8 +102,9 @@ async function open(opts = {}){
   });
   const calls = [];
   if (opts.real){
-    await context.route("https://www.bungie.net/Platform/User/GetMembershipsForCurrentUser/", r => r.fulfill(opts.down ? maint() : json({ ErrorCode: 1, Response: { destinyMemberships: [{ membershipType: 3, membershipId: MEMBER }] } })));
-    await context.route(new RegExp("/Profile/" + MEMBER + "/\\?components"), r => {
+    await context.route("https://www.bungie.net/Platform/User/GetMembershipsForCurrentUser/", r => r.fulfill(opts.down ? maint() : json({ ErrorCode: 1, Response: { primaryMembershipId: MEMBER, destinyMemberships: [{ membershipType: 3, membershipId: MEMBER, displayName: "Main" }].concat(opts.accounts || []) } })));
+    await context.route(new RegExp("/Profile/(" + MEMBER + "|" + (opts.accounts || []).map(a => a.membershipId).concat(["x"]).join("|") + ")/\\?components"), r => {
+      calls.push({ ep: "Profile", body: r.request().url() });
       if (opts.down) return r.fulfill(maint());
       // Your Week's call (milestones, pursuits, seals).
       if (/components=[^&]*202/.test(r.request().url())){ calls.push({ ep: "Week profile", body: r.request().url() }); return r.fulfill(json({ ErrorCode: 1, Response: WEEK.progress })); }
@@ -578,6 +579,56 @@ await section("DIM extras", async () => {
   await p.fill("#lo-dim", url); await p.click("#lo-dim-go"); await p.waitForTimeout(800);
   check("dim link: and it imports back", /Imported DIM out/.test(await toastText(p)), await toastText(p));
   check("extras: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
+// ---------- 2h. Community wish lists (Voltron, routed to a small list) ----------
+await section("Community rolls", async () => {
+  const reuse = DEMO.itemComponents.reusablePlugs.data;
+  const w = DEMO.characterInventories.data[TITAN].items.find(i => reuse[i.itemInstanceId] && [1498876634, 2465295065, 953998645].includes(i.bucketHash));
+  const plugs = DEMO.itemComponents.sockets.data[w.itemInstanceId].sockets.map(x => x.plugHash).filter(Boolean);
+  const alt = Object.values(reuse[w.itemInstanceId].plugs)[0].map(x => x.plugItemHash).find(h => !plugs.includes(h));
+  const list = "title:Test list\n\n//notes:Great for testing\ndimwishlist:item=" + w.itemHash + "&perks=" + plugs.slice(1, 3).concat(alt ? [alt] : []).join(",") + "\n" +
+    "dimwishlist:item=" + w.itemHash + "&perks=1,2,3#notes:never\ndimwishlist:item=-" + w.itemHash + "&perks=" + plugs[1] + "\n";
+  let fetched = 0;
+  const p = await open();
+  await p.context_.route("https://raw.githubusercontent.com/**", r => { fetched++; r.fulfill({ status: 200, contentType: "text/plain", headers: { "access-control-allow-origin": "*" }, body: list }); });
+  const tile = '#buckets .item-tile[data-id="' + w.itemInstanceId + '"]';
+  check("community: off by default, nothing downloaded", fetched === 0 && await p.locator(tile + " .community").count() === 0);
+  await p.click("#tools-btn"); await p.click("#community-on");
+  await p.waitForFunction(() => /rolls for your weapons/.test(document.getElementById("community-row").textContent), null, { timeout: 30000 });
+  check("community: switching it on downloads the list once and counts your rolls", fetched === 1 && /2 rolls for your weapons/.test(await p.textContent("#community-row")), await p.textContent("#community-row"));
+  const star = await p.locator(tile + " .tile-badge:not(.community)").filter({ hasText: "★" }).count();
+  check("community: a copy with the roll (perks it has or can switch to) is marked", /community recommended roll/.test(await p.getAttribute(tile, "aria-label")) && (star || await p.locator(tile + " .tile-badge.community").count() === 1));
+  await p.fill("#locker-search", "is:community"); await p.waitForTimeout(300);
+  check("community: is:community finds it", await p.locator("#buckets .item-tile[data-id]:not([hidden])").count() >= 1);
+  await p.fill("#locker-search", ""); await p.waitForTimeout(200);
+  await p.click(tile);
+  check("community: the popup says so, with the list's note", /Community roll/.test(await p.textContent("#item-dialog")) && /Great for testing/.test(await p.textContent("#item-dialog")));
+  await p.keyboard.press("Escape");
+  await p.reload(); await p.waitForSelector("#locker-app:not([hidden])", { timeout: 90000 }); await p.waitForTimeout(800);
+  check("community: kept for the week, no new download on reload", fetched === 1 && /community recommended roll/.test(await p.getAttribute(tile, "aria-label")));
+  if (await p.isHidden("#community-on")) await p.click("#tools-btn");
+  await p.click("#community-on");
+  check("community: switching it off removes the marks", !/community recommended roll/.test(await p.getAttribute(tile, "aria-label")));
+  check("community: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
+// ---------- 2g. Account switcher ----------
+await section("Accounts", async () => {
+  const one = await open({ real: true });
+  check("accounts: one account, no switcher", await one.isHidden("#account-row"));
+  await one.context_.close();
+  const OTHER = "4611686018400000999";
+  const p = await open({ real: true, accounts: [{ membershipType: 2, membershipId: OTHER, displayName: "Couch" }, { membershipType: 1, membershipId: "4611686018400000888", crossSaveOverride: 3, displayName: "Folded" }] });
+  const opts = await p.$$eval("#account-pick option", o => o.map(x => x.textContent));
+  check("accounts: more than one account offers a switcher (cross-saved ones left out)", opts.length === 2 && /Main · Steam/.test(opts[0]) && /Couch · PlayStation/.test(opts[1]), opts.join(" / "));
+  p.calls.length = 0;
+  await Promise.all([p.waitForNavigation(), p.selectOption("#account-pick", OTHER)]);
+  await p.waitForSelector("#locker-app:not([hidden])", { timeout: 90000 }); await p.waitForTimeout(500);
+  check("accounts: switching loads that account's profile, and it's remembered", p.calls.some(c => c.ep === "Profile" && c.body.includes("/Profile/" + OTHER + "/")) && await p.inputValue("#account-pick") === OTHER);
+  check("accounts: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
 });
 

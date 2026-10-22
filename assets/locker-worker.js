@@ -34,22 +34,22 @@ function idb(){
     req.onerror = () => reject(req.error);
   });
 }
-async function idbGet(){
+async function idbGet(key = KEY){
   try {
     const db = await idb();
     return await new Promise((resolve) => {
-      const r = db.transaction(STORE).objectStore(STORE).get(KEY);
+      const r = db.transaction(STORE).objectStore(STORE).get(key);
       r.onsuccess = () => resolve(r.result || null);
       r.onerror = () => resolve(null);
     });
   } catch (e){ return null; } // private browsing etc.: just don't cache
 }
-async function idbPut(value){
+async function idbPut(value, key = KEY){
   try {
     const db = await idb();
     await new Promise((resolve) => {
       const tx = db.transaction(STORE, "readwrite");
-      tx.objectStore(STORE).put(value, KEY);
+      tx.objectStore(STORE).put(value, key);
       tx.oncomplete = resolve; tx.onerror = resolve; tx.onabort = resolve;
     });
   } catch (e){}
@@ -101,8 +101,47 @@ function trimItems(lite){
   return out;
 }
 
+// Community wish lists in DIM's format (message { kind: "wishlist", url,
+// hashes }): download the list (Voltron is ~28MB) and keep only the rolls
+// for weapons the player owns. Lines look like
+//   dimwishlist:item=<hash>&perks=<hash>,<hash>…#notes:<text>
+// item=-69420 means any item; other negative items are "trash" rolls
+// (skipped). A //notes: line applies to the lines after it. Kept in
+// IndexedDB ("community") for a week, or until a weapon it hasn't read
+// appears; each note is stored once (rolls point at it by number).
+async function loadWishlist(url, hashes, force){
+  const want = new Set(hashes.map(String));
+  const cached = await idbGet("community");
+  if (!force && cached && cached.url === url && Date.now() - cached.at < 7 * 864e5 && [...want].every(h => cached.hashes.includes(h))) return cached;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("HTTP " + res.status + " fetching the wish list");
+  const text = await res.text();
+  const rolls = {}, any = [], notes = [], noteIx = new Map();
+  let note = "", count = 0;
+  const ix = n => { if (!n) return -1; if (!noteIx.has(n)){ noteIx.set(n, notes.length); notes.push(n); } return noteIx.get(n); };
+  for (const raw of text.split("\n")){
+    const line = raw.trim();
+    if (!line){ note = ""; continue; }
+    if (line.startsWith("//notes:")){ note = line.slice(8).trim(); continue; }
+    if (!line.startsWith("dimwishlist:")) continue;
+    const m = /item=(-?\d+)&perks=([\d,]+)(?:#notes:(.*))?/.exec(line);
+    if (!m) continue;
+    const item = m[1], roll = { p: m[2].split(",").map(Number).filter(Boolean), n: ix(((m[3] || note) || "").slice(0, 240)) };
+    if (item === "-69420") any.push(roll);
+    else if (item.charAt(0) !== "-" && want.has(item)){ (rolls[item] = rolls[item] || []).push(roll); count++; }
+  }
+  const out = { rolls, any, notes, count, at: Date.now(), url, hashes: [...want] };
+  await idbPut(out, "community");
+  return out;
+}
+
 self.onmessage = async (msg) => {
   const headers = { "X-API-Key": msg.data.apiKey };
+  if (msg.data.kind === "wishlist"){
+    try { self.postMessage({ type: "done", db: await loadWishlist(msg.data.url, msg.data.hashes || [], msg.data.force) }); }
+    catch (e){ self.postMessage({ type: "error", message: (e && e.message) || String(e) }); }
+    return;
+  }
   try {
     self.postMessage({ type: "progress", step: "Checking Bungie's item database…" });
     const manifest = (await getJson(BUNGIE + "/Platform/Destiny2/Manifest/", headers)).Response;

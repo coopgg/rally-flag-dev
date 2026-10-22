@@ -277,6 +277,22 @@
     if (!res.ok || data.ErrorCode !== 1) throw new Error((data && data.Message) || ("HTTP " + res.status));
     return data.Response;
   }
+  // More than one Destiny account (not merged by cross-save): pick which to
+  // show; remembered per browser.
+  const ACCOUNT_KEY = "rallyflag_locker_account", PLATFORMS = { 1: "Xbox", 2: "PlayStation", 3: "Steam", 5: "Stadia", 6: "Epic Games" };
+  let ACCOUNTS = [];
+  function renderAccounts(){
+    const row = $("account-row");
+    if (!row || ACCOUNTS.length < 2) return;
+    const cur = PROFILE_PATH.split("/").pop();
+    row.hidden = false;
+    row.innerHTML = '<label class="sort-label" for="account-pick"><span>Account</span></label><select class="chip chip-select" id="account-pick">' +
+      ACCOUNTS.map(m => '<option value="' + m.membershipId + '"' + (String(m.membershipId) === cur ? " selected" : "") + ">" + esc((m.bungieGlobalDisplayName || m.displayName || "Guardian") + " · " + (PLATFORMS[m.membershipType] || "Platform " + m.membershipType)) + "</option>").join("") + "</select>";
+    $("account-pick").addEventListener("change", e => {
+      try { localStorage.setItem(ACCOUNT_KEY, e.target.value); } catch (err){}
+      location.reload();
+    });
+  }
   async function loadProfile(){
     if (DEMO){
       const res = await fetch("assets/locker-demo.json");
@@ -284,9 +300,13 @@
       return res.json();
     }
     const memberships = await authedGet("/Platform/User/GetMembershipsForCurrentUser/");
-    const list = memberships.destinyMemberships || [];
+    // Cross-save folds platforms into one account; the others can't be read.
+    const list = (memberships.destinyMemberships || []).filter(m => !m.crossSaveOverride || m.crossSaveOverride === m.membershipType);
     if (!list.length) throw new Error("this Bungie account has no linked Destiny 2 platform.");
-    const primary = list.find(m => m.membershipId === memberships.primaryMembershipId) || list[0];
+    ACCOUNTS = list;
+    let pick = null;
+    try { pick = localStorage.getItem(ACCOUNT_KEY); } catch (e){}
+    const primary = list.find(m => String(m.membershipId) === pick) || list.find(m => m.membershipId === memberships.primaryMembershipId) || list[0];
     PROFILE_PATH = "/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId;
     return authedGet(PROFILE_PATH + "/?components=" + COMPONENTS);
   }
@@ -380,6 +400,64 @@
     computeSets();
     computeNew();
   }
+  // ---------------- community wish lists ----------------
+  // Opt-in (Tools): a DIM-format community list, Voltron by default,
+  // refreshed at most weekly; the worker keeps only the rolls for weapons
+  // you own (in IndexedDB; the on/off setting is in localStorage). A copy
+  // matches a roll when it has, or can switch to, every perk in it.
+  const COMMUNITY_KEY = "rallyflag_locker_community", VOLTRON = "https://raw.githubusercontent.com/48klocs/dim-wish-list-sources/master/voltron.txt";
+  const COMMUNITY = (() => { try { return Object.assign({ on: false, url: VOLTRON }, JSON.parse(localStorage.getItem(COMMUNITY_KEY) || "{}"), { data: null }); } catch (e){ return { on: false, url: VOLTRON, data: null }; } })();
+  let communityBusy = false, communityErr = "";
+  function saveCommunity(){ try { localStorage.setItem(COMMUNITY_KEY, JSON.stringify({ on: COMMUNITY.on, url: COMMUNITY.url })); } catch (e){} }
+  const plugSet = item => item.plugSetAll || (item.plugSetAll = new Set(item.plugs.concat(...Object.values(item.alts).map(a => a.map(x => x.plugItemHash)))));
+  function communityMatch(item){
+    if (!COMMUNITY.on || !COMMUNITY.data || item.def.t !== 3) return null;
+    const rolls = (COMMUNITY.data.rolls[item.hash] || []).concat(COMMUNITY.data.any || []);
+    if (!rolls.length) return null;
+    const have = plugSet(item), hits = rolls.filter(r => r.p.every(h => have.has(h)));
+    return hits.length ? hits : null;
+  }
+  function refreshCommunity(force){
+    if (!COMMUNITY.on || communityBusy) return;
+    const hashes = [...new Set(ITEMS.filter(i => i.def.t === 3).map(i => String(i.hash)))];
+    const d = COMMUNITY.data, fresh = d && d.url === COMMUNITY.url && Date.now() - d.at < 7 * 864e5 && hashes.every(h => d.hashes.includes(h));
+    if (fresh && !force) return;
+    const quiet = !force && !d; // first read this visit: usually the worker's cached copy
+    communityBusy = true; communityErr = ""; renderCommunity();
+    const w = new Worker("assets/locker-worker.js");
+    w.onmessage = e => {
+      const m = e.data;
+      if (m.type === "done"){
+        w.terminate(); const fetched = !d || m.db.at !== d.at; COMMUNITY.data = m.db; communityBusy = false; renderItems(); renderCommunity();
+        if (fetched && (!quiet || Date.now() - m.db.at < 60000)) toast("Community wish list updated: " + m.db.count.toLocaleString() + " rolls for your weapons.", "ok");
+      }
+      else if (m.type === "error"){ w.terminate(); communityBusy = false; communityErr = m.message; renderCommunity(); }
+    };
+    w.onerror = e => { communityBusy = false; communityErr = e.message || "worker failed"; renderCommunity(); };
+    w.postMessage({ kind: "wishlist", url: COMMUNITY.url, hashes, force: !!force });
+  }
+  function renderCommunity(){
+    const row = $("community-row");
+    if (!row) return;
+    const d = COMMUNITY.data, days = d ? Math.floor((Date.now() - d.at) / 864e5) : 0;
+    row.innerHTML = '<span class="farm-label">Community rolls</span><button type="button" class="farm-btn" id="community-on" aria-pressed="' + COMMUNITY.on + '">Voltron</button>' +
+      '<span class="farm-note" aria-live="polite">' + esc(communityBusy ? "Reading the list (the first time each week it downloads about 28MB)…" : communityErr ? "Couldn't load it: " + communityErr :
+        COMMUNITY.on && d ? d.count.toLocaleString() + " rolls for your weapons · updated " + (days ? days + " day" + (days === 1 ? "" : "s") + " ago" : "today") + ". Matching weapons get a 👍." :
+        "DIM's community wish list (Voltron): weapons with a recommended roll get a 👍. About a 28MB download, at most once a week.") + "</span>" +
+      (COMMUNITY.on && d && !communityBusy ? '<button type="button" class="farm-btn" id="community-update">Update now</button>' : "");
+  }
+  function wireCommunity(){
+    $("community-row").addEventListener("click", e => {
+      if (e.target.closest("#community-on")){
+        COMMUNITY.on = !COMMUNITY.on; saveCommunity(); renderCommunity(); renderItems();
+        if (COMMUNITY.on) refreshCommunity();
+        $("community-on").focus();
+      } else if (e.target.closest("#community-update")) refreshCommunity(true);
+    });
+    renderCommunity();
+    if (COMMUNITY.on) refreshCommunity();
+  }
+
   // "New" items (like DIM's): anything not in this browser's list of
   // items already seen. The first visit counts everything as seen; opening
   // an item, or Mark as seen, clears the marker.
@@ -2172,7 +2250,7 @@
         crafted: i => !!(i.state & STATE_CRAFTED),
         dupe: i => ctx.dupes().get(i.hash) > 1, godroll: i => !!(i.roll && i.roll.full),
         set: i => !!i.set, tagged: i => !!TAGS[i.id], hasnote: i => !!NOTES[i.id],
-        inloadout: i => ctx.inLoadout().has(i.id), new: i => NEW.has(i.id), wishlist: i => { const w = wishMatch(i); return !!(w && w.full); }, haswishlist: i => !!wishOf(i), invault: i => i.owner === "vault", ornamented: i => !!i.ornament
+        inloadout: i => ctx.inLoadout().has(i.id), new: i => NEW.has(i.id), community: i => !!communityMatch(i), wishlist: i => { const w = wishMatch(i); return !!(w && w.full); }, haswishlist: i => !!wishOf(i), invault: i => i.owner === "vault", ornamented: i => !!i.ornament
       };
       return is[val] || ("is:" + val);
     }
@@ -2238,7 +2316,7 @@
   // Suggestions while typing: filter words, then perk names and item types.
   const FILTER_WORDS = ["is:weapon", "is:armor", "is:exotic", "is:legendary", "is:equipped", "is:locked", "is:unlocked", "is:masterwork", "is:crafted",
     "is:dupe", "is:godroll", "is:set", "is:tagged", "is:hasnote", "is:inloadout", "is:ornamented", "is:kinetic", "is:solar", "is:arc", "is:void", "is:stasis", "is:strand",
-    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "is:new", "is:pve", "is:pvp", "is:wishlist", "is:haswishlist", "wish:>=", "tag:none", "tag:any",
+    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "is:new", "is:community", "is:pve", "is:pvp", "is:wishlist", "is:haswishlist", "wish:>=", "tag:none", "tag:any",
     "in:vault", "in:titan", "in:hunter", "in:warlock", "class:titan", "class:hunter", "class:warlock", "class:any",
     "slot:kinetic", "slot:energy", "slot:power", "slot:helmet", "slot:gauntlets", "slot:chest", "slot:legs", "slot:classitem",
     "power:>", "power:<", "tier:>=", "tier:5", "stat:total:>=", "stat:weapons:>", "stat:health:>", "stat:class:>", "stat:grenade:>", "stat:super:>", "stat:melee:>",
@@ -2275,7 +2353,7 @@
     return '<div class="search-help panel-card" id="search-help" hidden><h2 class="dlg-label">Search filters</h2>' +
       '<p class="muted">Combine terms with spaces (all must match), <b>or</b>, brackets, and <b>-</b> or <b>not</b> to exclude. Put names with spaces in quotes.</p>' +
       '<ul class="search-examples">' + SEARCH_EXAMPLES.map(([q, what]) => '<li><button type="button" class="act-btn" data-search="' + esc(q) + '"><code translate="no">' + esc(q) + "</code></button><span>" + esc(what) + "</span></li>").join("") + "</ul>" +
-      '<p class="muted search-words"><b>is:</b> new, weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive), pve, pvp, wishlist (matches your wish list), haswishlist · <b>wish:</b> how many wish-list picks a copy has (wish:>=4) · ' +
+      '<p class="muted search-words"><b>is:</b> new, community (a Voltron roll, when on under Tools), weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive), pve, pvp, wishlist (matches your wish list), haswishlist · <b>wish:</b> how many wish-list picks a copy has (wish:>=4) · ' +
         "<b>in:</b> vault, titan, hunter, warlock · <b>tag:</b> a tag, none, any · <b>class:</b> titan, hunter, warlock, any · <b>slot:</b> kinetic, energy, power, helmet, gauntlets, chest, legs, classitem · " +
         "<b>type:</b>, <b>name:</b>, <b>perk:</b>, <b>note:</b> text · <b>power:</b>, <b>tier:</b> a number with &gt;, &lt;, &gt;=, &lt;= · <b>stat:</b>total, weapons, health, class, grenade, super, melee or a weapon stat, then a number (stat:range:&gt;60)</p></div>";
   }
@@ -2397,7 +2475,8 @@
       { k: "perks", label: "Perks", v: i => curPerks(i).join(" · "), wide: true },
       { k: "mw", label: "Masterwork", v: i => mwStatOf(i) || (i.state & STATE_MASTERWORK ? "Yes" : "") },
       { k: "roll", label: "God Roll", v: i => i.roll ? i.roll.matched + "/" + i.roll.total : "", sort: rollScore },
-      { k: "wish", label: "Wish list", v: i => { const w = wishMatch(i); return w ? w.n + "/" + w.total : ""; }, sort: i => { const w = wishMatch(i); return w ? w.n / w.total : -1; } }
+      { k: "wish", label: "Wish list", v: i => { const w = wishMatch(i); return w ? w.n + "/" + w.total : ""; }, sort: i => { const w = wishMatch(i); return w ? w.n / w.total : -1; } },
+      { k: "community", label: "Community", v: i => communityMatch(i) ? "Yes" : "" }
     ], tail);
     return common.concat([
       { k: "class", label: "Guardian", v: i => i.def.c === 3 ? "Any" : CLASS_NAMES[i.def.c] || "" }, // "Class" is also a stat
@@ -2506,10 +2585,10 @@
     const d = item.def, dmg = DB.damage[item.damage];
     const mw = item.state & STATE_MASTERWORK;
     const orn = item.ornament && DB.items[item.ornament];
-    const wish = wishMatch(item);
+    const wish = wishMatch(item), community = communityMatch(item);
     const label = [d.n, d.y, orn ? "ornament " + orn.n : "", item.power ? "power " + item.power : "", item.tier ? "tier " + item.tier : "", mw ? "masterworked" : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
       item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : "",
-      d.t === 2 ? "stat total " + statTotal(item) : "", NEW.has(item.id) ? "new" : "",
+      d.t === 2 ? "stat total " + statTotal(item) : "", NEW.has(item.id) ? "new" : "", community ? "community recommended roll" : "",
       wish ? (wish.full ? "matches your wish list" : "has " + wish.n + " of " + wish.total + " wish-list picks") : "", TAGS[item.id] ? "tagged " + TAGS[item.id] : "", USE[item.id] ? "for " + useText(item.id) : "", NOTES[item.id] ? "note: " + NOTES[item.id] : ""].filter(Boolean).join(", ");
     const tag = TAGS[item.id], use = USE[item.id];
     return '<button type="button" class="item-tile ' + tierClass(d) + (mw ? " mw" : "") + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
@@ -2521,7 +2600,7 @@
       // Wish list: a bar along the top edge, as full as the match (green = all of it).
       (wish && wish.n ? '<span class="tile-wish' + (wish.full ? " full" : "") + '" style="--w:' + Math.round(wish.n / wish.total * 100) + '%" aria-hidden="true"></span>' : "") +
       (NOTES[item.id] ? '<span class="tile-note" aria-hidden="true"></span>' : "") +
-      (item.roll && item.roll.full || tag || NEW.has(item.id) ? '<span class="tile-badges" aria-hidden="true">' + (NEW.has(item.id) ? '<span class="tile-new"></span>' : "") + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
+      (item.roll && item.roll.full || tag || NEW.has(item.id) || community ? '<span class="tile-badges" aria-hidden="true">' + (NEW.has(item.id) ? '<span class="tile-new"></span>' : "") + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : community ? '<span class="tile-badge community">👍</span>' : "") +
         (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag ? '<span class="tile-badge tag-' + tag + '">' + (TAG_LIST.find(t => t[0] === tag) || [, , ""])[2] + "</span>" : "") + "</span>" : "") +
       '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") +
         (d.t === 2 ? '<span class="tile-total">' + statTotal(item) + "</span>" : "") + (item.power || "") + "</span>" +
@@ -3342,6 +3421,11 @@
       notes += '<div class="callout godroll"><span><strong>' + (r.full ? "Our God Roll" : r.matched + " of " + r.total + " God Roll perks") + "</strong>" +
         ' <span class="muted">(gold diamonds below)</span></span><a href="' + PUBLIC_SITE + "god-rolls.html#weapon-" + esc(r.weapon.slug) + '"' + NEW_TAB + ">See our roll →" + NEW_TAB_NOTE + "</a></div>";
     }
+    const comm = communityMatch(item);
+    if (comm){
+      const n = (COMMUNITY.data.notes || [])[comm.map(r => r.n).find(x => x >= 0)] || "";
+      notes += '<div class="callout"><span><strong>👍 Community roll</strong> <span class="muted">' + esc(comm.length === 1 ? "1 recommended roll matches" : comm.length + " recommended rolls match") + (n ? ": " + esc(n.length > 160 ? n.slice(0, 157) + "…" : n) : "") + "</span></span></div>";
+    }
     if (item.set){
       const p = item.setProgress, ours = item.set.ours;
       notes += '<div class="callout"><span><strong>' + esc(ours ? ours.name : item.set.name) + "</strong> " + p.slots.size + '/5 · <span class="muted">' + esc(setStatus(p).text) + "</span></span>" +
@@ -3694,6 +3778,7 @@
       if (!busyNotice()) run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to), null, item);
     });
     $("tools-btn").addEventListener("click", () => setTools($("tools-panel").hidden));
+    wireCommunity();
     try { if (localStorage.getItem(TOOLS_KEY) === "1") setTools(true); } catch (e){}
     $("farm-row").addEventListener("click", e => {
       const b = e.target.closest("[data-farm]");
@@ -3781,6 +3866,7 @@
         if (b) b.addEventListener("click", () => RallyFlagAuth.signIn(location.pathname));
       }
       $("locker-app").hidden = false;
+      renderAccounts();
       wire();
       render();
       resolvePostmasterNames();

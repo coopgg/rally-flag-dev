@@ -506,7 +506,10 @@
   /* Armor: stat total on the left of the Power strip. */
   .tile-total{ float:left; font-weight:500; color:#aeb7cf; }
   .item-tile.mw .tile-total{ color:#4a3a00; }
+  .tile-badge.community{ background:#e8eefc; }
   .fuel-gain{ color:var(--accent-text); font-weight:600; }
+  .account-row{ display:flex; align-items:center; gap:8px; margin-top:10px; }
+  .account-row[hidden]{ display:none; }
   /* Organizer: the Gear tab as a table */
   .table-mode [data-kind="type"], .table-mode .chip-sep, .table-mode .sort-label, .table-mode #fold-all{ display:none; }
   .org-kinds{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:16px 0 10px; }
@@ -776,6 +779,7 @@
   <div id="locker-status" role="status"></div>
   <div id="locker-app" hidden>
     <div id="demo-banner"></div>
+    <div class="account-row" id="account-row" hidden></div>
     <div class="locker-head" id="locker-head">
         <div class="search-box"><input type="search" id="locker-search" spellcheck="false" role="combobox" aria-expanded="false" aria-controls="search-suggest" aria-autocomplete="list" aria-describedby="search-hint" aria-label="Search or filter your gear (try is:dupe or perk:)" placeholder="Search, or filter: is:dupe, perk:…, stat:total:>60" autocomplete="off"><button type="button" class="search-help-btn" id="search-help-btn" aria-expanded="false" aria-controls="search-help">Filters</button></div>
       <div class="owner-grid" id="owner-grid" role="group" aria-label="Show gear for"></div>
@@ -793,6 +797,7 @@
     <div class="tools-panel" id="tools-panel" hidden>
       <div class="farm-row" id="farm-row" role="group" aria-label="Farming mode"></div>
       <div class="farm-row" id="junk-row" role="group" aria-label="Junk cleanup"></div>
+      <div class="farm-row" id="community-row" role="group" aria-label="Community rolls"></div>
     </div>
     <div class="locker-controls">
       <div id="search-help-slot"></div>
