@@ -2932,6 +2932,7 @@
       if (c >= 0) g.forEach(x => { const e = cols[c].perks.find(y => y.n.toLowerCase() === x.toLowerCase()); if (e) picks[c].add(e.n); }); else keep.push(g);
     }
     wishView = { fromId, name, k, cols, picks, keep };
+    dlg.style.setProperty("--wish-cols", cols.length);
     const ours = new Set(item.roll ? item.roll.weapon.perkHashes.map(h => (DB.items[h] || {}).n) : []);
     const owned = ITEMS.filter(i => i.def.t === 3 && wishName(i) === name);
     const onCopies = new Set(owned.flatMap(i => [...wishHave(i)]));

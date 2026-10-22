@@ -421,6 +421,7 @@ await section("Wish list", async () => {
   const heads = await p.$$eval(".wish-col-h", h => h.map(x => x.textContent));
   const counts = await p.$$eval(".wish-col", c => c.map(x => x.querySelectorAll("[data-wish-perk]").length));
   check("wish: a generic copy lists every perk the weapon can roll, per column", heads.length >= 4 && counts.filter(n => n >= 2).length >= 3 && await p.evaluate(() => document.activeElement.id === "dlg-name"), heads.join(", ") + " / " + counts.join(","));
+  check("wish: on desktop every column, Masterwork included, sits on one row", await p.evaluate(() => new Set([...document.querySelectorAll(".wish-col")].map(c => Math.round(c.getBoundingClientRect().top))).size === 1));
   // The trait this copy has, or another from that column (any of them will do).
   const trait = onCopy[onCopy.length - 2], col = await p.getAttribute('[data-wish-perk="' + trait + '"]', "data-wish-col");
   const others = await p.$$eval('[data-wish-col="' + col + '"]', b => b.map(x => x.dataset.wishPerk));

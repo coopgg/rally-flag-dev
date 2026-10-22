@@ -518,7 +518,9 @@
   /* Compare is as wide as its copies need (about 190px each) on anything
      bigger than a phone, up to the screen; phones keep the bottom sheet. */
   @media (min-width:641px){
-    dialog.item-dialog[data-view="wish"]{ width:min(1080px, calc(100vw - 48px)); }
+    /* Every perk column side by side (about 190px each), up to the screen. */
+    dialog.item-dialog[data-view="wish"]{ width:min(calc(40px + var(--wish-cols, 5) * 192px), calc(100vw - 48px)); }
+    dialog.item-dialog[data-view="wish"] .wish-cols{ grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); }
     dialog.item-dialog[data-view="compare"]{ width:min(calc(170px + var(--copies, 2) * 215px), calc(100vw - 48px)); }
     dialog.item-dialog[data-view="compare"] .cmp{ width:100%; }
     dialog.item-dialog[data-view="compare"] .cmp td, dialog.item-dialog[data-view="compare"] .cmp thead th{ min-width:170px; }
