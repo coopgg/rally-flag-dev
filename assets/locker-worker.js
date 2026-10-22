@@ -24,7 +24,7 @@
 const BUNGIE = "https://www.bungie.net";
 const DB_NAME = "rallyflag-locker", STORE = "manifest", KEY = "lite";
 // Bump when the stored shape changes, so cached copies are rebuilt.
-const SCHEMA = 7;
+const SCHEMA = 8;
 
 function idb(){
   return new Promise((resolve, reject) => {
@@ -67,12 +67,15 @@ async function getJson(url, headers){
 // subclasses (shown in in-game loadouts), and ornaments (item sub type 21,
 // a few of them filed as dummies, type 20), flagged o.
 const KEEP_TYPES = new Set([0, 1, 2, 3, 16, 19]);
+const CONSUMABLES = 1469714392;
 function trimItems(lite){
   const out = {};
   for (const hash in lite){
     const v = lite[hash];
     const dp = v.displayProperties;
-    if (!dp || !dp.name || !(KEEP_TYPES.has(v.itemType) || v.itemSubType === 21)) continue;
+    // Stackable materials (Enhancement Cores, Ascendant Shards, …) for the Materials panel.
+    const material = !!(v.inventory && v.inventory.bucketTypeHash === CONSUMABLES && v.inventory.maxStackSize > 1);
+    if (!dp || !dp.name || !(KEEP_TYPES.has(v.itemType) || v.itemSubType === 21 || material)) continue;
     const e = { n: dp.name };
     if (dp.icon) e.i = dp.icon;
     if (v.itemType === 2 || v.itemType === 3){

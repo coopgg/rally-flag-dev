@@ -2355,7 +2355,8 @@
       '<ul class="search-examples">' + SEARCH_EXAMPLES.map(([q, what]) => '<li><button type="button" class="act-btn" data-search="' + esc(q) + '"><code translate="no">' + esc(q) + "</code></button><span>" + esc(what) + "</span></li>").join("") + "</ul>" +
       '<p class="muted search-words"><b>is:</b> new, community (a Voltron roll, when on under Tools), weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive), pve, pvp, wishlist (matches your wish list), haswishlist · <b>wish:</b> how many wish-list picks a copy has (wish:>=4) · ' +
         "<b>in:</b> vault, titan, hunter, warlock · <b>tag:</b> a tag, none, any · <b>class:</b> titan, hunter, warlock, any · <b>slot:</b> kinetic, energy, power, helmet, gauntlets, chest, legs, classitem · " +
-        "<b>type:</b>, <b>name:</b>, <b>perk:</b>, <b>note:</b> text · <b>power:</b>, <b>tier:</b> a number with &gt;, &lt;, &gt;=, &lt;= · <b>stat:</b>total, weapons, health, class, grenade, super, melee or a weapon stat, then a number (stat:range:&gt;60)</p></div>";
+        "<b>type:</b>, <b>name:</b>, <b>perk:</b>, <b>note:</b> text · <b>power:</b>, <b>tier:</b> a number with &gt;, &lt;, &gt;=, &lt;= · <b>stat:</b>total, weapons, health, class, grenade, super, melee or a weapon stat, then a number (stat:range:&gt;60)</p>" +
+      '<p class="muted">On a keyboard, press <kbd>/</kbd> to search from anywhere. <button type="button" class="act-btn" data-keys>All keyboard shortcuts</button></p></div>';
   }
 
   // Bulk actions on what's shown (DIM's "act on search results"): tag,
@@ -2591,7 +2592,7 @@
       d.t === 2 ? "stat total " + statTotal(item) : "", NEW.has(item.id) ? "new" : "", community ? "community recommended roll" : "",
       wish ? (wish.full ? "matches your wish list" : "has " + wish.n + " of " + wish.total + " wish-list picks") : "", TAGS[item.id] ? "tagged " + TAGS[item.id] : "", USE[item.id] ? "for " + useText(item.id) : "", NOTES[item.id] ? "note: " + NOTES[item.id] : ""].filter(Boolean).join(", ");
     const tag = TAGS[item.id], use = USE[item.id];
-    return '<button type="button" class="item-tile ' + tierClass(d) + (mw ? " mw" : "") + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
+    return '<button type="button" class="item-tile ' + tierClass(d) + (mw ? " mw" : "") + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="' + !COARSE + '" aria-label="' + esc(label) + '">' +
       '<img class="icon" src="' + esc(img(iconOf(item))) + '" alt="" loading="lazy" width="64" height="64">' +
       (d.w ? '<img class="wm" src="' + esc(img(d.w)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (mw ? '<img class="ov" src="' + esc(img(MW_OVERLAY[d.r === 6 ? 6 : 5])) + '" alt="" loading="lazy" width="64" height="64">' : "") +
@@ -2633,7 +2634,7 @@
   // under their cards (equipped item, then inventory), then that slot's
   // vault items full width, armor split by class. Nothing is clipped.
   function renderAll(){
-    const shown = ITEMS.filter(matches);
+    const shown = ITEMS.filter(i => matches(i));
     const byPower = tileOrder;
     const filtering = !!(state.type || state.flags.size || state.tag);
     const slot = b => {
@@ -2673,7 +2674,7 @@
   // is one grid per slot (long lists show a preview). Between phone and
   // desktop widths, weapons and armor sit side by side.
   function renderOne(){
-    const shown = ITEMS.filter(matches), owner = state.focus, vault = owner === "vault";
+    const shown = ITEMS.filter(i => matches(i)), owner = state.focus, vault = owner === "vault";
     const byPower = tileOrder;
     // Long vault lists show a preview, but never while searching or
     // filtering, so a match can't end up hidden.
@@ -2915,6 +2916,22 @@
   }
   // Redrawing the popup (innerHTML) must not destroy the message element
   // when it's hosted inside the popup: park it, redraw, put it back.
+  // The item popup is modal everywhere except Compare on wide screens,
+  // which opens as a bottom drawer (DIM-style) so the gear above stays
+  // usable: click another copy, drag, search. Switching between the two
+  // closes and reopens the same <dialog>.
+  function showDialog(dlg, drawer){
+    drawer = !!drawer;
+    if (dlg.open && dlg.matches(":modal") === !drawer){ if (drawer) fitDrawer(); return; }
+    if (dlg.open) dlg.close(); // its "close" event comes later, when it's open again
+    dlg.classList.toggle("drawer", drawer);
+    if (drawer) dlg.show(); else dlg.showModal();
+    fitDrawer();
+  }
+  function fitDrawer(){
+    const dlg = $("item-dialog");
+    document.body.style.paddingBottom = dlg.open && dlg.classList.contains("drawer") ? dlg.offsetHeight + "px" : "";
+  }
   function redrawDialog(dlg, html){
     const t = $("locker-toast"), inside = dlg.contains(t);
     if (inside) document.body.appendChild(t);
@@ -2926,7 +2943,7 @@
     const t = $("locker-toast");
     // A modal popup makes the rest of the page inert, so while it's open
     // the message lives inside it (its button must stay clickable).
-    const dlg = $("item-dialog"), host = dlg.open ? dlg : document.body;
+    const dlg = $("item-dialog"), host = dlg.open && dlg.matches(":modal") ? dlg : document.body;
     if (t.parentNode !== host) host.appendChild(t);
     t.textContent = text;
     // Errors carry Bungie's code, and a permission error offers a fresh sign-in.
@@ -3211,7 +3228,7 @@
       const i = ITEMS.find(x => x.id === b.dataset.cmpMove), to = b.dataset.to, where = to === "vault" ? "the vault" : "your " + ownerLabel(to);
       run("Moving " + i.def.n + " to " + where, "Moved " + i.def.n + " to " + where + ".", () => moveTo(i, to), back('[data-cmp-move="' + i.id + '"]'), i);
     }));
-    if (!dlg.open) dlg.showModal();
+    showDialog(dlg, isWide());
     if (keep){
       const sc = dlg.querySelector(".cmp-scroll"), bd = dlg.querySelector(".dlg-body");
       if (sc) sc.scrollLeft = keep.x; if (bd) bd.scrollTop = keep.y;
@@ -3602,7 +3619,88 @@
         run((lock ? "Locking " : "Unlocking ") + name, (lock ? "Locked " : "Unlocked ") + name + ".", () => setLock(item, lock), reopen, item);
       }
     }));
-    if (!dlg.open) dlg.showModal();
+    showDialog(dlg);
+  }
+
+  // Materials and currencies (like Ishtar's): everything stackable you
+  // hold, totalled, with where it is. Currencies first, then materials,
+  // then other consumables; biggest stacks first.
+  const CONSUMABLES_BUCKET = 1469714392;
+  function materialsList(){
+    const by = new Map();
+    const add = (hash, qty, where) => {
+      const d = DB.items[hash];
+      if (!d || d.t === 2 || d.t === 3 || !qty) return;
+      const m = by.get(hash) || by.set(hash, { hash, d, total: 0, where: {} }).get(hash);
+      m.total += qty; m.where[where] = (m.where[where] || 0) + qty;
+    };
+    for (const c of data(PROFILE, "profileCurrencies").items || []) add(c.itemHash, c.quantity, "account");
+    const gearIds = new Set(ITEMS.map(i => i.id));
+    for (const it of data(PROFILE, "profileInventory").items || []) if (!gearIds.has(it.itemInstanceId) && (it.quantity || 1) >= 1 && DB.items[it.itemHash] && /material|currency|redeemable|consumable/i.test(DB.items[it.itemHash].y || "")) add(it.itemHash, it.quantity || 1, "vault");
+    const invs = data(PROFILE, "characterInventories");
+    for (const o of OWNERS) for (const it of ((invs[o.id] || {}).items || [])) if (it.bucketHash === CONSUMABLES_BUCKET) add(it.itemHash, it.quantity || 1, o.id);
+    const group = m => /currency/i.test(m.d.y || "") || m.where.account ? 0 : /material/i.test(m.d.y || "") ? 1 : 2;
+    return [...by.values()].sort((a, b) => group(a) - group(b) || b.total - a.total || a.d.n.localeCompare(b.d.n)).map(m => Object.assign(m, { group: group(m) }));
+  }
+  function openMaterials(){
+    const list = materialsList(), dlg = $("item-dialog");
+    const whereText = m => Object.keys(m.where).length === 1 && m.where.account ? "" : Object.entries(m.where).map(([w, q]) => (w === "vault" ? "Vault" : w === "account" ? "Account" : ownerLabel(w)) + " " + q.toLocaleString()).join(" · ");
+    const groups = ["Currencies", "Materials", "Consumables"].map((label, g) => {
+      const rows = list.filter(m => m.group === g);
+      return rows.length ? '<div class="dlg-block"><div class="dlg-label">' + label + '</div><ul class="mat-list">' + rows.map(m => '<li class="mat-row">' + (m.d.i ? '<img src="' + esc(img(m.d.i)) + '" alt="" width="32" height="32" loading="lazy">' : '<span class="mat-noicon"></span>') +
+        '<span class="mat-name"><b>' + esc(m.d.n) + "</b>" + (whereText(m) ? "<small>" + esc(whereText(m)) + "</small>" : "") + '</span><span class="mat-qty">' + m.total.toLocaleString() + "</span></li>").join("") + "</ul></div>" : "";
+    }).join("");
+    dlg.dataset.item = ""; dlg.dataset.view = "materials";
+    redrawDialog(dlg, '<div class="dlg-head"><div class="dlg-title"><div class="dlg-eyebrow">Vault &amp; characters</div><h2 class="dlg-name" id="dlg-name">Materials &amp; currencies</h2></div><button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
+      '<div class="dlg-body" tabindex="0" role="region" aria-label="Materials and currencies list">' + (groups || '<p class="muted">No materials found.</p>') + "</div>");
+    dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
+    showDialog(dlg);
+    dlg.querySelector(".dlg-close").focus();
+  }
+
+  // Keyboard shortcuts (DIM has a similar set). Single keys, ignored while
+  // typing, with a modifier held, or with a popup open.
+  const SHORTCUTS = [["/", "Search your gear"], ["g", "Gear tab"], ["l", "Loadouts tab"], ["a", "Armor Sets tab"],
+    ["t", "Table view on or off"], ["m", "Materials & currencies"], ["?", "This list"], ["Esc", "Close a popup or the suggestions"]];
+  function openKeys(){
+    const dlg = $("item-dialog");
+    dlg.dataset.item = ""; dlg.dataset.view = "keys";
+    redrawDialog(dlg, '<div class="dlg-head"><div class="dlg-title"><h2 class="dlg-name" id="dlg-name">Keyboard shortcuts</h2></div><button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
+      '<div class="dlg-body"><ul class="mat-list">' + SHORTCUTS.map(([k, what]) => '<li class="mat-row"><kbd class="key">' + esc(k) + '</kbd><span class="mat-name">' + esc(what) + "</span></li>").join("") + "</ul></div>");
+    dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
+    showDialog(dlg);
+    dlg.querySelector(".dlg-close").focus();
+  }
+  function onShortcut(e){
+    if (e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented || $("locker-app").hidden || $("item-dialog").matches(":modal")) return;
+    const el = e.target, typing = el.closest && el.closest("input, textarea, select, [contenteditable=''], [contenteditable=true]");
+    if (typing) return;
+    const view = v => { if ($("view-" + v).hidden) showView(v); };
+    const k = e.key;
+    if (k === "/"){ view("gear"); $("locker-search").focus(); $("locker-search").select(); }
+    else if (k === "g" || k === "l" || k === "a") showView({ g: "gear", l: "loadouts", a: "sets" }[k], true);
+    else if (k === "t"){ view("gear"); $("table-toggle").click(); $("table-toggle").focus(); }
+    else if (k === "m") openMaterials();
+    else if (k === "?") openKeys();
+    else return;
+    e.preventDefault();
+  }
+
+  // Long-press "Move to" bar (touch): the drag-and-drop bar with buttons,
+  // at the bottom of the screen within thumb reach.
+  let quickFired = false;
+  // Touch screens long-press instead of dragging (a draggable tile would start a drag).
+  const COARSE = window.matchMedia("(pointer: coarse)").matches;
+  function showQuickMove(id){
+    const item = ITEMS.find(i => i.id === id), bar = $("drop-bar");
+    if (!item) return;
+    if (navigator.vibrate) try { navigator.vibrate(15); } catch (e){}
+    bar.dataset.item = id; bar.classList.add("quick");
+    bar.innerHTML = '<span class="drop-label">Move ' + esc(item.def.n) + " to</span>" + OWNERS.map(o => o.id).concat("vault").filter(x => x !== item.owner)
+      .map(x => '<button type="button" class="drop-slot" data-quick="' + x + '">' + esc(ownerLabel(x)) + "</button>").join("") +
+      '<button type="button" class="drop-slot cancel" data-quick="cancel" aria-label="Cancel">×</button>';
+    bar.hidden = false;
+    bar.querySelector("[data-quick]").focus();
   }
 
   // Postmaster items: a short popup with what it is and a Pull button.
@@ -3622,7 +3720,7 @@
       if (busyNotice()) return;
       run("Pulling " + d.n + " to your " + o.name, "Pulled " + d.n + " to your " + o.name + ".", () => pull(p), () => dlg.close());
     });
-    if (!dlg.open) dlg.showModal();
+    showDialog(dlg);
   }
 
   // ---------------- wiring ----------------
@@ -3709,6 +3807,8 @@
       toast("Showing " + SHOWN.length + " for " + b.dataset.search, "ok");
     });
     $("bulk-row").addEventListener("click", bulkClick);
+    document.addEventListener("keydown", onShortcut);
+    $("search-help").addEventListener("click", e => { if (e.target.closest("[data-keys]")) openKeys(); });
     $("new-clear").addEventListener("click", () => { markSeen([...NEW]); renderItems(); toast("Marked everything as seen.", "ok"); });
     wireTable();
     $("buckets").addEventListener("click", e => {
@@ -3721,7 +3821,7 @@
         return run("Pulling " + list.length + " items to your " + who, "Pulled everything to your " + who + ".", async () => { for (const p of list) await pull(p); });
       }
       const tile = e.target.closest(".item-tile");
-      if (tile) return openItem(tile.dataset.id);
+      if (tile){ if (quickFired){ quickFired = false; return; } return openItem(tile.dataset.id); }
       const slot = e.target.closest(".bucket-toggle");
       const more = e.target.closest(".vault-more");
       const btn = slot || more;
@@ -3777,7 +3877,45 @@
       const item = d.item, to = d.to, where = to === "vault" ? "the vault" : "your " + ownerLabel(to);
       if (!busyNotice()) run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to), null, item);
     });
+    // Touch: long-press a tile for a quick "Move to" bar (Ishtar/DIM
+    // mobile); swipe the gear sideways to switch character (one-owner view).
+    let pressTimer = 0, pressStart = null;
+    $("buckets").addEventListener("pointerdown", e => {
+      const tile = e.pointerType === "touch" && e.target.closest(".item-tile[data-id]");
+      if (!tile) return;
+      pressStart = { x: e.clientX, y: e.clientY };
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(() => { quickFired = true; showQuickMove(tile.dataset.id); }, 500);
+    });
+    const cancelPress = e => { if (pressStart && (!e.clientX || Math.hypot(e.clientX - pressStart.x, e.clientY - pressStart.y) > 10)){ clearTimeout(pressTimer); pressStart = null; } };
+    $("buckets").addEventListener("pointermove", cancelPress);
+    $("buckets").addEventListener("pointerup", () => { clearTimeout(pressTimer); pressStart = null; if (quickFired) setTimeout(() => { quickFired = false; }, 600); });
+    $("buckets").addEventListener("pointercancel", () => { clearTimeout(pressTimer); pressStart = null; });
+    $("buckets").addEventListener("contextmenu", e => { if (e.target.closest(".item-tile") && quickFired) e.preventDefault(); });
+    $("drop-bar").addEventListener("click", e => {
+      const b = e.target.closest("[data-quick]");
+      if (!b) return;
+      const bar = $("drop-bar"), item = ITEMS.find(i => i.id === bar.dataset.item);
+      bar.hidden = true; bar.classList.remove("quick");
+      if (b.dataset.quick === "cancel" || !item || busyNotice()) return;
+      const to = b.dataset.quick, where = to === "vault" ? "the vault" : "your " + ownerLabel(to);
+      run("Moving " + item.def.n + " to " + where, "Moved " + item.def.n + " to " + where + ".", () => moveTo(item, to), null, item);
+    });
+    let swipe = null;
+    $("buckets").addEventListener("touchstart", e => { swipe = e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() } : null; }, { passive: true });
+    $("buckets").addEventListener("touchend", e => {
+      if (!swipe || isWide() || tableState.on || quickFired) return;
+      const t = e.changedTouches[0], dx = t.clientX - swipe.x, dy = t.clientY - swipe.y;
+      if (Math.abs(dx) < 70 || Math.abs(dx) < 2 * Math.abs(dy) || Date.now() - swipe.t > 700) return;
+      const order = OWNERS.map(o => o.id).concat("vault"), k = order.indexOf(state.focus);
+      const next = order[(k + (dx < 0 ? 1 : order.length - 1)) % order.length];
+      state.focus = next;
+      try { localStorage.setItem(FOCUS_KEY, next); } catch (err){}
+      render();
+      toast("Showing " + (next === "vault" ? "the vault" : "your " + ownerLabel(next)) + ".", "ok");
+    }, { passive: true });
     $("tools-btn").addEventListener("click", () => setTools($("tools-panel").hidden));
+    $("materials-btn").addEventListener("click", openMaterials);
     wireCommunity();
     try { if (localStorage.getItem(TOOLS_KEY) === "1") setTools(true); } catch (e){}
     $("farm-row").addEventListener("click", e => {
@@ -3848,7 +3986,20 @@
     });
     // Click on the backdrop closes the dialog.
     $("item-dialog").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
-    $("item-dialog").addEventListener("close", () => { document.body.appendChild($("locker-toast")); wishView = null; });
+    $("item-dialog").addEventListener("close", e => {
+      if (e.currentTarget.open) return; // reopened as a drawer or a popup (showDialog)
+      document.body.appendChild($("locker-toast"));
+      wishView = null; e.currentTarget.classList.remove("drawer"); fitDrawer();
+    });
+    // A drawer isn't modal, so Escape needs wiring (from inside it, or from
+    // the page when nothing else wants the key).
+    document.addEventListener("keydown", e => {
+      const dlg = $("item-dialog");
+      if (e.key !== "Escape" || !dlg.open || dlg.matches(":modal") || e.defaultPrevented) return;
+      if (!dlg.contains(e.target) && e.target.closest && e.target.closest("input, textarea, select")) return;
+      e.preventDefault(); dlg.close();
+    });
+    window.addEventListener("resize", () => { const dlg = $("item-dialog"); if (dlg.open && dlg.classList.contains("drawer") && !isWide()) showDialog(dlg); else fitDrawer(); });
   }
 
   async function init(){

@@ -92,7 +92,7 @@ const browser = await chromium.launch();
 // opts: { real } signs in with a fake session and mocks Bungie's profile and
 // actions; { env } is the sync service's database (shared = two devices).
 async function open(opts = {}){
-  const context = await browser.newContext({ viewport: { width: opts.width || 1280, height: 900 }, serviceWorkers: "block", isMobile: (opts.width || 1280) < 900 });
+  const context = await browser.newContext({ viewport: { width: opts.width || 1280, height: 900 }, serviceWorkers: "block", isMobile: (opts.width || 1280) < 900, hasTouch: !!opts.touch });
   if (opts.real) await context.addInitScript(() => sessionStorage.setItem("rallyflag_bungie_auth", JSON.stringify({ access_token: "GOOD", access_expires_at: Date.now() + 3600e3 })));
   await context.route(BASE + "**", r => {
     const rel = new URL(r.request().url()).pathname.replace("/rally-flag-dev/", "") || "index.html";
@@ -304,12 +304,26 @@ await section("Gear", async () => {
   check("compare: Lock on a column locks that copy, popup stays", await p.getAttribute('[data-cmp-lock="' + col + '"]', "aria-pressed") !== null && await p.evaluate(() => document.getElementById("item-dialog").dataset.view) === "compare", await toastText(p));
   check("compare: perks show as icons with our God Roll ringed", await p.locator(".cmp .cmp-perk-ico").count() > 0);
   const v = await axe(p); check("compare passes axe", !v.length, v.join(", "));
+  check("compare: on wide screens it's a bottom drawer, not modal, and the page makes room for it", await p.evaluate(() => { const d = document.getElementById("item-dialog"), r = d.getBoundingClientRect(); return !d.matches(":modal") && d.classList.contains("drawer") && Math.abs(r.bottom - innerHeight) < 2 && Math.abs(parseFloat(document.body.style.paddingBottom) - r.height) < 2; }));
   check("compare: on desktop the popup widens to fit every copy, no sideways scroll", await p.evaluate(() => { const d = document.getElementById("item-dialog"), sc = d.querySelector(".cmp-scroll"); return d.getBoundingClientRect().width > 460 && sc.scrollWidth <= sc.clientWidth; }));
   const other = await p.$$eval("[data-cmp-open]", b => b.map(x => x.dataset.cmpOpen));
   const target = other.find(x => x !== dupe);
   await p.click('[data-cmp-open="' + target + '"]');
-  check("compare: Open goes to that copy", await p.evaluate(() => document.getElementById("item-dialog").dataset.item) === target);
+  check("compare: Open goes to that copy, as a normal popup", await p.evaluate(() => { const d = document.getElementById("item-dialog"); return d.matches(":modal") && !d.classList.contains("drawer"); }) && await p.evaluate(() => document.getElementById("item-dialog").dataset.item) === target);
+  await p.click("#open-compare");
+  // A tile just under the pinned header, above the drawer.
+  const above = await p.evaluate(() => {
+    const head = document.getElementById("locker-head").getBoundingClientRect().bottom, t = document.querySelector("#buckets .item-tile[data-id]");
+    window.scrollBy(0, t.getBoundingClientRect().top - head - 20);
+    return t.dataset.id;
+  });
+  await p.click('#buckets .item-tile[data-id="' + above + '"]');
+  check("compare drawer: clicking gear above it opens that item", await p.evaluate(() => { const d = document.getElementById("item-dialog"); return d.open && d.matches(":modal") && !!d.dataset.item; }));
   await p.keyboard.press("Escape");
+  check("compare drawer: closing leaves no padding behind", await p.evaluate(() => !document.getElementById("item-dialog").open && !document.body.style.paddingBottom));
+  await p.click('#buckets .item-tile[data-id="' + dupe + '"]'); await p.click("#open-compare");
+  await p.keyboard.press("Escape");
+  check("compare drawer: Escape closes it", await p.evaluate(() => !document.getElementById("item-dialog").open));
   await p.click('.chip[data-value="dupes"]');
   // Organizer: the table view.
   await p.fill("#locker-search", ""); await p.waitForTimeout(200);
@@ -578,7 +592,57 @@ await section("DIM extras", async () => {
   check("dim link: Copy DIM link makes a DIM loadout link with gear, subclass, mods and cosmetics", url.startsWith("https://app.destinyitemmanager.com/loadouts?loadout=") && j.name === "DIM out" && j.equipped.length >= 9 && j.parameters.mods.length > 0 && Object.keys(j.parameters.modsByBucket).length > 0);
   await p.fill("#lo-dim", url); await p.click("#lo-dim-go"); await p.waitForTimeout(800);
   check("dim link: and it imports back", /Imported DIM out/.test(await toastText(p)), await toastText(p));
+  // Materials and currencies.
+  await p.click("#tab-gear"); await p.click("#materials-btn");
+  check("materials: the button lists materials and currencies with totals", await p.evaluate(() => document.getElementById("item-dialog").dataset.view) === "materials" && await p.locator(".mat-row").count() >= 8 && /\d/.test(await p.textContent(".mat-row .mat-qty")));
+  const mv = await axe(p); check("materials passes axe", !mv.length, mv.join(", "));
+  await p.keyboard.press("Escape");
+  // Keyboard shortcuts.
+  await p.locator("body").focus(); await p.keyboard.press("l");
+  check("keys: l opens Loadouts", await p.isVisible("#view-loadouts"));
+  await p.keyboard.press("a");
+  check("keys: a opens Armor Sets", await p.isVisible("#view-sets"));
+  await p.keyboard.press("/");
+  check("keys: / goes to Gear and focuses the search", await p.isVisible("#view-gear") && await p.evaluate(() => document.activeElement.id) === "locker-search");
+  await p.keyboard.type("gl");
+  check("keys: typing in the search box is just typing", (await p.inputValue("#locker-search")) === "gl" && await p.isVisible("#view-gear"));
+  await p.fill("#locker-search", ""); await p.locator("#locker-count").click();
+  await p.keyboard.press("m");
+  check("keys: m opens Materials", await p.evaluate(() => document.getElementById("item-dialog").dataset.view) === "materials");
+  await p.keyboard.press("g");
+  check("keys: shortcuts are off while a popup is open", await p.evaluate(() => document.getElementById("item-dialog").open));
+  await p.keyboard.press("Escape"); await p.keyboard.press("Shift+?");
+  check("keys: ? lists the shortcuts", await p.evaluate(() => document.getElementById("item-dialog").dataset.view) === "keys" && await p.locator(".mat-row kbd.key").count() >= 7);
+  const kv = await axe(p); check("shortcut list passes axe", !kv.length, kv.join(", "));
+  await p.keyboard.press("Escape");
   check("extras: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
+// ---------- 2g2. Touch: long-press to move, swipe to switch character ----------
+await section("Touch", async () => {
+  const p = await open({ width: 390, touch: true, hash: "#gear" });
+  check("touch: tiles aren't draggable on a touch screen", await p.getAttribute("#buckets .item-tile[data-id]", "draggable") !== "true");
+  const before = await p.textContent("#locker-count");
+  check("phone: the count is this character's items", /^Showing (\d+) of \1 items$/.test(before), before);
+  const tile = p.locator("#buckets .slot-equipped .item-tile[data-id]").first(), id = await tile.getAttribute("data-id");
+  const box = await tile.boundingBox(), xy = [box.x + 20, box.y + 20];
+  await p.evaluate(([x, y]) => document.elementFromPoint(x, y).dispatchEvent(new PointerEvent("pointerdown", { pointerType: "touch", bubbles: true, clientX: x, clientY: y })), xy);
+  await p.waitForTimeout(650);
+  await p.evaluate(([x, y]) => { const t = document.elementFromPoint(x, y); t.dispatchEvent(new PointerEvent("pointerup", { pointerType: "touch", bubbles: true, clientX: x, clientY: y })); t.closest(".item-tile").click(); }, xy);
+  check("touch: long-press shows a Move to bar at the bottom, not the popup", await p.isVisible("#drop-bar.quick") && !await p.evaluate(() => document.getElementById("item-dialog").open) && await p.evaluate(() => { const r = document.getElementById("drop-bar").getBoundingClientRect(); return r.bottom > innerHeight - 40 && r.width > 300 && !!document.activeElement.dataset.quick; }));
+  await p.click('#drop-bar [data-quick="vault"]'); await idle(p);
+  check("touch: a button in the bar moves the item", /Moved .* to the vault/.test(await toastText(p)) && await p.isHidden("#drop-bar") && !await p.locator('#buckets .item-tile[data-id="' + id + '"]').count(), await toastText(p));
+  const owner = () => p.getAttribute('.owner-card[aria-pressed="true"]', "data-owner");
+  const was = await owner();
+  await p.evaluate(() => {
+    const el = document.getElementById("buckets"), mk = (x, y) => new Touch({ identifier: 1, target: el, clientX: x, clientY: y });
+    el.dispatchEvent(new TouchEvent("touchstart", { touches: [mk(300, 400)], changedTouches: [mk(300, 400)], bubbles: true }));
+    el.dispatchEvent(new TouchEvent("touchend", { touches: [], changedTouches: [mk(150, 410)], bubbles: true }));
+  });
+  await p.waitForTimeout(300);
+  check("touch: swiping left shows the next character", (await owner()) !== was && /Showing your/.test(await toastText(p)));
+  check("touch: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
 });
 

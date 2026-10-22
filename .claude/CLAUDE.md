@@ -155,7 +155,9 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   Share links (`?share=<id>`, HANDOFF item 55) use the same Worker's
   `shares` table; opening one needs no sign-in. Search filters, bulk
   actions, perk/mod switching and the loadout editor: HANDOFF item 56.
-  Armor optimizer: HANDOFF item 60.
+  Armor optimizer: HANDOFF item 60. Materials, touch long-press/swipe,
+  keyboard shortcuts and the Compare bottom drawer (`showDialog`; the
+  dialog's `close` event is async): HANDOFF item 64.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.
