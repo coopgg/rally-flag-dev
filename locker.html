@@ -467,6 +467,8 @@
   .cmp td.best{ color:var(--accent-text); font-weight:700; }
   .cmp-perk{ display:block; }
   .cmp-perk.ours{ color:var(--accent-text); font-weight:600; }
+  /* Many copies scroll sideways: the row labels stay put. */
+  .cmp tbody th, .cmp thead td:first-child{ position:sticky; left:0; z-index:1; background:var(--bg); box-shadow:1px 0 0 var(--panel-border); }
   /* Compare is as wide as its copies need (about 190px each) on anything
      bigger than a phone, up to the screen; phones keep the bottom sheet. */
   @media (min-width:641px){
