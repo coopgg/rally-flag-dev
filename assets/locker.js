@@ -2815,15 +2815,10 @@
   }
 
   // The popup's Wish list block: the rolls you want for this weapon, with
-  // whether this copy has each; picking mode turns the perk dots into
-  // toggles (several in one column = any of them).
-  let wishEdit = null; // { name, k (roll index, -1 = new), picks: Map(socket -> Set(names)), keep: [groups not on this copy] }
+  // whether this copy has each, and the wanted perks ringed in the columns.
+  // Picking happens on a generic copy of the weapon (openWishView).
   function wishHtml(item){
     const name = wishName(item), rolls = WISHES[name] || [], have = new Set(perkNames(item).split("|"));
-    const label = '<div class="dlg-label">Wish list</div>';
-    if (wishEdit && wishEdit.name === name)
-      return label + '<p class="wish-help">Tap the perks you want, in the perk columns above. Pick several in one column if any of them will do.</p>' +
-        '<div class="act-row"><button type="button" class="act-btn" id="wish-save">Save roll</button><button type="button" class="act-btn" id="wish-cancel">Cancel</button></div>';
     const list = rolls.map((r, k) => {
       const n = r.groups.filter(g => g.some(x => have.has(x.toLowerCase()))).length, full = n === r.groups.length;
       return '<div class="wish-roll"><span class="wish-status' + (full ? " ok" : "") + '">' + (full ? ICON_WISH + " This copy has it" : "Has " + n + " of " + r.groups.length) + "</span>" +
@@ -2831,64 +2826,132 @@
         '<span class="wish-btns"><button type="button" class="act-btn" data-wish-edit="' + k + '">Edit<span class="sr-only"> roll ' + (k + 1) + "</span></button>" +
         '<button type="button" class="act-btn" data-wish-del="' + k + '">Delete<span class="sr-only"> roll ' + (k + 1) + "</span></button></span></div>";
     }).join("");
-    return label + list + '<div class="act-row"><button type="button" class="act-btn" id="wish-add">' + (rolls.length ? "Add another roll" : "Pick the perks you want") + "</button></div>";
+    return '<div class="dlg-label">Wish list</div>' + list + '<div class="act-row"><button type="button" class="act-btn" id="wish-add">' + (rolls.length ? "Add another roll" : "Pick the perks you want") + "</button></div>";
   }
   function wireWish(dlg, item){
     const name = wishName(item), rolls = WISHES[name] || [];
-    const nameOf = h => (DB.items[h] || {}).n || "";
-    const reopen = sel => { openItem(item.id); const t = sel && dlg.querySelector(sel); if (t) t.focus(); };
     const add = $("wish-add");
-    const start = k => {
-      const picks = new Map(), keep = [];
-      for (const g of k >= 0 ? rolls[k].groups : []){
-        const lower = g.map(x => x.toLowerCase());
-        const dot = [...dlg.querySelectorAll(".perk-dot")].find(b => lower.includes(nameOf(+b.dataset.plug).toLowerCase()));
-        if (dot) picks.set(dot.dataset.socket, new Set(g)); else keep.push(g);
-      }
-      wishEdit = { name, k, picks, keep };
-      reopen(".perk-dot");
-    };
-    if (add) add.addEventListener("click", () => start(-1));
-    dlg.querySelectorAll("[data-wish-edit]").forEach(b => b.addEventListener("click", () => start(+b.dataset.wishEdit)));
+    if (add) add.addEventListener("click", () => openWishView(item.id, -1));
+    dlg.querySelectorAll("[data-wish-edit]").forEach(b => b.addEventListener("click", () => openWishView(item.id, +b.dataset.wishEdit)));
     dlg.querySelectorAll("[data-wish-del]").forEach(b => b.addEventListener("click", () => {
       if (b.dataset.confirm !== "1"){ b.dataset.confirm = "1"; b.firstChild.textContent = "Tap again to delete"; return; }
       saveWish(name, rolls.filter((r, k) => k !== +b.dataset.wishDel));
-      renderItems(); reopen("#wish-add"); toast("Wish-list roll deleted.", "ok");
+      renderItems(); openItem(item.id); $("wish-add").focus(); toast("Wish-list roll deleted.", "ok");
     }));
-    // Ring the perks your rolls want (or, while picking, the ones picked).
-    const editing = wishEdit && wishEdit.name === name;
     const wanted = new Set(rolls.flatMap(r => r.groups.flat()).map(x => x.toLowerCase()));
-    dlg.querySelectorAll(".perk-dot").forEach(b => {
-      const n = nameOf(+b.dataset.plug), on = editing ? !!(wishEdit.picks.get(b.dataset.socket) || new Set()).has(n) : wanted.has(n.toLowerCase());
-      b.classList.toggle("wished", on);
-      if (editing){
-        b.setAttribute("aria-pressed", String(on));
-        b.setAttribute("aria-label", n + (on ? ", on your wish list" : ", add to your wish list"));
-        b.addEventListener("click", () => {
-          const set = wishEdit.picks.get(b.dataset.socket) || new Set();
-          set.has(n) ? set.delete(n) : set.add(n);
-          wishEdit.picks.set(b.dataset.socket, set);
-          const now = set.has(n);
-          b.classList.toggle("wished", now); b.setAttribute("aria-pressed", String(now));
-          b.setAttribute("aria-label", n + (now ? ", on your wish list" : ", add to your wish list"));
-          $("plug-info").textContent = n + (now ? " added to" : " removed from") + " this roll.";
-        });
+    dlg.querySelectorAll(".perk-dot").forEach(b => b.classList.toggle("wished", wanted.has(((DB.items[+b.dataset.plug] || {}).n || "").toLowerCase())));
+  }
+
+  // Every perk a weapon can roll, per column, from Bungie's item and plug
+  // set definitions (a few small requests, kept for the visit). Retired
+  // perks are left out; enhanced versions fold into their perk by name.
+  const PERK_POOLS = new Map();
+  function perkPool(hash){
+    if (!PERK_POOLS.has(hash)) PERK_POOLS.set(hash, (async () => {
+      const get = async (kind, h) => {
+        const res = await fetch(BUNGIE + "/Platform/Destiny2/Manifest/" + kind + "/" + h + "/", { headers: { "X-API-Key": window.RallyFlagAPI.BUNGIE_API_KEY } });
+        const j = await res.json().catch(() => ({}));
+        if (!j.Response) throw new Error(j.ErrorStatus === "SystemDisabled" ? FRIENDLY.SystemDisabled : (j.Message || "HTTP " + res.status));
+        return j.Response;
+      };
+      const def = await get("DestinyInventoryItemDefinition", hash);
+      // A socket's choices are in a plug set, or (origin traits) listed on the socket itself.
+      const entries = (def.sockets && def.sockets.socketEntries) || [];
+      const defs = await Promise.all(entries.map(e => {
+        const h = e.randomizedPlugSetHash || e.reusablePlugSetHash;
+        return h ? get("DestinyPlugSetDefinition", h).catch(() => null) : (e.reusablePlugItems || []).length ? { reusablePlugItems: e.reusablePlugItems } : null;
+      }));
+      const cols = [];
+      for (const set of defs){
+        if (!set) continue;
+        const seen = new Set(), perks = [];
+        for (const p of set.reusablePlugItems || []){
+          const d = DB.items[p.plugItemHash];
+          if (p.currentlyCanRoll === false || !d || !showPlug(p.plugItemHash) || isMod(d) || isIntrinsic(d) || seen.has(d.n)) continue;
+          seen.add(d.n); perks.push(p.plugItemHash);
+        }
+        if (perks.length) cols.push(perks);
       }
-    });
-    if (!editing) return;
-    $("wish-cancel").addEventListener("click", () => { wishEdit = null; reopen(rolls.length ? "#wish-add" : "#wish-add"); });
+      if (!cols.length) throw new Error("Bungie lists no perk choices for it.");
+      return cols;
+    })().catch(e => { PERK_POOLS.delete(hash); throw e; }));
+    return PERK_POOLS.get(hash);
+  }
+  const colLabel = perks => { const y = (DB.items[perks[0]] || {}).y || "Perk"; return /trait/i.test(y) && !/origin/i.test(y) ? "Trait" : y.replace(/^Enhanced /, ""); };
+  // A generic copy of the weapon with every perk it can roll: tap the ones
+  // you want (several in a column = any of them), then Save roll. Shows how
+  // many of your copies have that roll as you pick.
+  let wishView = null; // { fromId, name, k, cols, picks: [Set(names) per column], keep: [groups not in the pool] }
+  async function openWishView(fromId, k){
+    const item = ITEMS.find(i => i.id === fromId);
+    if (!item) return;
+    const d = item.def, name = wishName(item), dlg = $("item-dialog");
+    dlg.dataset.item = ""; dlg.dataset.view = "wish";
+    const head = '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-icon"><img src="' + esc(img(d.i)) + '" alt="" width="56" height="56">' + (d.w ? '<img src="' + esc(img(d.w)) + '" alt="" width="56" height="56">' : "") + "</div>" +
+      '<div class="dlg-title"><div class="dlg-eyebrow">Wish list · ' + esc(d.y || "Weapon") + '</div><h2 class="dlg-name" id="dlg-name" tabindex="-1">' + esc(d.n) + "</h2></div>" +
+      '<button type="button" class="dlg-close" aria-label="Close">×</button></div>';
+    redrawDialog(dlg, head + '<div class="dlg-body"><p class="wish-help" role="status">Loading every perk ' + esc(d.n) + " can roll…</p></div>");
+    dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
+    let cols, fallback = "";
+    try { cols = await perkPool(item.hash); }
+    catch (e){
+      // Bungie's definitions didn't come: offer what this copy has.
+      fallback = "Couldn't load every perk (" + e.message + "), so these are the perks on this copy and the ones it can switch to.";
+      cols = item.plugs.map((h, idx) => [h].concat((item.alts[idx] || []).map(a => a.plugItemHash))).filter(c => showPlug(c[0]) && !isMod(DB.items[c[0]]) && !isIntrinsic(DB.items[c[0]]))
+        .map(c => [...new Map(c.filter(h => DB.items[h] && showPlug(h)).map(h => [DB.items[h].n, h])).values()]);
+    }
+    if (!dlg.open || dlg.dataset.view !== "wish") return; // closed while loading
+    const roll = k >= 0 && WISHES[name] ? WISHES[name][k] : null;
+    const picks = cols.map(() => new Set()), keep = [];
+    for (const g of roll ? roll.groups : []){
+      const lower = g.map(x => x.toLowerCase());
+      const c = cols.findIndex(col => col.some(h => lower.includes(DB.items[h].n.toLowerCase())));
+      if (c >= 0) g.forEach(x => { const h = cols[c].find(y => DB.items[y].n.toLowerCase() === x.toLowerCase()); if (h) picks[c].add(DB.items[h].n); }); else keep.push(g);
+    }
+    wishView = { fromId, name, k, cols, picks, keep };
+    const ours = new Set(item.roll ? item.roll.weapon.perkHashes.map(h => (DB.items[h] || {}).n) : []);
+    const owned = ITEMS.filter(i => i.def.t === 3 && wishName(i) === name);
+    const onCopies = new Set(owned.flatMap(i => perkNames(i).split("|")));
+    const colsHtml = cols.map((col, c) => '<div class="wish-col" role="group" aria-labelledby="wc-' + c + '"><div class="wish-col-h" id="wc-' + c + '">' + esc(colLabel(col)) + "</div>" +
+      col.map(h => { const p = DB.items[h], on = picks[c].has(p.n);
+        return '<button type="button" class="wish-perk' + (on ? " on" : "") + (ours.has(p.n) ? " ours" : "") + '" data-wish-col="' + c + '" data-wish-perk="' + esc(p.n) + '" aria-pressed="' + on + '" title="' + esc(p.x || p.n) + '">' +
+          (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="28" height="28" loading="lazy">' : '<span class="wish-noicon"></span>') + "<span>" + esc(p.n) +
+          (ours.has(p.n) ? '<small>our God Roll</small>' : onCopies.has(p.n.toLowerCase()) ? "<small>on a copy you own</small>" : "") + "</span></button>"; }).join("") + "</div>").join("");
+    redrawDialog(dlg, head + '<div class="dlg-body">' +
+      (fallback ? '<p class="wish-help">' + esc(fallback) + "</p>" : "") +
+      '<p class="wish-help">Tap the perks you want. Pick several in one column if any of them will do. Columns you leave empty don\'t matter.</p>' +
+      '<p class="wish-count" id="wish-count" role="status"></p>' +
+      '<div class="wish-cols">' + colsHtml + "</div>" +
+      '<div class="act-row wish-actions"><button type="button" class="act-btn" id="wish-save">Save roll</button><button type="button" class="act-btn" id="wish-cancel">Cancel</button></div></div>');
+    dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
+    const groups = () => wishView.picks.filter(x => x.size).map(x => [...x]).concat(wishView.keep);
+    const count = () => {
+      const g = groups();
+      if (!g.length) return $("wish-count").textContent = "Nothing picked yet. You have " + owned.length + " " + (owned.length === 1 ? "copy" : "copies") + ".";
+      const n = owned.filter(i => { const have = new Set(perkNames(i).split("|")); return g.every(x => x.some(y => have.has(y.toLowerCase()))); }).length;
+      $("wish-count").textContent = n + " of your " + owned.length + " " + (owned.length === 1 ? "copy has" : "copies have") + " this roll.";
+    };
+    count();
+    dlg.querySelectorAll("[data-wish-perk]").forEach(b => b.addEventListener("click", () => {
+      const set = wishView.picks[+b.dataset.wishCol], n = b.dataset.wishPerk;
+      set.has(n) ? set.delete(n) : set.add(n);
+      b.classList.toggle("on", set.has(n)); b.setAttribute("aria-pressed", String(set.has(n)));
+      count();
+    }));
+    const back = sel => { wishView = null; openItem(fromId); const t = $(sel) || $("wish-add"); if (t) t.focus(); };
+    $("wish-cancel").addEventListener("click", () => back("wish-add"));
     $("wish-save").addEventListener("click", () => {
-      const groups = [...wishEdit.picks.values()].filter(x => x.size).map(x => [...x]).concat(wishEdit.keep);
-      if (!groups.length) return toast("Tap at least one perk first.", "error");
-      const next = rolls.slice();
-      wishEdit.k >= 0 ? (next[wishEdit.k] = { groups }) : next.push({ groups });
-      wishEdit = null;
+      const g = groups();
+      if (!g.length) return toast("Tap at least one perk first.", "error");
+      const next = (WISHES[name] || []).slice();
+      k >= 0 && next[k] ? (next[k] = { groups: g }) : next.push({ groups: g });
       saveWish(name, next);
       renderItems();
-      const matches = ITEMS.filter(i => i.def.t === 3 && wishName(i) === name && (wishMatch(i) || {}).full).length;
-      reopen("#wish-add");
+      const matches = owned.filter(i => (wishMatch(i) || {}).full).length;
+      back("wish-add");
       toast("Wish-list roll saved. " + (matches ? matches + " of your copies " + (matches === 1 ? "has" : "have") + " it." : "None of your copies has it yet."), "ok");
     });
+    $("dlg-name").focus();
   }
 
   function openItem(id){
@@ -3014,7 +3077,6 @@
     };
     wireWish(dlg, item);
     dlg.querySelectorAll("[data-plug]").forEach(b => b.addEventListener("click", () => {
-      if (wishEdit && b.classList.contains("perk-dot")) return; // picking wish-list perks
       dlg.querySelectorAll("[data-plug]").forEach(o => o.setAttribute("aria-pressed", String(o === b)));
       const h = +b.dataset.plug, idx = +b.dataset.socket, p = DB.items[h];
       $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(h) ? " · in our God Roll" : "") +
@@ -3325,7 +3387,7 @@
     });
     // Click on the backdrop closes the dialog.
     $("item-dialog").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
-    $("item-dialog").addEventListener("close", () => { document.body.appendChild($("locker-toast")); wishEdit = null; });
+    $("item-dialog").addEventListener("close", () => { document.body.appendChild($("locker-toast")); wishView = null; });
   }
 
   async function init(){
