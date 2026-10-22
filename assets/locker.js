@@ -106,8 +106,9 @@
   // Definition; a brighter one for Exotics). Gear tier: gold diamonds down
   // the left edge, as in game and DIM, drawn bolder than Bungie's overlay so
   // they read on bright weapon art.
-  const tierPips = n => '<svg class="tier-pips" viewBox="0 0 10 40" aria-hidden="true">' +
-    Array.from({ length: n }, (_, k) => '<path d="M5 ' + k * 8 + "l4.5 4L5 " + (k * 8 + 8) + "L0.5 " + (k * 8 + 4) + 'z"/>').join("") + "</svg>";
+  // Each diamond 7 units tall with a 2.5-unit gap, stacked from the top.
+  const tierPips = n => '<svg class="tier-pips" viewBox="0 0 10 45" preserveAspectRatio="xMidYMin meet" aria-hidden="true">' +
+    Array.from({ length: n }, (_, k) => { const y = k * 9.5; return '<path d="M5 ' + y + "l4.5 3.5L5 " + (y + 7) + "L0.5 " + (y + 3.5) + 'z"/>'; }).join("") + "</svg>";
   const MW_OVERLAY = { 5: "/img/destiny_content/items/masterwork-overlay-border.png", 6: "/img/destiny_content/items/masterwork-overlay-exotic-border.png" };
   const slugify = s => s.toLowerCase().replace(/['’]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
