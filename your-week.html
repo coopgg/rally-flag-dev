@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="favicon.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* Boot script: theme, light/dark mode, load guard. Generated from tools/boot-script.js; edit there and run node tools/sync-boot-script.js. */
+(function(){
+  var d = document.documentElement;
+  // Valid saved themes; a first visit gets a random subclass (not Cosmic).
+  var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
+  var theme = null, modePref = null, legacyMode = null;
+  try {
+    theme = localStorage.getItem("rallyflag_theme");
+    if (THEMES.indexOf(theme) < 0){
+      theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+      localStorage.setItem("rallyflag_theme", theme);
+    }
+    modePref = localStorage.getItem("rallyflag_mode_pref");
+    legacyMode = localStorage.getItem("rallyflag_mode");
+  } catch (e) {}
+  if (THEMES.indexOf(theme) < 0) theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+  if (modePref !== "light" && modePref !== "dark"){
+    modePref = legacyMode === "light" ? "light"
+      : (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  }
+  d.setAttribute("data-theme", theme);
+  d.setAttribute("data-mode", modePref);
+
+  d.classList.add("rf-boot");
+  var reveal = function(){ d.classList.remove("rf-boot"); };
+  document.addEventListener("DOMContentLoaded", function(){
+    Promise.race([
+      document.fonts ? document.fonts.ready : 0,
+      new Promise(function(r){ setTimeout(r, 400); })
+    ]).then(function(){ requestAnimationFrame(reveal); });
+  });
+  setTimeout(reveal, 2500);
+})();
+</script>
+<title>Your Week (preview) - Rally Flag</title>
+<meta name="description" content="Your Destiny 2 week against Rally Flag's rotation: this week's featured raids and dungeons per character, milestones, bounties and quests, season pass and seals.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rally Flag">
+<meta property="og:title" content="Your Week">
+<meta property="og:description" content="Your Destiny 2 week against Rally Flag's rotation: this week's featured raids and dungeons per character, milestones, bounties and quests, season pass and seals.">
+<meta property="og:url" content="https://rallyflag.gg/your-week.html">
+<link rel="canonical" href="https://rallyflag.gg/your-week.html">
+<meta property="og:image" content="https://rallyflag.gg/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Rally Flag: Destiny 2 raid and dungeon guides, weapon god rolls, builds and live trackers">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Your Week">
+<meta name="twitter:description" content="Your Destiny 2 week against Rally Flag's rotation: this week's featured raids and dungeons per character, milestones, bounties and quests, season pass and seals.">
+<meta name="twitter:image" content="https://rallyflag.gg/assets/og-image.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.bungie.net">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  /* Your Week (dev-only preview). Script: assets/your-week.js. The featured
+     cards share This Week's look; the rest was the Locker's Progress tab. */
+  /* A screen of room up front: progress arrives after the first paint, and the footer shouldn't jump. */
+  .yw-root{ max-width:1180px; margin:0 auto; padding:8px 24px 90px; min-height:100vh; }
+  @media (max-width:640px){ .yw-root{ padding:8px 16px 80px; } }
+  .preview-tag{ display:inline-block; margin-left:8px; padding:2px 8px; border:1px solid var(--accent); border-radius:999px; color:var(--accent-text); font-size:12px; letter-spacing:0.08em; vertical-align:middle; }
+  /* This Week | Your Week */
+  .yw-switch{ display:flex; justify-content:center; gap:8px; margin:22px auto 0; padding:0 16px; flex-wrap:wrap; }
+  .yw-switch a{ font-size:14px; font-weight:500; color:var(--text-dim); text-decoration:none; padding:8px 16px; border-radius:999px; border:1px solid var(--panel-border); background:var(--panel); }
+  .yw-switch a:hover{ color:var(--text); }
+  .yw-switch a[aria-current="page"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
+  .yw-panel{ max-width:640px; margin:28px auto 0; padding:24px; text-align:center; }
+  .yw-panel p{ color:var(--text-dim); font-size:15px; margin:0 auto 16px; max-width:52ch; }
+  .yw-actions{ display:flex; flex-wrap:wrap; gap:10px; justify-content:center; }
+  .yw-btn{ display:inline-flex; align-items:center; font-family:'Oswald', sans-serif; font-weight:600; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; padding:10px 20px; border-radius:999px; border:1px solid var(--accent-fill); background:var(--accent-fill); color:var(--on-accent); cursor:pointer; text-decoration:none; }
+  .yw-btn.ghost{ background:transparent; color:var(--accent-text); border-color:var(--accent); }
+  .act-btn{ font:inherit; font-size:13px; padding:6px 12px; border-radius:999px; border:1px solid var(--panel-border); background:var(--panel); color:var(--text); cursor:pointer; }
+  .act-btn:hover{ border-color:var(--text-dim); }
+  .chip{ font-family:var(--font-sans); font-size:13px; font-weight:500; color:var(--text-dim); background:var(--panel); border:1px solid var(--panel-border); padding:7px 14px; border-radius:999px; cursor:pointer; }
+  .chip:hover{ color:var(--text); }
+  .chip[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
+  .muted{ color:var(--text-dim); }
+  .dlg-label{ display:flex; align-items:center; gap:12px; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.18em; text-transform:uppercase; color:var(--accent-text); margin:0 0 12px; }
+  .dlg-label::after{ content:""; flex:1; height:1px; background:var(--panel-border); }
+  .yw-chars{ display:flex; flex-wrap:wrap; gap:6px; margin-top:12px; }
+  .yw-char{ padding:3px 10px; border-radius:999px; border:1px solid var(--panel-border); font-size:12px; color:var(--text-dim); }
+  .yw-char.done{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
+  .yw-note{ font-size:13px; color:var(--text-dim); margin:8px 0 0; }
+  .pg-tag{ display:inline-block; padding:1px 7px; border-radius:999px; font-size:12px; font-weight:600; background:#ffe1a8; color:#5a3a00; }
+
+  .tw-section-head{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    margin:44px 0 16px;
+  }
+  .tw-section-head:first-child{ margin-top:8px; }
+  .tw-section-title{
+    font-family:'Oswald', sans-serif; font-weight:700; font-size:20px; color:var(--text);
+  }
+  .tw-refresh-note{
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer);
+  }
+
+  .tw-collapsible{ margin:44px 0 0; }
+  .tw-collapsible summary{
+    display:flex; align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:8px 12px;
+    margin:0 0 16px; cursor:pointer; list-style:none;
+  }
+  .tw-collapsible summary::-webkit-details-marker{ display:none; }
+  /* Pill-shaped Show/Hide control: the old lone 12px chevron didn't read
+     as clickable. The whole summary row stays the click target. */
+  .tw-collapse-toggle{
+    display:inline-flex; align-items:center; gap:6px; min-height:28px;
+    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dim);
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:999px;
+    padding:4px 12px; transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .tw-collapsible summary:hover .tw-collapse-toggle,
+  .tw-collapsible summary:focus-visible .tw-collapse-toggle{ color:var(--accent-text); border-color:var(--accent); }
+  .tw-collapse-chevron{ display:inline-block; transition:transform 0.15s ease; }
+  .tw-collapsible[open] .tw-collapse-chevron{ transform:rotate(180deg); }
+  .tw-collapsible .when-open{ display:none; }
+  .tw-collapsible[open] .when-open{ display:inline; }
+  .tw-collapsible[open] .when-closed{ display:none; }
+
+  .tw-status{
+    text-align:center; padding:30px 20px; color:var(--text-dimmer);
+    font-family:'JetBrains Mono', monospace; font-size:13px;
+  }
+  .tw-status.tw-error{ color:#ff8f8f; }
+
+  /* --- Featured This Week --- */
+  .tw-subsection-label{
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
+    color:var(--text-dimmer); text-transform:uppercase; margin:18px 0 10px;
+  }
+  .tw-subsection-label:first-of-type{ margin-top:0; }
+  .featured-grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
+    grid-auto-rows:1fr; gap:12px;
+  }
+  .featured-card{ padding:16px 18px; overflow:hidden; }
+  .featured-card .art-thumb{ margin:-16px -18px 14px; aspect-ratio:21/9; }
+  .featured-kind{
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
+    color:var(--accent-text); text-transform:uppercase; margin-bottom:6px;
+  }
+  .featured-always-badge{
+    display:inline-block; font-family:'JetBrains Mono', monospace; font-size:12px;
+    font-weight:400; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--accent-bright); border:1px solid var(--accent); border-radius:999px;
+    padding:2px 8px; margin-left:6px; vertical-align:middle;
+  }
+  .featured-name{ font-family:'Oswald', sans-serif; font-weight:700; font-size:16px; color:var(--text); }
+  .featured-set-label{
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
+    color:var(--text-dimmer); text-transform:uppercase; margin-top:14px; margin-bottom:8px;
+  }
+  /* Room for two rows of set pills (The Desert Perpetual has two sets) so
+     every featured card, raid or dungeon, is the same height. */
+  .set-links{ display:flex; flex-wrap:wrap; align-content:flex-start; gap:8px; min-height:82px; }
+  .set-link{
+    font-size:12.5px; font-family:'JetBrains Mono', monospace; color:var(--accent-bright);
+    text-decoration:none; background:var(--accent-dim); border:1px solid var(--panel-border);
+    padding:8px 14px; border-radius:999px; transition: border-color 0.2s ease;
+  }
+  .set-link:hover, .set-link:focus-visible{ border-color:var(--accent-bright); }
+  .featured-link{
+    display:block; font-size:12px; color:var(--accent-bright); margin-top:10px; padding:4px 0;
+    text-decoration:none;
+  }
+  .featured-link:hover{ text-decoration:underline; }
+
+  .ib-banner{
+    padding:16px 18px; margin-bottom:16px;
+    border-left:3px solid var(--accent); background:var(--accent-dim);
+  }
+  .ib-banner-label{
+    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
+    color:var(--accent-bright); text-transform:uppercase; margin-bottom:6px;
+  }
+  .ib-banner-name{ font-family:'Oswald', sans-serif; font-weight:700; font-size:16px; color:var(--text); margin-bottom:10px; }
+
+  .featured-card.predicted{ border-style:dashed; } /* no fade: it took the text below 4.5:1 */
+  .tw-predicted-badge{
+    display:inline-block; font-family:'JetBrains Mono', monospace; font-size:12px;
+    font-weight:400; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--text-dimmer); border:1px solid var(--panel-border); border-radius:999px;
+    padding:3px 8px; margin-left:8px; vertical-align:middle;
+  }
+  #reset-countdown-note{ font-variant-numeric:tabular-nums; }
+  /* Progress tab */
+  .pg-view{ padding-top:10px; display:flex; flex-direction:column; gap:22px; }
+  .pg-top{ display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:8px 14px; }
+  .pg-msg{ margin:20px 0; color:var(--text-dim); }
+  .pg-section h2.dlg-label{ margin-top:0; font-weight:400; }
+  .pg-sub{ display:block; font-size:13px; color:var(--text-dim); font-variant-numeric:tabular-nums; }
+  .pg-bar{ display:block; height:6px; margin-top:6px; border-radius:3px; background:var(--panel-border); overflow:hidden; }
+  .pg-bar i{ display:block; height:100%; background:var(--accent-fill); }
+  .pg-bar.done i{ background:#2f9e5e; }
+  .pg-season{ padding:14px 16px; }
+  .pg-season-row{ display:flex; align-items:center; gap:16px; }
+  .pg-rank{ display:flex; flex-direction:column; align-items:center; min-width:64px; }
+  .pg-rank b{ font-family:'Oswald', sans-serif; font-size:34px; line-height:1; }
+  .pg-rank small{ font-size:12px; color:var(--text-dim); }
+  .pg-season-main{ flex:1; min-width:0; font-size:14px; }
+  .pg-ms{ display:flex; flex-direction:column; }
+  .pg-ms-row{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 16px; padding:8px 0; border-top:1px solid var(--panel-border); }
+  .pg-ms-row:first-child{ border-top:0; }
+  .pg-ms-name{ min-width:0; flex:1 1 260px; }
+  .pg-ms-name b{ display:block; font-size:14px; }
+  .pg-ms-name small{ display:block; font-size:12px; color:var(--text-dim); }
+  .pg-ms-chars{ display:flex; flex-wrap:wrap; gap:6px; }
+  .pg-ms-char{ padding:3px 10px; border-radius:999px; border:1px solid var(--panel-border); font-size:12px; font-variant-numeric:tabular-nums; color:var(--text-dim); }
+  .pg-ms-char.done{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
+  .pg-owners{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:6px; }
+  .pg-h3{ margin:14px 0 8px; font-size:14px; font-weight:600; }
+  .pg-h3 span{ color:var(--text-dim); font-weight:400; }
+  .pg-cards{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 300px), 1fr)); grid-auto-rows:1fr; gap:8px; }
+  .pg-card{ display:flex; flex-direction:column; gap:6px; padding:10px 12px; border:1px solid var(--panel-border); border-radius:10px; background:var(--panel); min-width:0; }
+  .pg-card.done{ border-color:#2f9e5e; }
+  .pg-card-head{ display:flex; align-items:center; gap:10px; min-width:0; }
+  .pg-card-head img, .pg-seal img{ width:40px; height:40px; flex:none; border:1px solid var(--panel-border); background:#1a1f2b; }
+  .pg-card-head b{ display:block; font-size:14px; overflow-wrap:anywhere; }
+  .pg-card-head small{ display:block; font-size:12px; color:var(--text-dim); }
+  .pg-ready{ color:#16693a; font-weight:600; }
+  [data-mode="dark"] .pg-ready{ color:#7be0a0; }
+  .pg-obj{ display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:0 10px; font-size:13px; }
+  .pg-obj .pg-bar{ grid-column:1 / -1; margin-top:3px; }
+  .pg-obj-d{ min-width:0; overflow-wrap:anywhere; }
+  .pg-obj-v{ color:var(--text-dim); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .pg-obj.done .pg-obj-v{ color:#16693a; }
+  [data-mode="dark"] .pg-obj.done .pg-obj-v{ color:#7be0a0; }
+  .pg-seals{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 280px), 1fr)); grid-auto-rows:1fr; gap:8px; margin-bottom:8px; }
+  .pg-seal{ display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border:1px solid var(--panel-border); border-radius:10px; background:var(--panel); min-width:0; }
+  .pg-seal > div{ flex:1; min-width:0; }
+  .pg-seal b{ display:block; font-size:14px; }
+  .pg-seal small{ display:block; font-size:12px; color:var(--text-dim); }
+  .pg-done-seals{ margin-top:8px; }
+</style>
+</head>
+<body data-nav-group="thisweek">
+
+<div id="site-nav"></div>
+
+<main id="main-content" tabindex="-1">
+
+<div class="hero">
+  <div class="eyebrow">Destiny 2 · Live Info <span class="preview-tag">Preview</span></div>
+  <h1 class="title">Your Week</h1>
+  <p class="subtitle">Your progress against this week's rotation: featured raids and dungeons, milestones, bounties and quests, and your season pass.</p>
+</div>
+<nav class="yw-switch" aria-label="This Week views"><a href="this-week.html">This week's rotation</a><a href="your-week.html" aria-current="page">Your week</a></nav>
+
+<div class="yw-root">
+  <div id="yw-status" role="status"></div>
+  <div id="yw-app" class="pg-view" hidden></div>
+</div>
+
+</main>
+
+<footer>
+  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
+  <p>Featured raid/dungeon picks are computed from a reverse-engineered rotation pattern, not pulled live from Bungie. Your progress is read from Bungie when you open this page.</p>
+</footer>
+
+<script src="assets/api-keys.js"></script>
+<script src="assets/oauth.js"></script>
+<script src="assets/nav.js"></script>
+<script src="assets/activity-index.js"></script>
+<script src="assets/featured-rotation-data.js"></script>
+<script src="assets/your-week.js"></script>
+</body>
+</html>

@@ -1,18 +1,22 @@
-/* Adds sample Progress-tab data to assets/locker-demo.json (key "progress"),
-   shaped like Bungie's GetProfile reply for components
-   100,104,200,201,202,300,301,700, from real definitions:
-     node --max-old-space-size=6144 tools/build-locker-progress-demo.js <manifest dir> <progress manifest dir>
+/* Builds assets/your-week-demo.json, the sample data for your-week.html?demo:
+   the characters from assets/locker-demo.json plus a reply shaped like
+   Bungie's GetProfile for components 100,104,200,201,202,300,301,700 and
+   each character's raid/dungeon activity history, from real definitions:
+     node --max-old-space-size=6144 tools/build-your-week-demo.js <manifest dir> <progress manifest dir>
    The first dir needs DestinyInventoryItemDefinition.json (as for
    build-locker-demo.js); the second DestinyObjectiveDefinition,
    DestinyMilestoneDefinition, DestinySeasonDefinition,
-   DestinySeasonPassDefinition and DestinyPresentationNodeDefinition.
-   Bounty expiry is stored as _hours and turned into a date on load. */
+   DestinySeasonPassDefinition, DestinyPresentationNodeDefinition and
+   DestinyActivityDefinition. Times are stored relative (_hours: bounty
+   expiry from now; _hoursAgo: when an activity was played) and turned into
+   dates on load, so the sample always reads as this week. */
 const fs = require("fs"), path = require("path");
 const [mfDir, mf2Dir] = process.argv.slice(2);
 if (!mfDir || !mf2Dir){ console.error("usage: build-locker-progress-demo.js <manifest dir> <progress manifest dir>"); process.exit(1); }
 const read = (dir, name) => JSON.parse(fs.readFileSync(path.join(dir, name + ".json"), "utf8"));
-const DEMO_PATH = path.join(__dirname, "..", "assets", "locker-demo.json");
-const demo = JSON.parse(fs.readFileSync(DEMO_PATH, "utf8"));
+const LOCKER_DEMO = path.join(__dirname, "..", "assets", "locker-demo.json"), OUT = path.join(__dirname, "..", "assets", "your-week-demo.json");
+const demo = JSON.parse(fs.readFileSync(LOCKER_DEMO, "utf8"));
+const ACTS = read(mf2Dir, "DestinyActivityDefinition");
 const ITEMS = read(mfDir, "DestinyInventoryItemDefinition");
 const OBJ = read(mf2Dir, "DestinyObjectiveDefinition"), MS = read(mf2Dir, "DestinyMilestoneDefinition");
 const SEASONS = read(mf2Dir, "DestinySeasonDefinition"), PASSES = read(mf2Dir, "DestinySeasonPassDefinition"), NODES = read(mf2Dir, "DestinyPresentationNodeDefinition");
@@ -72,13 +76,33 @@ seals.forEach((n, k) => {
   const total = 10 + Math.floor(rand() * 40), done = k < 3 ? total : Math.floor(rand() * total);
   nodes[n.hash] = { state: 0, progressValue: done, completionValue: total };
 });
-demo.progress = {
+// Raid and dungeon clears: some this week (hours ago), some last week.
+const RAID = 2043403989, DUNGEON = 608898761;
+const acts = Object.values(ACTS).filter(a => (a.activityTypeHash === RAID || a.activityTypeHash === DUNGEON) && a.displayProperties && a.displayProperties.name && !a.redacted && /: (Standard|Normal)$/.test(a.displayProperties.name));
+const byName = new Map();
+for (const a of acts){ const base = a.displayProperties.name.replace(/: .*$/, ""); if (!byName.has(base)) byName.set(base, a); }
+const activityHistory = {};
+chars.forEach(c => {
+  activityHistory[c] = [...byName.values()].filter(() => rand() < 0.55).map(a => ({
+    period: null, _hoursAgo: rand() < 0.6 ? 2 + Math.floor(rand() * 60) : 200 + Math.floor(rand() * 300),
+    activityDetails: { referenceId: a.hash, directorActivityHash: a.hash, mode: a.activityTypeHash === RAID ? 4 : 82 },
+    values: { completed: { basic: { value: 1 } }, completionReason: { basic: { value: 0 } } }
+  }));
+});
+const out = {
+  profile: demo.profile, characters: demo.characters,
+  activityHistory,
+  progress: {
   profile: { data: Object.assign({}, demo.profile.data, { currentSeasonHash: season.hash }) },
   profileProgression: { data: { seasonalArtifact: { artifactHash: 0, pointsAcquired: 132, powerBonus: 14 } } },
   characterProgressions: { data: characterProgressions },
   characterInventories: { data: characterInventories },
   itemComponents: { objectives: { data: objectives } },
   profilePresentationNodes: { data: { nodes } }
+  }
 };
-fs.writeFileSync(DEMO_PATH, JSON.stringify(demo));
-console.log("progress sample: season", season.displayProperties.name, "/", pass.displayProperties.name, "·", bounties.length, "bounty defs,", quests.length, "quest defs,", seals.length, "seals");
+out.progress.characters = demo.characters;
+fs.writeFileSync(OUT, JSON.stringify(out));
+// The Locker's sample no longer carries progress data.
+if (demo.progress){ delete demo.progress; fs.writeFileSync(LOCKER_DEMO, JSON.stringify(demo)); }
+console.log("your-week sample: " + byName.size + " raids/dungeons; season", season.displayProperties.name, "/", pass.displayProperties.name, "·", bounties.length, "bounty defs,", quests.length, "quest defs,", seals.length, "seals");

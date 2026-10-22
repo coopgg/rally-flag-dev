@@ -21,6 +21,7 @@ const RELAY = "https://rallyflag-dim.rallyflag.workers.dev/";
 const MEMBER = "4611686018400000000";
 const TYPES = { ".html": "text/html", ".js": "application/javascript", ".css": "text/css", ".json": "application/json", ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml", ".ico": "image/x-icon", ".webmanifest": "application/manifest+json" };
 const DEMO = JSON.parse(fs.readFileSync(path.join(ROOT, "assets/locker-demo.json"), "utf8"));
+const WEEK = JSON.parse(fs.readFileSync(path.join(ROOT, "assets/your-week-demo.json"), "utf8"));
 const [TITAN] = DEMO.profile.data.characterIds;
 const MAINT = { ErrorCode: 5, ThrottleSeconds: 0, ErrorStatus: "SystemDisabled", Message: "This system is temporarily disabled for maintenance.", MessageData: {} };
 
@@ -104,10 +105,17 @@ async function open(opts = {}){
     await context.route("https://www.bungie.net/Platform/User/GetMembershipsForCurrentUser/", r => r.fulfill(opts.down ? maint() : json({ ErrorCode: 1, Response: { destinyMemberships: [{ membershipType: 3, membershipId: MEMBER }] } })));
     await context.route(new RegExp("/Profile/" + MEMBER + "/\\?components"), r => {
       if (opts.down) return r.fulfill(maint());
-      // The Progress tab's own call (milestones, pursuits, seals).
-      if (/components=[^&]*202/.test(r.request().url())){ calls.push({ ep: "Progress profile", body: r.request().url() }); return r.fulfill(json({ ErrorCode: 1, Response: DEMO.progress })); }
+      // Your Week's call (milestones, pursuits, seals).
+      if (/components=[^&]*202/.test(r.request().url())){ calls.push({ ep: "Week profile", body: r.request().url() }); return r.fulfill(json({ ErrorCode: 1, Response: WEEK.progress })); }
       const p = JSON.parse(JSON.stringify(DEMO)); p.responseMintedTimestamp = new Date(Date.now() - 600000).toISOString();
       r.fulfill(json({ ErrorCode: 1, Response: p }));
+    });
+    // Raid/dungeon activity history for Your Week (times relative to now, as in the sample).
+    await context.route(/\/Stats\/Activities\//, r => {
+      const u = r.request().url(), c = (u.match(/Character\/(\d+)/) || [])[1], mode = +(u.match(/mode=(\d+)/) || [])[1];
+      calls.push({ ep: "Activity history", body: u });
+      const list = (WEEK.activityHistory[c] || []).filter(a => a.activityDetails.mode === mode).map(a => Object.assign({}, a, { period: new Date(Date.now() - a._hoursAgo * 3600e3).toISOString() }));
+      r.fulfill(json({ ErrorCode: 1, Response: { activities: list } }));
     });
     await context.route(/\/Platform\/Destiny2\/Actions\//, r => {
       const ep = r.request().url().split("/Actions/")[1].replace(/^Items\//, "").replace(/\/$/, "");
@@ -125,7 +133,7 @@ async function open(opts = {}){
   page.errors = []; page.on("pageerror", e => page.errors.push(e.message));
   page.calls = calls; page.context_ = context;
   await page.goto(opts.url || BASE + "locker.html" + (opts.real ? "" : "?demo") + (opts.hash || ""));
-  if (!opts.down && !opts.signedOut) await page.waitForSelector("#locker-app:not([hidden])", { timeout: 90000 });
+  if (!opts.down && !opts.signedOut) await page.waitForSelector(opts.ready || "#locker-app:not([hidden])", { timeout: 120000 });
   await page.waitForTimeout(opts.real ? 2200 : 600);
   return page;
 }
@@ -481,33 +489,40 @@ await section("Wish list", async () => {
   await p.context_.close();
 });
 
-// ---------- 2e. Progress tab ----------
-await section("Progress", async () => {
-  const p = await open({ hash: "#progress" });
-  await p.waitForSelector(".pg-season", { timeout: 120000 });
-  const P = DEMO.progress, chars = DEMO.profile.data.characterIds;
-  const lvl = Object.values(Object.values(P.characterProgressions.data)[0].progressions).reduce((n, x) => n + x.level, 0);
-  check("progress: season pass rank and XP", (await p.textContent(".pg-rank b")) === String(lvl) && /XP to rank/.test(await p.textContent(".pg-season")), await p.textContent(".pg-season"));
-  check("progress: milestones with a status per character", await p.locator(".pg-ms-row").count() >= 3 && await p.locator(".pg-ms-row:first-child .pg-ms-char").count() === chars.length);
-  const items = P.characterInventories.data;
-  const focus = await p.getAttribute('[data-pg-owner][aria-pressed="true"]', "data-pg-owner");
-  check("progress: bounties and quests of the last-played character, objectives shown", await p.locator(".pg-card").count() === items[focus].items.length && await p.locator(".pg-card .pg-obj").count() > 0 && /Expires in/.test(await p.textContent(".pg-cards")));
-  check("progress: finished pursuits come first, ready to turn in", await p.locator(".pg-cards .pg-card:first-child.done .pg-ready").count() >= 1);
-  const other = chars.find(c => c !== focus);
-  await p.click('[data-pg-owner="' + other + '"]');
-  check("progress: switching character shows theirs, focus stays", await p.getAttribute('[data-pg-owner="' + other + '"]', "aria-pressed") === "true" && await p.evaluate(c => document.activeElement.dataset.pgOwner === c, other));
-  const open8 = await p.locator(".pg-seal").count();
-  await p.click("#pg-seals-more");
-  check("progress: seals closest to done first, Show all opens the rest", open8 === 8 && await p.locator(".pg-seal").count() > 8 && /Done:/.test(await p.textContent("#view-progress")));
-  const v = await axe(p); check("progress passes axe", !v.length, v.join(", "));
-  check("progress: no script errors", !p.errors.length, p.errors.join("; "));
+// ---------- 2e. Your Week (its own page) ----------
+await section("Your Week", async () => {
+  const p = await open({ url: BASE + "your-week.html?demo", ready: "#yw-app .featured-card" });
+  const titles = await p.$$eval(".featured-card .featured-name", n => n.map(x => x.textContent));
+  check("week: this week's featured raids and dungeons, three of each", titles.length === 6 && titles.includes("The Desert Perpetual") && titles.includes("Equilibrium"), titles.join(", "));
+  const chips = await p.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-char")].map(x => x.textContent)));
+  check("week: each featured activity shows every character's clear since reset", chips.every(c => c.length === 3) && chips.flat().some(t => /cleared/.test(t)) && chips.flat().some(t => /not yet/.test(t)));
+  check("week: links to our guide from each featured card", await p.locator('.featured-card a.featured-link[href*="raid-"]').count() === 3 && await p.locator('.featured-card a.featured-link[href*="dungeon-"]').count() === 3);
+  check("week: season pass, milestones, pursuits and seals render", await p.locator(".pg-season").count() === 1 && await p.locator(".pg-ms-row").count() >= 3 && await p.locator(".pg-card").count() > 0 && await p.locator(".pg-seal").count() >= 1);
+  check("week: pursuits expiring before reset are marked", await p.locator(".pg-tag").count() >= 1);
+  const other = await p.getAttribute('[data-yw-owner][aria-pressed="false"]', "data-yw-owner");
+  await p.click('[data-yw-owner="' + other + '"]');
+  check("week: switching character shows theirs, focus stays", await p.evaluate(c => document.activeElement.dataset.ywOwner === c, other) && await p.locator(".pg-card").count() > 0);
+  check("week: the switch links back to This Week", await p.getAttribute('.yw-switch a[aria-current="page"]', "href") === "your-week.html" && await p.locator('.yw-switch a[href="this-week.html"]').count() === 1);
+  const v = await axe(p); check("week passes axe", !v.length, v.join(", "));
+  check("week: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
-  // Signed in: one extra GetProfile call, only when the tab opens.
-  const q = await open({ real: true });
-  check("progress: nothing extra is loaded until the tab opens", !q.calls.some(c => c.ep === "Progress profile"));
-  await q.click("#tab-progress"); await q.waitForSelector(".pg-season", { timeout: 120000 });
-  check("progress: opening the tab fetches progress components", q.calls.some(c => c.ep === "Progress profile" && /components=100,104,200,201,202,300,301,700/.test(c.body)) && await q.locator(".pg-card").count() > 0);
+  // Signed out: an explanation, a sign-in and the sample.
+  const so = await open({ signedOut: true, url: BASE + "your-week.html" });
+  await so.waitForSelector("#yw-signin");
+  check("week: signed out, it explains and offers sign-in and sample data", /Sign in with Bungie\.net to see your week/.test(await so.textContent("#yw-status")) && await so.locator('a[href="your-week.html?demo"]').count() === 1);
+  await so.context_.close();
+  // Signed in: the profile call with progress components, and each character's raid and dungeon history.
+  const q = await open({ real: true, url: BASE + "your-week.html", ready: "#yw-app .featured-card" });
+  const ids = DEMO.profile.data.characterIds;
+  check("week: signed in, it reads progress and each character's raid and dungeon history", q.calls.some(c => c.ep === "Week profile" && /components=100,104,200,201,202,300,301,700/.test(c.body)) &&
+    ids.every(id => q.calls.some(c => c.ep === "Activity history" && c.body.includes(id) && /mode=4/.test(c.body)) && q.calls.some(c => c.ep === "Activity history" && c.body.includes(id) && /mode=82/.test(c.body))));
+  check("week: and shows the same clears as the sample", JSON.stringify(await q.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-char")].map(x => x.textContent)))) === JSON.stringify(chips));
+  check("week: signed in, no script errors", !q.errors.length, q.errors.join("; "));
   await q.context_.close();
+  // The Locker no longer has a Progress tab.
+  const l = await open();
+  check("locker: Progress lives on Your Week now, not in the Locker", await l.locator("#tab-progress").count() === 0);
+  await l.context_.close();
 });
 
 // ---------- 3. Loadouts and max Power (sample data) ----------

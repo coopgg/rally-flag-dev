@@ -72,7 +72,8 @@
       label: "Debug",
       items: [
         { label: "🐞 Debug", href: "debug.html", group: "debug" },
-        { label: "Locker (preview)", href: "locker.html", group: "locker" }
+        { label: "Locker (preview)", href: "locker.html", group: "locker" },
+        { label: "Your Week (preview)", href: "your-week.html", group: "thisweek" }
       ]
     });
   }

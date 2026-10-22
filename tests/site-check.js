@@ -49,11 +49,12 @@ const TYPES = { ".html": "text/html", ".js": "application/javascript", ".css": "
 const SKIP = new Set(["debug.html", "api-debug.html", "xur-debug.html", "clan-admin.html", "oauth-callback.html"]);
 // Public-looking pages that only exist on dev (linked from nav.js's Debug
 // section, which rallyflag.gg hides). Checked on dev; absent on prod.
-const DEV_ONLY = new Set(["locker.html"]);
+const DEV_ONLY = new Set(["locker.html", "your-week.html"]);
 let pages = fs.readdirSync(ROOT).filter(f => f.endsWith(".html") && !SKIP.has(f)).sort();
 pages.push("no/such/page"); // served by 404.html, like GitHub Pages
 // The Locker's sample-data view renders the whole app without a sign-in.
 if (fs.existsSync(path.join(ROOT, "assets", "locker-demo.json"))) pages.push("locker.html?demo", "locker.html?demo#loadouts", "locker.html?demo#sets");
+if (fs.existsSync(path.join(ROOT, "assets", "your-week-demo.json"))) pages.push("your-week.html?demo");
 
 // Live-mode HTTP requests (honours HTTPS_PROXY, unlike Node's fetch).
 let http = null;
@@ -122,6 +123,7 @@ async function settle(page){
   await page.waitForFunction(() => !document.documentElement.classList.contains("rf-boot"), null, { timeout: 5000 }).catch(() => {});
   // The Locker's sample view downloads Bungie's item database first.
   if (page.url().includes("locker.html?demo")) await page.waitForSelector("#locker-app:not([hidden])", { timeout: 30000 }).catch(() => {});
+  if (page.url().includes("your-week.html?demo")) await page.waitForSelector("#yw-app:not([hidden]) .featured-card", { timeout: 60000 }).catch(() => {});
   await page.waitForTimeout(1200);
 }
 

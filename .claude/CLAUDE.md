@@ -21,7 +21,9 @@ git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)skills-lock.json' ':(exclude).gitignore' ':(exclude)tools' \
   ':(exclude)tests' ':(exclude).github' ':(exclude)locker.html' \
   ':(exclude)assets/locker.js' ':(exclude)assets/locker-worker.js' \
-  ':(exclude)assets/locker-demo.json' > /tmp/promote.patch
+  ':(exclude)assets/locker-demo.json' ':(exclude)your-week.html' \
+  ':(exclude)assets/your-week.js' ':(exclude)assets/your-week-worker.js' \
+  ':(exclude)assets/your-week-demo.json' > /tmp/promote.patch
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
@@ -152,12 +154,20 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   HANDOFF item 45), keyed by Destiny account, checked against Bungie.
   Share links (`?share=<id>`, HANDOFF item 55) use the same Worker's
   `shares` table; opening one needs no sign-in. Search filters, bulk
-  actions, perk/mod switching and the loadout editor: HANDOFF item 56. Progress tab
-  (season pass, milestones, pursuits, seals; loaded when the tab opens;
-  sample data from `tools/build-locker-progress-demo.js`): HANDOFF item 60.
+  actions, perk/mod switching and the loadout editor: HANDOFF item 56.
+  Armor optimizer: HANDOFF item 60.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.
+- **Your Week (dev-only preview).** `your-week.html` + `assets/your-week.js`
+  (+ `your-week-worker.js` for Bungie's definitions, `your-week-demo.json`
+  for `?demo`, built by `tools/build-your-week-demo.js`): the signed-in
+  player's week against This Week's rotation (featured raids/dungeons with
+  each character's clears since reset from activity history, season pass,
+  milestones, pursuits, seals). Owner wanted it off the Locker and under
+  This Week (HANDOFF item 61). Its four files are excluded from promotion;
+  This Week gets its "This week's rotation | Your week" switch only when
+  Your Week is promoted (no dev-only link in a public page).
 - **Standalone pages:** `<body data-nav="standalone">` (nav.js) hides the
   site menu and Discord/Ko-fi, keeps brand + settings (theme, sign-in). The
   Locker uses it so it can be shared directly; its links go to rallyflag.gg.
