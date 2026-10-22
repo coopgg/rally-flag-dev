@@ -90,7 +90,8 @@
   .yw-char{ display:inline-flex; align-items:center; gap:5px; }
   .yw-mark{ font-weight:700; }
   /* Activities with a Master version: two labelled rows, N (normal) and M (Master). */
-  .yw-chars.yw-master{ margin-top:6px; }
+  .yw-chars.yw-master, .yw-chars.yw-ph{ margin-top:6px; }
+  .yw-chars.yw-ph{ height:26px; } /* a featured card's missing Master row */
   .yw-chars{ align-items:center; }
   .yw-row-label{ width:14px; font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:700; color:var(--text-dim); }
   /* Muted green / red (white text 5.6:1 / 6:1). */

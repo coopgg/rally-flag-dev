@@ -552,6 +552,10 @@ await section("Your Week", async () => {
   check("week: activities with a Master version get rows labelled N and M, M ticked by Master clears only", await p.locator(".yw-master").count() === 14 && kf.join() === "true,true,false" &&
     await p.evaluate(() => [...document.querySelectorAll(".yw-master")].every(r => r.previousElementSibling.querySelector(".yw-row-label").textContent === "N" && r.querySelector(".yw-row-label").textContent === "M")) &&
     await p.evaluate(() => [...document.querySelectorAll(".featured-card, .yw-tile")].filter(x => /Garden of Salvation|Last Wish/.test(x.textContent)).every(x => !x.querySelector(".yw-master"))), kf.join());
+  check("week: every featured card's guide link sits at the same height (a gap where there's no Master row)", await p.evaluate(() => {
+    const y = [...document.querySelectorAll(".featured-card")].map(c => Math.round(c.querySelector(".featured-link").getBoundingClientRect().top - c.querySelector(".featured-name").getBoundingClientRect().top));
+    return new Set(y).size === 1;
+  }));
   const idx = await p.evaluate(() => window.ActivityIndex.raids.length + window.ActivityIndex.dungeons.length);
   check("week: the rest shows every raid and dungeon not featured as art tiles with the same chips", await p.locator(".yw-tile").count() === idx - 6 && await p.locator(".yw-tile .yw-chars:not(.yw-master) .yw-char").count() === (idx - 6) * 3 && await p.locator(".yw-tile .yw-char.done").count() > 0 && await p.locator('a.yw-tile[href*="raid-"]').count() > 0);
   check("week: links to our guide from each featured card", await p.locator('.featured-card a.featured-link[href*="raid-"]').count() === 3 && await p.locator('.featured-card a.featured-link[href*="dungeon-"]').count() === 3);

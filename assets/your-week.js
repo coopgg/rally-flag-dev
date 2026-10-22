@@ -145,6 +145,8 @@
           '<div class="featured-kind">' + kind + (item.slug === always ? '<span class="featured-always-badge">Always Featured</span>' : "") + "</div>" +
           '<div class="featured-name">' + esc(item.name) + "</div>" +
           clearsHtml(item) +
+          // No Master version: an empty row where it would be, so every card's guide link lines up.
+          (masterOf.has(item.name.toLowerCase()) ? "" : '<div class="yw-chars yw-ph" aria-hidden="true"></div>') +
           '<a class="featured-link" href="' + window.rallyFlagGuideHref(kind === "Raid" ? "raid" : "dungeon", item.slug) + '">View the guide →<span class="sr-only"> for ' + esc(item.name) + "</span></a></div>";
       }).join("");
       return '<div class="tw-subsection-label">' + label + "</div>" + (cards ? '<div class="featured-grid">' + cards + "</div>" : '<p class="muted">Nothing featured.</p>');
