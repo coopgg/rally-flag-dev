@@ -5,11 +5,13 @@ Written 2026-10-16 (updated 2026-10-17) by a Claude Code cloud session for the n
 
 ## Where things stand
 
-**Production (`coopgg/rally-flag`, rallyflag.gg) is at `80653d3`, synced
-with dev up to `f9c0c1d` (Twitch rename, nav wordmark).** That includes everything below: the first round
-(14-item review, cache fix, sign-in fixes, Auto/Light/Dark, iPhone
-`minimal-ui`) and the whole skills rescan, items 1–8. Next promotion range
-starts at `f9c0c1d`. Before promoting, run `SITE_ROOT=<prod clone> npm run check` in tests/.
+**Production (`coopgg/rally-flag`, rallyflag.gg) is at `2036fc4` (2026-10-22), in sync with dev
+`005d3b6` for every public file except the Locker** (its four files stay dev-only). That
+sync was a file copy, not a patch: prod had drifted (item 22's font fix, oauth.js's
+`peekAccessToken` and nav.js changes had never been promoted), so every tracked dev file
+outside the exclude list was copied over and `diff -rq` then showed only CNAME,
+.gitignore, api-debug.html / xur-debug.html (old prod copies) and the Locker files.
+Next promotion range starts at `005d3b6`. Before promoting, run `SITE_ROOT=<prod clone> npm run check` in tests/.
 
 | Item | Dev commit(s) | What |
 |---|---|---|
