@@ -310,6 +310,27 @@ await section("Gear", async () => {
   check("compare: Open goes to that copy", await p.evaluate(() => document.getElementById("item-dialog").dataset.item) === target);
   await p.keyboard.press("Escape");
   await p.click('.chip[data-value="dupes"]');
+  // Organizer: the table view.
+  await p.fill("#locker-search", ""); await p.waitForTimeout(200);
+  await p.click("#table-toggle"); await p.waitForSelector(".org");
+  const rowsN = () => p.locator(".org tbody tr").count();
+  check("organizer: Table lists every weapon with its details", await rowsN() > 50 && /Perks/.test(await p.textContent(".org thead")) && await p.getAttribute("#table-toggle", "aria-pressed") === "true");
+  await p.click('[data-org-sort="name"]');
+  const names = await p.$$eval(".org tbody th", t => t.map(x => x.textContent));
+  check("organizer: clicking a column sorts by it", names.join("|") === names.slice().sort((a, b) => a.localeCompare(b)).join("|") && await p.getAttribute('th:has([data-org-sort="name"])', "aria-sort") === "ascending");
+  await p.click('[data-org-kind="armor"]'); await p.click('[data-org-sort="total"]');
+  const totals = await p.$$eval('.org tbody tr', r => r.map(x => +x.children[13].textContent));
+  check("organizer: armor shows stats and sorts by total, highest first", totals.length > 30 && totals.every((t, k) => k === 0 || t <= totals[k - 1]), totals.slice(0, 5).join(","));
+  await p.fill("#locker-search", "class:titan"); await p.waitForTimeout(350);
+  const titanRows = await rowsN();
+  check("organizer: search filters the table and the bulk bar acts on it", titanRows > 0 && titanRows < totals.length && (await p.textContent(".bulk-count")).startsWith(titanRows + " item"));
+  const [dl] = await Promise.all([p.waitForEvent("download"), p.click("#org-csv")]);
+  const csvFile = path.join(path.dirname(fileURLToPath(import.meta.url)), ".org-test.csv"); await dl.saveAs(csvFile);
+  const csv = fs.readFileSync(csvFile, "utf8"); fs.unlinkSync(csvFile);
+  check("organizer: Export CSV saves what's shown", /^rallyflag-armor-\d{4}-\d\d-\d\d\.csv$/.test(dl.suggestedFilename()) && csv.trim().split("\r\n").length === titanRows + 1 && /Name,Type,Power/.test(csv), dl.suggestedFilename());
+  let tv = await axe(p); check("organizer passes axe", !tv.length, tv.join(", "));
+  await p.click(".org-name"); check("organizer: a name opens the item", await p.evaluate(() => document.getElementById("item-dialog").open)); await p.keyboard.press("Escape");
+  await p.fill("#locker-search", ""); await p.click("#table-toggle"); await p.waitForSelector("#buckets .item-tile[data-id]");
   // Compact layout: Farming mode and Junk cleanup sit behind Tools.
   check("layout: Farming and Junk cleanup start folded behind Tools", await p.isHidden("#farm-row") && await p.getAttribute("#tools-btn", "aria-expanded") === "false");
   await p.click("#tools-btn");

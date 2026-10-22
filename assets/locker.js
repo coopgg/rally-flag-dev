@@ -2061,14 +2061,15 @@
   // Duplicates filter and the compare view.
   const copiesOf = item => ITEMS.filter(i => i.hash === item.hash).sort((a, b) => b.power - a.power || (b.equipped - a.equipped));
   let dupeCount = null;
-  function matches(item){
+  // ignoreFocus (the table): every owner, also on phones, and no Weapons/Armor chip.
+  function matches(item, ignoreFocus){
     if (state.flags.has("dupes")){
       if (!dupeCount){ dupeCount = new Map(); for (const i of ITEMS) dupeCount.set(i.hash, (dupeCount.get(i.hash) || 0) + 1); }
       if (dupeCount.get(item.hash) < 2) return false;
     }
-    if (!isWide() && item.owner !== state.focus) return false;
+    if (!ignoreFocus && !isWide() && item.owner !== state.focus) return false;
     const bucket = BUCKET_BY_HASH.get(item.def.b);
-    if (state.type && bucket.kind !== state.type) return false;
+    if (state.type && !ignoreFocus && bucket.kind !== state.type) return false; // the table has its own Weapons/Armor switch
     if (state.flags.has("exotic") && item.def.r !== 6) return false;
     if (state.flags.has("godroll") && !(item.roll && item.roll.full)) return false;
     if (state.flags.has("set") && !item.set) return false;
@@ -2323,7 +2324,114 @@
   // rebuilding them (a rebuild of ~1,250 tiles took 200-290ms per keystroke
   // in Firefox). Slots and class rows left empty hide too, the counts follow
   // what's visible, and vault previews open up so no match stays clipped.
+  // ---------------- Organizer (DIM's table view) ----------------
+  // The Gear tab as a spreadsheet: weapons or armor, the same filters,
+  // search and bulk bar, a column per detail. Click a column to sort,
+  // a name to open the item; Export CSV saves what's shown.
+  const TABLE_KEY = "rallyflag_locker_table";
+  const tableState = (() => { try { return Object.assign({ on: false, kind: "weapons", key: "power", dir: -1 }, JSON.parse(localStorage.getItem(TABLE_KEY) || "{}")); } catch (e){ return { on: false, kind: "weapons", key: "power", dir: -1 }; } })();
+  function saveTable(){ try { localStorage.setItem(TABLE_KEY, JSON.stringify(tableState)); } catch (e){} }
+  const curPerks = i => i.plugs.filter(h => showPlug(h) && !isMod(DB.items[h]) && !isIntrinsic(DB.items[h])).map(h => DB.items[h].n);
+  function tableColumns(kind){
+    const yes = b => b ? "Yes" : "";
+    const common = [
+      { k: "name", label: "Name", v: i => i.def.n },
+      { k: "type", label: "Type", v: i => i.def.y || "" },
+      { k: "power", label: "Power", v: i => i.power, num: true },
+      { k: "tier", label: "Tier", v: i => i.tier || 0, num: true, show: v => v || "–" },
+      { k: "where", label: "Where", v: i => ownerLabel(i.owner) + (i.equipped ? ", equipped" : "") }
+    ];
+    const tail = [
+      { k: "tag", label: "Tag", v: i => TAGS[i.id] ? (TAG_LIST.find(t => t[0] === TAGS[i.id]) || [, TAGS[i.id]])[1] : "" },
+      { k: "mode", label: "Mode", v: i => useText(i.id) },
+      { k: "locked", label: "Locked", v: i => yes(i.state & STATE_LOCKED) },
+      { k: "note", label: "Note", v: i => NOTES[i.id] || "", wide: true }
+    ];
+    if (kind === "weapons") return common.concat([
+      { k: "element", label: "Element", v: i => (DB.damage[i.damage] || {}).n || "" },
+      { k: "frame", label: "Frame", v: frameOf },
+      { k: "perks", label: "Perks", v: i => curPerks(i).join(" · "), wide: true },
+      { k: "mw", label: "Masterwork", v: i => mwStatOf(i) || (i.state & STATE_MASTERWORK ? "Yes" : "") },
+      { k: "roll", label: "God Roll", v: i => i.roll ? i.roll.matched + "/" + i.roll.total : "", sort: rollScore },
+      { k: "wish", label: "Wish list", v: i => { const w = wishMatch(i); return w ? w.n + "/" + w.total : ""; }, sort: i => { const w = wishMatch(i); return w ? w.n / w.total : -1; } }
+    ], tail);
+    return common.concat([
+      { k: "class", label: "Guardian", v: i => i.def.c === 3 ? "Any" : CLASS_NAMES[i.def.c] || "" }, // "Class" is also a stat
+      { k: "set", label: "Set", v: i => i.set ? (i.set.ours && i.set.ours.name) || i.set.name : "" }
+    ], ARMOR_STATS.map(h => ({ k: "s" + h, label: STAT_SHORT[DB.stats[h]] || DB.stats[h] || "Stat", v: i => (i.stats[h] || {}).value || 0, num: true })),
+    [{ k: "total", label: "Total", v: statTotal, num: true }, { k: "mwd", label: "Masterwork", v: i => yes(i.state & STATE_MASTERWORK) }], tail);
+  }
+  function tableRows(){
+    const search = compileSearch(state.q), kind = tableState.kind;
+    const cols = tableColumns(kind), col = cols.find(c => c.k === tableState.key) || cols.find(c => c.k === "power");
+    const key = col.sort || col.v;
+    const rows = ITEMS.filter(i => (kind === "weapons" ? i.def.t === 3 : i.def.t === 2) && matches(i, true) && (search.empty || search.test(i)));
+    rows.sort((a, b) => {
+      const x = key(a), y = key(b);
+      const d = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y));
+      return d * tableState.dir || b.power - a.power || a.def.n.localeCompare(b.def.n);
+    });
+    return { cols, rows, search };
+  }
+  function renderTable(){
+    const { cols, rows, search } = tableRows();
+    SHOWN = rows;
+    const sortedBy = c => tableState.key === c.k ? (tableState.dir > 0 ? "ascending" : "descending") : null;
+    const head = cols.map(c => '<th scope="col"' + (sortedBy(c) ? ' aria-sort="' + sortedBy(c) + '"' : "") + (c.wide ? ' class="wide"' : "") + '><button type="button" class="org-sort" data-org-sort="' + c.k + '">' + esc(c.label) +
+      '<span aria-hidden="true">' + (sortedBy(c) ? (tableState.dir > 0 ? " ▲" : " ▼") : "") + "</span></button></th>").join("");
+    const cell = (c, i) => {
+      if (c.k === "name") return '<th scope="row"><button type="button" class="org-name ' + tierClass(i.def) + '" data-org-open="' + i.id + '"><img src="' + esc(img(iconOf(i))) + '" alt="" width="28" height="28" loading="lazy"><span>' + esc(i.def.n) + "</span></button></th>";
+      const v = c.v(i), text = c.show ? c.show(v) : v;
+      return "<td" + (c.num ? ' class="num"' : c.wide ? ' class="wide"' : "") + ">" + esc(text === "" ? "–" : text) + "</td>";
+    };
+    const kinds = '<div class="org-kinds" role="group" aria-label="Show"><button type="button" class="chip" data-org-kind="weapons" aria-pressed="' + (tableState.kind === "weapons") + '">Weapons</button><button type="button" class="chip" data-org-kind="armor" aria-pressed="' + (tableState.kind === "armor") + '">Armor</button>' +
+      '<button type="button" class="act-btn" id="org-csv"' + (rows.length ? "" : ' aria-disabled="true"') + ">Export CSV<span class=\"sr-only\"> (" + rows.length + " rows)</span></button></div>";
+    $("buckets").innerHTML = kinds + (rows.length ? '<div class="org-scroll" tabindex="0" role="region" aria-label="Your ' + tableState.kind + ' as a table"><table class="org"><caption class="sr-only">Your ' + tableState.kind + ", " + rows.length + " shown</caption><thead><tr>" + head + "</tr></thead><tbody>" +
+      rows.map(i => "<tr>" + cols.map(c => cell(c, i)).join("") + "</tr>").join("") + "</tbody></table></div>" : '<p class="locker-empty">Nothing matches.</p>');
+    $("locker-count").textContent = "Showing " + rows.length + " " + tableState.kind;
+    const hint = $("search-hint");
+    if (hint){ hint.textContent = search.bad.length ? "Not a filter: " + search.bad.join(", ") + ". Ignored; see Filters for the list." : ""; hint.hidden = !search.bad.length; }
+    renderBulk();
+  }
+  function exportCsv(){
+    const { cols, rows } = tableRows();
+    const q = v => { const s = String(v == null ? "" : v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const csv = [cols.map(c => q(c.label)).join(",")].concat(rows.map(i => cols.map(c => q(c.v(i))).join(","))).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+    a.download = "rallyflag-" + tableState.kind + "-" + new Date().toISOString().slice(0, 10) + ".csv";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    toast("Saved " + rows.length + " " + tableState.kind + " as " + a.download + ".", "ok");
+  }
+  function wireTable(){
+    $("buckets").addEventListener("click", e => {
+      if (!tableState.on) return;
+      const s = e.target.closest("[data-org-sort]"), k = e.target.closest("[data-org-kind]"), o = e.target.closest("[data-org-open]");
+      if (s){
+        const key = s.dataset.orgSort, col = tableColumns(tableState.kind).find(c => c.k === key);
+        tableState.dir = tableState.key === key ? -tableState.dir : (col.num || col.sort ? -1 : 1);
+        tableState.key = key; saveTable(); renderTable();
+        $("buckets").querySelector('[data-org-sort="' + key + '"]').focus();
+      } else if (k){
+        tableState.kind = k.dataset.orgKind; if (!tableColumns(tableState.kind).some(c => c.k === tableState.key)) tableState.key = "power";
+        saveTable(); renderTable(); $("buckets").querySelector('[data-org-kind="' + tableState.kind + '"]').focus();
+      } else if (o) openItem(o.dataset.orgOpen);
+      else if (e.target.closest("#org-csv") && e.target.closest("#org-csv").getAttribute("aria-disabled") !== "true") exportCsv();
+    });
+    const t = $("table-toggle");
+    t.setAttribute("aria-pressed", String(tableState.on));
+    t.addEventListener("click", () => {
+      tableState.on = !tableState.on; saveTable();
+      t.setAttribute("aria-pressed", String(tableState.on));
+      document.querySelector(".locker-controls").classList.toggle("table-mode", tableState.on);
+      renderItems();
+    });
+    document.querySelector(".locker-controls").classList.toggle("table-mode", tableState.on);
+  }
+
   function applySearch(){
+    if (tableState.on) return renderTable();
     const root = $("buckets"), search = compileSearch(state.q), words = search.empty ? [] : [state.q];
     const byId = new Map(ITEMS.map(i => [i.id, i]));
     let shown = 0;
@@ -2378,7 +2486,7 @@
   // one owner at a time, like DIM on a phone.
   const WIDE = window.matchMedia("(min-width: 1100px)");
   const isWide = () => WIDE.matches;
-  function renderItems(){ isWide() ? renderAll() : renderOne(); }
+  function renderItems(){ tableState.on ? renderTable() : isWide() ? renderAll() : renderOne(); }
   // The vault in labelled rows, as DIM does, each keeping the list's order
   // (highest Power first). Armor: one row per class, any class first, then
   // your characters' classes, then any other class you hold (once each).
@@ -3450,6 +3558,7 @@
       toast("Showing " + SHOWN.length + " for " + b.dataset.search, "ok");
     });
     $("bulk-row").addEventListener("click", bulkClick);
+    wireTable();
     $("buckets").addEventListener("click", e => {
       const pmTile = e.target.closest("[data-pm]");
       if (pmTile) return openPostmaster(pmTile.dataset.pm);
