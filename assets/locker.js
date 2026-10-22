@@ -1420,6 +1420,148 @@
     return saved.name + " saved" + (empty ? " with " + empty + " empty slot" + (empty === 1 ? "" : "s") : "") + ".";
   }
 
+  // ---------------- armor optimizer (like DIM's Loadout Optimizer) ----------------
+  // For one character: every armor set you could wear (one piece per slot,
+  // at most one Exotic), from anywhere, that meets your stat minimums, an
+  // optional Exotic and an optional 2- or 4-piece set bonus; the 10 with the
+  // highest stat total (each stat counts up to 200). Pieces another piece in
+  // the same slot beats on every stat are dropped first, then a depth-first
+  // search skips any branch that can't reach the minimums or the top 10.
+  // Stats are as Bungie reports them now, mods already on a piece included.
+  const OPT_MAX = 200, OPT_KEEP = 10;
+  const opt = { charId: null, exotic: "any", set: "", setN: 2, mins: {}, results: null, running: false, note: "" };
+  const armorBuckets = () => BUCKETS.filter(b => b.kind === "armor").map(b => b.hash);
+  const statVec = i => ARMOR_STATS.map(h => (i.stats[h] || {}).value || 0);
+  function optPool(cls){
+    return ITEMS.filter(i => i.def.t === 2 && armorBuckets().includes(i.def.b) && (i.def.c === cls || i.def.c === 3));
+  }
+  async function runOptimizer(){
+    const o = ownerOf(opt.charId), cls = o.cls, mins = ARMOR_STATS.map(h => Math.max(0, Math.min(OPT_MAX, +opt.mins[h] || 0)));
+    const t0 = performance.now();
+    let pool = optPool(cls);
+    if (opt.exotic === "none") pool = pool.filter(i => i.def.r !== 6);
+    else if (opt.exotic !== "any") pool = pool.filter(i => i.def.r !== 6 || String(i.hash) === opt.exotic);
+    const setHash = opt.set, setN = setHash ? opt.setN : 0, needExo = opt.exotic !== "any" && opt.exotic !== "none";
+    const all = pool.length;
+    // Per slot, drop pieces beaten (or tied) on every stat by another piece
+    // of the same kind (Exotic or not, in the wanted set or not).
+    const slots = armorBuckets().map(b => {
+      const list = pool.filter(i => i.def.b === b).map(i => ({ i, s: statVec(i), exo: i.def.r === 6, inSet: !!(setHash && i.set && String(i.set.hash) === setHash), here: i.owner === opt.charId }));
+      const kept = list.filter(a => !list.some(b2 => b2 !== a && b2.exo === a.exo && b2.inSet === a.inSet && b2.s.every((v, k) => v >= a.s[k]) && (b2.s.some((v, k) => v > a.s[k]) || (b2.here && !a.here) || (b2.here === a.here && b2.i.id < a.i.id))));
+      return kept.sort((a, b2) => b2.s.reduce((x, y) => x + y, 0) - a.s.reduce((x, y) => x + y, 0));
+    });
+    const missing = armorBuckets().filter((b, k) => !slots[k].length);
+    if (missing.length) return { builds: [], note: "Your " + o.name + " has no " + missing.map(b => BUCKETS.find(x => x.hash === b).label.toLowerCase()).join(", ") + " to choose from." };
+    // Bounds for the slots still to fill: best value per stat, best total, and whether the wanted Exotic / set pieces are still possible.
+    const n = slots.length, remMax = [], remTotal = [], remExo = [], remSet = [];
+    for (let k = n; k >= 0; k--){
+      if (k === n){ remMax[k] = ARMOR_STATS.map(() => 0); remTotal[k] = 0; remExo[k] = false; remSet[k] = 0; continue; }
+      remMax[k] = remMax[k + 1].map((v, s) => v + Math.max(...slots[k].map(c => c.s[s])));
+      remTotal[k] = remTotal[k + 1] + Math.max(...slots[k].map(c => c.s.reduce((x, y) => x + y, 0)));
+      remExo[k] = remExo[k + 1] || slots[k].some(c => c.exo);
+      remSet[k] = remSet[k + 1] + (slots[k].some(c => c.inSet) ? 1 : 0);
+    }
+    const best = []; // { score, here, picks, totals }, best first
+    const cur = ARMOR_STATS.map(() => 0), picks = [];
+    let nodes = 0, stopped = false;
+    const scoreOf = v => v.reduce((x, y) => x + Math.min(y, OPT_MAX), 0);
+    const worst = () => best.length < OPT_KEEP ? -1 : best[best.length - 1].score;
+    async function dfs(k, exoUsed, setCount){
+      if (k === n){
+        if (needExo && !exoUsed) return;
+        if (setCount < setN) return;
+        if (cur.some((v, s) => v < mins[s])) return;
+        const score = scoreOf(cur), here = picks.filter(c => c.here).length;
+        if (best.length >= OPT_KEEP && (score < worst() || (score === worst() && here <= best[best.length - 1].here))) return;
+        best.push({ score, here, picks: picks.slice(), totals: cur.slice() });
+        best.sort((a, b) => b.score - a.score || b.here - a.here);
+        if (best.length > OPT_KEEP) best.pop();
+        return;
+      }
+      for (const c of slots[k]){
+        if (c.exo && exoUsed) continue;
+        if (++nodes % 20000 === 0){ await sleep(0); if (performance.now() - t0 > 8000){ stopped = true; return; } }
+        if (stopped) return;
+        for (let s = 0; s < cur.length; s++) cur[s] += c.s[s];
+        const eu = exoUsed || c.exo, sc = setCount + (c.inSet ? 1 : 0);
+        const ok = cur.every((v, s) => v + remMax[k + 1][s] >= mins[s]) && sc + remSet[k + 1] >= setN && (!needExo || eu || remExo[k + 1]) &&
+          (best.length < OPT_KEEP || cur.reduce((x, y) => x + y, 0) + remTotal[k + 1] >= worst());
+        if (ok){ picks.push(c); await dfs(k + 1, eu, sc); picks.pop(); }
+        for (let s = 0; s < cur.length; s++) cur[s] -= c.s[s];
+      }
+    }
+    await dfs(0, false, 0);
+    const kept = slots.reduce((x, l) => x + l.length, 0), ms = Math.round(performance.now() - t0);
+    return { builds: best, note: "Checked " + all + " armor pieces (" + kept + " after dropping ones another piece beats on every stat) in " + (ms < 1000 ? ms + "ms" : (ms / 1000).toFixed(1) + "s") + "." + (stopped ? " Stopped after 8 seconds: add minimums or pick an Exotic to narrow it down." : "") };
+  }
+  function optimizerHtml(){
+    if (!opt.charId || !ownerOf(opt.charId)) opt.charId = (OWNERS.slice().sort((a, b) => b.played - a.played)[0] || {}).id;
+    const o = ownerOf(opt.charId);
+    if (!o) return "";
+    const pool = optPool(o.cls);
+    const exos = [...new Map(pool.filter(i => i.def.r === 6).map(i => [String(i.hash), i.def.n])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    const sets = [...new Map(pool.filter(i => i.set).map(i => [String(i.set.hash), (i.set.ours && i.set.ours.name) || i.set.name])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+    const statIcon = h => (DB.statIcons || {})[h] ? '<img src="' + esc(img(DB.statIcons[h])) + '" alt="" width="16" height="16">' : "";
+    const results = opt.results ? (opt.results.builds.length ? '<ol class="opt-results">' + opt.results.builds.map((b, k) =>
+      '<li class="opt-build"><div class="opt-stats">' + b.totals.map((v, s) => '<span class="opt-stat' + (v > OPT_MAX ? " over" : "") + '" title="' + esc(DB.stats[ARMOR_STATS[s]] || "") + '">' + statIcon(ARMOR_STATS[s]) + '<span class="sr-only">' + esc(DB.stats[ARMOR_STATS[s]] || "") + " </span>" + v + "</span>").join("") +
+        '<span class="opt-total">Total ' + b.score + "</span></div>" +
+        '<div class="opt-pieces">' + b.picks.map(c => '<span class="opt-piece"><img src="' + esc(img(iconOf(c.i))) + '" alt="" width="36" height="36" loading="lazy"><span><b>' + esc(c.i.def.n) + "</b><small>" + esc(ownerLabel(c.i.owner)) + (c.i.equipped ? ", equipped" : "") + "</small></span></span>").join("") + "</div>" +
+        '<div class="act-row"><button type="button" class="act-btn" data-opt-equip="' + k + '">Equip on your ' + esc(o.name) + '<span class="sr-only"> (build ' + (k + 1) + ")</span></button>" +
+        '<button type="button" class="act-btn" data-opt-save="' + k + '">Save as loadout<span class="sr-only"> (build ' + (k + 1) + ")</span></button></div></li>").join("") + "</ol>"
+      : '<p class="muted">No armor set meets those minimums. Lower one and try again.</p>') : "";
+    return '<section class="lo-section" aria-labelledby="lo-h-opt"><h2 class="dlg-label" id="lo-h-opt">Armor optimizer</h2>' +
+      '<p class="muted lo-help">The best armor for a character from everything you own: set the stats you need, pick an Exotic or set bonus if you want one, and get the 10 sets with the highest stat total. Stats are as Bungie reports them now, mods on each piece included.</p>' +
+      '<div class="opt-form">' +
+        '<div class="opt-row" role="group" aria-label="For"><span class="opt-label">For</span>' + OWNERS.map(x => '<button type="button" class="chip" data-opt-char="' + x.id + '" aria-pressed="' + (x.id === opt.charId) + '">' + esc(x.name) + "</button>").join("") + "</div>" +
+        '<div class="opt-row"><label class="opt-label" for="opt-exotic">Exotic</label><select class="chip chip-select" id="opt-exotic"><option value="any">Any (or none)</option><option value="none">No Exotic</option>' +
+          exos.map(([h, n]) => '<option value="' + h + '"' + (opt.exotic === h ? " selected" : "") + ">" + esc(n) + "</option>").join("") + "</select></div>" +
+        '<div class="opt-row"><label class="opt-label" for="opt-set">Set bonus</label><select class="chip chip-select" id="opt-set"><option value="">Any</option>' + sets.map(([h, n]) => '<option value="' + h + '"' + (opt.set === h ? " selected" : "") + ">" + esc(n) + "</option>").join("") + "</select>" +
+          '<select class="chip chip-select" id="opt-setn" aria-label="Pieces of that set"' + (opt.set ? "" : " disabled") + '><option value="2"' + (opt.setN === 2 ? " selected" : "") + '>2-piece</option><option value="4"' + (opt.setN === 4 ? " selected" : "") + ">4-piece</option></select></div>" +
+        '<div class="opt-mins" role="group" aria-label="Minimum stats">' + ARMOR_STATS.map(h => '<label class="opt-min">' + statIcon(h) + "<span>" + esc(DB.stats[h] || "") + '</span><input type="number" inputmode="numeric" min="0" max="200" step="5" id="opt-min-' + h + '" value="' + (opt.mins[h] || 0) + '" data-opt-min="' + h + '" aria-label="' + esc(DB.stats[h] || "") + ' at least"></label>').join("") + "</div>" +
+        '<div class="act-row"><button type="button" class="act-btn" id="opt-go"' + (opt.running ? ' aria-disabled="true"' : "") + ">" + (opt.running ? "Searching…" : "Find the best armor") + "</button>" +
+          (opt.results ? '<span class="muted opt-note" role="status">' + esc(opt.results.note) + "</span>" : '<span class="muted opt-note" role="status"></span>') + "</div>" +
+      "</div>" + results + "</section>";
+  }
+  function wireOptimizer(box){
+    const again = sel => { renderLoadouts(); const t = sel && box.querySelector(sel); if (t) t.focus(); };
+    box.querySelectorAll("[data-opt-char]").forEach(b => b.addEventListener("click", () => {
+      if (opt.charId === b.dataset.optChar) return;
+      opt.charId = b.dataset.optChar; opt.exotic = "any"; opt.set = ""; opt.results = null;
+      again('[data-opt-char="' + opt.charId + '"]');
+    }));
+    const ex = $("opt-exotic"); if (!ex) return;
+    ex.value = opt.exotic;
+    ex.addEventListener("change", () => { opt.exotic = ex.value; });
+    $("opt-set").addEventListener("change", e => { opt.set = e.target.value; $("opt-setn").disabled = !opt.set; });
+    $("opt-setn").addEventListener("change", e => { opt.setN = +e.target.value; });
+    box.querySelectorAll("[data-opt-min]").forEach(inp => inp.addEventListener("input", () => { opt.mins[inp.dataset.optMin] = Math.max(0, Math.min(OPT_MAX, +inp.value || 0)); }));
+    $("opt-go").addEventListener("click", async () => {
+      if (opt.running) return;
+      opt.running = true; again("#opt-go");
+      try { opt.results = await runOptimizer(); }
+      catch (e){ opt.results = { builds: [], note: "Couldn't search: " + ((e && e.message) || e) }; }
+      opt.running = false;
+      again(opt.results.builds.length ? '[data-opt-equip="0"]' : "#opt-go");
+    });
+    const buildOf = b => opt.results && opt.results.builds[+(b.dataset.optEquip || b.dataset.optSave)];
+    box.querySelectorAll("[data-opt-equip]").forEach(b => b.addEventListener("click", () => {
+      const build = buildOf(b), o = ownerOf(opt.charId);
+      if (!build || busyNotice()) return;
+      const items = build.picks.map(c => c.i);
+      run("Equipping the optimized armor on your " + o.name, "Equipped the optimized armor on your " + o.name + ".", () => equipSet(items, o.id));
+    }));
+    box.querySelectorAll("[data-opt-save]").forEach(b => b.addEventListener("click", () => {
+      const build = buildOf(b), o = ownerOf(opt.charId);
+      if (!build) return;
+      const all = readLoadouts();
+      const name = "Optimized " + o.name + " armor " + (all.filter(x => /^Optimized /.test(x.name)).length + 1);
+      const lo = { id: Date.now().toString(36), name, cls: o.cls, items: build.picks.map(c => ({ id: c.i.id, hash: c.i.hash })), subclass: null, artifact: null, mods: [], cosmetics: {} };
+      all.push(lo); writeLoadouts(all); loOpen = "r-" + lo.id;
+      renderLoadoutCount(); again('[data-lo-pick="r-' + lo.id + '"]');
+      toast("Saved as " + name + ". Rename it from its details.", "ok");
+    }));
+  }
+
   // The Loadouts tab (like DIM's): loadouts saved in this browser, grouped
   // by class, then Destiny's in-game loadouts, then max Power.
   // Editing a saved loadout (like DIM's loadout editor): swap or clear the
@@ -1635,6 +1777,7 @@
         sharesHtml() +
         "</section>" +
       '<section class="lo-section" aria-labelledby="lo-h-game"><h2 class="dlg-label" id="lo-h-game">In-game loadouts</h2><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first. Empty slots can save what a character wears now.</p>' + gameSection() + "</section>" +
+      optimizerHtml() +
       '<section class="lo-section" aria-labelledby="lo-h-max"><h2 class="dlg-label" id="lo-h-max">Max Power</h2><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</section>";
     $("lo-name").value = typed.name; $("lo-dim").value = typed.dim;
     if (typed.rename != null && $("lo-rename-input")) $("lo-rename-input").value = typed.rename;
@@ -1764,6 +1907,7 @@
       renderLoadouts(); $("lo-edit-h").focus();
     }));
     if (loEditing && box.querySelector(".lo-edit")) wireEditor(box);
+    wireOptimizer(box);
     box.querySelectorAll("[data-lo-share]").forEach(b => b.addEventListener("click", async () => {
       const lo = readLoadouts().find(x => x.id === b.dataset.loShare);
       if (!lo || b.getAttribute("aria-disabled") === "true") return;

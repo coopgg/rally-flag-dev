@@ -554,6 +554,33 @@ await section("Loadouts", async () => {
   check("edit: Save keeps the swap, the cleared slot and the mods", edited.items.length === 7 && edited.items.some(x => x.id === swap) && edited.mods.length === 1 && await p.evaluate(id => document.activeElement.dataset.loEdit === id, id), JSON.stringify(edited.items.length));
   await p.click('[data-lo-edit="' + id + '"]'); await p.click('[data-ed-clear="1498876634"]'); await p.keyboard.press("Escape");
   check("edit: Escape cancels without saving", (await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id), id)).items.length === 7 && !(await p.locator(".lo-edit").count()));
+  // Armor optimizer: top 10 by stat total, minimums and an Exotic respected; Equip and Save work.
+  await p.click("#opt-go"); await p.waitForSelector(".opt-build");
+  const totals = await p.$$eval(".opt-total", t => t.map(x => +x.textContent.replace(/\D/g, "")));
+  check("optimizer: finds up to 10 armor sets, best total first", totals.length >= 1 && totals.length <= 10 && totals.every((t, k) => k === 0 || t <= totals[k - 1]) && await p.locator(".opt-build:first-child .opt-piece").count() === 5, totals.join(","));
+  const firstStat = await p.getAttribute("[data-opt-min]", "data-opt-min");
+  const topFirst = await p.$$eval(".opt-build .opt-stat:first-child", t => Math.max(...t.map(x => +x.textContent.replace(/\D/g, ""))));
+  await p.fill("#opt-min-" + firstStat, String(topFirst)); await p.click("#opt-go"); await p.waitForTimeout(800);
+  check("optimizer: every result meets the minimums", await p.locator(".opt-build").count() >= 1 && (await p.$$eval(".opt-build .opt-stat:first-child", t => t.map(x => +x.textContent.replace(/\D/g, "")))).every(v => v >= topFirst));
+  await p.fill("#opt-min-" + firstStat, "200"); await p.click("#opt-go"); await p.waitForTimeout(800);
+  check("optimizer: impossible minimums say so", /No armor set meets/.test(await p.textContent("#view-loadouts")));
+  await p.fill("#opt-min-" + firstStat, "0");
+  const exo = await p.$$eval("#opt-exotic option", o => o.slice(2).map(x => [x.value, x.textContent]));
+  if (exo.length){
+    await p.selectOption("#opt-exotic", exo[0][0]); await p.click("#opt-go"); await p.waitForSelector(".opt-build");
+    check("optimizer: a chosen Exotic is in every result", (await p.$$eval(".opt-build", b => b.map(x => x.textContent))).every(t => t.includes(exo[0][1])));
+    await p.selectOption("#opt-exotic", "none"); await p.click("#opt-go"); await p.waitForSelector(".opt-build");
+    check("optimizer: No Exotic leaves them all out", (await p.$$eval(".opt-build", b => b.map(x => x.textContent))).every(t => !exo.some(([, n]) => t.includes(n))));
+  }
+  v = await axe(p); check("optimizer passes axe", !v.length, v.join(", "));
+  await p.click('[data-opt-equip="0"]'); await idle(p);
+  check("optimizer: Equip puts the set on the character", /Equipped the optimized armor/.test(await toastText(p)), await toastText(p));
+  const before = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).length);
+  await p.click('[data-opt-save="0"]');
+  const optSaved = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).slice(-1)[0]);
+  check("optimizer: Save as loadout stores the 5 pieces", optSaved.items.length === 5 && /^Optimized /.test(optSaved.name) && (await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).length)) === before + 1);
+  await p.click('[data-lo-del="' + optSaved.id + '"]'); await p.click('[data-lo-del="' + optSaved.id + '"]');
+  await p.click('[data-lo-pick="r-' + id + '"]');
   const del = p.locator("[data-lo-del]").first(); await del.click(); await del.click();
   check("loadouts: two-tap delete", await p.locator('[data-lo-pick^="r-"]').count() === 0);
   check("loadouts: no script errors", !p.errors.length, p.errors.join("; "));
