@@ -63,12 +63,18 @@
   const USE_LIST = [["pve", "PvE", ICON_PVE, "Vanguard, raids, dungeons"], ["pvp", "PvP", ICON_PVP, "Crucible, Trials, Gambit"]];
   const hasUse = (id, u) => USE[id] === u || USE[id] === "both";
   const wishName = item => item.def.n.toLowerCase();
+  // Masterwork plugs are "Tier 1: Range" … "Tier 9: Range", "Masterworked: Range".
+  const MW_PLUG = /^(?:tier \d+|masterworked):\s*(.+)$/i;
+  const mwStatOf = item => { for (const h of item.plugs){ const m = MW_PLUG.exec((DB.items[h] || {}).n || ""); if (m) return m[1]; } return ""; };
+  // What a copy has for wish-list matching: every perk it has or can switch
+  // to, and its masterwork's stat (at any tier: the tier can be raised).
+  const wishHave = item => { const have = new Set(perkNames(item).split("|")), mw = mwStatOf(item); if (mw) have.add("masterwork: " + mw.toLowerCase()); return have; };
   const wishOf = item => item.def.t === 3 ? WISHES[wishName(item)] || null : null;
   // How close this copy is to its best wish-list roll: { k, n, total, full }.
   function wishMatch(item){
     const rolls = wishOf(item);
     if (!rolls || !rolls.length) return null;
-    const have = new Set(perkNames(item).split("|"));
+    const have = wishHave(item);
     let best = null;
     rolls.forEach((r, k) => {
       const n = r.groups.filter(g => g.some(x => have.has(x.toLowerCase()))).length;
@@ -2756,7 +2762,12 @@
     const body = [numRow(numRows[0])].concat(
       textRow("Where", copies.map(i => esc(ownerLabel(i.owner)) + (i.equipped ? ", equipped" : ""))),
       textRow("Tier", copies.map(i => i.tier ? String(i.tier) : "–")),
-      textRow("Masterwork", copies.map(i => i.state & STATE_MASTERWORK ? "Yes" : "No")),
+      textRow("Masterwork", copies.map(i => {
+        const plug = i.plugs.map(h => (DB.items[h] || {}).n || "").find(n => MW_PLUG.test(n));
+        if (!plug) return i.state & STATE_MASTERWORK ? "Yes" : "–";
+        const t = /^tier (\d+)/i.exec(plug);
+        return esc(MW_PLUG.exec(plug)[1]) + (t ? " (tier " + t[1] + ")" : " (full)");
+      })),
       textRow("Tag", copies.map(i => [TAGS[i.id] ? esc((TAG_LIST.find(t => t[0] === TAGS[i.id]) || [, TAGS[i.id]])[1]) : "", useText(i.id)].filter(Boolean).join(" · ") || "–")),
       weapon ? textRow("Frame", copies.map(i => esc(frameOf(i)) || "–")) : "",
       numRows.filter(r => r[0] === "roll" || r[0] === "wish").map(numRow),
@@ -2818,7 +2829,7 @@
   // whether this copy has each, and the wanted perks ringed in the columns.
   // Picking happens on a generic copy of the weapon (openWishView).
   function wishHtml(item){
-    const name = wishName(item), rolls = WISHES[name] || [], have = new Set(perkNames(item).split("|"));
+    const name = wishName(item), rolls = WISHES[name] || [], have = wishHave(item);
     const list = rolls.map((r, k) => {
       const n = r.groups.filter(g => g.some(x => have.has(x.toLowerCase()))).length, full = n === r.groups.length;
       return '<div class="wish-roll"><span class="wish-status' + (full ? " ok" : "") + '">' + (full ? ICON_WISH + " This copy has it" : "Has " + n + " of " + r.groups.length) + "</span>" +
@@ -2861,23 +2872,29 @@
         const h = e.randomizedPlugSetHash || e.reusablePlugSetHash;
         return h ? get("DestinyPlugSetDefinition", h).catch(() => null) : (e.reusablePlugItems || []).length ? { reusablePlugItems: e.reusablePlugItems } : null;
       }));
+      // Columns: { label, perks: [{ h, n (name matched and stored), show }] }.
       const cols = [];
       for (const set of defs){
         if (!set) continue;
-        const seen = new Set(), perks = [];
+        const seen = new Set(), perks = [], mw = new Map();
         for (const p of set.reusablePlugItems || []){
           const d = DB.items[p.plugItemHash];
-          if (p.currentlyCanRoll === false || !d || !showPlug(p.plugItemHash) || isMod(d) || isIntrinsic(d) || seen.has(d.n)) continue;
-          seen.add(d.n); perks.push(p.plugItemHash);
+          if (p.currentlyCanRoll === false || !d) continue;
+          // The masterwork socket: one choice per stat (the fully masterworked plug's icon).
+          const m = MW_PLUG.exec(d.n);
+          if (m){ if (!mw.has(m[1]) || /^masterworked/i.test(d.n)) mw.set(m[1], p.plugItemHash); continue; }
+          if (!showPlug(p.plugItemHash) || isMod(d) || isIntrinsic(d) || seen.has(d.n)) continue;
+          seen.add(d.n); perks.push({ h: p.plugItemHash, n: d.n });
         }
-        if (perks.length) cols.push(perks);
+        if (perks.length) cols.push({ label: colLabel(perks[0].h), perks });
+        if (mw.size) cols.push({ label: "Masterwork", perks: [...mw].map(([stat, h]) => ({ h, n: "Masterwork: " + stat, show: stat })) });
       }
       if (!cols.length) throw new Error("Bungie lists no perk choices for it.");
       return cols;
     })().catch(e => { PERK_POOLS.delete(hash); throw e; }));
     return PERK_POOLS.get(hash);
   }
-  const colLabel = perks => { const y = (DB.items[perks[0]] || {}).y || "Perk"; return /trait/i.test(y) && !/origin/i.test(y) ? "Trait" : y.replace(/^Enhanced /, ""); };
+  const colLabel = h => { const y = (DB.items[h] || {}).y || "Perk"; return /trait/i.test(y) && !/origin/i.test(y) ? "Trait" : y.replace(/^Enhanced /, ""); };
   // A generic copy of the weapon with every perk it can roll: tap the ones
   // you want (several in a column = any of them), then Save roll. Shows how
   // many of your copies have that roll as you pick.
@@ -2898,28 +2915,34 @@
       // Bungie's definitions didn't come: offer what this copy has.
       fallback = "Couldn't load every perk (" + e.message + "), so these are the perks on this copy and the ones it can switch to.";
       cols = item.plugs.map((h, idx) => [h].concat((item.alts[idx] || []).map(a => a.plugItemHash))).filter(c => showPlug(c[0]) && !isMod(DB.items[c[0]]) && !isIntrinsic(DB.items[c[0]]))
-        .map(c => [...new Map(c.filter(h => DB.items[h] && showPlug(h)).map(h => [DB.items[h].n, h])).values()]);
+        .map(c => ({ label: colLabel(c[0]), perks: [...new Map(c.filter(h => DB.items[h] && showPlug(h)).map(h => [DB.items[h].n, { h, n: DB.items[h].n }])).values()] }));
+      const mw = mwStatOf(item), mwPlug = item.plugs.find(h => MW_PLUG.test((DB.items[h] || {}).n || ""));
+      if (mw) cols.push({ label: "Masterwork", perks: [{ h: mwPlug, n: "Masterwork: " + mw, show: mw }] });
     }
     if (!dlg.open || dlg.dataset.view !== "wish") return; // closed while loading
+    // Masterwork last, with only the stats this weapon has (the plug set is shared by every weapon type).
+    const statNames = new Set(Object.values(item.stats).map(st => DB.stats[st.statHash]).filter(Boolean));
+    cols = cols.map(c => c.label === "Masterwork" ? { label: c.label, perks: c.perks.filter(e => statNames.has(e.show)) } : c).filter(c => c.perks.length)
+      .sort((a, b) => (a.label === "Masterwork") - (b.label === "Masterwork"));
     const roll = k >= 0 && WISHES[name] ? WISHES[name][k] : null;
     const picks = cols.map(() => new Set()), keep = [];
     for (const g of roll ? roll.groups : []){
       const lower = g.map(x => x.toLowerCase());
-      const c = cols.findIndex(col => col.some(h => lower.includes(DB.items[h].n.toLowerCase())));
-      if (c >= 0) g.forEach(x => { const h = cols[c].find(y => DB.items[y].n.toLowerCase() === x.toLowerCase()); if (h) picks[c].add(DB.items[h].n); }); else keep.push(g);
+      const c = cols.findIndex(col => col.perks.some(e => lower.includes(e.n.toLowerCase())));
+      if (c >= 0) g.forEach(x => { const e = cols[c].perks.find(y => y.n.toLowerCase() === x.toLowerCase()); if (e) picks[c].add(e.n); }); else keep.push(g);
     }
     wishView = { fromId, name, k, cols, picks, keep };
     const ours = new Set(item.roll ? item.roll.weapon.perkHashes.map(h => (DB.items[h] || {}).n) : []);
     const owned = ITEMS.filter(i => i.def.t === 3 && wishName(i) === name);
-    const onCopies = new Set(owned.flatMap(i => perkNames(i).split("|")));
-    const colsHtml = cols.map((col, c) => '<div class="wish-col" role="group" aria-labelledby="wc-' + c + '"><div class="wish-col-h" id="wc-' + c + '">' + esc(colLabel(col)) + "</div>" +
-      col.map(h => { const p = DB.items[h], on = picks[c].has(p.n);
-        return '<button type="button" class="wish-perk' + (on ? " on" : "") + (ours.has(p.n) ? " ours" : "") + '" data-wish-col="' + c + '" data-wish-perk="' + esc(p.n) + '" aria-pressed="' + on + '" title="' + esc(p.x || p.n) + '">' +
-          (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="28" height="28" loading="lazy">' : '<span class="wish-noicon"></span>') + "<span>" + esc(p.n) +
-          (ours.has(p.n) ? '<small>our God Roll</small>' : onCopies.has(p.n.toLowerCase()) ? "<small>on a copy you own</small>" : "") + "</span></button>"; }).join("") + "</div>").join("");
+    const onCopies = new Set(owned.flatMap(i => [...wishHave(i)]));
+    const colsHtml = cols.map((col, c) => '<div class="wish-col" role="group" aria-labelledby="wc-' + c + '"><div class="wish-col-h" id="wc-' + c + '">' + esc(col.label) + "</div>" +
+      col.perks.map(e => { const p = DB.items[e.h] || {}, on = picks[c].has(e.n);
+        return '<button type="button" class="wish-perk' + (on ? " on" : "") + (ours.has(e.n) ? " ours" : "") + '" data-wish-col="' + c + '" data-wish-perk="' + esc(e.n) + '" aria-pressed="' + on + '" title="' + esc(e.show ? "Masterwork on " + e.show + " (any tier)" : p.x || e.n) + '">' +
+          (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="28" height="28" loading="lazy">' : '<span class="wish-noicon"></span>') + "<span>" + esc(e.show || e.n) + (e.show ? '<span class="sr-only"> masterwork</span>' : "") +
+          (ours.has(e.n) ? '<small>our God Roll</small>' : onCopies.has(e.n.toLowerCase()) ? "<small>on a copy you own</small>" : "") + "</span></button>"; }).join("") + "</div>").join("");
     redrawDialog(dlg, head + '<div class="dlg-body">' +
       (fallback ? '<p class="wish-help">' + esc(fallback) + "</p>" : "") +
-      '<p class="wish-help">Tap the perks you want. Pick several in one column if any of them will do. Columns you leave empty don\'t matter.</p>' +
+      '<p class="wish-help">Tap the perks you want, and the masterwork stat if it matters. Pick several in one column if any of them will do. Columns you leave empty don\'t matter.</p>' +
       '<p class="wish-count" id="wish-count" role="status"></p>' +
       '<div class="wish-cols">' + colsHtml + "</div>" +
       '<div class="act-row wish-actions"><button type="button" class="act-btn" id="wish-save">Save roll</button><button type="button" class="act-btn" id="wish-cancel">Cancel</button></div></div>');
@@ -2928,7 +2951,7 @@
     const count = () => {
       const g = groups();
       if (!g.length) return $("wish-count").textContent = "Nothing picked yet. You have " + owned.length + " " + (owned.length === 1 ? "copy" : "copies") + ".";
-      const n = owned.filter(i => { const have = new Set(perkNames(i).split("|")); return g.every(x => x.some(y => have.has(y.toLowerCase()))); }).length;
+      const n = owned.filter(i => { const have = wishHave(i); return g.every(x => x.some(y => have.has(y.toLowerCase()))); }).length;
       $("wish-count").textContent = n + " of your " + owned.length + " " + (owned.length === 1 ? "copy has" : "copies have") + " this roll.";
     };
     count();

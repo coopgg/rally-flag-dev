@@ -447,6 +447,17 @@ await section("Wish list", async () => {
   check("wish: a perk no copy has drops the count to 0", /^0 of your 1/.test(await p.textContent("#wish-count")));
   await p.click("#wish-save");
   check("wish: the copy now says what it's missing", /Has 1 of 2/.test(await p.textContent(".wish-roll")) && await p.locator(".wish-roll").count() === 1);
+  // Masterwork: a last column with only this weapon's stats; the copy's stat counts at any tier.
+  await p.click("[data-wish-edit]"); await p.waitForSelector(".wish-col");
+  const mwHead = await p.textContent(".wish-col:last-child .wish-col-h");
+  const mw = await p.$$eval(".wish-col:last-child [data-wish-perk]", b => b.map(x => ({ n: x.dataset.wishPerk, mine: x.textContent.includes("on a copy you own") })));
+  check("wish: a Masterwork column lists this weapon's stats, the copy's own marked", mwHead === "Masterwork" && mw.length >= 3 && mw.filter(x => x.mine).length === 1 && mw.length <= 6, JSON.stringify(mw));
+  await p.click('[data-wish-perk="' + barrel + '"]'); // back to a roll the copy has
+  await p.click('[data-wish-perk="' + mw.find(x => x.mine).n + '"]');
+  check("wish: the copy's masterwork stat keeps the match", /^1 of your 1/.test(await p.textContent("#wish-count")));
+  await p.click('[data-wish-perk="' + mw.find(x => x.mine).n + '"]'); await p.click('[data-wish-perk="' + mw.find(x => !x.mine).n + '"]');
+  check("wish: another masterwork stat doesn't match", /^0 of your 1/.test(await p.textContent("#wish-count")));
+  await p.click("#wish-cancel");
   const del = p.locator("[data-wish-del]"); await del.click(); await del.click();
   await p.keyboard.press("Escape");
   check("wish: Delete (two taps) removes the roll and the badge", await p.locator(tile + " .tile-badge.wish").count() === 0 && await p.evaluate(() => localStorage.getItem("rallyflag_locker_wishes")) === "{}");
