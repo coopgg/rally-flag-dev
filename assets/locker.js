@@ -62,6 +62,27 @@
   const ICON_PVP = svg('<path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 17.5L21 6V3h-3L6.5 14.5M11 19l-6-6M8 16l-4 4M5 21l-2-2"/>');
   const USE_LIST = [["pve", "PvE", ICON_PVE, "Vanguard, raids, dungeons"], ["pvp", "PvP", ICON_PVP, "Crucible, Trials, Gambit"]];
   const hasUse = (id, u) => USE[id] === u || USE[id] === "both";
+  const wishName = item => item.def.n.toLowerCase();
+  const wishOf = item => item.def.t === 3 ? WISHES[wishName(item)] || null : null;
+  // How close this copy is to its best wish-list roll: { k, n, total, full }.
+  function wishMatch(item){
+    const rolls = wishOf(item);
+    if (!rolls || !rolls.length) return null;
+    const have = new Set(perkNames(item).split("|"));
+    let best = null;
+    rolls.forEach((r, k) => {
+      const n = r.groups.filter(g => g.some(x => have.has(x.toLowerCase()))).length;
+      if (!best || n / r.groups.length > best.n / best.total) best = { k, n, total: r.groups.length };
+    });
+    best.full = best.n === best.total;
+    return best;
+  }
+  function saveWish(name, rolls){
+    rolls && rolls.length ? (WISHES[name] = rolls) : delete WISHES[name];
+    TAG_AT["wish:" + name] = Date.now();
+    saveTags(); tagsChanged();
+  }
+  const ICON_WISH = svg('<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>');
   const useText = id => USE[id] === "both" ? "PvE and PvP" : USE[id] === "pve" ? "PvE" : USE[id] === "pvp" ? "PvP" : "";
   const ICON_LOCK = svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>');
   const ICON_UNLOCK = svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>');
@@ -155,9 +176,14 @@
   // A short note per item (like DIM's), stored and synced with its tag.
   const NOTE_KEY = "rallyflag_locker_notes";
   const NOTES = (() => { try { return JSON.parse(localStorage.getItem(NOTE_KEY) || "{}"); } catch (e){ return {}; } })();
+  // Wish lists (like DIM's): per weapon name, rolls you want, each a list
+  // of perk columns, each column the perk names any of which will do.
+  // Matched by name, so enhanced and older versions count too.
+  const WISH_KEY = "rallyflag_locker_wishes";
+  const WISHES = (() => { try { return JSON.parse(localStorage.getItem(WISH_KEY) || "{}"); } catch (e){ return {}; } })();
   const USE_KEY = "rallyflag_locker_use";
   const USE = (() => { try { return JSON.parse(localStorage.getItem(USE_KEY) || "{}"); } catch (e){ return {}; } })();
-  function saveTags(){ try { localStorage.setItem(USE_KEY, JSON.stringify(USE)); localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); localStorage.setItem(TAG_TIME_KEY, JSON.stringify(TAG_AT)); localStorage.setItem(NOTE_KEY, JSON.stringify(NOTES)); } catch (e){} }
+  function saveTags(){ try { localStorage.setItem(WISH_KEY, JSON.stringify(WISHES)); localStorage.setItem(USE_KEY, JSON.stringify(USE)); localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); localStorage.setItem(TAG_TIME_KEY, JSON.stringify(TAG_AT)); localStorage.setItem(NOTE_KEY, JSON.stringify(NOTES)); } catch (e){} }
   function setNote(id, text){
     text = String(text || "").trim().slice(0, 120);
     if ((NOTES[id] || "") === text) return false;
@@ -480,7 +506,8 @@
   // Tags as synced: itemId -> { t: "favorite" | "junk" | "" (removed), at }.
   function readTagState(){
     const out = {};
-    for (const id in TAG_AT) out[id] = { t: TAGS[id] || "", n: NOTES[id] || "", u: USE[id] || "", at: TAG_AT[id] };
+    for (const id in TAG_AT) out[id] = id.startsWith("wish:") ? { w: WISHES[id.slice(5)] || [], at: TAG_AT[id] } : { t: TAGS[id] || "", n: NOTES[id] || "", u: USE[id] || "", at: TAG_AT[id] };
+    for (const name in WISHES) if (!out["wish:" + name]) out["wish:" + name] = { w: WISHES[name], at: 1 };
     for (const id in TAGS) if (!out[id]) out[id] = { t: TAGS[id], n: NOTES[id] || "", u: USE[id] || "", at: 1 }; // tagged before tags synced
     return out;
   }
@@ -488,17 +515,18 @@
     for (const id of Object.keys(TAGS)) if (!map[id] || !map[id].t) delete TAGS[id];
     for (const id of Object.keys(NOTES)) if (!map[id] || !map[id].n) delete NOTES[id];
     for (const id of Object.keys(USE)) if (!map[id] || !map[id].u) delete USE[id];
+    for (const name of Object.keys(WISHES)){ const r = map["wish:" + name]; if (!r || !r.w || !r.w.length) delete WISHES[name]; }
     for (const id of Object.keys(TAG_AT)) delete TAG_AT[id];
-    for (const id in map){ if (map[id].t) TAGS[id] = map[id].t; if (map[id].n) NOTES[id] = map[id].n; if (map[id].u) USE[id] = map[id].u; TAG_AT[id] = map[id].at; }
+    for (const id in map){ if (map[id].t) TAGS[id] = map[id].t; if (map[id].n) NOTES[id] = map[id].n; if (map[id].u) USE[id] = map[id].u; if (map[id].w && map[id].w.length) WISHES[id.slice(5)] = map[id].w; TAG_AT[id] = map[id].at; }
     saveTags();
   }
   function mergeTags(a, b){
     const out = Object.assign({}, a), cut = Date.now() - SYNC_KEEP_DELETED;
     for (const id in b) if (!out[id] || (b[id].at || 0) > (out[id].at || 0)) out[id] = b[id];
-    for (const id in out) if (!out[id].t && !out[id].n && !out[id].u && out[id].at < cut) delete out[id];
+    for (const id in out) if (!out[id].t && !out[id].n && !out[id].u && !(out[id].w && out[id].w.length) && out[id].at < cut) delete out[id];
     return out;
   }
-  const tagKey = tags => JSON.stringify(Object.keys(tags).sort().map(id => id + ":" + tags[id].t + ":" + (tags[id].n || "") + ":" + (tags[id].u || "") + ":" + tags[id].at));
+  const tagKey = tags => JSON.stringify(Object.keys(tags).sort().map(id => id + ":" + tags[id].t + ":" + (tags[id].n || "") + ":" + (tags[id].u || "") + ":" + JSON.stringify(tags[id].w || []) + ":" + tags[id].at));
   function tagsChanged(){ const m = readSyncMeta(); m.dirty = true; writeSyncMeta(m); syncGen++; schedulePush(); }
   const localState = () => ({ loadouts: readLoadouts(), deleted: readSyncMeta().deleted, tags: readTagState() });
   const serverState = d => ({ loadouts: d.loadouts || [], deleted: d.deleted || {}, tags: d.tags || {} });
@@ -1880,6 +1908,7 @@
     if (state.flags.has("set") && !item.set) return false;
     if (state.flags.has("equipped") && !item.equipped) return false;
     if (state.tag === "pve" || state.tag === "pvp"){ if (!hasUse(item.id, state.tag)) return false; }
+    else if (state.tag === "wish"){ const w = wishMatch(item); if (!w || !w.full) return false; }
     else if (state.tag === "any" ? !TAGS[item.id] : state.tag === "note" ? !NOTES[item.id] : state.tag && TAGS[item.id] !== state.tag) return false;
     return true;
   }
@@ -1932,7 +1961,7 @@
         crafted: i => !!(i.state & STATE_CRAFTED),
         dupe: i => ctx.dupes().get(i.hash) > 1, godroll: i => !!(i.roll && i.roll.full),
         set: i => !!i.set, tagged: i => !!TAGS[i.id], hasnote: i => !!NOTES[i.id],
-        inloadout: i => ctx.inLoadout().has(i.id), invault: i => i.owner === "vault", ornamented: i => !!i.ornament
+        inloadout: i => ctx.inLoadout().has(i.id), wishlist: i => { const w = wishMatch(i); return !!(w && w.full); }, haswishlist: i => !!wishOf(i), invault: i => i.owner === "vault", ornamented: i => !!i.ornament
       };
       return is[val] || ("is:" + val);
     }
@@ -1997,7 +2026,7 @@
   // Suggestions while typing: filter words, then perk names and item types.
   const FILTER_WORDS = ["is:weapon", "is:armor", "is:exotic", "is:legendary", "is:equipped", "is:locked", "is:unlocked", "is:masterwork", "is:crafted",
     "is:dupe", "is:godroll", "is:set", "is:tagged", "is:hasnote", "is:inloadout", "is:ornamented", "is:kinetic", "is:solar", "is:arc", "is:void", "is:stasis", "is:strand",
-    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "is:pve", "is:pvp", "tag:none", "tag:any",
+    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "is:pve", "is:pvp", "is:wishlist", "is:haswishlist", "tag:none", "tag:any",
     "in:vault", "in:titan", "in:hunter", "in:warlock", "class:titan", "class:hunter", "class:warlock", "class:any",
     "slot:kinetic", "slot:energy", "slot:power", "slot:helmet", "slot:gauntlets", "slot:chest", "slot:legs", "slot:classitem",
     "power:>", "power:<", "tier:>=", "tier:5", "stat:total:>=", "stat:weapons:>", "stat:health:>", "stat:class:>", "stat:grenade:>", "stat:super:>", "stat:melee:>",
@@ -2022,6 +2051,7 @@
     ["is:dupe -is:godroll", "Duplicates that aren't our God Roll"],
     ["is:weapon is:junk", "Weapons you tagged Junk"],
     ["is:pvp -is:pve", "Gear you marked PvP only"],
+    ["is:haswishlist -is:wishlist", "Copies of wish-listed weapons that miss the roll"],
     ['perk:"kill clip" type:"hand cannon"', "Hand cannons that have or can switch to Kill Clip"],
     ["is:armor stat:total:>=65", "Armor with a stat total of 65 or more"],
     ["in:vault is:exotic is:dupe", "Exotics you have more than one of, in the vault"],
@@ -2033,7 +2063,7 @@
     return '<div class="search-help panel-card" id="search-help" hidden><h2 class="dlg-label">Search filters</h2>' +
       '<p class="muted">Combine terms with spaces (all must match), <b>or</b>, brackets, and <b>-</b> or <b>not</b> to exclude. Put names with spaces in quotes.</p>' +
       '<ul class="search-examples">' + SEARCH_EXAMPLES.map(([q, what]) => '<li><button type="button" class="act-btn" data-search="' + esc(q) + '"><code translate="no">' + esc(q) + "</code></button><span>" + esc(what) + "</span></li>").join("") + "</ul>" +
-      '<p class="muted search-words"><b>is:</b> weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive), pve, pvp · ' +
+      '<p class="muted search-words"><b>is:</b> weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive), pve, pvp, wishlist (matches your wish list), haswishlist · ' +
         "<b>in:</b> vault, titan, hunter, warlock · <b>tag:</b> a tag, none, any · <b>class:</b> titan, hunter, warlock, any · <b>slot:</b> kinetic, energy, power, helmet, gauntlets, chest, legs, classitem · " +
         "<b>type:</b>, <b>name:</b>, <b>perk:</b>, <b>note:</b> text · <b>power:</b>, <b>tier:</b> a number with &gt;, &lt;, &gt;=, &lt;= · <b>stat:</b>total, weapons, health, class, grenade, super, melee or a weapon stat, then a number (stat:range:&gt;60)</p></div>";
   }
@@ -2157,9 +2187,10 @@
     const d = item.def, dmg = DB.damage[item.damage];
     const mw = item.state & STATE_MASTERWORK;
     const orn = item.ornament && DB.items[item.ornament];
+    const wish = wishMatch(item);
     const label = [d.n, d.y, orn ? "ornament " + orn.n : "", item.power ? "power " + item.power : "", item.tier ? "tier " + item.tier : "", mw ? "masterworked" : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
       item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : "",
-      TAGS[item.id] ? "tagged " + TAGS[item.id] : "", USE[item.id] ? "for " + useText(item.id) : "", NOTES[item.id] ? "note: " + NOTES[item.id] : ""].filter(Boolean).join(", ");
+      wish && wish.full ? "matches your wish list" : "", TAGS[item.id] ? "tagged " + TAGS[item.id] : "", USE[item.id] ? "for " + useText(item.id) : "", NOTES[item.id] ? "note: " + NOTES[item.id] : ""].filter(Boolean).join(", ");
     const tag = TAGS[item.id], use = USE[item.id];
     return '<button type="button" class="item-tile ' + tierClass(d) + (mw ? " mw" : "") + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
       '<img class="icon" src="' + esc(img(iconOf(item))) + '" alt="" loading="lazy" width="64" height="64">' +
@@ -2167,7 +2198,7 @@
       (mw ? '<img class="ov" src="' + esc(img(MW_OVERLAY[d.r === 6 ? 6 : 5])) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (item.tier >= 1 && item.tier <= 5 ? tierPips(item.tier) : "") +
       (use ? '<span class="tile-use" aria-hidden="true">' + (hasUse(item.id, "pve") ? '<span class="tile-badge use-pve">' + ICON_PVE + "</span>" : "") + (hasUse(item.id, "pvp") ? '<span class="tile-badge use-pvp">' + ICON_PVP + "</span>" : "") + "</span>" : "") +
-      (item.roll && item.roll.full || tag || NOTES[item.id] ? '<span class="tile-badges" aria-hidden="true">' + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
+      (item.roll && item.roll.full || tag || NOTES[item.id] || (wish && wish.full) ? '<span class="tile-badges" aria-hidden="true">' + (wish && wish.full ? '<span class="tile-badge wish">' + ICON_WISH + "</span>" : "") + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
         (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag ? '<span class="tile-badge tag-' + tag + '">' + (TAG_LIST.find(t => t[0] === tag) || [, , ""])[2] + "</span>" : "") +
         (NOTES[item.id] ? '<span class="tile-badge note">' + ICON_NOTE + "</span>" : "") + "</span>" : "") +
       '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") + (item.power || "") + "</span>" +
@@ -2637,6 +2668,7 @@
     } else names = ARMOR_STATS.map(h => DB.stats[h]).filter(Boolean);
     const numRows = [["power", "Power", i => i.power, false]]
       .concat(copies.some(i => i.roll) ? [["roll", "God Roll", i => i.roll ? i.roll.matched : null, false]] : [])
+      .concat(copies.some(i => wishOf(i)) ? [["wish", "Wish list", i => { const w = wishMatch(i); return w ? w.n : null; }, false]] : [])
       .concat(names.map(n => ["stat:" + n, STAT_SHORT[n] || n, i => statOf(i, n), LOWER_IS_BETTER.test(n)]))
       .concat(weapon ? [] : [["total", "Total", i => statTotal(i), false]]);
     // Sort: the item you opened first by default, then Power.
@@ -2678,7 +2710,12 @@
     };
     const numRow = r => {
       const vals = copies.map(r[2]), qs = NO_SHADE.test(r[0]) ? vals.map(() => null) : shade(vals, r[3]);
-      const text = (v, i) => r[0] === "roll" ? (v == null ? "–" : i.roll.full ? "★ " + v + "/" + i.roll.total : v + "/" + i.roll.total) : v == null ? "–" : String(v);
+      const text = (v, i) => {
+        if (v == null) return "–";
+        if (r[0] === "roll") return (i.roll.full ? "★ " : "") + v + "/" + i.roll.total;
+        if (r[0] === "wish"){ const w = wishMatch(i); return (w.full ? "✓ " : "") + v + "/" + w.total; }
+        return String(v);
+      };
       return "<tr>" + head(r[0], r[1]) + vals.map((v, k) => cell(text(v, copies[k]), qs[k])).join("") + "</tr>";
     };
     const textRow = (label, cells) => "<tr>" + head(null, label) + cells.map(c => "<td>" + c + "</td>").join("") + "</tr>";
@@ -2722,10 +2759,10 @@
       textRow("Masterwork", copies.map(i => i.state & STATE_MASTERWORK ? "Yes" : "No")),
       textRow("Tag", copies.map(i => [TAGS[i.id] ? esc((TAG_LIST.find(t => t[0] === TAGS[i.id]) || [, TAGS[i.id]])[1]) : "", useText(i.id)].filter(Boolean).join(" · ") || "–")),
       weapon ? textRow("Frame", copies.map(i => esc(frameOf(i)) || "–")) : "",
-      numRows.filter(r => r[0] === "roll").map(numRow),
+      numRows.filter(r => r[0] === "roll" || r[0] === "wish").map(numRow),
       textRow("Perks", copies.map(perkIcons)),
       textRow("Mods", copies.map(mods)),
-      numRows.filter(r => r[0] !== "power" && r[0] !== "roll").map(numRow)
+      numRows.filter(r => r[0] !== "power" && r[0] !== "roll" && r[0] !== "wish").map(numRow)
     ).join("");
     const chips = scopes.length > 1 ? '<div class="cmp-scopes" role="group" aria-label="Compare with">' + scopes.map(s => '<button type="button" class="chip" data-cmp-scope="' + s[0] + '" aria-pressed="' + (s[0] === scope[0]) + '">' + esc(s[1]) + " (" + s[2].length + ")</button>").join("") + "</div>" : "";
     dlg.dataset.item = ""; dlg.dataset.view = "compare";
@@ -2775,6 +2812,83 @@
     } else {
       const focusBtn = dlg.querySelector('[data-cmp-open="' + fromId + '"]'); if (focusBtn) focusBtn.focus();
     }
+  }
+
+  // The popup's Wish list block: the rolls you want for this weapon, with
+  // whether this copy has each; picking mode turns the perk dots into
+  // toggles (several in one column = any of them).
+  let wishEdit = null; // { name, k (roll index, -1 = new), picks: Map(socket -> Set(names)), keep: [groups not on this copy] }
+  function wishHtml(item){
+    const name = wishName(item), rolls = WISHES[name] || [], have = new Set(perkNames(item).split("|"));
+    const label = '<div class="dlg-label">Wish list</div>';
+    if (wishEdit && wishEdit.name === name)
+      return label + '<p class="wish-help">Tap the perks you want, in the perk columns above. Pick several in one column if any of them will do.</p>' +
+        '<div class="act-row"><button type="button" class="act-btn" id="wish-save">Save roll</button><button type="button" class="act-btn" id="wish-cancel">Cancel</button></div>';
+    const list = rolls.map((r, k) => {
+      const n = r.groups.filter(g => g.some(x => have.has(x.toLowerCase()))).length, full = n === r.groups.length;
+      return '<div class="wish-roll"><span class="wish-status' + (full ? " ok" : "") + '">' + (full ? ICON_WISH + " This copy has it" : "Has " + n + " of " + r.groups.length) + "</span>" +
+        '<span class="wish-perks">' + r.groups.map(g => g.map(x => '<span class="' + (have.has(x.toLowerCase()) ? "got" : "") + '">' + esc(x) + "</span>").join(" or ")).join(" · ") + "</span>" +
+        '<span class="wish-btns"><button type="button" class="act-btn" data-wish-edit="' + k + '">Edit<span class="sr-only"> roll ' + (k + 1) + "</span></button>" +
+        '<button type="button" class="act-btn" data-wish-del="' + k + '">Delete<span class="sr-only"> roll ' + (k + 1) + "</span></button></span></div>";
+    }).join("");
+    return label + list + '<div class="act-row"><button type="button" class="act-btn" id="wish-add">' + (rolls.length ? "Add another roll" : "Pick the perks you want") + "</button></div>";
+  }
+  function wireWish(dlg, item){
+    const name = wishName(item), rolls = WISHES[name] || [];
+    const nameOf = h => (DB.items[h] || {}).n || "";
+    const reopen = sel => { openItem(item.id); const t = sel && dlg.querySelector(sel); if (t) t.focus(); };
+    const add = $("wish-add");
+    const start = k => {
+      const picks = new Map(), keep = [];
+      for (const g of k >= 0 ? rolls[k].groups : []){
+        const lower = g.map(x => x.toLowerCase());
+        const dot = [...dlg.querySelectorAll(".perk-dot")].find(b => lower.includes(nameOf(+b.dataset.plug).toLowerCase()));
+        if (dot) picks.set(dot.dataset.socket, new Set(g)); else keep.push(g);
+      }
+      wishEdit = { name, k, picks, keep };
+      reopen(".perk-dot");
+    };
+    if (add) add.addEventListener("click", () => start(-1));
+    dlg.querySelectorAll("[data-wish-edit]").forEach(b => b.addEventListener("click", () => start(+b.dataset.wishEdit)));
+    dlg.querySelectorAll("[data-wish-del]").forEach(b => b.addEventListener("click", () => {
+      if (b.dataset.confirm !== "1"){ b.dataset.confirm = "1"; b.firstChild.textContent = "Tap again to delete"; return; }
+      saveWish(name, rolls.filter((r, k) => k !== +b.dataset.wishDel));
+      renderItems(); reopen("#wish-add"); toast("Wish-list roll deleted.", "ok");
+    }));
+    // Ring the perks your rolls want (or, while picking, the ones picked).
+    const editing = wishEdit && wishEdit.name === name;
+    const wanted = new Set(rolls.flatMap(r => r.groups.flat()).map(x => x.toLowerCase()));
+    dlg.querySelectorAll(".perk-dot").forEach(b => {
+      const n = nameOf(+b.dataset.plug), on = editing ? !!(wishEdit.picks.get(b.dataset.socket) || new Set()).has(n) : wanted.has(n.toLowerCase());
+      b.classList.toggle("wished", on);
+      if (editing){
+        b.setAttribute("aria-pressed", String(on));
+        b.setAttribute("aria-label", n + (on ? ", on your wish list" : ", add to your wish list"));
+        b.addEventListener("click", () => {
+          const set = wishEdit.picks.get(b.dataset.socket) || new Set();
+          set.has(n) ? set.delete(n) : set.add(n);
+          wishEdit.picks.set(b.dataset.socket, set);
+          const now = set.has(n);
+          b.classList.toggle("wished", now); b.setAttribute("aria-pressed", String(now));
+          b.setAttribute("aria-label", n + (now ? ", on your wish list" : ", add to your wish list"));
+          $("plug-info").textContent = n + (now ? " added to" : " removed from") + " this roll.";
+        });
+      }
+    });
+    if (!editing) return;
+    $("wish-cancel").addEventListener("click", () => { wishEdit = null; reopen(rolls.length ? "#wish-add" : "#wish-add"); });
+    $("wish-save").addEventListener("click", () => {
+      const groups = [...wishEdit.picks.values()].filter(x => x.size).map(x => [...x]).concat(wishEdit.keep);
+      if (!groups.length) return toast("Tap at least one perk first.", "error");
+      const next = rolls.slice();
+      wishEdit.k >= 0 ? (next[wishEdit.k] = { groups }) : next.push({ groups });
+      wishEdit = null;
+      saveWish(name, next);
+      renderItems();
+      const matches = ITEMS.filter(i => i.def.t === 3 && wishName(i) === name && (wishMatch(i) || {}).full).length;
+      reopen("#wish-add");
+      toast("Wish-list roll saved. " + (matches ? matches + " of your copies " + (matches === 1 ? "has" : "have") + " it." : "None of your copies has it yet."), "ok");
+    });
   }
 
   function openItem(id){
@@ -2864,6 +2978,7 @@
       stats ? label("Stats") + stats : "",
       intrinsic ? label(d.t === 3 ? "Frame" : "Archetype") + intrinsic : "",
       cols.length ? label("Perks") + '<div class="perk-cols" role="group" aria-label="Perks">' + cols.join("") + "</div>" : "",
+      cols.length && d.t === 3 ? wishHtml(item) : "",
       mods.length ? label("Mods") + '<div class="mod-row" role="group" aria-label="Mods">' + mods.join("") + "</div>" : ""
     ].filter(Boolean).map(b => '<div class="dlg-block">' + b + "</div>");
     const hasPlugs = cols.length || mods.length;
@@ -2897,7 +3012,9 @@
         item.perkText = null;
       }, () => { reopenItem(); const again = dlg.querySelector('[data-socket="' + idx + '"][data-plug="' + hash + '"]'); if (again) again.focus(); }, item);
     };
+    wireWish(dlg, item);
     dlg.querySelectorAll("[data-plug]").forEach(b => b.addEventListener("click", () => {
+      if (wishEdit && b.classList.contains("perk-dot")) return; // picking wish-list perks
       dlg.querySelectorAll("[data-plug]").forEach(o => o.setAttribute("aria-pressed", String(o === b)));
       const h = +b.dataset.plug, idx = +b.dataset.socket, p = DB.items[h];
       $("plug-info").innerHTML = "<b>" + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (ourPerks.has(h) ? " · in our God Roll" : "") +
@@ -3208,7 +3325,7 @@
     });
     // Click on the backdrop closes the dialog.
     $("item-dialog").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
-    $("item-dialog").addEventListener("close", () => document.body.appendChild($("locker-toast")));
+    $("item-dialog").addEventListener("close", () => { document.body.appendChild($("locker-toast")); wishEdit = null; });
   }
 
   async function init(){

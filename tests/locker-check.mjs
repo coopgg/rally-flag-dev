@@ -409,6 +409,49 @@ await section("Perks and mods", async () => {
   await p.context_.close();
 });
 
+// ---------- 2d. Wish lists (sample data) ----------
+await section("Wish list", async () => {
+  const p = await open();
+  const reuse = DEMO.itemComponents.reusablePlugs.data;
+  const w = DEMO.characterInventories.data[TITAN].items.find(i => reuse[i.itemInstanceId] && [1498876634, 2465295065, 953998645].includes(i.bucketHash));
+  const tile = '#buckets .item-tile[data-id="' + w.itemInstanceId + '"]';
+  await p.click(tile); await p.click("#wish-add");
+  check("wish: Pick the perks you want turns the perk dots into toggles", await p.evaluate(() => document.activeElement.classList.contains("perk-dot")) && await p.isVisible("#wish-save"));
+  const cols = p.locator("#item-dialog .perk-col");
+  const n = await cols.count();
+  await cols.nth(n - 2).locator(".perk-dot.sel").click();
+  const alt = cols.nth(n - 1).locator(".perk-dot.alt");
+  const wantAlt = await alt.count() ? await alt.first().getAttribute("data-plug") : null;
+  await cols.nth(n - 1).locator(".perk-dot.sel").click();
+  if (wantAlt) await alt.first().click();
+  check("wish: picked perks are pressed and ringed", await p.locator('#item-dialog .perk-dot.wished[aria-pressed="true"]').count() === (wantAlt ? 3 : 2));
+  let v = await axe(p); check("wish: picking passes axe", !v.length, v.join(", "));
+  await p.click("#wish-save");
+  check("wish: saving says how many copies have it", /Wish-list roll saved\. 1 of your copies has it/.test(await toastText(p)), await toastText(p));
+  check("wish: the roll shows as had by this copy", /This copy has it/.test(await p.textContent(".wish-roll")) && (!wantAlt || / or /.test(await p.textContent(".wish-roll"))));
+  await p.keyboard.press("Escape");
+  check("wish: the tile gets the wish-list badge", await p.locator(tile + " .tile-badge.wish").count() === 1 && /matches your wish list/.test(await p.getAttribute(tile, "aria-label")));
+  await p.fill("#locker-search", "is:wishlist"); await p.waitForTimeout(300);
+  check("wish: is:wishlist finds it", await p.locator("#buckets .item-tile[data-id]:not([hidden])").count() === 1);
+  await p.fill("#locker-search", ""); await p.waitForTimeout(200);
+  await p.selectOption("#tag-filter", "wish");
+  check("wish: the filter menu has Wish-list match", await p.locator("#buckets .item-tile[data-id]").count() === 1);
+  await p.selectOption("#tag-filter", "");
+  // A perk this copy doesn't have: no longer a match, and says so.
+  await p.click(tile); await p.click("[data-wish-edit]");
+  await cols.nth(n - 2).locator(".perk-dot.sel").click(); // unpick
+  const other = cols.nth(n - 2).locator(".perk-dot.alt");
+  if (await other.count()){
+    await other.first().click(); await p.click("#wish-save");
+    check("wish: Edit keeps the roll; a roll with a switchable perk still matches", /This copy has it/.test(await p.textContent(".wish-roll")) && await p.locator(".wish-roll").count() === 1);
+  }
+  const del = p.locator("[data-wish-del]"); await del.click(); await del.click();
+  await p.keyboard.press("Escape");
+  check("wish: Delete (two taps) removes the roll and the badge", await p.locator(tile + " .tile-badge.wish").count() === 0 && await p.evaluate(() => localStorage.getItem("rallyflag_locker_wishes")) === "{}");
+  check("wish: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
 // ---------- 3. Loadouts and max Power (sample data) ----------
 await section("Loadouts", async () => {
   const p = await open({ hash: "#loadouts" });
@@ -607,6 +650,10 @@ await section("Sync", async () => {
   const B = await open({ real: true, env, hash: "#loadouts" });
   check("sync: a fresh browser gets the loadout", /Synced/.test(await B.textContent("#view-loadouts")));
   check("sync: and the tag", await B.evaluate(id => /tag-favorite/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').className), item));
+  const wishWeapon = DEMO.characterInventories.data[TITAN].items.find(i => DEMO.itemComponents.reusablePlugs.data[i.itemInstanceId] && [1498876634, 2465295065, 953998645].includes(i.bucketHash)).itemInstanceId;
+  await A.click('#buckets .item-tile[data-id="' + wishWeapon + '"]'); await A.click("#wish-add"); await A.locator("#item-dialog .perk-col .perk-dot.sel").last().click(); await A.click("#wish-save"); await A.keyboard.press("Escape"); await A.waitForTimeout(2000);
+  await comeBack(B);
+  check("sync: wish lists reach the other device", await B.evaluate(id => /matches your wish list/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').getAttribute("aria-label")), wishWeapon));
   check("sync: and the PvP mark", await B.evaluate(id => /for PvP/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').getAttribute("aria-label")), item));
   await A.click("#tab-gear"); await A.click('#buckets .item-tile[data-id="' + item + '"]'); await A.fill("#item-note", "synced note"); await A.click("#note-form [type=submit]"); await A.keyboard.press("Escape"); await A.waitForTimeout(2000);
   await comeBack(B);
