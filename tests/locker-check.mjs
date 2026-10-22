@@ -532,9 +532,9 @@ await section("Your Week", async () => {
   check("week: this week's featured raids and dungeons, three of each", titles.length === 6 && titles.includes("The Desert Perpetual") && titles.includes("Equilibrium"), titles.join(", "));
   const chips = await p.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-char")].map(x => x.textContent)));
   check("week: each featured activity shows every character's clear since reset", chips.every(c => c.length === 3) && chips.flat().some(t => /, cleared$/.test(t)) && chips.flat().some(t => /not cleared yet$/.test(t)));
-  check("week: chips are just the class, green when cleared and red when not", await p.evaluate(() => [...document.querySelectorAll(".yw-char")].every(c => {
-    const shown = c.firstChild.textContent, bg = getComputedStyle(c).backgroundColor;
-    return /^(Titan|Hunter|Warlock)$/.test(shown) && (c.classList.contains("done") ? bg === "rgb(30, 122, 60)" : bg === "rgb(179, 38, 30)");
+  check("week: chips are the class with a mark, green ✓ when cleared and red ✕ when not", await p.evaluate(() => [...document.querySelectorAll(".yw-char")].every(c => {
+    const mark = c.querySelector(".yw-mark").textContent, shown = c.childNodes[1].textContent, bg = getComputedStyle(c).backgroundColor;
+    return /^(Titan|Hunter|Warlock)$/.test(shown) && (c.classList.contains("done") ? bg === "rgb(30, 122, 60)" && mark === "✓" : bg === "rgb(179, 38, 30)" && mark === "✕");
   })));
   const idx = await p.evaluate(() => window.ActivityIndex.raids.length + window.ActivityIndex.dungeons.length);
   check("week: the rest lists every raid and dungeon not featured, with the same chips", await p.locator(".yw-rest-row").count() === idx - 6 && await p.locator(".yw-rest-row .yw-char").count() === (idx - 6) * 3 && await p.locator(".yw-rest-row .yw-char.done").count() > 0 && await p.locator('.yw-rest-row a[href*="raid-"]').count() > 0);

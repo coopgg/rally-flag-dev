@@ -154,16 +154,16 @@
     const missing = OWNERS.some(o => DATA.history[o.id] == null);
     return '<section class="pg-section" aria-labelledby="yw-h-featured"><h2 class="dlg-label" id="yw-h-featured">Featured this week</h2>' +
       group("Raids", "Raid", wk.raids, idx.raids, R.ALWAYS_FEATURED_RAID_SLUG) + group("Dungeons", "Dungeon", wk.dungeons, idx.dungeons, R.ALWAYS_FEATURED_DUNGEON_SLUG) +
-      '<p class="yw-note">Green: cleared since the weekly reset. Red: not yet. From each character\'s activity history.' + (missing ? " Bungie didn't share some characters' history (a privacy setting can hide it), shown grey with a ?." : "") + "</p></section>" +
+      '<p class="yw-note">✓ Cleared since the weekly reset. ✕ Not yet. From each character\'s activity history.' + (missing ? " Bungie didn't share some characters' history (a privacy setting can hide it), shown grey with a ?." : "") + "</p></section>" +
       '<section class="pg-section" aria-labelledby="yw-h-rest"><h2 class="dlg-label" id="yw-h-rest">The rest</h2>' +
       rest("Raids", "raid", wk.raids, idx.raids) + rest("Dungeons", "dungeon", wk.dungeons, idx.dungeons) + "</section>";
   }
-  // One chip per character: green cleared, red not yet, grey unknown (the
-  // words are there for screen readers).
+  // One chip per character: green ✓ cleared, red ✕ not yet, grey ? unknown
+  // (the mark is there for colour-blind eyes, the words for screen readers).
   function charsHtml(c){
     return '<div class="yw-chars">' + OWNERS.map(o => {
       const v = c[o.id], state = v == null ? "unknown" : v ? "done" : "todo";
-      return '<span class="yw-char ' + state + '">' + esc(o.name) + (v == null ? " ?" : "") + '<span class="sr-only">' + (v == null ? ", unknown" : v ? ", cleared" : ", not cleared yet") + "</span></span>";
+      return '<span class="yw-char ' + state + '"><span class="yw-mark" aria-hidden="true">' + (v == null ? "?" : v ? "✓" : "✕") + "</span>" + esc(o.name) + '<span class="sr-only">' + (v == null ? ", unknown" : v ? ", cleared" : ", not cleared yet") + "</span></span>";
     }).join("") + "</div>";
   }
   function draw(){
