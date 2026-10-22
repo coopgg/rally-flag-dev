@@ -231,7 +231,7 @@ await section("Gear", async () => {
   check("pve/pvp: is:pvp (is:crucible) and is:pve search", pvpShown === 1 && await p.locator("#buckets .item-tile[data-id]:not([hidden])").count() === 0);
   await p.fill("#locker-search", ""); await p.waitForTimeout(300);
   await p.click(tile); await p.fill("#item-note", "Quillwick roll"); await p.click("#note-form [type=submit]");
-  check("notes: saving a note marks the tile", /Note saved/.test(await toastText(p)) && await p.locator(tile + " .tile-badge.note").count() === 1 && /note: Quillwick roll/.test(await p.getAttribute(tile, "aria-label")));
+  check("notes: saving a note marks the tile", /Note saved/.test(await toastText(p)) && await p.locator(tile + " .tile-note").count() === 1 && /note: Quillwick roll/.test(await p.getAttribute(tile, "aria-label")));
   await p.keyboard.press("Escape");
   await p.fill("#locker-search", "quillwick"); await p.waitForTimeout(300);
   check("notes: search finds notes", await p.locator("#buckets .item-tile[data-id]:not([hidden])").count() === 1);
@@ -433,7 +433,7 @@ await section("Wish list", async () => {
   check("wish: saving says how many copies have it", /Wish-list roll saved\. 1 of your copies has it/.test(await toastText(p)), await toastText(p));
   check("wish: back on the copy, the roll shows as had and the perk is ringed", /This copy has it/.test(await p.textContent(".wish-roll")) && / or /.test(await p.textContent(".wish-roll")) && await p.locator("#item-dialog .perk-dot.wished").count() >= 1 && await p.evaluate(() => document.activeElement.id === "wish-add"));
   await p.keyboard.press("Escape");
-  check("wish: the tile gets the wish-list badge", await p.locator(tile + " .tile-badge.wish").count() === 1 && /matches your wish list/.test(await p.getAttribute(tile, "aria-label")));
+  check("wish: a full match fills the green bar on the tile", await p.locator(tile + " .tile-wish.full").count() === 1 && /matches your wish list/.test(await p.getAttribute(tile, "aria-label")));
   await p.fill("#locker-search", "is:wishlist"); await p.waitForTimeout(300);
   check("wish: is:wishlist finds it", await p.locator("#buckets .item-tile[data-id]:not([hidden])").count() === 1);
   await p.fill("#locker-search", ""); await p.waitForTimeout(200);
@@ -448,6 +448,12 @@ await section("Wish list", async () => {
   check("wish: a perk no copy has drops the count to 0", /^0 of your 1/.test(await p.textContent("#wish-count")));
   await p.click("#wish-save");
   check("wish: the copy now says what it's missing", /Has 1 of 2/.test(await p.textContent(".wish-roll")) && await p.locator(".wish-roll").count() === 1);
+  await p.keyboard.press("Escape");
+  check("wish: a part match shows a half-full amber bar and says so", await p.locator(tile + ' .tile-wish:not(.full)[style*="--w:50%"]').count() === 1 && /has 1 of 2 wish-list picks/.test(await p.getAttribute(tile, "aria-label")));
+  await p.fill("#locker-search", "wish:>=1 -is:wishlist"); await p.waitForTimeout(300);
+  check("wish: wish:>=1 -is:wishlist finds part matches", await p.locator("#buckets .item-tile[data-id]:not([hidden])").count() === 1);
+  await p.fill("#locker-search", ""); await p.waitForTimeout(200);
+  await p.click(tile);
   // Masterwork: a last column with only this weapon's stats; the copy's stat counts at any tier.
   await p.click("[data-wish-edit]"); await p.waitForSelector(".wish-col");
   const mwHead = await p.textContent(".wish-col:last-child .wish-col-h");
@@ -462,7 +468,7 @@ await section("Wish list", async () => {
   check("wish: the popup shows the copy's masterwork stat and tier", /Masterwork/.test(await p.textContent("#item-dialog .dlg-body")) && /^(?:[A-Z][a-z]+ ?)+(Tier \d+ of 10|Fully masterworked)/.test(await p.textContent("#item-dialog .mw-row")), await p.textContent("#item-dialog .mw-row"));
   const del = p.locator("[data-wish-del]"); await del.click(); await del.click();
   await p.keyboard.press("Escape");
-  check("wish: Delete (two taps) removes the roll and the badge", await p.locator(tile + " .tile-badge.wish").count() === 0 && await p.evaluate(() => localStorage.getItem("rallyflag_locker_wishes")) === "{}");
+  check("wish: Delete (two taps) removes the roll and the badge", await p.locator(tile + " .tile-wish").count() === 0 && await p.evaluate(() => localStorage.getItem("rallyflag_locker_wishes")) === "{}");
   check("wish: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
 });

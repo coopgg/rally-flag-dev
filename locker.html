@@ -414,7 +414,14 @@
   .tile-badge.tag-infuse{ background:#ffd76a; }
   .tile-badge.tag-archive{ background:#b8a4e6; }
   .tile-badge.note{ background:#f2f2f2; }
-  .tile-badge.wish{ display:flex; align-items:center; justify-content:center; background:#7be0a0; }
+  /* Wish-list match: a bar along the top edge (amber part-way, green when it all matches). */
+  .tile-wish{ position:absolute; top:0; left:0; right:0; height:4px; background:rgba(0,0,0,0.65); }
+  .tile-wish::before{ content:""; position:absolute; top:0; left:0; bottom:0; width:var(--w); background:#f2c14e; }
+  .tile-wish.full{ height:5px; }
+  .tile-wish.full::before{ background:#4fd389; }
+  /* Has a note: a folded top-left corner (the left edge holds the tier pips). */
+  .tile-note{ position:absolute; top:0; left:0; width:15px; height:15px; background:#f2f2f2; clip-path:polygon(0 0, 100% 0, 0 100%); box-shadow:none; }
+  .item-tile:has(.tile-wish) .tile-badges{ top:7px; }
   .perk-dot.wished{ box-shadow:0 0 0 3px #3fbf74; opacity:1; }
   .wish-help{ margin:0 0 8px; font-size:13px; color:var(--text-dim); }
   .wish-count{ margin:0 0 10px; font-size:14px; font-weight:600; }

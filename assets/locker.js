@@ -1988,6 +1988,7 @@
     if (key === "perk") return val ? i => perkNames(i).includes(val) : "perk:";
     if (key === "note") return val ? i => (NOTES[i.id] || "").toLowerCase().includes(val) : "note:";
     if (key === "power" || key === "tier"){ const t = numTest(val); return t ? i => t(key === "power" ? i.power : i.tier) : key + ":" + val; }
+    if (key === "wish"){ const t = numTest(val); return t ? i => { const w = wishMatch(i); return !!w && t(w.n); } : "wish:" + val; }
     if (key === "stat"){
       const sm = /^([a-z0-9]+):(.+)$/.exec(val), t = sm && numTest(sm[2]);
       return t ? i => { const v = statValue(i, sm[1]); return v != null && t(v); } : "stat:" + val;
@@ -2032,7 +2033,7 @@
   // Suggestions while typing: filter words, then perk names and item types.
   const FILTER_WORDS = ["is:weapon", "is:armor", "is:exotic", "is:legendary", "is:equipped", "is:locked", "is:unlocked", "is:masterwork", "is:crafted",
     "is:dupe", "is:godroll", "is:set", "is:tagged", "is:hasnote", "is:inloadout", "is:ornamented", "is:kinetic", "is:solar", "is:arc", "is:void", "is:stasis", "is:strand",
-    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "is:pve", "is:pvp", "is:wishlist", "is:haswishlist", "tag:none", "tag:any",
+    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "is:pve", "is:pvp", "is:wishlist", "is:haswishlist", "wish:>=", "tag:none", "tag:any",
     "in:vault", "in:titan", "in:hunter", "in:warlock", "class:titan", "class:hunter", "class:warlock", "class:any",
     "slot:kinetic", "slot:energy", "slot:power", "slot:helmet", "slot:gauntlets", "slot:chest", "slot:legs", "slot:classitem",
     "power:>", "power:<", "tier:>=", "tier:5", "stat:total:>=", "stat:weapons:>", "stat:health:>", "stat:class:>", "stat:grenade:>", "stat:super:>", "stat:melee:>",
@@ -2069,7 +2070,7 @@
     return '<div class="search-help panel-card" id="search-help" hidden><h2 class="dlg-label">Search filters</h2>' +
       '<p class="muted">Combine terms with spaces (all must match), <b>or</b>, brackets, and <b>-</b> or <b>not</b> to exclude. Put names with spaces in quotes.</p>' +
       '<ul class="search-examples">' + SEARCH_EXAMPLES.map(([q, what]) => '<li><button type="button" class="act-btn" data-search="' + esc(q) + '"><code translate="no">' + esc(q) + "</code></button><span>" + esc(what) + "</span></li>").join("") + "</ul>" +
-      '<p class="muted search-words"><b>is:</b> weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive), pve, pvp, wishlist (matches your wish list), haswishlist · ' +
+      '<p class="muted search-words"><b>is:</b> weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive), pve, pvp, wishlist (matches your wish list), haswishlist · <b>wish:</b> how many wish-list picks a copy has (wish:>=4) · ' +
         "<b>in:</b> vault, titan, hunter, warlock · <b>tag:</b> a tag, none, any · <b>class:</b> titan, hunter, warlock, any · <b>slot:</b> kinetic, energy, power, helmet, gauntlets, chest, legs, classitem · " +
         "<b>type:</b>, <b>name:</b>, <b>perk:</b>, <b>note:</b> text · <b>power:</b>, <b>tier:</b> a number with &gt;, &lt;, &gt;=, &lt;= · <b>stat:</b>total, weapons, health, class, grenade, super, melee or a weapon stat, then a number (stat:range:&gt;60)</p></div>";
   }
@@ -2196,7 +2197,7 @@
     const wish = wishMatch(item);
     const label = [d.n, d.y, orn ? "ornament " + orn.n : "", item.power ? "power " + item.power : "", item.tier ? "tier " + item.tier : "", mw ? "masterworked" : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
       item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : "",
-      wish && wish.full ? "matches your wish list" : "", TAGS[item.id] ? "tagged " + TAGS[item.id] : "", USE[item.id] ? "for " + useText(item.id) : "", NOTES[item.id] ? "note: " + NOTES[item.id] : ""].filter(Boolean).join(", ");
+      wish ? (wish.full ? "matches your wish list" : "has " + wish.n + " of " + wish.total + " wish-list picks") : "", TAGS[item.id] ? "tagged " + TAGS[item.id] : "", USE[item.id] ? "for " + useText(item.id) : "", NOTES[item.id] ? "note: " + NOTES[item.id] : ""].filter(Boolean).join(", ");
     const tag = TAGS[item.id], use = USE[item.id];
     return '<button type="button" class="item-tile ' + tierClass(d) + (mw ? " mw" : "") + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
       '<img class="icon" src="' + esc(img(iconOf(item))) + '" alt="" loading="lazy" width="64" height="64">' +
@@ -2204,9 +2205,11 @@
       (mw ? '<img class="ov" src="' + esc(img(MW_OVERLAY[d.r === 6 ? 6 : 5])) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (item.tier >= 1 && item.tier <= 5 ? tierPips(item.tier) : "") +
       (use ? '<span class="tile-use" aria-hidden="true">' + (hasUse(item.id, "pve") ? '<span class="tile-badge use-pve">' + ICON_PVE + "</span>" : "") + (hasUse(item.id, "pvp") ? '<span class="tile-badge use-pvp">' + ICON_PVP + "</span>" : "") + "</span>" : "") +
-      (item.roll && item.roll.full || tag || NOTES[item.id] || (wish && wish.full) ? '<span class="tile-badges" aria-hidden="true">' + (wish && wish.full ? '<span class="tile-badge wish">' + ICON_WISH + "</span>" : "") + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
-        (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag ? '<span class="tile-badge tag-' + tag + '">' + (TAG_LIST.find(t => t[0] === tag) || [, , ""])[2] + "</span>" : "") +
-        (NOTES[item.id] ? '<span class="tile-badge note">' + ICON_NOTE + "</span>" : "") + "</span>" : "") +
+      // Wish list: a bar along the top edge, as full as the match (green = all of it).
+      (wish && wish.n ? '<span class="tile-wish' + (wish.full ? " full" : "") + '" style="--w:' + Math.round(wish.n / wish.total * 100) + '%" aria-hidden="true"></span>' : "") +
+      (NOTES[item.id] ? '<span class="tile-note" aria-hidden="true"></span>' : "") +
+      (item.roll && item.roll.full || tag ? '<span class="tile-badges" aria-hidden="true">' + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
+        (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag ? '<span class="tile-badge tag-' + tag + '">' + (TAG_LIST.find(t => t[0] === tag) || [, , ""])[2] + "</span>" : "") + "</span>" : "") +
       '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") + (item.power || "") + "</span>" +
     "</button>";
   }
