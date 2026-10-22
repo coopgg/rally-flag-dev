@@ -546,6 +546,41 @@ await section("Your Week", async () => {
   await l.context_.close();
 });
 
+// ---------- 2f. New markers, infusion, stat totals, DIM links (sample data) ----------
+await section("DIM extras", async () => {
+  const p = await open({ hash: "#gear" });
+  check("new: a first visit marks nothing new", await p.locator(".tile-new").count() === 0 && await p.isHidden("#new-clear"));
+  const ids = await p.$$eval("#buckets .item-tile[data-id]", t => t.map(x => x.dataset.id));
+  const fresh = ids.slice(3, 6);
+  await p.evaluate(drop => { const s = JSON.parse(localStorage.getItem("rallyflag_locker_seen:demo")); localStorage.setItem("rallyflag_locker_seen:demo", JSON.stringify(s.filter(id => !drop.includes(id)))); }, fresh);
+  await p.reload(); await p.waitForSelector("#locker-app:not([hidden])", { timeout: 90000 }); await p.waitForTimeout(600);
+  check("new: items not seen before get a dot and say so", await p.locator(".tile-new").count() === 3 && /, new(,|$)/.test(await p.getAttribute('#buckets .item-tile[data-id="' + fresh[0] + '"]', "aria-label")) && /Mark 3 new as seen/.test(await p.textContent("#new-clear")));
+  await p.fill("#locker-search", "is:new"); await p.waitForTimeout(300);
+  check("new: is:new finds them", await p.locator("#buckets .item-tile[data-id]:not([hidden])").count() === 3);
+  await p.fill("#locker-search", ""); await p.waitForTimeout(300);
+  await p.click('#buckets .item-tile[data-id="' + fresh[0] + '"]');
+  const fuel = await p.$$eval("[data-fuel]", b => b.map(x => x.textContent));
+  check("infuse: the popup lists higher-Power fuel of the same category", fuel.length >= 1 && fuel.every(t => /\+\d+/.test(t)), fuel.join(" | "));
+  await p.keyboard.press("Escape");
+  check("new: opening an item clears its dot", await p.locator(".tile-new").count() === 2);
+  await p.click("#new-clear");
+  check("new: Mark as seen clears the rest", await p.locator(".tile-new").count() === 0 && await p.isHidden("#new-clear"));
+  const armorTiles = await p.locator("#buckets .item-tile[data-id] .tile-total").count();
+  check("armor tiles show their stat total", armorTiles > 40 && /stat total \d+/.test(await p.$eval("#buckets .item-tile[data-id]:has(.tile-total)", t => t.getAttribute("aria-label"))));
+  // Copy DIM link: DIM's loadout link format, which our own importer reads back.
+  await p.context_.grantPermissions(["clipboard-read", "clipboard-write"]);
+  await p.click("#tab-loadouts"); await p.fill("#lo-name", "DIM out"); await p.click('[data-lo-save="' + TITAN + '"]');
+  const id = (await p.getAttribute('[data-lo-pick^="r-"]', "data-lo-pick")).slice(2);
+  await p.click('[data-lo-dim="' + id + '"]'); await p.waitForTimeout(200);
+  const url = await p.evaluate(() => navigator.clipboard.readText());
+  const j = JSON.parse(decodeURIComponent(url.split("loadout=")[1]));
+  check("dim link: Copy DIM link makes a DIM loadout link with gear, subclass, mods and cosmetics", url.startsWith("https://app.destinyitemmanager.com/loadouts?loadout=") && j.name === "DIM out" && j.equipped.length >= 9 && j.parameters.mods.length > 0 && Object.keys(j.parameters.modsByBucket).length > 0);
+  await p.fill("#lo-dim", url); await p.click("#lo-dim-go"); await p.waitForTimeout(800);
+  check("dim link: and it imports back", /Imported DIM out/.test(await toastText(p)), await toastText(p));
+  check("extras: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
 // ---------- 3. Loadouts and max Power (sample data) ----------
 await section("Loadouts", async () => {
   const p = await open({ hash: "#loadouts" });

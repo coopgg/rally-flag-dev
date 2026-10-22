@@ -378,6 +378,32 @@
       state.focus = (OWNERS.slice().sort((a, b) => b.played - a.played)[0] || {}).id || "vault";
     JOURNAL_APPLIED = applyJournal();
     computeSets();
+    computeNew();
+  }
+  // "New" items (like DIM's): anything not in this browser's list of
+  // items already seen. The first visit counts everything as seen; opening
+  // an item, or Mark as seen, clears the marker.
+  const seenKey = () => "rallyflag_locker_seen:" + (PROFILE_PATH.split("/").pop() || "demo");
+  let NEW = new Set();
+  function saveSeen(ids){ try { localStorage.setItem(seenKey(), JSON.stringify(ids)); } catch (e){} }
+  function computeNew(){
+    let seen = null;
+    try { seen = JSON.parse(localStorage.getItem(seenKey()) || "null"); } catch (e){}
+    const ids = ITEMS.map(i => i.id);
+    if (!Array.isArray(seen)){ saveSeen(ids); NEW = new Set(); return; }
+    const had = new Set(seen);
+    NEW = new Set(ids.filter(id => !had.has(id)));
+  }
+  function markSeen(ids){
+    ids.forEach(id => NEW.delete(id));
+    saveSeen(ITEMS.map(i => i.id).filter(id => !NEW.has(id)));
+    renderNewBtn();
+  }
+  function renderNewBtn(){
+    const b = $("new-clear");
+    if (!b) return;
+    b.hidden = !NEW.size;
+    b.textContent = "Mark " + NEW.size + " new as seen";
   }
   let JOURNAL_APPLIED = 0;
 
@@ -663,6 +689,16 @@
   const SHARE_ID = (new URLSearchParams(location.search).get("share") || "").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 16);
   const SHARES = { count: null, asked: false, made: null, confirm: false }; // made: { lo, url } for the open loadout
   const shareLink = id => location.origin + location.pathname + "?share=" + id;
+  // A DIM loadout link (the format DIM's own "Copy link" makes, and that
+  // readDimLoadout reads): gear by id and hash, subclass and artifact with
+  // their choices, armor mods and per-slot shaders/ornaments.
+  function dimLink(lo){
+    const equipped = lo.items.map(x => ({ id: x.id || "0", hash: x.hash }))
+      .concat(lo.subclass ? [{ id: "0", hash: lo.subclass.hash, socketOverrides: lo.subclass.sockets || {} }] : [])
+      .concat(lo.artifact ? [{ id: "0", hash: lo.artifact.hash, socketOverrides: lo.artifact.sockets || {} }] : []);
+    const json = { name: lo.name, classType: lo.cls, equipped, unequipped: [], parameters: { mods: lo.mods || [], modsByBucket: lo.cosmetics || {} } };
+    return "https://app.destinyitemmanager.com/loadouts?loadout=" + encodeURIComponent(JSON.stringify(json));
+  }
   const shareable = lo => ({ name: lo.name, cls: lo.cls, items: lo.items.map(x => ({ hash: x.hash })), subclass: lo.subclass || null, artifact: lo.artifact || null, mods: lo.mods || [], cosmetics: lo.cosmetics || {} });
   async function makeShare(lo){
     const { data } = await syncFetch("POST", { loadout: shareable(lo) }, "shares");
@@ -1564,7 +1600,7 @@
     const box = $("view-loadouts"), list = readLoadouts();
     // A redraw replaces the buttons: keep keyboard focus on the same control.
     const was = box.contains(document.activeElement) ? document.activeElement : null;
-    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename", "data-game-edit", "data-game-snap", "data-lo-share", "data-lo-copy", "data-lo-edit"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
+    const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename", "data-game-edit", "data-game-snap", "data-lo-share", "data-lo-copy", "data-lo-edit", "data-lo-dim"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
       || (was && was.id ? "#" + was.id : null);
     const typed = { name: ($("lo-name") || {}).value || "", dim: ($("lo-dim") || {}).value || "", rename: $("lo-rename-input") ? $("lo-rename-input").value : null };
     const byId = new Map(ITEMS.map(i => [i.id, i]));
@@ -1618,6 +1654,7 @@
           '<button type="button" class="act-btn" data-lo-edit="' + lo.id + '">Edit<span class="sr-only"> ' + esc(lo.name) + "</span></button>" +
           (loRenaming === lo.id ? "" : '<button type="button" class="act-btn" data-lo-rename="' + lo.id + '">Rename<span class="sr-only"> ' + esc(lo.name) + "</span></button>") +
           '<button type="button" class="act-btn" data-lo-share="' + lo.id + '">Share<span class="sr-only"> ' + esc(lo.name) + "</span></button>" +
+          '<button type="button" class="act-btn" data-lo-dim="' + lo.id + '">Copy DIM link<span class="sr-only"> for ' + esc(lo.name) + "</span></button>" +
           '<button type="button" class="act-btn" data-lo-del="' + lo.id + '">Delete<span class="sr-only"> ' + esc(lo.name) + "</span></button></div>" + share };
     };
     // Grouped by class like DIM: your characters' classes first, then any class.
@@ -1790,6 +1827,13 @@
         toast((e && e.message) || "Couldn't make a share link.", "error");
         b.removeAttribute("aria-disabled"); b.firstChild.textContent = "Share";
       }
+    }));
+    box.querySelectorAll("[data-lo-dim]").forEach(b => b.addEventListener("click", async () => {
+      const lo = readLoadouts().find(x => x.id === b.dataset.loDim);
+      if (!lo) return;
+      const url = dimLink(lo);
+      try { await navigator.clipboard.writeText(url); toast("DIM link copied. Anyone with DIM can open it as a loadout.", "ok"); }
+      catch (e){ window.prompt("Copy this DIM link:", url); }
     }));
     box.querySelectorAll("[data-lo-copy]").forEach(b => b.addEventListener("click", async () => {
       const input = $("lo-share-url");
@@ -2128,7 +2172,7 @@
         crafted: i => !!(i.state & STATE_CRAFTED),
         dupe: i => ctx.dupes().get(i.hash) > 1, godroll: i => !!(i.roll && i.roll.full),
         set: i => !!i.set, tagged: i => !!TAGS[i.id], hasnote: i => !!NOTES[i.id],
-        inloadout: i => ctx.inLoadout().has(i.id), wishlist: i => { const w = wishMatch(i); return !!(w && w.full); }, haswishlist: i => !!wishOf(i), invault: i => i.owner === "vault", ornamented: i => !!i.ornament
+        inloadout: i => ctx.inLoadout().has(i.id), new: i => NEW.has(i.id), wishlist: i => { const w = wishMatch(i); return !!(w && w.full); }, haswishlist: i => !!wishOf(i), invault: i => i.owner === "vault", ornamented: i => !!i.ornament
       };
       return is[val] || ("is:" + val);
     }
@@ -2194,7 +2238,7 @@
   // Suggestions while typing: filter words, then perk names and item types.
   const FILTER_WORDS = ["is:weapon", "is:armor", "is:exotic", "is:legendary", "is:equipped", "is:locked", "is:unlocked", "is:masterwork", "is:crafted",
     "is:dupe", "is:godroll", "is:set", "is:tagged", "is:hasnote", "is:inloadout", "is:ornamented", "is:kinetic", "is:solar", "is:arc", "is:void", "is:stasis", "is:strand",
-    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "is:pve", "is:pvp", "is:wishlist", "is:haswishlist", "wish:>=", "tag:none", "tag:any",
+    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "is:new", "is:pve", "is:pvp", "is:wishlist", "is:haswishlist", "wish:>=", "tag:none", "tag:any",
     "in:vault", "in:titan", "in:hunter", "in:warlock", "class:titan", "class:hunter", "class:warlock", "class:any",
     "slot:kinetic", "slot:energy", "slot:power", "slot:helmet", "slot:gauntlets", "slot:chest", "slot:legs", "slot:classitem",
     "power:>", "power:<", "tier:>=", "tier:5", "stat:total:>=", "stat:weapons:>", "stat:health:>", "stat:class:>", "stat:grenade:>", "stat:super:>", "stat:melee:>",
@@ -2231,7 +2275,7 @@
     return '<div class="search-help panel-card" id="search-help" hidden><h2 class="dlg-label">Search filters</h2>' +
       '<p class="muted">Combine terms with spaces (all must match), <b>or</b>, brackets, and <b>-</b> or <b>not</b> to exclude. Put names with spaces in quotes.</p>' +
       '<ul class="search-examples">' + SEARCH_EXAMPLES.map(([q, what]) => '<li><button type="button" class="act-btn" data-search="' + esc(q) + '"><code translate="no">' + esc(q) + "</code></button><span>" + esc(what) + "</span></li>").join("") + "</ul>" +
-      '<p class="muted search-words"><b>is:</b> weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive), pve, pvp, wishlist (matches your wish list), haswishlist · <b>wish:</b> how many wish-list picks a copy has (wish:>=4) · ' +
+      '<p class="muted search-words"><b>is:</b> new, weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive), pve, pvp, wishlist (matches your wish list), haswishlist · <b>wish:</b> how many wish-list picks a copy has (wish:>=4) · ' +
         "<b>in:</b> vault, titan, hunter, warlock · <b>tag:</b> a tag, none, any · <b>class:</b> titan, hunter, warlock, any · <b>slot:</b> kinetic, energy, power, helmet, gauntlets, chest, legs, classitem · " +
         "<b>type:</b>, <b>name:</b>, <b>perk:</b>, <b>note:</b> text · <b>power:</b>, <b>tier:</b> a number with &gt;, &lt;, &gt;=, &lt;= · <b>stat:</b>total, weapons, health, class, grenade, super, melee or a weapon stat, then a number (stat:range:&gt;60)</p></div>";
   }
@@ -2465,6 +2509,7 @@
     const wish = wishMatch(item);
     const label = [d.n, d.y, orn ? "ornament " + orn.n : "", item.power ? "power " + item.power : "", item.tier ? "tier " + item.tier : "", mw ? "masterworked" : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
       item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : "",
+      d.t === 2 ? "stat total " + statTotal(item) : "", NEW.has(item.id) ? "new" : "",
       wish ? (wish.full ? "matches your wish list" : "has " + wish.n + " of " + wish.total + " wish-list picks") : "", TAGS[item.id] ? "tagged " + TAGS[item.id] : "", USE[item.id] ? "for " + useText(item.id) : "", NOTES[item.id] ? "note: " + NOTES[item.id] : ""].filter(Boolean).join(", ");
     const tag = TAGS[item.id], use = USE[item.id];
     return '<button type="button" class="item-tile ' + tierClass(d) + (mw ? " mw" : "") + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
@@ -2476,9 +2521,10 @@
       // Wish list: a bar along the top edge, as full as the match (green = all of it).
       (wish && wish.n ? '<span class="tile-wish' + (wish.full ? " full" : "") + '" style="--w:' + Math.round(wish.n / wish.total * 100) + '%" aria-hidden="true"></span>' : "") +
       (NOTES[item.id] ? '<span class="tile-note" aria-hidden="true"></span>' : "") +
-      (item.roll && item.roll.full || tag ? '<span class="tile-badges" aria-hidden="true">' + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
+      (item.roll && item.roll.full || tag || NEW.has(item.id) ? '<span class="tile-badges" aria-hidden="true">' + (NEW.has(item.id) ? '<span class="tile-new"></span>' : "") + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
         (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag ? '<span class="tile-badge tag-' + tag + '">' + (TAG_LIST.find(t => t[0] === tag) || [, , ""])[2] + "</span>" : "") + "</span>" : "") +
-      '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") + (item.power || "") + "</span>" +
+      '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") +
+        (d.t === 2 ? '<span class="tile-total">' + statTotal(item) + "</span>" : "") + (item.power || "") + "</span>" +
     "</button>";
   }
 
@@ -2615,7 +2661,7 @@
       chips + '</div><div class="pm-body" id="pm-body"' + (open ? "" : " hidden") + ">" + tiles + "</div></section>";
   }
 
-  function render(){ dupeCount = null; renderOwners(); renderSets(); renderItems(); }
+  function render(){ dupeCount = null; renderOwners(); renderSets(); renderItems(); renderNewBtn(); }
   WIDE.addEventListener("change", () => { if (ITEMS.length) render(); });
 
   // ---------------- actions (stage 2) ----------------
@@ -3258,9 +3304,28 @@
     $("dlg-name").focus();
   }
 
+  // Infusion fuel (DIM's infusion finder): your higher-Power items of the
+  // same infusion category (Bungie's; for weapons that's roughly the slot),
+  // Junk-tagged and unlocked ones first.
+  function infuseFuel(item){
+    const cat = item.def.q;
+    return ITEMS.filter(i => i !== item && i.power > item.power && (cat ? i.def.q === cat : i.def.b === item.def.b))
+      .sort((a, b) => ((TAGS[b.id] === "junk") - (TAGS[a.id] === "junk")) || (!(b.state & STATE_LOCKED) - !(a.state & STATE_LOCKED)) || b.power - a.power).slice(0, 3);
+  }
+  function infuseHtml(item){
+    const fuel = infuseFuel(item);
+    if (!fuel.length) return "";
+    return '<div class="act-row"><span class="act-label">Infuse</span>' + fuel.map(i => '<button type="button" class="act-btn" data-fuel="' + i.id + '"><img src="' + esc(img(iconOf(i))) + '" alt="" width="20" height="20">' +
+      esc(i.def.n) + " " + i.power + ' <span class="fuel-gain">+' + (i.power - item.power) + '</span><span class="sr-only"> Power, in ' + esc(ownerLabel(i.owner)) + (TAGS[i.id] === "junk" ? ", tagged Junk" : "") + "</span></button>").join("") + "</div>";
+  }
+
   function openItem(id){
     const item = ITEMS.find(i => i.id === id);
     if (!item) return;
+    if (NEW.has(id)){
+      markSeen([id]);
+      document.querySelectorAll('#buckets .item-tile[data-id="' + id + '"]').forEach(t => { const hidden = t.hidden; t.outerHTML = tileHtml(item); if (hidden) document.querySelector('#buckets .item-tile[data-id="' + id + '"]:not([hidden])').hidden = true; });
+    }
     const d = item.def, dmg = DB.damage[item.damage];
     const ourPerks = new Set(item.roll ? item.roll.weapon.perkHashes : []);
     const eyebrow = (d.r === 6 ? "Exotic" : "Legendary") + " · " + (d.y || "");
@@ -3330,6 +3395,7 @@
         // Icon shows what a tap does: a closed lock locks it, an open lock unlocks it.
         '<button type="button" class="act-btn lock icon-only" data-act="lock" aria-label="' + (item.state & STATE_LOCKED ? "Unlock (it's locked)" : "Lock") + '" title="' + (item.state & STATE_LOCKED ? "Unlock" : "Lock") + '">' + (item.state & STATE_LOCKED ? ICON_UNLOCK : ICON_LOCK) + "</button></div>" +
       '<div class="act-row"><span class="act-label">Compare</span><button type="button" class="act-btn" id="open-compare">' + (copiesOf(item).length > 1 ? "Compare " + copiesOf(item).length + " copies" : "Compare with similar") + "</button></div>" +
+      infuseHtml(item) +
       '<div class="act-row"><span class="act-label">Tag</span>' +
         TAG_LIST.map(([t, name, ico]) => '<button type="button" class="act-btn tag" data-tag="' + t + '" aria-pressed="' + (TAGS[item.id] === t) + '">' + (ico.charAt(0) === "<" ? ico : ico + " ") + name + "</button>").join("") + "</div>" +
       '<div class="act-row"><span class="act-label">Mode</span>' +
@@ -3431,6 +3497,7 @@
       const again = dlg.querySelector('[data-use="' + b.dataset.use + '"]');
       if (again) again.focus();
     }));
+    dlg.querySelectorAll("[data-fuel]").forEach(b => b.addEventListener("click", () => openItem(b.dataset.fuel)));
     const cmp = $("open-compare");
     if (cmp) cmp.addEventListener("click", () => openCompare(item.id));
     $("note-form").addEventListener("submit", e => {
@@ -3558,6 +3625,7 @@
       toast("Showing " + SHOWN.length + " for " + b.dataset.search, "ok");
     });
     $("bulk-row").addEventListener("click", bulkClick);
+    $("new-clear").addEventListener("click", () => { markSeen([...NEW]); renderItems(); toast("Marked everything as seen.", "ok"); });
     wireTable();
     $("buckets").addEventListener("click", e => {
       const pmTile = e.target.closest("[data-pm]");

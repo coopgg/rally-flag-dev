@@ -501,6 +501,12 @@
   .opt-piece > span{ display:flex; flex-direction:column; min-width:0; }
   .opt-piece b{ font-weight:600; overflow-wrap:anywhere; }
   .opt-piece small{ color:var(--text-dim); font-size:12px; }
+  /* New since last visit: a small dot, first of the top-right badges. */
+  .tile-new{ align-self:center; width:10px; height:10px; border-radius:50%; background:#4fd1ff; box-shadow:0 0 0 2px rgba(0,0,0,0.7); }
+  /* Armor: stat total on the left of the Power strip. */
+  .tile-total{ float:left; font-weight:500; color:#aeb7cf; }
+  .item-tile.mw .tile-total{ color:#4a3a00; }
+  .fuel-gain{ color:var(--accent-text); font-weight:600; }
   /* Organizer: the Gear tab as a table */
   .table-mode [data-kind="type"], .table-mode .chip-sep, .table-mode .sort-label, .table-mode #fold-all{ display:none; }
   .org-kinds{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:16px 0 10px; }
@@ -825,7 +831,7 @@
             <option value="newest">Newest</option>
             <option value="stats">Armor stat total</option>
           </select></label>
-          <span class="chip-actions"><button type="button" class="fold-all" id="tools-btn" aria-expanded="false" aria-controls="tools-panel">Tools</button><button type="button" class="fold-all" id="locker-refresh">Refresh</button><button type="button" class="fold-all" id="fold-all">Collapse all</button></span>
+          <span class="chip-actions"><button type="button" class="fold-all" id="new-clear" hidden></button><button type="button" class="fold-all" id="tools-btn" aria-expanded="false" aria-controls="tools-panel">Tools</button><button type="button" class="fold-all" id="locker-refresh">Refresh</button><button type="button" class="fold-all" id="fold-all">Collapse all</button></span>
         </div>
       </div>
     </div>

@@ -15,6 +15,7 @@
    items: hash -> { n name, i icon, w watermark, t itemType, s subType,
      r tierType, b bucketHash, c classType, d damageTypeHash,
      y itemTypeDisplayName, x description (plugs), o 1 = ornament, sh 1 = shader,
+     q infusion category (weapons, armor),
      k armor mod kind }; currencies keep n, i.
    buckets: hash -> { n name, c capacity } (vault space in the banner).
    loadouts: { names: hash -> name, icons: hash -> path, colors: hash -> path,
@@ -23,7 +24,7 @@
 const BUNGIE = "https://www.bungie.net";
 const DB_NAME = "rallyflag-locker", STORE = "manifest", KEY = "lite";
 // Bump when the stored shape changes, so cached copies are rebuilt.
-const SCHEMA = 6;
+const SCHEMA = 7;
 
 function idb(){
   return new Promise((resolve, reject) => {
@@ -80,6 +81,8 @@ function trimItems(lite){
       e.c = v.classType; e.y = v.itemTypeDisplayName;
       if (v.defaultDamageTypeHash) e.d = v.defaultDamageTypeHash;
       if (v.iconWatermark) e.w = v.iconWatermark;
+      // Infusion: an item takes Power from another of the same category.
+      if (v.quality && v.quality.infusionCategoryHash) e.q = v.quality.infusionCategoryHash;
     } else {
       e.y = v.itemTypeDisplayName || "";
       if (dp.description) e.x = dp.description.slice(0, 300);
