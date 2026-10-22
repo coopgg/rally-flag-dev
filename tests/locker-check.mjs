@@ -542,14 +542,15 @@ await section("Your Week", async () => {
   check("week: this week's featured raids and dungeons, three of each", titles.length === 6 && titles.includes("The Desert Perpetual") && titles.includes("Equilibrium"), titles.join(", "));
   const chips = await p.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-chars:not(.yw-master) .yw-char")].map(x => x.textContent)));
   check("week: each featured activity shows every character's clear since reset", chips.every(c => c.length === 3) && chips.flat().some(t => /, cleared$/.test(t)) && chips.flat().some(t => /not cleared yet$/.test(t)));
-  check("week: chips are the class with a mark, green ✓ when cleared and red ✕ when not", await p.evaluate(() => [...document.querySelectorAll(".yw-char")].every(c => {
-    const mark = c.querySelector(".yw-mark").textContent, shown = c.querySelector(".yw-cname").textContent, bg = getComputedStyle(c).backgroundColor;
-    return /^(Titan|Hunter|Warlock)$/.test(shown) && (c.classList.contains("done") ? bg === "rgb(30, 122, 60)" && mark === "✓" : bg === "rgb(179, 38, 30)" && mark === "✕");
+  check("week: chips are a mark and the class initial, muted green ✓ when cleared and red ✕ when not", await p.evaluate(() => [...document.querySelectorAll(".yw-char")].every(c => {
+    const mark = c.querySelector(".yw-mark").textContent, shown = c.querySelector(".yw-ci").textContent, bg = getComputedStyle(c).backgroundColor;
+    return /^[THW]$/.test(shown) && /^(Titan|Hunter|Warlock)/.test(c.querySelector(".sr-only").textContent) && (c.classList.contains("done") ? bg === "rgb(70, 112, 90)" && mark === "✓" : bg === "rgb(148, 80, 74)" && mark === "✕");
   })));
   // Master clears: a labelled second row for every raid and dungeon with a Master version (14),
   // ticked only by Master clears (the sample has King's Fall: Master on the first two characters).
   const kf = await p.evaluate(() => { const box = [...document.querySelectorAll(".featured-card, .yw-tile")].find(x => /King.s Fall/.test(x.textContent)); return [...box.querySelectorAll(".yw-master .yw-char")].map(c => c.classList.contains("done")); });
-  check("week: activities with a Master version get a Master row, ticked by Master clears only", await p.locator(".yw-master").count() === 14 && kf.join() === "true,true,false" &&
+  check("week: activities with a Master version get rows labelled N and M, M ticked by Master clears only", await p.locator(".yw-master").count() === 14 && kf.join() === "true,true,false" &&
+    await p.evaluate(() => [...document.querySelectorAll(".yw-master")].every(r => r.previousElementSibling.querySelector(".yw-row-label").textContent === "N" && r.querySelector(".yw-row-label").textContent === "M")) &&
     await p.evaluate(() => [...document.querySelectorAll(".featured-card, .yw-tile")].filter(x => /Garden of Salvation|Last Wish/.test(x.textContent)).every(x => !x.querySelector(".yw-master"))), kf.join());
   const idx = await p.evaluate(() => window.ActivityIndex.raids.length + window.ActivityIndex.dungeons.length);
   check("week: the rest shows every raid and dungeon not featured as art tiles with the same chips", await p.locator(".yw-tile").count() === idx - 6 && await p.locator(".yw-tile .yw-chars:not(.yw-master) .yw-char").count() === (idx - 6) * 3 && await p.locator(".yw-tile .yw-char.done").count() > 0 && await p.locator('a.yw-tile[href*="raid-"]').count() > 0);
@@ -564,7 +565,7 @@ await section("Your Week", async () => {
   check("week: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
   const ph = await open({ width: 390, url: BASE + "your-week.html?demo", ready: "#yw-app .yw-tile" });
-  check("week: on a phone the small tiles show ✓/✕ and the class initial, all on one line", await ph.evaluate(() => [...document.querySelectorAll(".yw-tile .yw-chars")].every(r => { const t = [...r.querySelectorAll(".yw-char")].map(c => c.getBoundingClientRect().top); return Math.max(...t) - Math.min(...t) < 2; }) && /^[THW]$/.test(document.querySelector(".yw-tile .yw-cshort").textContent) && getComputedStyle(document.querySelector(".yw-tile .yw-cname")).display === "none"));
+  check("week: on a phone every row of chips stays on one line", await ph.evaluate(() => [...document.querySelectorAll(".yw-chars")].every(r => { const t = [...r.querySelectorAll(".yw-char")].map(c => c.getBoundingClientRect().top); return Math.max(...t) - Math.min(...t) < 2; })));
   await ph.context_.close();
   // Signed out: an explanation, a sign-in and the sample.
   const so = await open({ signedOut: true, url: BASE + "your-week.html" });

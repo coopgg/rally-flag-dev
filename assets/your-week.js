@@ -136,7 +136,8 @@
       }
       return out;
     };
-    const clearsHtml = item => charsHtml(cleared(item)) + (masterOf.has(item.name.toLowerCase()) ? charsHtml(cleared(item, true), true) : "");
+    // With a Master version: two rows, N (normal, any clear) and M (Master only).
+    const clearsHtml = item => masterOf.has(item.name.toLowerCase()) ? charsHtml(cleared(item), "N") + charsHtml(cleared(item, true), "M") : charsHtml(cleared(item));
     const group = (label, kind, slugs, list, always) => {
       const by = new Map(list.map(x => [x.slug, x]));
       const cards = slugs.map(s => by.get(s)).filter(Boolean).map(item => {
@@ -159,20 +160,18 @@
     const missing = OWNERS.some(o => DATA.history[o.id] == null);
     return '<section class="pg-section" aria-labelledby="yw-h-featured"><h2 class="dlg-label" id="yw-h-featured">Featured this week</h2>' +
       group("Raids", "Raid", wk.raids, idx.raids, R.ALWAYS_FEATURED_RAID_SLUG) + group("Dungeons", "Dungeon", wk.dungeons, idx.dungeons, R.ALWAYS_FEATURED_DUNGEON_SLUG) +
-      '<p class="yw-note">✓ Cleared since the weekly reset. ✕ Not yet. The Master row counts only clears on Master difficulty. From each character\'s activity history.' + (missing ? " Bungie didn't share some characters' history (a privacy setting can hide it), shown grey with a ?." : "") + "</p></section>" +
+      '<p class="yw-note">✓ Cleared since the weekly reset, ✕ not yet, for your Titan (T), Hunter (H) and Warlock (W). N counts any clear, M only clears on Master. From each character\'s activity history.' + (missing ? " Bungie didn't share some characters' history (a privacy setting can hide it), shown grey with a ?." : "") + "</p></section>" +
       '<section class="pg-section" aria-labelledby="yw-h-rest"><h2 class="dlg-label" id="yw-h-rest">The rest</h2>' +
       rest("Raids", "raid", wk.raids, idx.raids) + rest("Dungeons", "dungeon", wk.dungeons, idx.dungeons) + "</section>";
   }
-  // One chip per character: green ✓ cleared, red ✕ not yet, grey ? unknown
-  // (the mark is there for colour-blind eyes, the words for screen readers).
-  // master: the Master row, labelled ("M" in the small tiles on phones).
-  function charsHtml(c, master){
-    return '<div class="yw-chars' + (master ? " yw-master" : "") + '">' + (master ? '<span class="yw-row-label" aria-hidden="true"><span class="yw-cname">Master</span><span class="yw-cshort">M</span></span>' : "") + OWNERS.map(o => {
+  // One chip per character: ✓/✕ and the class initial on green / red (grey
+  // ? when unknown); the mark is for colour-blind eyes, the hidden text
+  // gives screen readers the whole class name. row: "N" or "M" label.
+  function charsHtml(c, row){
+    return '<div class="yw-chars' + (row === "M" ? " yw-master" : "") + '">' + (row ? '<span class="yw-row-label" aria-hidden="true">' + row + "</span>" : "") + OWNERS.map(o => {
       const v = c[o.id], state = v == null ? "unknown" : v ? "done" : "todo";
-      return '<span class="yw-char ' + state + '"><span class="yw-mark" aria-hidden="true">' + (v == null ? "?" : v ? "✓" : "✕") + "</span>" +
-        // Phones show the initial in the small tiles; screen readers get the whole name either way.
-        '<span class="yw-cname" aria-hidden="true">' + esc(o.name) + '</span><span class="yw-cshort" aria-hidden="true">' + esc(o.name.charAt(0)) + "</span>" +
-        '<span class="sr-only">' + esc(o.name) + (master ? ", Master" : "") + (v == null ? ", unknown" : v ? ", cleared" : ", not cleared yet") + "</span></span>";
+      return '<span class="yw-char ' + state + '"><span class="yw-mark" aria-hidden="true">' + (v == null ? "?" : v ? "✓" : "✕") + '</span><span class="yw-ci" aria-hidden="true">' + esc(o.name.charAt(0)) + "</span>" +
+        '<span class="sr-only">' + esc(o.name) + (row === "M" ? ", Master" : "") + (v == null ? ", unknown" : v ? ", cleared" : ", not cleared yet") + "</span></span>";
     }).join("") + "</div>";
   }
   function draw(){
