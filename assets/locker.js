@@ -56,6 +56,13 @@
   // DIM's tags. Junk sorts last and is what Junk cleanup sends; Favorite
   // and Keep protect an item when farming or loadouts need room.
   const TAG_LIST = [["favorite", "Favorite", "♥"], ["keep", "Keep", ICON_KEEP], ["junk", "Junk", ICON_TRASH], ["infuse", "Infuse", ICON_INFUSE], ["archive", "Archive", ICON_ARCHIVE]];
+  // PvE / PvP marks, apart from tags: an item can be Favorite and PvP, or
+  // both PvE and PvP. USE[id] is "pve", "pvp" or "both".
+  const ICON_PVE = svg('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>');
+  const ICON_PVP = svg('<path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M16 16l4 4M19 21l2-2M9.5 17.5L21 6V3h-3L6.5 14.5M11 19l-6-6M8 16l-4 4M5 21l-2-2"/>');
+  const USE_LIST = [["pve", "PvE", ICON_PVE, "Vanguard, raids, dungeons"], ["pvp", "PvP", ICON_PVP, "Crucible, Trials, Gambit"]];
+  const hasUse = (id, u) => USE[id] === u || USE[id] === "both";
+  const useText = id => USE[id] === "both" ? "PvE and PvP" : USE[id] === "pve" ? "PvE" : USE[id] === "pvp" ? "PvP" : "";
   const ICON_LOCK = svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>');
   const ICON_UNLOCK = svg('<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 7.5-2"/>');
   const INVENTORY_CAP = 9; // Bungie: 9 unequipped items per weapon/armor slot on a character
@@ -148,7 +155,9 @@
   // A short note per item (like DIM's), stored and synced with its tag.
   const NOTE_KEY = "rallyflag_locker_notes";
   const NOTES = (() => { try { return JSON.parse(localStorage.getItem(NOTE_KEY) || "{}"); } catch (e){ return {}; } })();
-  function saveTags(){ try { localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); localStorage.setItem(TAG_TIME_KEY, JSON.stringify(TAG_AT)); localStorage.setItem(NOTE_KEY, JSON.stringify(NOTES)); } catch (e){} }
+  const USE_KEY = "rallyflag_locker_use";
+  const USE = (() => { try { return JSON.parse(localStorage.getItem(USE_KEY) || "{}"); } catch (e){ return {}; } })();
+  function saveTags(){ try { localStorage.setItem(USE_KEY, JSON.stringify(USE)); localStorage.setItem(TAG_KEY, JSON.stringify(TAGS)); localStorage.setItem(TAG_TIME_KEY, JSON.stringify(TAG_AT)); localStorage.setItem(NOTE_KEY, JSON.stringify(NOTES)); } catch (e){} }
   function setNote(id, text){
     text = String(text || "").trim().slice(0, 120);
     if ((NOTES[id] || "") === text) return false;
@@ -156,6 +165,17 @@
     TAG_AT[id] = Date.now();
     saveTags(); tagsChanged();
     return true;
+  }
+  // PvE/PvP: each button toggles its own half.
+  function setUse(id, value){
+    if ((USE[id] || "") === value) return;
+    value ? (USE[id] = value) : delete USE[id];
+    TAG_AT[id] = Date.now();
+    saveTags(); tagsChanged();
+  }
+  function toggleUse(id, u){
+    const pve = u === "pve" ? !hasUse(id, "pve") : hasUse(id, "pve"), pvp = u === "pvp" ? !hasUse(id, "pvp") : hasUse(id, "pvp");
+    setUse(id, pve && pvp ? "both" : pve ? "pve" : pvp ? "pvp" : "");
   }
   function toggleTag(id, tag){
     TAGS[id] === tag ? delete TAGS[id] : (TAGS[id] = tag);
@@ -460,24 +480,25 @@
   // Tags as synced: itemId -> { t: "favorite" | "junk" | "" (removed), at }.
   function readTagState(){
     const out = {};
-    for (const id in TAG_AT) out[id] = { t: TAGS[id] || "", n: NOTES[id] || "", at: TAG_AT[id] };
-    for (const id in TAGS) if (!out[id]) out[id] = { t: TAGS[id], n: NOTES[id] || "", at: 1 }; // tagged before tags synced
+    for (const id in TAG_AT) out[id] = { t: TAGS[id] || "", n: NOTES[id] || "", u: USE[id] || "", at: TAG_AT[id] };
+    for (const id in TAGS) if (!out[id]) out[id] = { t: TAGS[id], n: NOTES[id] || "", u: USE[id] || "", at: 1 }; // tagged before tags synced
     return out;
   }
   function writeTagState(map){
     for (const id of Object.keys(TAGS)) if (!map[id] || !map[id].t) delete TAGS[id];
     for (const id of Object.keys(NOTES)) if (!map[id] || !map[id].n) delete NOTES[id];
+    for (const id of Object.keys(USE)) if (!map[id] || !map[id].u) delete USE[id];
     for (const id of Object.keys(TAG_AT)) delete TAG_AT[id];
-    for (const id in map){ if (map[id].t) TAGS[id] = map[id].t; if (map[id].n) NOTES[id] = map[id].n; TAG_AT[id] = map[id].at; }
+    for (const id in map){ if (map[id].t) TAGS[id] = map[id].t; if (map[id].n) NOTES[id] = map[id].n; if (map[id].u) USE[id] = map[id].u; TAG_AT[id] = map[id].at; }
     saveTags();
   }
   function mergeTags(a, b){
     const out = Object.assign({}, a), cut = Date.now() - SYNC_KEEP_DELETED;
     for (const id in b) if (!out[id] || (b[id].at || 0) > (out[id].at || 0)) out[id] = b[id];
-    for (const id in out) if (!out[id].t && !out[id].n && out[id].at < cut) delete out[id];
+    for (const id in out) if (!out[id].t && !out[id].n && !out[id].u && out[id].at < cut) delete out[id];
     return out;
   }
-  const tagKey = tags => JSON.stringify(Object.keys(tags).sort().map(id => id + ":" + tags[id].t + ":" + (tags[id].n || "") + ":" + tags[id].at));
+  const tagKey = tags => JSON.stringify(Object.keys(tags).sort().map(id => id + ":" + tags[id].t + ":" + (tags[id].n || "") + ":" + (tags[id].u || "") + ":" + tags[id].at));
   function tagsChanged(){ const m = readSyncMeta(); m.dirty = true; writeSyncMeta(m); syncGen++; schedulePush(); }
   const localState = () => ({ loadouts: readLoadouts(), deleted: readSyncMeta().deleted, tags: readTagState() });
   const serverState = d => ({ loadouts: d.loadouts || [], deleted: d.deleted || {}, tags: d.tags || {} });
@@ -1858,7 +1879,8 @@
     if (state.flags.has("godroll") && !(item.roll && item.roll.full)) return false;
     if (state.flags.has("set") && !item.set) return false;
     if (state.flags.has("equipped") && !item.equipped) return false;
-    if (state.tag === "any" ? !TAGS[item.id] : state.tag === "note" ? !NOTES[item.id] : state.tag && TAGS[item.id] !== state.tag) return false;
+    if (state.tag === "pve" || state.tag === "pvp"){ if (!hasUse(item.id, state.tag)) return false; }
+    else if (state.tag === "any" ? !TAGS[item.id] : state.tag === "note" ? !NOTES[item.id] : state.tag && TAGS[item.id] !== state.tag) return false;
     return true;
   }
 
@@ -1900,6 +1922,8 @@
       if (dmg) return item => item.def.t === 3 && String(item.damage) === dmg;
       const tags = TAG_LIST.map(t => t[0]);
       if (tags.includes(val)) return item => TAGS[item.id] === val;
+      const use = { pve: "pve", vanguard: "pve", pvp: "pvp", crucible: "pvp" }[val];
+      if (use) return item => hasUse(item.id, use);
       const is = {
         weapon: i => i.def.t === 3, armor: i => i.def.t === 2,
         equipped: i => i.equipped, unequipped: i => !i.equipped,
@@ -1973,7 +1997,7 @@
   // Suggestions while typing: filter words, then perk names and item types.
   const FILTER_WORDS = ["is:weapon", "is:armor", "is:exotic", "is:legendary", "is:equipped", "is:locked", "is:unlocked", "is:masterwork", "is:crafted",
     "is:dupe", "is:godroll", "is:set", "is:tagged", "is:hasnote", "is:inloadout", "is:ornamented", "is:kinetic", "is:solar", "is:arc", "is:void", "is:stasis", "is:strand",
-    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "tag:none", "tag:any",
+    "is:favorite", "is:keep", "is:junk", "is:infuse", "is:archive", "is:pve", "is:pvp", "tag:none", "tag:any",
     "in:vault", "in:titan", "in:hunter", "in:warlock", "class:titan", "class:hunter", "class:warlock", "class:any",
     "slot:kinetic", "slot:energy", "slot:power", "slot:helmet", "slot:gauntlets", "slot:chest", "slot:legs", "slot:classitem",
     "power:>", "power:<", "tier:>=", "tier:5", "stat:total:>=", "stat:weapons:>", "stat:health:>", "stat:class:>", "stat:grenade:>", "stat:super:>", "stat:melee:>",
@@ -1997,6 +2021,7 @@
   const SEARCH_EXAMPLES = [
     ["is:dupe -is:godroll", "Duplicates that aren't our God Roll"],
     ["is:weapon is:junk", "Weapons you tagged Junk"],
+    ["is:pvp -is:pve", "Gear you marked PvP only"],
     ['perk:"kill clip" type:"hand cannon"', "Hand cannons that have or can switch to Kill Clip"],
     ["is:armor stat:total:>=65", "Armor with a stat total of 65 or more"],
     ["in:vault is:exotic is:dupe", "Exotics you have more than one of, in the vault"],
@@ -2008,7 +2033,7 @@
     return '<div class="search-help panel-card" id="search-help" hidden><h2 class="dlg-label">Search filters</h2>' +
       '<p class="muted">Combine terms with spaces (all must match), <b>or</b>, brackets, and <b>-</b> or <b>not</b> to exclude. Put names with spaces in quotes.</p>' +
       '<ul class="search-examples">' + SEARCH_EXAMPLES.map(([q, what]) => '<li><button type="button" class="act-btn" data-search="' + esc(q) + '"><code translate="no">' + esc(q) + "</code></button><span>" + esc(what) + "</span></li>").join("") + "</ul>" +
-      '<p class="muted search-words"><b>is:</b> weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive) · ' +
+      '<p class="muted search-words"><b>is:</b> weapon, armor, exotic, legendary, equipped, locked, unlocked, masterwork, crafted, dupe, godroll, set, tagged, hasnote, inloadout, ornamented, a damage type (solar, arc, void, stasis, strand, kinetic), a tag (favorite, keep, junk, infuse, archive), pve, pvp · ' +
         "<b>in:</b> vault, titan, hunter, warlock · <b>tag:</b> a tag, none, any · <b>class:</b> titan, hunter, warlock, any · <b>slot:</b> kinetic, energy, power, helmet, gauntlets, chest, legs, classitem · " +
         "<b>type:</b>, <b>name:</b>, <b>perk:</b>, <b>note:</b> text · <b>power:</b>, <b>tier:</b> a number with &gt;, &lt;, &gt;=, &lt;= · <b>stat:</b>total, weapons, health, class, grenade, super, melee or a weapon stat, then a number (stat:range:&gt;60)</p></div>";
   }
@@ -2028,7 +2053,8 @@
     row.hidden = false;
     row.innerHTML = '<span class="bulk-count">' + items + " shown:</span>" +
       '<span class="bulk-group"><label class="bulk-field" for="bulk-tag">Tag as</label><select class="chip chip-select" id="bulk-tag">' +
-        TAG_LIST.map(([t, name]) => '<option value="' + t + '">' + esc(name) + "</option>").join("") + '<option value="">No tag</option></select>' +
+        '<optgroup label="Tag">' + TAG_LIST.map(([t, name]) => '<option value="' + t + '">' + esc(name) + "</option>").join("") + '<option value="">No tag</option></optgroup>' +
+        '<optgroup label="Use for"><option value="use:pve">PvE</option><option value="use:pvp">PvP</option><option value="use:both">PvE and PvP</option><option value="use:">Neither PvE nor PvP</option></optgroup></select>' +
         '<button type="button" class="act-btn" id="bulk-tag-go">Tag ' + items + "</button></span>" +
       '<span class="bulk-group"><button type="button" class="act-btn" id="bulk-lock"' + (unlocked ? "" : ' aria-disabled="true"') + ">Lock " + unlocked + "</button>" +
         '<button type="button" class="act-btn" id="bulk-unlock"' + (n - unlocked ? "" : ' aria-disabled="true"') + ">Unlock " + (n - unlocked) + "</button></span>" +
@@ -2051,6 +2077,15 @@
     const list = SHOWN.slice(), n = list.length;
     if (b.id === "bulk-tag-go"){
       const tag = $("bulk-tag").value, name = tag ? (TAG_LIST.find(t => t[0] === tag) || [, tag])[1] : "";
+      if (tag.startsWith("use:")){
+        const u = tag.slice(4), what = u === "both" ? "PvE and PvP" : u === "pve" ? "PvE" : u === "pvp" ? "PvP" : "";
+        if (!bulkConfirm(b, n, what ? "mark " + n + " " + what : "clear PvE/PvP on " + n)) return;
+        const now = Date.now();
+        for (const i of list){ u ? (USE[i.id] = u) : delete USE[i.id]; TAG_AT[i.id] = now; }
+        saveTags(); tagsChanged(); renderItems();
+        toast(what ? "Marked " + n + " item" + (n === 1 ? "" : "s") + " " + what + "." : "Cleared PvE/PvP on " + n + " item" + (n === 1 ? "" : "s") + ".", "ok");
+        return;
+      }
       if (!bulkConfirm(b, n, tag ? "tag " + n + " as " + name : "remove tags from " + n)) return;
       const now = Date.now();
       for (const i of list){ tag ? (TAGS[i.id] = tag) : delete TAGS[i.id]; TAG_AT[i.id] = now; }
@@ -2124,13 +2159,14 @@
     const orn = item.ornament && DB.items[item.ornament];
     const label = [d.n, d.y, orn ? "ornament " + orn.n : "", item.power ? "power " + item.power : "", item.tier ? "tier " + item.tier : "", mw ? "masterworked" : "", ownerLabel(item.owner) + (item.equipped ? ", equipped" : ""),
       item.roll && item.roll.full ? "matches our God Roll" : "", item.set ? "part of a set" : "",
-      TAGS[item.id] ? "tagged " + TAGS[item.id] : "", NOTES[item.id] ? "note: " + NOTES[item.id] : ""].filter(Boolean).join(", ");
-    const tag = TAGS[item.id];
+      TAGS[item.id] ? "tagged " + TAGS[item.id] : "", USE[item.id] ? "for " + useText(item.id) : "", NOTES[item.id] ? "note: " + NOTES[item.id] : ""].filter(Boolean).join(", ");
+    const tag = TAGS[item.id], use = USE[item.id];
     return '<button type="button" class="item-tile ' + tierClass(d) + (mw ? " mw" : "") + (item.equipped ? " equipped" : "") + (tag ? " tag-" + tag : "") + '" data-id="' + item.id + '" draggable="true" aria-label="' + esc(label) + '">' +
       '<img class="icon" src="' + esc(img(iconOf(item))) + '" alt="" loading="lazy" width="64" height="64">' +
       (d.w ? '<img class="wm" src="' + esc(img(d.w)) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (mw ? '<img class="ov" src="' + esc(img(MW_OVERLAY[d.r === 6 ? 6 : 5])) + '" alt="" loading="lazy" width="64" height="64">' : "") +
       (item.tier >= 1 && item.tier <= 5 ? tierPips(item.tier) : "") +
+      (use ? '<span class="tile-use" aria-hidden="true">' + (hasUse(item.id, "pve") ? '<span class="tile-badge use-pve">' + ICON_PVE + "</span>" : "") + (hasUse(item.id, "pvp") ? '<span class="tile-badge use-pvp">' + ICON_PVP + "</span>" : "") + "</span>" : "") +
       (item.roll && item.roll.full || tag || NOTES[item.id] ? '<span class="tile-badges" aria-hidden="true">' + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : "") +
         (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag ? '<span class="tile-badge tag-' + tag + '">' + (TAG_LIST.find(t => t[0] === tag) || [, , ""])[2] + "</span>" : "") +
         (NOTES[item.id] ? '<span class="tile-badge note">' + ICON_NOTE + "</span>" : "") + "</span>" : "") +
@@ -2414,7 +2450,7 @@
       else {
         // Redraw with fresh data but keep the open perk/mod (and its list) and focus.
         const pressed = dlg.querySelector('[data-plug][aria-pressed="true"]'), act = document.activeElement;
-        const key = el => el && el.dataset && ["socket", "modPick", "act", "tag"].map(k => el.dataset[k] != null ? "[data-" + k.replace(/[A-Z]/g, c => "-" + c.toLowerCase()) + '="' + el.dataset[k] + '"]' : "").join("") + (el.dataset.plug ? '[data-plug="' + el.dataset.plug + '"]' : "") + (el.dataset.to ? '[data-to="' + el.dataset.to + '"]' : "");
+        const key = el => el && el.dataset && ["socket", "modPick", "act", "tag", "use"].map(k => el.dataset[k] != null ? "[data-" + k.replace(/[A-Z]/g, c => "-" + c.toLowerCase()) + '="' + el.dataset[k] + '"]' : "").join("") + (el.dataset.plug ? '[data-plug="' + el.dataset.plug + '"]' : "") + (el.dataset.to ? '[data-to="' + el.dataset.to + '"]' : "");
         const pk = pressed && key(pressed), ak = act && dlg.contains(act) ? (act.id ? "#" + act.id : key(act)) : null;
         openItem(dlg.dataset.item);
         const again = pk && dlg.querySelector(pk); if (again) again.click();
@@ -2590,6 +2626,7 @@
       row("Tier", copies.map(i => i.tier ? String(i.tier) : "–")),
       row("Masterwork", copies.map(i => i.state & STATE_MASTERWORK ? "Yes" : "No")),
       row("Tag", copies.map(i => TAGS[i.id] ? esc((TAG_LIST.find(t => t[0] === TAGS[i.id]) || [, TAGS[i.id]])[1]) : "–")),
+      row("Use for", copies.map(i => useText(i.id) || "–")),
       weapon ? row("Perks", copies.map(perks)) : ""
     ].concat(statRows).join("");
     const dlg = $("item-dialog");
@@ -2679,6 +2716,8 @@
       (copiesOf(item).length > 1 ? '<div class="act-row"><span class="act-label">Copies</span><button type="button" class="act-btn" id="open-compare">Compare ' + copiesOf(item).length + " copies</button></div>" : "") +
       '<div class="act-row"><span class="act-label">Tag</span>' +
         TAG_LIST.map(([t, name, ico]) => '<button type="button" class="act-btn tag" data-tag="' + t + '" aria-pressed="' + (TAGS[item.id] === t) + '">' + (ico.charAt(0) === "<" ? ico : ico + " ") + name + "</button>").join("") + "</div>" +
+      '<div class="act-row"><span class="act-label">Mode</span>' +
+        USE_LIST.map(([u, name, ico, what]) => '<button type="button" class="act-btn tag use-' + u + '" data-use="' + u + '" aria-pressed="' + hasUse(item.id, u) + '" title="' + what + '">' + ico + name + '<span class="sr-only"> (' + what + ")</span></button>").join("") + "</div>" +
       '<form class="act-row note-row" id="note-form"><label class="act-label" for="item-note">Note</label>' +
         '<input type="text" id="item-note" maxlength="120" value="' + esc(NOTES[item.id] || "") + '" placeholder="e.g. PvE roll, keep for Onslaught" autocomplete="off">' +
         '<button type="submit" class="act-btn">Save note</button></form></div>';
@@ -2754,13 +2793,23 @@
     const redrawTile = () => {
       const old = document.querySelectorAll('#buckets .item-tile[data-id="' + item.id + '"]');
       if (state.tag || !old.length) renderItems();
-      else old.forEach(t => { const hidden = t.hidden; t.outerHTML = tileHtml(item); if (hidden) document.querySelector('#buckets .item-tile[data-id="' + item.id + '"]:not([hidden])').hidden = true; });
+      else {
+        old.forEach(t => { const hidden = t.hidden; t.outerHTML = tileHtml(item); if (hidden) document.querySelector('#buckets .item-tile[data-id="' + item.id + '"]:not([hidden])').hidden = true; });
+        if (state.q) applySearch(); // a search like is:pvp may now match or not
+      }
     };
     dlg.querySelectorAll("[data-tag]").forEach(b => b.addEventListener("click", () => {
       toggleTag(item.id, b.dataset.tag);
       redrawTile(); renderJunk();
       openItem(item.id);
       const again = dlg.querySelector('[data-tag="' + b.dataset.tag + '"]');
+      if (again) again.focus();
+    }));
+    dlg.querySelectorAll("[data-use]").forEach(b => b.addEventListener("click", () => {
+      toggleUse(item.id, b.dataset.use);
+      redrawTile();
+      openItem(item.id);
+      const again = dlg.querySelector('[data-use="' + b.dataset.use + '"]');
       if (again) again.focus();
     }));
     const cmp = $("open-compare");

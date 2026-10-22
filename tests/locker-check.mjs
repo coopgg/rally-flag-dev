@@ -217,6 +217,19 @@ await section("Gear", async () => {
   await p.selectOption("#tag-filter", "archive");
   check("tags: the tag filter shows only that tag", await p.locator("#buckets .item-tile[data-id]").count() === 1);
   await p.selectOption("#tag-filter", "");
+  // PvE / PvP: their own marks, alongside a tag; both can be on.
+  await p.click(tile); await p.click('#item-dialog [data-use="pvp"]'); await p.click('#item-dialog [data-use="pve"]');
+  const both = [await p.getAttribute('#item-dialog [data-use="pve"]', "aria-pressed"), await p.getAttribute('#item-dialog [data-use="pvp"]', "aria-pressed"), await p.getAttribute('#item-dialog [data-tag="archive"]', "aria-pressed")].join();
+  await p.click('#item-dialog [data-use="pve"]'); await p.keyboard.press("Escape");
+  check("pve/pvp: marks sit alongside the tag; each button toggles its half", both === "true,true,true" && /tagged archive, for PvP/.test(await p.getAttribute(tile, "aria-label")) && await p.locator(tile + " .tile-use .use-pvp").count() === 1 && await p.locator(tile + " .tile-use .use-pve").count() === 0, both);
+  await p.selectOption("#tag-filter", "pvp");
+  check("pve/pvp: the filter menu shows PvP gear", await p.locator("#buckets .item-tile[data-id]").count() === 1);
+  await p.selectOption("#tag-filter", "");
+  await p.fill("#locker-search", "is:crucible"); await p.waitForTimeout(300);
+  const pvpShown = await p.locator("#buckets .item-tile[data-id]:not([hidden])").count();
+  await p.fill("#locker-search", "is:pve"); await p.waitForTimeout(300);
+  check("pve/pvp: is:pvp (is:crucible) and is:pve search", pvpShown === 1 && await p.locator("#buckets .item-tile[data-id]:not([hidden])").count() === 0);
+  await p.fill("#locker-search", ""); await p.waitForTimeout(300);
   await p.click(tile); await p.fill("#item-note", "Quillwick roll"); await p.click("#note-form [type=submit]");
   check("notes: saving a note marks the tile", /Note saved/.test(await toastText(p)) && await p.locator(tile + " .tile-badge.note").count() === 1 && /note: Quillwick roll/.test(await p.getAttribute(tile, "aria-label")));
   await p.keyboard.press("Escape");
@@ -569,11 +582,12 @@ await section("Sync", async () => {
   const A = await open({ real: true, env, hash: "#loadouts" });
   await A.fill("#lo-name", "Synced"); await A.click('[data-lo-save="' + TITAN + '"]'); await A.waitForTimeout(2000);
   const item = DEMO.characterInventories.data[TITAN].items.find(i => i.itemInstanceId && i.bucketHash !== SUBCLASS_BUCKET && i.bucketHash !== 215593132).itemInstanceId;
-  await A.click("#tab-gear"); await A.click('#buckets .item-tile[data-id="' + item + '"]'); await A.click('#item-dialog [data-tag="favorite"]'); await A.keyboard.press("Escape"); await A.waitForTimeout(2000);
+  await A.click("#tab-gear"); await A.click('#buckets .item-tile[data-id="' + item + '"]'); await A.click('#item-dialog [data-tag="favorite"]'); await A.click('#item-dialog [data-use="pvp"]'); await A.keyboard.press("Escape"); await A.waitForTimeout(2000);
   check("sync: saves reach the service", env.DB.rows.has(MEMBER) && /Synced/.test(env.DB.rows.get(MEMBER).data));
   const B = await open({ real: true, env, hash: "#loadouts" });
   check("sync: a fresh browser gets the loadout", /Synced/.test(await B.textContent("#view-loadouts")));
   check("sync: and the tag", await B.evaluate(id => /tag-favorite/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').className), item));
+  check("sync: and the PvP mark", await B.evaluate(id => /for PvP/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').getAttribute("aria-label")), item));
   await A.click("#tab-gear"); await A.click('#buckets .item-tile[data-id="' + item + '"]'); await A.fill("#item-note", "synced note"); await A.click("#note-form [type=submit]"); await A.keyboard.press("Escape"); await A.waitForTimeout(2000);
   await comeBack(B);
   check("sync: notes reach the other device", await B.evaluate(id => /note: synced note/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').getAttribute("aria-label")), item));
