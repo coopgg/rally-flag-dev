@@ -540,14 +540,19 @@ await section("Your Week", async () => {
   const p = await open({ url: BASE + "your-week.html?demo", ready: "#yw-app .featured-card" });
   const titles = await p.$$eval(".featured-card .featured-name", n => n.map(x => x.textContent));
   check("week: this week's featured raids and dungeons, three of each", titles.length === 6 && titles.includes("The Desert Perpetual") && titles.includes("Equilibrium"), titles.join(", "));
-  const chips = await p.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-char")].map(x => x.textContent)));
+  const chips = await p.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-chars:not(.yw-master) .yw-char")].map(x => x.textContent)));
   check("week: each featured activity shows every character's clear since reset", chips.every(c => c.length === 3) && chips.flat().some(t => /, cleared$/.test(t)) && chips.flat().some(t => /not cleared yet$/.test(t)));
   check("week: chips are the class with a mark, green ✓ when cleared and red ✕ when not", await p.evaluate(() => [...document.querySelectorAll(".yw-char")].every(c => {
     const mark = c.querySelector(".yw-mark").textContent, shown = c.querySelector(".yw-cname").textContent, bg = getComputedStyle(c).backgroundColor;
     return /^(Titan|Hunter|Warlock)$/.test(shown) && (c.classList.contains("done") ? bg === "rgb(30, 122, 60)" && mark === "✓" : bg === "rgb(179, 38, 30)" && mark === "✕");
   })));
+  // Master clears: a labelled second row for every raid and dungeon with a Master version (14),
+  // ticked only by Master clears (the sample has King's Fall: Master on the first two characters).
+  const kf = await p.evaluate(() => { const box = [...document.querySelectorAll(".featured-card, .yw-tile")].find(x => /King.s Fall/.test(x.textContent)); return [...box.querySelectorAll(".yw-master .yw-char")].map(c => c.classList.contains("done")); });
+  check("week: activities with a Master version get a Master row, ticked by Master clears only", await p.locator(".yw-master").count() === 14 && kf.join() === "true,true,false" &&
+    await p.evaluate(() => [...document.querySelectorAll(".featured-card, .yw-tile")].filter(x => /Garden of Salvation|Last Wish/.test(x.textContent)).every(x => !x.querySelector(".yw-master"))), kf.join());
   const idx = await p.evaluate(() => window.ActivityIndex.raids.length + window.ActivityIndex.dungeons.length);
-  check("week: the rest shows every raid and dungeon not featured as art tiles with the same chips", await p.locator(".yw-tile").count() === idx - 6 && await p.locator(".yw-tile .yw-char").count() === (idx - 6) * 3 && await p.locator(".yw-tile .yw-char.done").count() > 0 && await p.locator('a.yw-tile[href*="raid-"]').count() > 0);
+  check("week: the rest shows every raid and dungeon not featured as art tiles with the same chips", await p.locator(".yw-tile").count() === idx - 6 && await p.locator(".yw-tile .yw-chars:not(.yw-master) .yw-char").count() === (idx - 6) * 3 && await p.locator(".yw-tile .yw-char.done").count() > 0 && await p.locator('a.yw-tile[href*="raid-"]').count() > 0);
   check("week: links to our guide from each featured card", await p.locator('.featured-card a.featured-link[href*="raid-"]').count() === 3 && await p.locator('.featured-card a.featured-link[href*="dungeon-"]').count() === 3);
   check("week: season pass, milestones, pursuits and seals render", await p.locator(".pg-season").count() === 1 && await p.locator(".pg-ms-row").count() >= 3 && await p.locator(".pg-card").count() > 0 && await p.locator(".pg-seal").count() >= 1);
   check("week: pursuits expiring before reset are marked", await p.locator(".pg-tag").count() >= 1);
@@ -559,7 +564,7 @@ await section("Your Week", async () => {
   check("week: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
   const ph = await open({ width: 390, url: BASE + "your-week.html?demo", ready: "#yw-app .yw-tile" });
-  check("week: on a phone the small tiles show ✓/✕ and the class initial, all on one line", await ph.evaluate(() => [...document.querySelectorAll(".yw-tile .yw-chars")].every(r => { const t = [...r.children].map(c => c.getBoundingClientRect().top); return Math.max(...t) - Math.min(...t) < 2; }) && /^[THW]$/.test(document.querySelector(".yw-tile .yw-cshort").textContent) && getComputedStyle(document.querySelector(".yw-tile .yw-cname")).display === "none"));
+  check("week: on a phone the small tiles show ✓/✕ and the class initial, all on one line", await ph.evaluate(() => [...document.querySelectorAll(".yw-tile .yw-chars")].every(r => { const t = [...r.querySelectorAll(".yw-char")].map(c => c.getBoundingClientRect().top); return Math.max(...t) - Math.min(...t) < 2; }) && /^[THW]$/.test(document.querySelector(".yw-tile .yw-cshort").textContent) && getComputedStyle(document.querySelector(".yw-tile .yw-cname")).display === "none"));
   await ph.context_.close();
   // Signed out: an explanation, a sign-in and the sample.
   const so = await open({ signedOut: true, url: BASE + "your-week.html" });
@@ -571,7 +576,7 @@ await section("Your Week", async () => {
   const ids = DEMO.profile.data.characterIds;
   check("week: signed in, it reads progress and each character's raid and dungeon history", q.calls.some(c => c.ep === "Week profile" && /components=100,104,200,201,202,300,301,700/.test(c.body)) &&
     ids.every(id => q.calls.some(c => c.ep === "Activity history" && c.body.includes(id) && /mode=4/.test(c.body)) && q.calls.some(c => c.ep === "Activity history" && c.body.includes(id) && /mode=82/.test(c.body))));
-  check("week: and shows the same clears as the sample", JSON.stringify(await q.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-char")].map(x => x.textContent)))) === JSON.stringify(chips));
+  check("week: and shows the same clears as the sample", JSON.stringify(await q.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-chars:not(.yw-master) .yw-char")].map(x => x.textContent)))) === JSON.stringify(chips));
   check("week: signed in, no script errors", !q.errors.length, q.errors.join("; "));
   await q.context_.close();
   // Season rank past 100 (a player's real numbers: rank 154 in game). The
@@ -661,6 +666,7 @@ await section("Clarity", async () => {
     { classNames: ["spacer"] }, { linesContent: [{ text: "Stacks 3 times.", classNames: ["bold"] }] }] } } };
   await perk.click(); await p.waitForSelector("#plug-info .clarity", { timeout: 15000 });
   const box = "#plug-info .clarity";
+  check("dev: the site menu has the Locker under Loadouts", await p.locator('#site-nav a[href="locker.html"]').count() === 1);
   check("clarity: tapping a perk shows Clarity's description as written", /Deals 25% more damage to Scorched targets\. Buff rules/.test(await p.textContent(box)) && await p.locator(box + " b").textContent() === "Stacks 3 times." && await p.locator(box + ' .cl-ico[role="img"][aria-label="Solar"]').count() === 1);
   check("clarity: credited and linked next to the text, marked as not ours, with their Discord for feedback",
     await p.locator(box + ' a[href="https://d2clarity.com"]').count() === 1 && /Community Insights/.test(await p.textContent(box)) && /not Rally Flag/.test(await p.textContent(box)) && await p.locator(box + ' a[href="https://d2clarity.com/discord"]').count() === 1);
@@ -704,6 +710,7 @@ await section("Clarity", async () => {
   const q = await open({ url: "https://rallyflag.gg/locker.html?demo" });
   await q.click('#buckets .item-tile[data-id]'); await q.locator("#item-dialog [data-plug]:not(.mod-sq)").nth(2).click(); await q.waitForTimeout(800);
   check("clarity: off on rallyflag.gg: no box, no download, no Tools row", !await q.locator("#plug-info .clarity").count() && !q.clarityCalls.length && await q.isHidden("#clarity-row"), q.clarityCalls.join());
+  check("rallyflag.gg: the site menu has no Locker link until it launches (dev does)", await q.locator('#site-nav a[href="locker.html"]').count() === 0);
   check("clarity: rallyflag.gg Locker has no script errors", !q.errors.length, q.errors.join("; "));
   await q.context_.close();
 });

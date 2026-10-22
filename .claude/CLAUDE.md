@@ -19,7 +19,9 @@ git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)debug.html' ':(exclude)clan-admin.html' ':(exclude)discord-bot' \
   ':(exclude)api-debug.html' ':(exclude)xur-debug.html' ':(exclude).claude' \
   ':(exclude)skills-lock.json' ':(exclude).gitignore' ':(exclude)tools' \
-  ':(exclude)tests' ':(exclude).github' > /tmp/promote.patch
+  ':(exclude)tests' ':(exclude).github' ':(exclude)locker.html' \
+  ':(exclude)assets/locker.js' ':(exclude)assets/locker-worker.js' \
+  ':(exclude)assets/locker-demo.json' > /tmp/promote.patch
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
@@ -98,7 +100,7 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   stay `align-items:start` and reserve the variable bits instead (fixed line
   counts / min-heights). New card content that can vary in length needs the
   same treatment or the grid stops matching.
-- **Locker (live on rallyflag.gg since 2026-10-22, still labelled Preview).** `locker.html` + `assets/locker.js` show the
+- **Locker (dev-only until the owner says; owner held it back on 2026-10-22).** `locker.html` + `assets/locker.js` show the
   signed-in player's weapons/armor (one GetProfile call) with God Roll
   matches and armor set progress. `assets/locker-worker.js` downloads
   Bungie's DestinyInventoryItemLiteDefinition (~3MB gz), trims it to ~6MB
@@ -107,7 +109,11 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   `locker.html?demo` uses `assets/locker-demo.json`, built by
   `node --max-old-space-size=6144 tools/build-locker-demo.js <manifest dir>`
   from real hashes (needs the full item, plug set, item set and stat
-  tables). In nav.js's Loadouts section. Stage 2 (moving, equipping,
+  tables). In nav.js's Loadouts section only off rallyflag.gg (added
+  with the Debug section); its four files are excluded from promotion, and
+  it's out of the sitemap. To launch: drop the excludes, move the menu item
+  into the Loadouts list, add it to the sitemap, empty site-check's
+  DEV_ONLY. Stage 2 (moving, equipping,
   locking, postmaster pulls, desktop drag and drop) posts to
   /Platform/Destiny2/Actions/Items/{TransferItem,EquipItem,SetLockState,
   PullFromPostmaster}/ one at a time; these need the app's "Move or equip

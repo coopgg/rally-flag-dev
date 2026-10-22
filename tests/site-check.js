@@ -49,7 +49,7 @@ const TYPES = { ".html": "text/html", ".js": "application/javascript", ".css": "
 const SKIP = new Set(["debug.html", "api-debug.html", "xur-debug.html", "clan-admin.html", "oauth-callback.html"]);
 // Public-looking pages that only exist on dev (linked from nav.js's Debug
 // section, which rallyflag.gg hides). Checked on dev; absent on prod.
-const DEV_ONLY = new Set([]);
+const DEV_ONLY = new Set(["locker.html"]);
 let pages = fs.readdirSync(ROOT).filter(f => f.endsWith(".html") && !SKIP.has(f)).sort();
 pages.push("no/such/page"); // served by 404.html, like GitHub Pages
 // The Locker's sample-data view renders the whole app without a sign-in.

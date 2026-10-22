@@ -48,7 +48,6 @@
     {
       label: "Loadouts",
       items: [
-        { label: "Locker", href: "locker.html", group: "locker" },
         { label: "Builds", href: "builds.html", group: "builds" },
         { label: "God Rolls", href: "god-rolls.html", group: "godrolls" },
         { label: "Armor Sets", href: "armor-set-bonuses.html", group: "setbonuses" },
@@ -70,6 +69,9 @@
   // than deleted so this exact file can ship to prod unmodified — no
   // manual "strip the Debug section" step at promotion time.
   if (window.location.hostname !== "rallyflag.gg"){
+    // The Locker stays on dev until the owner promotes it (its files are
+    // excluded from promotion); first in Loadouts, as it will be on prod.
+    NAV_SECTIONS.find(s => s.label === "Loadouts").items.unshift({ label: "Locker", href: "locker.html", group: "locker" });
     NAV_SECTIONS.push({
       label: "Debug",
       items: [

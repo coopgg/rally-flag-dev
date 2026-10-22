@@ -89,6 +89,17 @@ chars.forEach(c => {
     values: { completed: { basic: { value: 1 } }, completionReason: { basic: { value: 0 } } }
   }));
 });
+// A few Master clears this week (Your Week shows them on their own row).
+const masters = Object.values(ACTS).filter(a => (a.activityTypeHash === RAID || a.activityTypeHash === DUNGEON) && a.displayProperties && / Master$/.test(a.displayProperties.name || "") && !a.redacted);
+const masterByName = new Map();
+for (const a of masters) if (!masterByName.has(a.displayProperties.name)) masterByName.set(a.displayProperties.name, a);
+chars.forEach(c => {
+  for (const a of masterByName.values()) if (rand() < 0.25) activityHistory[c].push({
+    period: null, _hoursAgo: 3 + Math.floor(rand() * 50),
+    activityDetails: { referenceId: a.hash, directorActivityHash: a.hash, mode: a.activityTypeHash === RAID ? 4 : 82 },
+    values: { completed: { basic: { value: 1 } }, completionReason: { basic: { value: 0 } } }
+  });
+});
 const out = {
   profile: demo.profile, characters: demo.characters,
   activityHistory,
