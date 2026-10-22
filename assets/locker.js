@@ -509,6 +509,24 @@
     return '<div class="clarity" lang="en"><div class="cl-head"><span>Community Insights</span><a href="' + CLARITY_SITE + '"' + CL_TAB + ">by Clarity" + CL_NEW + "</a></div>" + clarityText(blocks) +
       '<p class="cl-foot">Written by Clarity\'s community researchers, not Rally Flag. Something wrong? <a href="' + CLARITY_DISCORD + '"' + CL_TAB + ">Tell Clarity on Discord" + CL_NEW + "</a></p></div>";
   }
+  // A perk's name, Bungie's description and (when on) Clarity's, pinned to
+  // the bottom of the popup: for the wish-list picker and Compare, whose
+  // perks have no room for text (a hover title can't carry Clarity's
+  // credit links).
+  function perkPanel(dlg, h, note){
+    const body = dlg.querySelector(".dlg-body"), p = DB.items[h];
+    if (!body || !p) return;
+    let box = body.querySelector(".perk-panel");
+    if (!box){ body.insertAdjacentHTML("beforeend", '<div class="plug-info perk-panel" role="region" aria-label="Perk details" tabindex="0"></div>'); box = body.querySelector(".perk-panel"); }
+    const fill = () => {
+      box.dataset.h = h;
+      box.innerHTML = '<button type="button" class="perk-panel-x" aria-label="Close perk details">×</button><b>' + esc(p.n) + "</b>" + (p.y ? " · " + esc(p.y) : "") + (note ? " · " + esc(note) : "") +
+        (p.x ? "<br>" + esc(p.x) : "") + clarityHtml(h);
+      box.querySelector(".perk-panel-x").addEventListener("click", () => box.remove());
+    };
+    fill();
+    if (CLARITY.on && !CLARITY.data) loadClarity().then(() => { if (box.isConnected && box.dataset.h === String(h)) fill(); });
+  }
   // The Tools row doubles as the credits.
   function renderClarityRow(){
     const row = $("clarity-row");
@@ -3220,8 +3238,8 @@
     }
     const perkIcons = i => {
       const ours = new Set(i.roll ? i.roll.weapon.perkHashes : []);
-      const icon = (h, alt) => { const p = DB.items[h]; return '<span class="cmp-perk-ico' + (alt ? " alt" : "") + (ours.has(h) ? " ours" : "") + (!alt && onEvery.has(h) ? " common" : "") + '" title="' + esc(p.n + (alt ? " (can switch to)" : "") + (ours.has(h) ? " · our God Roll" : "")) + '">' +
-        (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="28" height="28" loading="lazy">' : "") + '<span class="sr-only">' + esc(p.n) + (alt ? " (can switch to)" : "") + (ours.has(h) ? " (our God Roll)" : "") + (!alt && onEvery.has(h) ? " (on every copy)" : "") + "</span></span>"; };
+      const icon = (h, alt) => { const p = DB.items[h]; return '<button type="button" class="cmp-perk-ico' + (alt ? " alt" : "") + (ours.has(h) ? " ours" : "") + (!alt && onEvery.has(h) ? " common" : "") + '" data-cmp-perk="' + h + '"' + (alt ? ' data-alt="1"' : "") + ' title="' + esc(p.n + (alt ? " (can switch to)" : "") + (ours.has(h) ? " · our God Roll" : "")) + '">' +
+        (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="28" height="28" loading="lazy">' : "") + '<span class="sr-only">' + esc(p.n) + (alt ? " (can switch to)" : "") + (ours.has(h) ? " (our God Roll)" : "") + (!alt && onEvery.has(h) ? " (on every copy)" : "") + "</span></button>"; };
       return '<div class="cmp-perks">' + perkSockets(i).map(x => '<div class="cmp-perk-col">' + icon(x.h, false) +
         (i.alts[x.k] || []).map(a => a.plugItemHash).filter(a => a !== x.h && showPlug(a)).map(a => icon(a, true)).join("") + "</div>").join("") + "</div>";
     };
@@ -3267,7 +3285,7 @@
       '<div class="dlg-head ' + tierClass(d) + '"><div class="dlg-title"><div class="dlg-eyebrow">Compare · ' + (scope[0] === "same" ? total + " copies" : total + " items") + "</div><h2 class=\"dlg-name\" id=\"dlg-name\">" + esc(scope[0] === "same" ? d.n : scope[1]) + "</h2></div>" +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
       '<div class="dlg-body">' + chips +
-        '<p class="muted cmp-help">Click a row name to sort, best first. Green and blue are better than most copies, orange and red worse. Dimmed perks are on every copy; gold rings are our God Roll.' + (total > CMP_MAX ? " Showing the first " + CMP_MAX + " of " + total + "." : "") + "</p>" +
+        '<p class="muted cmp-help">Click a row name to sort, best first. Green and blue are better than most copies, orange and red worse. Dimmed perks are on every copy; gold rings are our God Roll. Tap a perk to read what it does.' + (total > CMP_MAX ? " Showing the first " + CMP_MAX + " of " + total + "." : "") + "</p>" +
         '<div class="cmp-scroll" tabindex="0" role="region" aria-label="Side by side"><table class="cmp"><caption class="sr-only">' + esc(scope[1]) + ", side by side</caption>" +
         "<thead><tr><td></td>" + copies.map(colHead).join("") + "</tr></thead><tbody>" + body + "</tbody></table></div></div>");
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
@@ -3280,6 +3298,7 @@
       const sc = dlg.querySelector(".cmp-scroll"); if (sc) sc.scrollLeft = 0;
     }));
     dlg.querySelectorAll("[data-cmp-open]").forEach(b => b.addEventListener("click", () => openItem(b.dataset.cmpOpen)));
+    dlg.querySelectorAll("[data-cmp-perk]").forEach(b => b.addEventListener("click", () => perkPanel(dlg, +b.dataset.cmpPerk, b.dataset.alt ? "can switch to" : "")));
     const itemOf = b => ITEMS.find(i => i.id === b.dataset.cmpId);
     dlg.querySelectorAll("[data-cmp-tag]").forEach(b => b.addEventListener("click", () => {
       const i = itemOf(b); toggleTag(i.id, b.dataset.cmpTag); renderItems(); renderJunk();
@@ -3432,12 +3451,12 @@
     const onCopies = new Set(owned.flatMap(i => [...wishHave(i)]));
     const colsHtml = cols.map((col, c) => '<div class="wish-col" role="group" aria-labelledby="wc-' + c + '"><div class="wish-col-h" id="wc-' + c + '">' + esc(col.label) + "</div>" +
       col.perks.map(e => { const p = DB.items[e.h] || {}, on = picks[c].has(e.n);
-        return '<button type="button" class="wish-perk' + (on ? " on" : "") + (ours.has(e.n) ? " ours" : "") + '" data-wish-col="' + c + '" data-wish-perk="' + esc(e.n) + '" aria-pressed="' + on + '" title="' + esc(e.show ? "Masterwork on " + e.show + " (any tier)" : p.x || e.n) + '">' +
+        return '<button type="button" class="wish-perk' + (on ? " on" : "") + (ours.has(e.n) ? " ours" : "") + '" data-wish-col="' + c + '" data-wish-perk="' + esc(e.n) + '"' + (e.show ? "" : ' data-wish-h="' + e.h + '"') + ' aria-pressed="' + on + '" title="' + esc(e.show ? "Masterwork on " + e.show + " (any tier)" : p.x || e.n) + '">' +
           (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="28" height="28" loading="lazy">' : '<span class="wish-noicon"></span>') + "<span>" + esc(e.show || e.n) + (e.show ? '<span class="sr-only"> masterwork</span>' : "") +
           (ours.has(e.n) ? '<small>our God Roll</small>' : onCopies.has(e.n.toLowerCase()) ? "<small>on a copy you own</small>" : "") + "</span></button>"; }).join("") + "</div>").join("");
     redrawDialog(dlg, head + '<div class="dlg-body">' +
       (fallback ? '<p class="wish-help">' + esc(fallback) + "</p>" : "") +
-      '<p class="wish-help">Tap the perks you want, and the masterwork stat if it matters. Pick several in one column if any of them will do. Columns you leave empty don\'t matter.</p>' +
+      '<p class="wish-help">Tap the perks you want, and the masterwork stat if it matters. Pick several in one column if any of them will do. Columns you leave empty don\'t matter. What a perk does shows at the bottom.</p>' +
       '<p class="wish-count" id="wish-count" role="status"></p>' +
       '<div class="wish-cols">' + colsHtml + "</div>" +
       '<div class="act-row wish-actions"><button type="button" class="act-btn" id="wish-save">Save roll</button><button type="button" class="act-btn" id="wish-cancel">Cancel</button></div></div>');
@@ -3455,6 +3474,7 @@
       set.has(n) ? set.delete(n) : set.add(n);
       b.classList.toggle("on", set.has(n)); b.setAttribute("aria-pressed", String(set.has(n)));
       count();
+      if (b.dataset.wishH) perkPanel(dlg, +b.dataset.wishH);
     }));
     const back = sel => { wishView = null; openItem(fromId); const t = $(sel) || $("wish-add"); if (t) t.focus(); };
     $("wish-cancel").addEventListener("click", () => back("wish-add"));

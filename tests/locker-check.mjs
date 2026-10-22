@@ -651,6 +651,18 @@ await section("Clarity", async () => {
     await p.locator(box + ' a[href="https://d2clarity.com"]').count() === 1 && /Community Insights/.test(await p.textContent(box)) && /not Rally Flag/.test(await p.textContent(box)) && await p.locator(box + ' a[href="https://d2clarity.com/discord"]').count() === 1);
   check("clarity: downloads their version file and descriptions once", p.clarityCalls.join() === "versions.json,descriptions/dim.json", p.clarityCalls.join());
   const v = await axe(p); check("clarity passes axe", !v.length, v.join(", "));
+  // The wish-list picker and Compare: tapping a perk opens a details panel with it.
+  await p.click("#open-compare");
+  await p.click('[data-cmp-perk="' + hash + '"]'); await p.waitForSelector(".perk-panel .clarity");
+  check("clarity: in Compare, tapping a perk shows its details with Clarity's text and credit", /Deals 25% more damage/.test(await p.textContent(".perk-panel")) && await p.locator('.perk-panel a[href="https://d2clarity.com"]').count() === 1);
+  const cv = await axe(p); check("compare perk panel passes axe", !cv.length, cv.join(", "));
+  await p.click(".perk-panel-x");
+  check("clarity: the panel closes", !await p.locator(".perk-panel").count());
+  await p.keyboard.press("Escape");
+  await p.click('#buckets .item-tile[data-id]'); await p.click("#wish-add"); await p.waitForSelector('[data-wish-h="' + hash + '"]');
+  await p.click('[data-wish-h="' + hash + '"]'); await p.waitForSelector(".perk-panel .clarity");
+  check("clarity: in the wish-list picker, tapping a perk picks it and shows its details", await p.getAttribute('[data-wish-h="' + hash + '"]', "aria-pressed") === "true" && /Deals 25% more damage/.test(await p.textContent(".perk-panel")));
+  const wv = await axe(p); check("wish perk panel passes axe", !wv.length, wv.join(", "));
   await p.keyboard.press("Escape");
   // Same version next visit: only the version check; a new version: fresh descriptions.
   await p.reload(); await p.waitForSelector("#locker-app:not([hidden])", { timeout: 90000 }); await p.waitForTimeout(600);

@@ -460,6 +460,9 @@
   .wish-perk.on > span::after{ content:"Wanted"; font-size:12px; font-weight:600; color:#1f8a4c; }
   [data-mode="dark"] .wish-perk.on > span::after{ color:#7be0a0; }
   .wish-actions{ margin-top:12px; }
+  /* Perk details pinned to the bottom of the wish-list picker and Compare. */
+  .perk-panel{ position:sticky; bottom:0; z-index:3; background:linear-gradient(var(--panel), var(--panel)), var(--bg); max-height:42vh; overflow:auto; padding-right:40px; box-shadow:0 -10px 30px -12px rgba(0,0,0,0.55); }
+  .perk-panel-x{ position:absolute; top:6px; right:6px; width:32px; height:32px; border-radius:50%; border:1px solid var(--panel-border); background:var(--bg); color:var(--text); font-size:16px; cursor:pointer; }
   .wish-roll{ display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; padding:6px 0; border-top:1px solid var(--panel-border); font-size:13px; }
   .wish-roll:first-of-type{ border-top:0; }
   .wish-status{ display:inline-flex; align-items:center; gap:4px; font-weight:600; color:var(--text-dim); }
@@ -598,6 +601,8 @@
   .cmp-perks{ display:flex; gap:3px; }
   .cmp-perk-col{ display:flex; flex-direction:column; gap:3px; }
   .cmp-perk-ico{ position:relative; display:block; width:28px; height:28px; border-radius:50%; border:1px solid var(--panel-border); background:#1d2333; }
+  button.cmp-perk-ico{ padding:0; font:inherit; color:inherit; cursor:pointer; }
+  button.cmp-perk-ico:hover{ border-color:var(--text-dim); }
   .cmp-perk-ico img{ display:block; width:100%; height:100%; border-radius:50%; }
   .cmp-perk-ico.alt{ opacity:0.5; }
   .cmp-perk-ico.common:not(.ours){ opacity:0.45; }
