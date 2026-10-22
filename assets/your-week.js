@@ -184,7 +184,11 @@
     if (pdef && anyCp){
       const rp = anyCp.progressions[pdef.r] || {}, pp = anyCp.progressions[pdef.p] || {};
       const capped = rp.levelCap > 0 && rp.level >= rp.levelCap, cur = capped ? pp : rp;
-      const rank = (rp.level || 0) + (pp.level || 0), days = Math.max(0, Math.ceil((Date.parse(pass.end) - now) / 864e5));
+      // DIM's rule: the reward track's level, plus the bonus (prestige)
+      // track only once the reward track hits a real cap. Since Renegades
+      // the reward track keeps counting past 100 while the bonus track
+      // counts the same ranks again, so adding both counted them twice.
+      const rank = capped ? rp.levelCap + (pp.level || 0) : (rp.level || 0), days = Math.max(0, Math.ceil((Date.parse(pass.end) - now) / 864e5));
       const art = P.profileProgression && P.profileProgression.data && P.profileProgression.data.seasonalArtifact;
       season = '<section class="pg-section pg-season panel-card" aria-labelledby="yw-h-season"><h2 class="dlg-label" id="yw-h-season">Season pass</h2>' +
         '<div class="pg-season-row"><div class="pg-rank"><b>' + rank + '</b><small>rank</small></div><div class="pg-season-main"><div><b>' + esc(sdef.n) + "</b>" + (pdef.n && pdef.n !== sdef.n ? " · " + esc(pdef.n) : "") + "</div>" +

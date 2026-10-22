@@ -113,7 +113,11 @@
     display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));
     grid-auto-rows:1fr; gap:12px;
   }
-  .featured-card{ padding:16px 18px; overflow:hidden; }
+  .featured-card{ position:relative; padding:16px 18px; overflow:hidden; }
+  /* Master surges as corner badges on the art, like the Locker's item badges. */
+  .card-surges{ position:absolute; top:12px; right:12px; min-height:0; gap:5px; }
+  .card-surges .surge-chip.icon-only{ width:30px; height:30px; box-shadow:0 0 0 2px var(--bg); }
+  .card-surges .surge-chip img{ width:18px; height:18px; }
   .featured-card .art-thumb{ margin:-16px -18px 14px; aspect-ratio:21/9; }
   .featured-kind{
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
@@ -315,10 +319,10 @@
         const alwaysBadge = c.alwaysFeatured ? '<span class="featured-always-badge">Always Featured</span>' : '';
         return '<div class="featured-card panel-card' + (isPrediction ? ' predicted' : '') + '">' +
           window.rallyFlagArtThumb(c) +
+          // This week's Master surges as corner badges (current week only; Bungie doesn't publish next week's).
+          (!isPrediction && kind === "Raid" && window.RallyFlagSurges.hasMaster(c.slug) ? '<div class="surge-row card-surges" data-surges="' + c.slug + '" data-icons-only aria-busy="true"><span class="sr-only">Master surges: </span></div>' : '') +
           '<div class="featured-kind">' + c.kind + alwaysBadge + '</div>' +
           '<div class="featured-name">' + c.name + '</div>' +
-          // This week's Master surges (current week only; Bungie doesn't publish next week's).
-          (!isPrediction && kind === "Raid" && window.RallyFlagSurges.hasMaster(c.slug) ? '<div class="featured-set-label">Master surges</div><div class="surge-row" data-surges="' + c.slug + '" aria-busy="true"><span class="surge-note">Loading from Bungie…</span></div>' : '') +
           (armorLinksHtml ? '<div class="featured-set-label">Armor Set</div><div class="set-links">' + armorLinksHtml + '</div>' : '') +
           '<a class="featured-link" href="' + c.href + '">View the guide \u2192</a>' +
         '</div>';

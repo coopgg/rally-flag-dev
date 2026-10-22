@@ -574,6 +574,19 @@ await section("Your Week", async () => {
   check("week: and shows the same clears as the sample", JSON.stringify(await q.$$eval(".featured-card", cs => cs.map(c => [...c.querySelectorAll(".yw-char")].map(x => x.textContent)))) === JSON.stringify(chips));
   check("week: signed in, no script errors", !q.errors.length, q.errors.join("; "));
   await q.context_.close();
+  // Season rank past 100 (a player's real numbers: rank 154 in game). The
+  // reward track keeps counting while the bonus track counts the same
+  // ranks again, so the rank is not their sum.
+  const saved = JSON.stringify(WEEK.progress.characterProgressions);
+  // Triumphant (Monument of Triumph's current pass): reward and prestige progressions.
+  for (const c of Object.values(WEEK.progress.characterProgressions.data)){
+    Object.assign(c.progressions[3642754928], { level: 154, levelCap: 100, progressToNextLevel: 452432, nextLevelAt: 500000 });
+    Object.assign(c.progressions[276883584], { level: 54, levelCap: -1, progressToNextLevel: 452432, nextLevelAt: 500000 });
+  }
+  const r = await open({ real: true, url: BASE + "your-week.html", ready: "#yw-app .pg-season" });
+  check("week: season rank past 100 is the in-game rank (154), not the two tracks added (208)", (await r.textContent(".pg-rank b")) === "154" && /452,432 \/ 500,000 XP to rank 155/.test(await r.textContent(".pg-season")), await r.textContent(".pg-season"));
+  await r.context_.close();
+  WEEK.progress.characterProgressions = JSON.parse(saved);
   // The Locker no longer has a Progress tab.
   const l = await open();
   check("locker: Progress lives on Your Week now, not in the Locker", await l.locator("#tab-progress").count() === 0);
@@ -705,13 +718,14 @@ await section("Master surges", async () => {
   const want = await tw.evaluate(() => { const F = window.FeaturedRotationData; return F.featuredForWeek(F.currentWeekIndex()).raids.filter(window.RallyFlagSurges.hasMaster); });
   await tw.waitForFunction(() => [...document.querySelectorAll("[data-surges]")].every(x => x.getAttribute("aria-busy") === "false"));
   const rows = await tw.$$eval("#featured-raids-content [data-surges]", r => r.map(x => [x.dataset.surges, x.textContent]));
-  check("surges: This Week's featured raids with a Master version show its surges, the rest none", rows.length === want.length && rows.every(([slug, t]) => want.includes(slug) && t === "VoidStrand"), JSON.stringify(rows) + " want " + want);
+  check("surges: This Week's featured raids with a Master version show its surges as corner badges, the rest none", rows.length === want.length && rows.every(([slug, t]) => want.includes(slug) && /Master surges: Void surge\s*Strand surge/.test(t)) &&
+    await tw.$$eval("#featured-raids-content .card-surges", r => r.every(x => x.title === "Master surges: Void, Strand" && x.querySelectorAll("img").length === 2)), JSON.stringify(rows) + " want " + want);
   check("surges: next week's cards have no surge row (Bungie only lists this week)", await tw.locator("#next-week-raids-content [data-surges]").count() === 0);
   const v = await axe(tw); check("surges: This Week passes axe", !v.length, v.join(", "));
   // Every raid card, as if each had a Master version this week: the row reads right and passes axe.
-  await tw.evaluate(() => document.querySelectorAll("#featured-raids-content .featured-card").forEach(c => c.querySelector(".featured-name").insertAdjacentHTML("afterend", '<div class="surge-row" data-surges="kings-fall" aria-busy="true"></div>')));
+  await tw.evaluate(() => document.querySelectorAll("#featured-raids-content .featured-card").forEach(c => c.querySelector(".featured-name").insertAdjacentHTML("afterend", '<div class="surge-row t-row" data-surges="kings-fall" aria-busy="true"></div>')));
   await tw.evaluate(() => window.RallyFlagSurges.fill()); await tw.waitForTimeout(300);
-  check("surges: a surge row renders as element pills", await tw.locator('#featured-raids-content .surge-chip.surge-void').count() >= 3);
+  check("surges: a surge row with names renders as element pills", await tw.locator('#featured-raids-content .t-row .surge-chip.surge-void:not(.icon-only)').count() === 3);
   await tw.context_.close();
   const home = await open({ url: BASE + "index.html", ready: "#feature .feature-tile", milestones: ms });
   await home.evaluate(() => { document.querySelector(".feature-tile-name").insertAdjacentHTML("afterend", '<span class="surge-row tile-surges" data-surges="vault-of-glass" data-icons-only aria-busy="true"></span>'); window.RallyFlagSurges.fill(); });
