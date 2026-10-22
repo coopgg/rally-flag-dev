@@ -464,7 +464,11 @@
   // feedback, show their text unedited and only their latest version.
   const CL_TAB = ' target="_blank" rel="noopener"', CL_NEW = '<span class="sr-only"> (opens in a new tab)</span>';
   const CLARITY_KEY = "rallyflag_locker_clarity", CLARITY_SITE = "https://d2clarity.com", CLARITY_DISCORD = "https://d2clarity.com/discord", CLARITY_KOFI = "https://url.d2clarity.com/ko-fi";
-  const CLARITY = { on: (() => { try { return localStorage.getItem(CLARITY_KEY) !== "off"; } catch (e){ return true; } })(), data: null, err: "", job: null };
+  // Dev only until the Clarity partnership is agreed (their terms allow
+  // small projects; rallyflag.gg isn't one). Then set this to true.
+  const CLARITY_ON_PROD = false;
+  const CLARITY_ALLOWED = CLARITY_ON_PROD || !/(^|\.)rallyflag\.gg$/.test(location.hostname);
+  const CLARITY = { on: CLARITY_ALLOWED && (() => { try { return localStorage.getItem(CLARITY_KEY) !== "off"; } catch (e){ return true; } })(), data: null, err: "", job: null };
   function loadClarity(){
     if (!CLARITY.on) return Promise.resolve(null);
     if (CLARITY.data) return Promise.resolve(CLARITY.data);
@@ -509,6 +513,7 @@
   function renderClarityRow(){
     const row = $("clarity-row");
     if (!row) return;
+    if (!CLARITY_ALLOWED){ row.hidden = true; return; }
     row.innerHTML = '<span class="farm-label">Perk insights</span><button type="button" class="farm-btn" id="clarity-on" aria-pressed="' + CLARITY.on + '">Clarity</button>' +
       '<span class="farm-note">' + (CLARITY.job ? "Loading Clarity's descriptions… " : CLARITY.err ? "Couldn't load them: " + esc(CLARITY.err) + ". " : "") +
         'Tap a perk to see its real numbers from <a href="' + CLARITY_SITE + '"' + CL_TAB + ">Clarity" + CL_NEW + "</a>, a community research project (not part of Rally Flag)." +
@@ -2161,11 +2166,11 @@
     const two = "2‑piece " + (p.equipped.size >= 2 ? "active" : "ready") + " · ";
     return { active: p.equipped.size >= 2, text: two + (n === 3 ? "need " + miss[0] : "need 2 more") + " for 4‑piece" };
   }
-  // The Locker is shared on its own (no site menu), so its links go to the
-  // public site in a new tab rather than around the dev site.
-  const PUBLIC_SITE = "https://rallyflag.gg/";
+  // Links to the rest of the site stay on whichever site this is (dev or
+  // rallyflag.gg) and open in a new tab, so the Locker keeps its place.
+  const PUBLIC_SITE = "";
   const NEW_TAB = ' target="_blank" rel="noopener"';
-  const NEW_TAB_NOTE = '<span class="sr-only"> (opens rallyflag.gg in a new tab)</span>';
+  const NEW_TAB_NOTE = '<span class="sr-only"> (opens in a new tab)</span>';
   function setHref(p){ return p.set.ours ? PUBLIC_SITE + "armor-set-bonuses.html?highlight=" + p.set.ours.slug : null; }
 
   // Armor Sets: one compact row per set, grouped by class, then by

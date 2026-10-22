@@ -19,11 +19,7 @@ git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)debug.html' ':(exclude)clan-admin.html' ':(exclude)discord-bot' \
   ':(exclude)api-debug.html' ':(exclude)xur-debug.html' ':(exclude).claude' \
   ':(exclude)skills-lock.json' ':(exclude).gitignore' ':(exclude)tools' \
-  ':(exclude)tests' ':(exclude).github' ':(exclude)locker.html' \
-  ':(exclude)assets/locker.js' ':(exclude)assets/locker-worker.js' \
-  ':(exclude)assets/locker-demo.json' ':(exclude)your-week.html' \
-  ':(exclude)assets/your-week.js' ':(exclude)assets/your-week-worker.js' \
-  ':(exclude)assets/your-week-demo.json' > /tmp/promote.patch
+  ':(exclude)tests' ':(exclude).github' > /tmp/promote.patch
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
@@ -102,7 +98,7 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   stay `align-items:start` and reserve the variable bits instead (fixed line
   counts / min-heights). New card content that can vary in length needs the
   same treatment or the grid stops matching.
-- **Locker (dev-only preview).** `locker.html` + `assets/locker.js` show the
+- **Locker (live on rallyflag.gg since 2026-10-22, still labelled Preview).** `locker.html` + `assets/locker.js` show the
   signed-in player's weapons/armor (one GetProfile call) with God Roll
   matches and armor set progress. `assets/locker-worker.js` downloads
   Bungie's DestinyInventoryItemLiteDefinition (~3MB gz), trims it to ~6MB
@@ -111,8 +107,7 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   `locker.html?demo` uses `assets/locker-demo.json`, built by
   `node --max-old-space-size=6144 tools/build-locker-demo.js <manifest dir>`
   from real hashes (needs the full item, plug set, item set and stat
-  tables). Linked from nav.js's Debug section (hidden on rallyflag.gg); its
-  four files are excluded from promotion. Stage 2 (moving, equipping,
+  tables). In nav.js's Loadouts section. Stage 2 (moving, equipping,
   locking, postmaster pulls, desktop drag and drop) posts to
   /Platform/Destiny2/Actions/Items/{TransferItem,EquipItem,SetLockState,
   PullFromPostmaster}/ one at a time; these need the app's "Move or equip
@@ -159,22 +154,23 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   keyboard shortcuts and the Compare bottom drawer (`showDialog`; the
   dialog's `close` event is async): HANDOFF item 64.
   Clarity perk descriptions (their usage rules, versions.json check;
-  rallyflag.gg needs their partnership first): HANDOFF item 65.
+  off on rallyflag.gg via `CLARITY_ON_PROD` in locker.js until the
+  partnership is agreed): HANDOFF item 65.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.
-- **Your Week (dev-only preview).** `your-week.html` + `assets/your-week.js`
+- **Your Week (live on rallyflag.gg since 2026-10-22, Preview).** `your-week.html` + `assets/your-week.js`
   (+ `your-week-worker.js` for Bungie's definitions, `your-week-demo.json`
   for `?demo`, built by `tools/build-your-week-demo.js`): the signed-in
   player's week against This Week's rotation (featured raids/dungeons with
   each character's clears since reset from activity history, season pass,
   milestones, pursuits, seals). Owner wanted it off the Locker and under
-  This Week (HANDOFF item 61). Its four files are excluded from promotion;
-  This Week gets its "This week's rotation | Your week" switch only when
-  Your Week is promoted (no dev-only link in a public page).
+  This Week (HANDOFF item 61). In the site menu's Live section after This
+  Week, and linked both ways by the "This week's rotation | Your week" switch.
 - **Standalone pages:** `<body data-nav="standalone">` (nav.js) hides the
   site menu and Discord/Ko-fi, keeps brand + settings (theme, sign-in). The
-  Locker uses it so it can be shared directly; its links go to rallyflag.gg.
+  Locker used it while it was a dev-only preview; since going public it has
+  the normal menu and its links (`PUBLIC_SITE = ""`) stay on the same site.
 - **`404.html`** is served for any missing path at any depth; it sets `<base>`
   to the site root and writes its asset tags from script. Keep that pattern.
 

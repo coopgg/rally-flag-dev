@@ -163,6 +163,10 @@
     padding:3px 8px; margin-left:8px; vertical-align:middle;
   }
   #reset-countdown-note{ font-variant-numeric:tabular-nums; }
+  .yw-switch{ display:flex; justify-content:center; gap:8px; margin:22px auto 0; padding:0 16px; flex-wrap:wrap; }
+  .yw-switch a{ font-size:14px; font-weight:500; color:var(--text-dim); text-decoration:none; padding:8px 16px; border-radius:999px; border:1px solid var(--panel-border); background:var(--panel); }
+  .yw-switch a:hover{ color:var(--text); }
+  .yw-switch a[aria-current="page"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); font-weight:600; }
 </style>
 </head>
 <body data-nav-group="thisweek">
@@ -176,6 +180,7 @@
   <h1 class="title">This Week</h1>
   <p class="subtitle">This week's featured raid and dungeon.</p>
 </div>
+<nav class="yw-switch" aria-label="This Week views"><a href="this-week.html" aria-current="page">This week's rotation</a><a href="your-week.html">Your week</a></nav>
 
 <section>
   <div class="tw-section-head">

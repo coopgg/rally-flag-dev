@@ -39,6 +39,7 @@
       label: "Live",
       items: [
         { label: "This Week", href: "this-week.html", group: "thisweek" },
+        { label: "Your Week", href: "your-week.html", group: "yourweek" },
         { label: "Tracker", href: "tracker.html", group: "tracker" },
         { label: "Vendors", href: "vendors.html", group: "vendors" },
         { label: "Distortions", href: "distortions.html", group: "distortions" }
@@ -47,6 +48,7 @@
     {
       label: "Loadouts",
       items: [
+        { label: "Locker", href: "locker.html", group: "locker" },
         { label: "Builds", href: "builds.html", group: "builds" },
         { label: "God Rolls", href: "god-rolls.html", group: "godrolls" },
         { label: "Armor Sets", href: "armor-set-bonuses.html", group: "setbonuses" },
@@ -71,9 +73,7 @@
     NAV_SECTIONS.push({
       label: "Debug",
       items: [
-        { label: "🐞 Debug", href: "debug.html", group: "debug" },
-        { label: "Locker (preview)", href: "locker.html", group: "locker" },
-        { label: "Your Week (preview)", href: "your-week.html", group: "thisweek" }
+        { label: "🐞 Debug", href: "debug.html", group: "debug" }
       ]
     });
   }

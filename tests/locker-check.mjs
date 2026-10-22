@@ -95,8 +95,8 @@ const CLARITY_FIX = { version: 1, perks: {} };
 async function open(opts = {}){
   const context = await browser.newContext({ viewport: { width: opts.width || 1280, height: 900 }, serviceWorkers: "block", isMobile: (opts.width || 1280) < 900, hasTouch: !!opts.touch });
   if (opts.real) await context.addInitScript(() => sessionStorage.setItem("rallyflag_bungie_auth", JSON.stringify({ access_token: "GOOD", access_expires_at: Date.now() + 3600e3 })));
-  await context.route(BASE + "**", r => {
-    const rel = new URL(r.request().url()).pathname.replace("/rally-flag-dev/", "") || "index.html";
+  await context.route(new RegExp("^(" + BASE.replace(/[.\/]/g, "\\$&") + "|https://rallyflag\\.gg/)"), r => {
+    const rel = new URL(r.request().url()).pathname.replace(/^\/(rally-flag-dev\/)?/, "") || "index.html";
     const file = path.join(ROOT, rel);
     if (fs.existsSync(file) && fs.statSync(file).isFile()) r.fulfill({ body: fs.readFileSync(file), contentType: TYPES[path.extname(file)] || "application/octet-stream" });
     else r.continue();
@@ -670,6 +670,12 @@ await section("Clarity", async () => {
   await p.keyboard.press("Escape"); await p.click("#clarity-on");
   check("clarity: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
+  // rallyflag.gg: off until the partnership is agreed (CLARITY_ON_PROD).
+  const q = await open({ url: "https://rallyflag.gg/locker.html?demo" });
+  await q.click('#buckets .item-tile[data-id]'); await q.locator("#item-dialog [data-plug]:not(.mod-sq)").nth(2).click(); await q.waitForTimeout(800);
+  check("clarity: off on rallyflag.gg: no box, no download, no Tools row", !await q.locator("#plug-info .clarity").count() && !q.clarityCalls.length && await q.isHidden("#clarity-row"), q.clarityCalls.join());
+  check("clarity: rallyflag.gg Locker has no script errors", !q.errors.length, q.errors.join("; "));
+  await q.context_.close();
 });
 
 // ---------- 2g2. Touch: long-press to move, swipe to switch character ----------
