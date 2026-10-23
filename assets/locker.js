@@ -1469,7 +1469,7 @@
   // (DIM imports especially): the subclass and its choices, the artifact
   // perks and armor mods as icons, and their names grouped underneath.
   function loBuildHtml(lo, open){
-    const icon = h => { const d = DB.items[h] || {}; return '<span class="lo-mini sm" title="' + esc(d.n || "") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="28" height="28" loading="lazy">' : "") + "</span>"; };
+    const icon = (h, n) => { const d = DB.items[h] || {}; return '<span class="lo-mini sm" title="' + esc((d.n || "") + (n > 1 ? " ×" + n : "")) + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="28" height="28" loading="lazy">' : "") + (n > 1 ? '<span class="lo-count">×' + n + "</span>" : "") + "</span>"; };
     const inOrder = sockets => Object.keys(sockets || {}).sort((a, b) => a - b).map(k => sockets[k]).filter(h => DB.items[h]);
     const sub = lo.subclass ? inOrder(lo.subclass.sockets) : [], perks = lo.artifact ? inOrder(lo.artifact.sockets) : [], mods = (lo.mods || []).filter(h => DB.items[h]);
     if (!sub.length && !perks.length && !mods.length) return "";
@@ -1479,12 +1479,14 @@
     const counted = list => { const m = new Map(); for (const n of list) m.set(n, (m.get(n) || 0) + 1); return [...m].map(([n, c]) => c > 1 ? n + " ×" + c : n); };
     const groups = [["Super", sub.filter(h => kind(h) === 0)], ["Abilities", sub.filter(h => kind(h) === 1)], ["Aspects", sub.filter(h => kind(h) === 2)], ["Fragments", sub.filter(h => kind(h) === 3)],
       ["Artifact perks", perks], ["Armor mods", mods]].filter(g => g[1].length);
-    // A small gap between Super, abilities, Aspects and Fragments.
-    const row = (label, head, list, split) => '<div class="lo-build-row"><span class="lo-build-label">' + label + "</span>" + head +
-      list.map((h, k) => (split && k && kind(h) !== kind(list[k - 1]) ? '<span class="lo-gap"></span>' : "") + icon(h)).join("") + "</div>";
+    // Label column, then the icons wrapping in their own column; a small gap
+    // between Super, abilities, Aspects and Fragments. Repeated mods: one icon, ×n.
+    const row = (label, head, list, split) => '<div class="lo-build-row"><span class="lo-build-label">' + label + '</span><span class="lo-build-icons">' + head +
+      list.map((h, k) => (split && k && kind(h) !== kind(list[k - 1]) ? '<span class="lo-gap"></span>' : "") + icon(h)).join("") + "</span></div>";
+    const modIcons = () => { const m = new Map(); for (const h of mods) m.set(h, (m.get(h) || 0) + 1); return [...m].map(([h, n]) => icon(h, n)).join(""); };
     return '<div class="lo-build">' +
       (lo.subclass ? row(esc((DB.items[lo.subclass.hash] || {}).n || "Subclass"), icon(lo.subclass.hash) + '<span class="lo-gap"></span>', sub.slice().sort((a, b) => kind(a) - kind(b)), true) : "") +
-      (perks.length ? row("Artifact", "", perks) : "") + (mods.length ? row("Mods", "", mods) : "") +
+      (perks.length ? row("Artifact", "", perks) : "") + (mods.length ? '<div class="lo-build-row"><span class="lo-build-label">Mods</span><span class="lo-build-icons">' + modIcons() + "</span></div>" : "") +
       '<details class="lo-names"' + (open ? " open" : "") + '><summary>What it sets</summary><dl>' + groups.map(([g, list]) => "<dt>" + g + "</dt><dd>" + esc(counted(names(list)).join(", ")) + "</dd>").join("") + "</dl></details></div>";
   }
   // Destiny equips one exotic weapon and one exotic armor piece at a time,

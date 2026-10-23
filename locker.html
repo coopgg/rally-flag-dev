@@ -726,14 +726,16 @@
   .lo-mini.sm{ width:28px; height:28px; }
   /* A saved loadout's subclass, artifact perks and mods (icons, names below). */
   .lo-build{ display:flex; flex-direction:column; gap:4px; }
-  .lo-build-row{ display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
-  .lo-gap{ width:6px; }
-  .lo-build-label{ min-width:120px; margin-right:4px; font-size:12.5px; color:var(--text-dim); }
+  .lo-build-row{ display:grid; grid-template-columns:130px 1fr; align-items:start; gap:8px; }
+  .lo-build-icons{ display:flex; flex-wrap:wrap; gap:4px; min-width:0; }
+  .lo-build-label{ padding-top:6px; font-size:12.5px; color:var(--text-dim); overflow-wrap:anywhere; }
+  .lo-mini.sm{ position:relative; }
+  .lo-count{ position:absolute; right:-3px; bottom:-3px; padding:0 3px; border-radius:6px; font-size:12px; line-height:14px; font-weight:700; color:#fff; background:#1a1f2b; border:1px solid var(--panel-border); }
   .lo-names summary{ cursor:pointer; font-size:12.5px; color:var(--accent-text); width:max-content; }
   .lo-names dl{ display:grid; grid-template-columns:max-content 1fr; gap:3px 10px; margin:6px 0 0; font-size:13px; }
   .lo-names dt{ color:var(--text-dim); }
   .lo-names dd{ margin:0; color:var(--text); }
-  @media (max-width:640px){ .lo-build-label{ min-width:0; flex-basis:100%; } }
+  @media (max-width:640px){ .lo-build-row{ grid-template-columns:1fr; gap:4px; } .lo-build-label{ padding-top:0; } }
   .lo-owner{ margin:10px 0 2px; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
   .lo-owner:first-of-type{ margin-top:0; }
   .lo-game{ display:flex; align-items:center; gap:8px; }
