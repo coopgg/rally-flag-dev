@@ -157,6 +157,8 @@ async function viaWorker(worker, route, env){
 }
 const idle = p => p.waitForFunction(() => !document.body.classList.contains("locker-busy"), null, { timeout: 90000 }).then(() => p.waitForTimeout(300));
 const toastText = p => p.textContent("#locker-toast");
+// Imports always open the review (every slot, yours to swap): save it as it stands.
+const importAndSave = async (p, link) => { await p.fill("#lo-dim", link); await p.click("#lo-dim-go"); await p.waitForSelector("#lo-h-review"); await p.click("#lo-review-save"); await p.waitForTimeout(400); };
 const status = p => p.evaluate(() => [...document.querySelectorAll("#view-loadouts .lo-detail:not([hidden]) .lo-status")].map(x => x.textContent).join(" || "));
 const comeBack = p => p.evaluate(() => { const now = Date.now; Date.now = () => now() + 120000; document.dispatchEvent(new Event("visibilitychange")); }).then(() => p.waitForTimeout(2200));
 const allItems = [].concat(DEMO.profileInventory.data.items, ...Object.values(DEMO.characterInventories.data).map(c => c.items), ...Object.values(DEMO.characterEquipment.data).map(c => c.items));
@@ -634,8 +636,8 @@ await section("DIM extras", async () => {
   const j = JSON.parse(decodeURIComponent(url.split("loadout=")[1]));
   check("dim link: Copy DIM link makes a DIM loadout link with gear, subclass and mods, but no shaders or ornaments", url.startsWith("https://app.destinyitemmanager.com/loadouts?loadout=") && j.name === "DIM out" && j.equipped.length >= 9 && j.parameters.mods.length > 0 && Object.keys(j.parameters.modsByBucket).length === 0 &&
     Object.keys((await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.name === "DIM out"))).cosmetics).length > 0);
-  await p.fill("#lo-dim", url); await p.click("#lo-dim-go"); await p.waitForTimeout(800);
-  check("dim link: and it imports back", /Imported DIM out/.test(await toastText(p)), await toastText(p));
+  await importAndSave(p, url);
+  check("dim link: and it imports back", /DIM out saved/.test(await toastText(p)), await toastText(p));
   // Materials and currencies.
   await p.click("#tab-gear"); await p.click("#materials-btn");
   check("materials: the button lists materials and currencies with totals", await p.evaluate(() => document.getElementById("item-dialog").dataset.view) === "materials" && await p.locator(".mat-row").count() >= 8 && /\d/.test(await p.textContent(".mat-row .mat-qty")));
@@ -1058,7 +1060,19 @@ await section("Shaders and ornaments", async () => {
   const fixture = { id: "chk010", name: "Fashion import", classType: 0, equipped: lo.items.map(x => ({ id: x.id, hash: x.hash })), unequipped: [], parameters: { mods: [], modsByBucket: lo.cosmetics } };
   await p.context_.unroute(RELAY + "**"); await p.context_.route(RELAY + "**", r => r.fulfill(json(fixture)));
   await p.fill("#lo-dim", "https://dim.gg/chk010/x"); await p.click("#lo-dim-go"); await p.waitForSelector("#lo-h-review");
-  check("cosmetics: importing a DIM loadout with shaders and ornaments asks first, even when you have every item", /^Importing Fashion import/.test(await p.textContent("#lo-h-review")) && await p.locator(".lo-review .cos-row").count() === 8 && await p.locator(".lo-review .pick-slot").count() === 0);
+  check("cosmetics: importing shows every slot (your own items chosen) and the shaders and ornaments", await p.locator(".lo-review .cos-row").count() === 8 && await p.locator(".lo-review .pick-slot").count() === 8 && await p.locator(".lo-review .pick.on[data-pick]:not(.pick-empty)").count() === 8);
+  // Swap one for another of yours: Choose a different helmet lists every other helmet, searchable.
+  const helmSlot = lo.items.findIndex(x => bucketOfDemo(x.id) === helmet);
+  await p.click('[data-pick-more="' + helmSlot + '"]');
+  const others = await p.locator(".pick-slot").nth(helmSlot).locator(".pick-others .pick").count();
+  const ownHelmets = allItems.filter(i => i.bucketHash === helmet && i.itemInstanceId !== lo.items[helmSlot].id && i.itemInstanceId).length;
+  check("import: Choose a different helmet lists your other helmets, search focused", others > 0 && others <= ownHelmets && await p.evaluate(k => document.activeElement.dataset.pickQ === String(k), helmSlot), others + " of " + ownHelmets);
+  const otherName = await p.locator(".pick-slot").nth(helmSlot).locator(".pick-others .pick b").first().textContent();
+  await p.fill('[data-pick-q="' + helmSlot + '"]', "zzzz"); await p.waitForTimeout(400);
+  check("import: the search narrows the list", await p.locator(".pick-slot").nth(helmSlot).locator(".pick-others .pick").count() === 0 && /0 matches/.test(await p.locator(".pick-slot").nth(helmSlot).textContent()));
+  await p.fill('[data-pick-q="' + helmSlot + '"]', ""); await p.waitForTimeout(400);
+  await p.locator(".pick-slot").nth(helmSlot).locator(".pick-others .pick").first().click();
+  check("import: picking one swaps the helmet", (await p.locator(".pick-slot").nth(helmSlot).locator(".pick.on b").first().textContent()).startsWith(otherName.replace(/Chosen$/, "").trim()));
   const dimLabels = async () => { await ready(".lo-review"); return p.$$eval(".lo-review .cos-btn", b => b.map(x => x.textContent)); };
   const fromDim = await dimLabels();
   await p.click("[data-cos-none]");
@@ -1068,6 +1082,7 @@ await section("Shaders and ornaments", async () => {
   await p.click('.lo-review [data-cos-open="' + helmet + ':sh"]'); await p.click('.lo-review .cos-panel [data-cos-set="0"]');
   await p.click("#lo-review-save"); await p.waitForTimeout(300);
   const imp = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === "dim-chk010"));
+  check("import: the swapped helmet is what's saved", imp && imp.items[helmSlot] && imp.items[helmSlot].id !== lo.items[helmSlot].id, JSON.stringify(imp && imp.items[helmSlot]));
   check("cosmetics: the import saves what you chose (the helmet keeps DIM's ornament, not its shader)", imp && JSON.stringify(Object.keys(imp.cosmetics).sort()) === JSON.stringify(Object.keys(lo.cosmetics).sort()) &&
     (imp.cosmetics[helmet] || []).length === (lo.cosmetics[helmet] || []).length - 1, JSON.stringify(imp && imp.cosmetics) + " vs " + JSON.stringify(lo.cosmetics));
   check("cosmetics: no script errors", !p.errors.length, p.errors.join("; "));
@@ -1117,7 +1132,7 @@ await section("DIM apply", async () => {
   const fixture = { id: "chk002", name: "Apply check", classType: 0, equipped: A.items.map(x => ({ id: x.id, hash: x.hash })).concat([{ id: "1", hash: other.itemHash, socketOverrides: overrides }]), unequipped: [], parameters: { mods: B.mods } };
   await p.route(RELAY + "**", r => r.fulfill(json(fixture)));
   opts.refuseOnce = (ep, body) => ep === "InsertSocketPlugFree" && body.itemId !== other.itemInstanceId;
-  await p.fill("#lo-dim", "https://dim.gg/chk002/x"); await p.click("#lo-dim-go"); await p.waitForTimeout(800);
+  await importAndSave(p, "https://dim.gg/chk002/x");
   p.calls.length = 0;
   await p.click('[data-lo-equip="dim-chk002"][data-to="' + TITAN + '"]'); await idle(p);
   const ins = p.calls.filter(c => c.ep === "InsertSocketPlugFree");
@@ -1145,7 +1160,7 @@ await section("Artifact", async () => {
   const want = { 0: plugs[1], 1: plugs[0], 2: plugs[2] };
   const fixture = { id: "chk003", name: "Artifact check", classType: 0, equipped: A.items.concat([{ id: "5", hash: spare.itemHash, socketOverrides: want }]), unequipped: [], parameters: { mods: [] } };
   await p.route(RELAY + "**", r => r.fulfill(json(fixture)));
-  await p.fill("#lo-dim", "https://dim.gg/chk003/x"); await p.click("#lo-dim-go"); await p.waitForTimeout(800);
+  await importAndSave(p, "https://dim.gg/chk003/x");
   p.calls.length = 0;
   await p.click('[data-lo-equip="dim-chk003"][data-to="' + TITAN + '"]'); await idle(p);
   const onSpare = p.calls.filter(c => c.ep === "InsertSocketPlugFree" && c.body.itemId === spare.itemInstanceId).map(c => c.body.plug.socketIndex + ":" + c.body.plug.plugItemHash);

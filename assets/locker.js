@@ -1426,16 +1426,18 @@
   const rollRank = (a, b) => ((b.roll && b.roll.full) - (a.roll && a.roll.full)) || ((b.roll ? b.roll.matched : 0) - (a.roll ? a.roll.matched : 0)) || b.power - a.power;
   function startReview(lo, isNew){
     const slots = [];
+    // An import shows every slot (the loadout's item chosen, yours to swap);
+    // reviewing a saved loadout shows only slots whose item is gone.
     lo.items.forEach((want, k) => {
-      if (want.id && ITEMS.some(i => i.id === want.id)) return;
+      const own = want.id && ITEMS.find(i => i.id === want.id);
+      if (own && !isNew) return;
       const d = DB.items[want.hash] || {};
-      let cands = ITEMS.filter(i => i.hash === want.hash && fitsClass(i, lo.cls)).sort(rollRank), similar = false;
-      if (!cands.length && d.b){
-        cands = ITEMS.filter(i => i.def.b === d.b && (i.def.y || "") === (d.y || "") && fitsClass(i, lo.cls)).sort(rollRank).slice(0, 8);
-        similar = true;
-      }
-      // Your best copy is picked to start with; a different item never is.
-      slots.push({ k, want, cands, similar, pick: !similar && cands[0] ? cands[0].id : "" });
+      let cands = ITEMS.filter(i => i.hash === want.hash && fitsClass(i, lo.cls)).sort(rollRank);
+      if (own) cands = [own].concat(cands.filter(i => i !== own));
+      // Not owned at all: the slot opens on everything you have for it.
+      const similar = !cands.length;
+      // The loadout's own item, else your best copy; a different item never is.
+      slots.push({ k, want, cands, similar, more: similar, q: "", pick: own ? own.id : cands[0] ? cands[0].id : "" });
     });
     // An import that brings shaders or ornaments always stops here, so you can choose them.
     const cos = Object.keys(lo.cosmetics || {}).length > 0;
@@ -1629,7 +1631,7 @@
     const held = k => { const s = r.slots.find(x => x.k === k); return s ? byId.get(s.pick) : byId.get((lo.items[k] || {}).id); };
     const fromCos = Object.keys(r.cosFrom).length > 0;
     return '<section class="lo-review panel-card" aria-labelledby="lo-h-review"><h2 class="lo-review-title" id="lo-h-review" tabindex="-1">' + (r.slots.length ? "Choose your copies for " : "Importing ") + esc(lo.name) + "</h2>" +
-      (r.slots.length ? '<p class="muted lo-help">' + (lo.share ? "Someone shared this loadout with you. " : lo.dim ? "This loadout names items that aren't in your inventory. " : "Some of this loadout's items are gone. ") + "Pick which of yours goes in each slot. Perks are shown so you can compare rolls.</p>"
+      (r.slots.length ? '<p class="muted lo-help">' + (r.isNew ? (lo.share ? "Someone shared this loadout with you. " : "") + "Each slot starts with the loadout's item (or your best copy of it); swap any for another of yours. Perks and stats are shown so you can compare rolls." : "Some of this loadout's items are gone. Pick which of yours goes in each slot.") + "</p>"
         : '<p class="muted lo-help">You have every item. Check what it sets, and pick its shaders and ornaments, then save.</p>') +
       // What else it will set, before you save it.
       (loBuildHtml(lo) ? '<div class="pick-build" role="group" aria-labelledby="pick-h-build"><h3 class="pick-head" id="pick-h-build">Subclass, artifact and mods</h3>' + loBuildHtml(lo, true) + "</div>" : "") +
@@ -1637,11 +1639,20 @@
         const d = DB.items[slot.want.hash] || {}, label = d.n || "Unknown item";
         const ex = exoticAmong(lo.items.map((x, k) => k === slot.k ? null : held(k)).filter(Boolean), d.t);
         const cands = ex ? slot.cands.filter(i => !isExotic(i)) : slot.cands;
+        // Everything else you have for this slot (your class), searchable.
+        const seen = new Set(slot.cands.map(i => i.id)), q = slot.q.trim().toLowerCase();
+        const others = d.b ? ITEMS.filter(i => i.def.b === d.b && !seen.has(i.id) && fitsClass(i, lo.cls) && !(ex && isExotic(i))).sort(rollRank) : [];
+        const hits = others.filter(i => !q || i.text.includes(q) || (NOTES[i.id] || "").toLowerCase().includes(q)), shown = hits.slice(0, 24);
+        const type = (d.y || "item").toLowerCase();
         return '<div class="pick-slot" role="group" aria-labelledby="pick-h-' + slot.k + '"><h3 class="pick-head" id="pick-h-' + slot.k + '">' + esc(d.y || "Item") + ": " + esc(label) + "</h3>" +
-          (slot.similar ? '<p class="pick-note">' + (cands.length ? "You don't have " + esc(label) + ". Use another " + esc(d.y || "item") + ", or leave it empty." : "You don't have " + esc(label) + " or anything like it. It'll be left empty.") + "</p>"
+          (slot.similar ? '<p class="pick-note">' + (others.length ? "You don't have " + esc(label) + ". Pick another " + esc(type) + " of yours, or leave it empty." : "You don't have " + esc(label) + " or anything else for this slot. It'll be left empty.") + "</p>"
             : cands.length > 1 ? '<p class="pick-note">You have ' + cands.length + " copies.</p>" : "") +
-          (ex && cands.length < slot.cands.length ? exoticNote(ex, d.t) : "") +
+          (ex && (cands.length < slot.cands.length || slot.more) ? exoticNote(ex, d.t) : "") +
           (cands.length ? '<div class="pick-list">' + cands.map(i => pickHtml(slot, i)).join("") + "</div>" : "") +
+          (others.length ? (slot.similar ? "" : '<button type="button" class="act-btn pick-more" data-pick-more="' + slot.k + '" aria-expanded="' + !!slot.more + '">' + (slot.more ? "Hide other " : "Choose a different ") + esc(type) + (slot.more ? "s" : "") + "</button>") +
+            (slot.more ? '<div class="pick-others"><label class="lo-name"><span>Search</span><input type="search" data-pick-q="' + slot.k + '" value="' + esc(slot.q) + '" placeholder="Name, perk or stat…" autocomplete="off" spellcheck="false" aria-label="' + esc("Search your " + type + "s") + '"></label>' +
+              '<p class="pick-note">' + (q ? hits.length + (hits.length === 1 ? " match" : " matches") : others.length + " other " + esc(type) + (others.length === 1 ? "" : "s") + " you have") + (hits.length > shown.length ? ", showing " + shown.length + ": type to narrow it down." : ".") + "</p>" +
+              (shown.length ? '<div class="pick-list">' + shown.map(i => pickHtml(slot, i)).join("") + "</div>" : "") + "</div>" : "") : "") +
             '<button type="button" class="pick pick-empty' + (slot.pick === "" ? " on" : "") + '" data-pick-slot="' + slot.k + '" data-pick="" aria-pressed="' + (slot.pick === "") + '">Leave this slot empty' + (slot.pick === "" ? ' <span class="pick-chosen">Chosen</span>' : "") + "</button></div>";
       }).join("") +
       // Shaders and ornaments: DIM's picks to start with; change any, or none.
@@ -2148,6 +2159,18 @@
       });
       $("lo-review-cancel").addEventListener("click", () => { loReview = null; renderLoadouts(); $("lo-dim").focus(); });
       wireCosmetics(box, loReview.lo);
+      box.querySelectorAll("[data-pick-more]").forEach(b => b.addEventListener("click", () => {
+        const slot = loReview.slots.find(x => x.k === +b.dataset.pickMore);
+        slot.more = !slot.more; slot.q = "";
+        renderLoadouts();
+        const f = box.querySelector(slot.more ? '[data-pick-q="' + slot.k + '"]' : '[data-pick-more="' + slot.k + '"]'); if (f) f.focus();
+      }));
+      let pickT = 0;
+      box.querySelectorAll("[data-pick-q]").forEach(inp => inp.addEventListener("input", () => {
+        const slot = loReview.slots.find(x => x.k === +inp.dataset.pickQ);
+        slot.q = inp.value; clearTimeout(pickT);
+        pickT = setTimeout(() => { renderLoadouts(); const f = box.querySelector('[data-pick-q="' + slot.k + '"]'); if (f){ f.focus(); f.setSelectionRange(f.value.length, f.value.length); } }, 150);
+      }));
       const cosNone = box.querySelector("[data-cos-none]"), cosFrom = box.querySelector("[data-cos-from]");
       if (cosNone) cosNone.addEventListener("click", () => { loReview.lo.cosmetics = {}; renderLoadouts(); box.querySelector("[data-cos-none]").focus(); toast("This loadout won't change any shaders or ornaments.", "ok"); });
       if (cosFrom) cosFrom.addEventListener("click", () => { loReview.lo.cosmetics = JSON.parse(JSON.stringify(loReview.cosFrom)); renderLoadouts(); box.querySelector("[data-cos-from]").focus(); });
@@ -2249,7 +2272,7 @@
         if (startReview(lo, true)){
           renderLoadouts();
           const h = $("lo-h-review"); h.scrollIntoView({ block: "start" }); h.focus();
-          toast("Imported " + lo.name + (loReview.slots.length ? ". Choose your copies, then save." : ". Pick its shaders and ornaments, then save."), "ok");
+          toast("Imported " + lo.name + ". Check each slot, swap anything you like, then save.", "ok");
           return;
         }
         const all = readLoadouts().filter(x => x.id !== lo.id);
