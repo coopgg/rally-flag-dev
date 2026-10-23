@@ -839,6 +839,11 @@ await section("Loadouts", async () => {
   await p.fill("#lo-name", "Check Titan"); await p.click('[data-lo-save="' + TITAN + '"]');
   const saved = await status(p);
   check("loadouts: a saved loadout is fully on", /equipped 8 of 8 · subclass set · artifact set · mods (\d+) of \1/.test(saved) && await p.locator('.lo-tile[aria-expanded="true"] .lo-check').count() === 1, saved);
+  const b = ".lo-detail:not([hidden]) .lo-build";
+  check("loadouts: the card shows the subclass, its choices, artifact perks and mods as icons, with names grouped below",
+    await p.locator(b + " .lo-build-row").count() === 3 && await p.locator(b + " .lo-build-row").first().locator(".lo-mini").count() >= 10 &&
+    (await p.$$eval(b + " dt", d => d.map(x => x.textContent))).join() === "Super,Abilities,Aspects,Fragments,Artifact perks,Armor mods");
+  const bv = await axe(p); check("loadouts: the build view passes axe", !bv.length, bv.join(", "));
   await p.click('[data-lo-pick="g-' + TITAN + '-1"]'); await p.click('[data-game-lo="1"][data-to="' + TITAN + '"]'); await idle(p);
   await p.click('[data-lo-pick^="r-"]');
   check("loadouts: equipping something else is reflected", /equipped 0 of 8/.test(await status(p)), await status(p));
@@ -967,11 +972,15 @@ await section("In-game loadouts", async () => {
 // ---------- 5. DIM import: choose your copies (sample data) ----------
 await section("DIM import", async () => {
   const beta = DEMO.characterLoadouts.data[TITAN].loadouts[1].items.map(x => x.itemInstanceId).filter(id => hashOf(id) && !allItems.find(i => i.itemInstanceId === id && i.bucketHash === SUBCLASS_BUCKET));
-  const fixture = { id: "chk001", name: "Friend link", classType: 0, equipped: beta.map((id, k) => ({ id: "7000000" + k, hash: hashOf(id) })), unequipped: [], parameters: { mods: [] } };
+  // With a subclass and its choices (the Titan's own), like a real DIM link.
+  const sc = [].concat(DEMO.characterEquipment.data[TITAN].items).find(i => i.bucketHash === SUBCLASS_BUCKET);
+  const scOver = {}; DEMO.itemComponents.sockets.data[sc.itemInstanceId].sockets.forEach((x, k) => { if (x.plugHash) scOver[k] = x.plugHash; });
+  const fixture = { id: "chk001", name: "Friend link", classType: 0, equipped: beta.map((id, k) => ({ id: "7000000" + k, hash: hashOf(id) })).concat([{ id: "1", hash: sc.itemHash, socketOverrides: scOver }]), unequipped: [], parameters: { mods: [] } };
   const p = await open({ hash: "#loadouts", relay: fixture });
   await p.fill("#lo-dim", "https://dim.gg/chk001/x"); await p.click("#lo-dim-go"); await p.waitForSelector("#lo-h-review");
   check("dim: someone else's link opens Choose your copies first", await p.locator('[data-lo-pick="r-dim-chk001"]').count() === 0 && await p.locator(".pick-slot").count() === beta.length);
   check("dim: copies show their perks", await p.locator(".pick .pick-perk").count() > 0);
+  check("dim: before saving, it shows the subclass and the choices it will set, names open", await p.locator(".lo-review .lo-build .lo-mini").count() >= 10 && await p.locator(".lo-review .lo-names[open] dt", { hasText: "Aspects" }).count() === 1);
   await p.click("#lo-review-save");
   const stored = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === "dim-chk001"));
   check("dim: saving stores your own copies (nothing greyed out)", stored && stored.items.every(x => !x.id.startsWith("7000000")) && await p.locator(".lo-detail:not([hidden]) .lo-mini.gone").count() === 0, JSON.stringify(stored && stored.items));

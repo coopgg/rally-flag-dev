@@ -677,6 +677,7 @@
   .lo-review-title{ margin:0; font-family:'Oswald', sans-serif; font-weight:600; font-size:18px; }
   .lo-review .lo-help{ margin:0; }
   .pick-head{ margin:0 0 4px; font-size:14px; font-weight:600; }
+  .pick-build{ margin:4px 0 14px; }
   .pick-note{ margin:0 0 6px; font-size:13px; color:var(--text-dim); }
   /* Copies side by side are one height (their perk counts differ). */
   .pick-list{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); grid-auto-rows:1fr; gap:6px; }
@@ -722,6 +723,17 @@
   .lo-mini{ width:32px; height:32px; border:1px solid var(--panel-border); background:#1a1f2b; }
   .lo-mini img{ display:block; width:100%; height:100%; }
   .lo-mini.gone{ opacity:0.35; }
+  .lo-mini.sm{ width:28px; height:28px; }
+  /* A saved loadout's subclass, artifact perks and mods (icons, names below). */
+  .lo-build{ display:flex; flex-direction:column; gap:4px; }
+  .lo-build-row{ display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+  .lo-gap{ width:6px; }
+  .lo-build-label{ min-width:120px; margin-right:4px; font-size:12.5px; color:var(--text-dim); }
+  .lo-names summary{ cursor:pointer; font-size:12.5px; color:var(--accent-text); width:max-content; }
+  .lo-names dl{ display:grid; grid-template-columns:max-content 1fr; gap:3px 10px; margin:6px 0 0; font-size:13px; }
+  .lo-names dt{ color:var(--text-dim); }
+  .lo-names dd{ margin:0; color:var(--text); }
+  @media (max-width:640px){ .lo-build-label{ min-width:0; flex-basis:100%; } }
   .lo-owner{ margin:10px 0 2px; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
   .lo-owner:first-of-type{ margin-top:0; }
   .lo-game{ display:flex; align-items:center; gap:8px; }

@@ -1456,10 +1456,34 @@
       '<img class="pick-icon" src="' + esc(img(iconOf(i))) + '" alt="" width="40" height="40" loading="lazy">' +
       '<span class="pick-main"><b>' + esc(i.def.n) + (on ? ' <span class="pick-chosen">Chosen</span>' : "") + "</b><small>" + i.power + " · " + esc(ownerLabel(i.owner)) + (i.equipped ? ", equipped" : "") + (i.tier ? " · tier " + i.tier : "") + esc(roll) + "</small>" + detail + "</span></button>";
   }
+  // What the loadout sets besides gear, so you can see it before equipping
+  // (DIM imports especially): the subclass and its choices, the artifact
+  // perks and armor mods as icons, and their names grouped underneath.
+  function loBuildHtml(lo, open){
+    const icon = h => { const d = DB.items[h] || {}; return '<span class="lo-mini sm" title="' + esc(d.n || "") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="28" height="28" loading="lazy">' : "") + "</span>"; };
+    const inOrder = sockets => Object.keys(sockets || {}).sort((a, b) => a - b).map(k => sockets[k]).filter(h => DB.items[h]);
+    const sub = lo.subclass ? inOrder(lo.subclass.sockets) : [], perks = lo.artifact ? inOrder(lo.artifact.sockets) : [], mods = (lo.mods || []).filter(h => DB.items[h]);
+    if (!sub.length && !perks.length && !mods.length) return "";
+    const kind = h => { const y = (DB.items[h] || {}).y || ""; return /Super/.test(y) ? 0 : /Aspect/.test(y) ? 2 : /Fragment/.test(y) ? 3 : 1; };
+    const names = list => list.map(h => DB.items[h].n);
+    // Repeated mods once, with a count.
+    const counted = list => { const m = new Map(); for (const n of list) m.set(n, (m.get(n) || 0) + 1); return [...m].map(([n, c]) => c > 1 ? n + " ×" + c : n); };
+    const groups = [["Super", sub.filter(h => kind(h) === 0)], ["Abilities", sub.filter(h => kind(h) === 1)], ["Aspects", sub.filter(h => kind(h) === 2)], ["Fragments", sub.filter(h => kind(h) === 3)],
+      ["Artifact perks", perks], ["Armor mods", mods]].filter(g => g[1].length);
+    // A small gap between Super, abilities, Aspects and Fragments.
+    const row = (label, head, list, split) => '<div class="lo-build-row"><span class="lo-build-label">' + label + "</span>" + head +
+      list.map((h, k) => (split && k && kind(h) !== kind(list[k - 1]) ? '<span class="lo-gap"></span>' : "") + icon(h)).join("") + "</div>";
+    return '<div class="lo-build">' +
+      (lo.subclass ? row(esc((DB.items[lo.subclass.hash] || {}).n || "Subclass"), icon(lo.subclass.hash) + '<span class="lo-gap"></span>', sub.slice().sort((a, b) => kind(a) - kind(b)), true) : "") +
+      (perks.length ? row("Artifact", "", perks) : "") + (mods.length ? row("Mods", "", mods) : "") +
+      '<details class="lo-names"' + (open ? " open" : "") + '><summary>What it sets</summary><dl>' + groups.map(([g, list]) => "<dt>" + g + "</dt><dd>" + esc(counted(names(list)).join(", ")) + "</dd>").join("") + "</dl></details></div>";
+  }
   function reviewHtml(){
     const r = loReview, lo = r.lo;
     return '<section class="lo-review panel-card" aria-labelledby="lo-h-review"><h2 class="lo-review-title" id="lo-h-review" tabindex="-1">Choose your copies for ' + esc(lo.name) + "</h2>" +
       '<p class="muted lo-help">' + (lo.share ? "Someone shared this loadout with you. " : lo.dim ? "This loadout names items that aren't in your inventory. " : "Some of this loadout's items are gone. ") + "Pick which of yours goes in each slot. Perks are shown so you can compare rolls.</p>" +
+      // What else it will set, before you save it.
+      (loBuildHtml(lo) ? '<div class="pick-build" role="group" aria-labelledby="pick-h-build"><h3 class="pick-head" id="pick-h-build">Subclass, artifact and mods</h3>' + loBuildHtml(lo, true) + "</div>" : "") +
       r.slots.map(slot => {
         const d = DB.items[slot.want.hash] || {}, label = d.n || "Unknown item";
         return '<div class="pick-slot" role="group" aria-labelledby="pick-h-' + slot.k + '"><h3 class="pick-head" id="pick-h-' + slot.k + '">' + esc(d.y || "Item") + ": " + esc(label) + "</h3>" +
@@ -1788,10 +1812,8 @@
       const first = DB.items[(lo.items[0] || {}).hash] || {};
       // What it carries besides gear (older saves and imports only had gear).
       const gearOnly = !("mods" in lo);
-      const carries = gearOnly ? (lo.dim ? "Import it again to bring its subclass and mods too." : "Gear only (saved before loadouts kept subclass and mods).")
-        : [lo.subclass ? ((DB.items[lo.subclass.hash] || {}).n || "Subclass") + " with " + Object.keys(lo.subclass.sockets).length + " choices" : "",
-           lo.artifact ? ((DB.items[lo.artifact.hash] || {}).n || "Artifact") + " with " + Object.keys(lo.artifact.sockets).length + " perks" : "",
-           lo.mods && lo.mods.length ? lo.mods.length + " mods" : ""].filter(Boolean).join(", ");
+      // The subclass, artifact and mods show as icons (build), so the note only says where it came from.
+      const carries = gearOnly ? (lo.dim ? "Import it again to bring its subclass and mods too." : "Gear only (saved before loadouts kept subclass and mods).") : "";
       const from = lo.dim ? 'From DIM' + (lo.dim.id ? ' (<a href="https://dim.gg/' + esc(lo.dim.id) + '/" target="_blank" rel="noopener">dim.gg/' + esc(lo.dim.id) + '<span class="sr-only"> (opens in a new tab)</span></a>)' : "") + ". " : lo.share ? "From a share link. " : "";
       // Share: the link appears here, copied, with what it shows.
       const made = SHARES.made && SHARES.made.lo === lo.id ? SHARES.made.url : "";
@@ -1799,7 +1821,7 @@
           '<div class="act-row"><button type="button" class="act-btn" data-lo-copy="' + lo.id + '">Copy link</button></div>' +
           '<p class="muted lo-help">Anyone with this link can see this loadout and import it into their own Locker. It doesn\'t show your name or account. Changes you make later aren\'t in it; press Share again for a new link.</p></div>' : "";
       // DIM imports from before artifacts were kept: say how to get it.
-      const noArtifact = lo.dim && !gearOnly && !("artifact" in lo) ? (carries ? ". " : "") + "Import it again to bring its artifact too." : "";
+      const noArtifact = lo.dim && !gearOnly && !("artifact" in lo) ? "Import it again to bring its artifact too." : "";
       const note = from || carries || noArtifact ? '<p class="lo-status muted">' + from + esc(carries) + esc(noArtifact) + "</p>" : "";
       // Is it on? Gear equipped on the matching character, plus subclass/mods.
       const who = owners[0];
@@ -1816,7 +1838,7 @@
           '<div class="lo-main"><b>' + esc(lo.name) + '</b> <span class="muted">' + esc(lo.cls === 3 ? "Any class" : CLASS_NAMES[lo.cls] || "") +
           (gone ? " · " + gone + " item" + (gone === 1 ? "" : "s") + (lo.dim ? " you don't have" : " no longer found") : "") +
           (copies ? " · " + copies + " from your own copies" : "") + "</span></div>" +
-        '<div class="lo-items" aria-hidden="true">' + lo.items.map((x, k) => mini(x.hash, !!found[k], found[k])).join("") + "</div>" + status + note +
+        '<div class="lo-items" aria-hidden="true">' + lo.items.map((x, k) => mini(x.hash, !!found[k], found[k])).join("") + "</div>" + (gearOnly ? "" : loBuildHtml(lo)) + status + note +
         '<div class="act-row">' + owners.map(o => '<button type="button" class="act-btn" data-lo-equip="' + lo.id + '" data-to="' + o.id + '">Equip on ' + esc(o.name) + '<span class="sr-only"> (' + esc(lo.name) + ")</span></button>").join("") +
           (gone || copies ? '<button type="button" class="act-btn" data-lo-review="' + lo.id + '">Choose copies<span class="sr-only"> for ' + esc(lo.name) + "</span></button>" : "") +
           '<button type="button" class="act-btn" data-lo-edit="' + lo.id + '">Edit<span class="sr-only"> ' + esc(lo.name) + "</span></button>" +
