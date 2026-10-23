@@ -1503,6 +1503,15 @@
     if (!j.Response) throw new Error(j.ErrorStatus === "SystemDisabled" ? FRIENDLY.SystemDisabled : (j.Message || "HTTP " + res.status));
     return j.Response;
   }
+  // Which plugs of one plug set you've unlocked (profile and character plug
+  // sets); null when Bungie sent no plug sets at all (sample data: offer all).
+  function ownedInSet(setHash){
+    const prof = PROFILE.profilePlugSets && PROFILE.profilePlugSets.data, chars = (PROFILE.characterPlugSets && PROFILE.characterPlugSets.data) || {};
+    if (!prof && !Object.keys(chars).length) return null;
+    const lists = [(prof && prof.plugs || {})[setHash]].concat(Object.values(chars).map(c => (c.plugs || {})[setHash])).filter(Boolean), out = new Set();
+    for (const l of lists) for (const p of l) if (p.canInsert !== false && p.enabled !== false) out.add(p.plugItemHash);
+    return out;
+  }
   function cosmeticPool(hash){
     if (!COSMETIC_POOLS.has(hash)){
       const job = (async () => {
@@ -1511,7 +1520,8 @@
           const init = DB.items[e.singleInitialItemHash] || {}, kind = init.sh ? "sh" : init.o ? "orn" : null;
           if (!kind || !e.reusablePlugSetHash) continue;
           const set = await manifestGet("DestinyPlugSetDefinition", e.reusablePlugSetHash).catch(() => ({}));
-          const owned = ownedPlugs(), seen = new Set();
+          // Only what you own for this piece (the default look/shader always).
+          const owned = ownedInSet(e.reusablePlugSetHash), seen = new Set();
           for (const p of set.reusablePlugItems || []){
             const h = p.plugItemHash, d = DB.items[h];
             if (!d || seen.has(d.n) || !(kind === "sh" ? d.sh : isOrnamentPlug(h))) continue;
@@ -1535,31 +1545,75 @@
     lo.cosmetics = Object.assign({}, lo.cosmetics || {});
     if (keep.length) lo.cosmetics[b] = keep; else delete lo.cosmetics[b];
   }
-  // One row per slot: the piece, then a Shader and an Ornament menu.
+  // One row per slot: the piece, then a Shader and an Ornament button; a
+  // button opens a searchable list (icons and names) under the row.
+  let cosOpen = null; // "bucket:kind" of the open list
+  const cosName = (h, kind) => !h ? "Don't change" : kind === "orn" && /^Default /.test((DB.items[h] || {}).n || "") ? "Default look" : (DB.items[h] || {}).n || "Unknown";
+  const cosIcon = h => h && DB.items[h] && DB.items[h].i ? '<img src="' + esc(img(DB.items[h].i)) + '" alt="" width="24" height="24" loading="lazy">' : '<span class="cos-noicon"></span>';
   function cosRowHtml(lo, x){
     const b = bucketOfHash(x.hash), d = DB.items[x.hash] || {}, mine = x.id && ITEMS.find(i => i.id === x.id);
-    const pool = cosmeticPool(x.hash), cur = cosOf(lo, b);
-    const curSh = cur.find(h => DB.items[h] && DB.items[h].sh) || "", curOrn = cur.find(isOrnamentPlug) || "";
-    if (!pool.data && !pool.err) pool.job.then(() => {}, () => {}).then(() => { const el = document.querySelector('[data-cos-row="' + b + '"]'); if (el) el.outerHTML = cosRowHtml(lo, x); });
-    // Alphabetical (Default first); the current pick only added if it's not in the list.
-    const opts = (list, cur, kind) => '<option value="">Don\'t change</option>' + (list || []).concat(cur && !(list || []).includes(cur) ? [cur] : [])
-      .map(h => '<option value="' + h + '"' + (h === cur ? " selected" : "") + ">" + esc(kind === "orn" && /^Default /.test(DB.items[h].n) ? "Default look" : DB.items[h].n) + "</option>").join("");
-    const sel = (kind, label, cur) => '<label class="cos-pick"><span>' + label + '</span><select class="chip chip-select" data-cos-b="' + b + '" data-cos-kind="' + kind + '"' + (pool.data || pool.err ? "" : " disabled") + ' aria-label="' + esc(label + " for " + (d.n || "this slot")) + '">' +
-      (pool.data || pool.err ? opts(pool.data ? pool.data[kind] : [], cur, kind) : "<option>Loading…</option>") + "</select></label>";
+    const pool = cosmeticPool(x.hash), cur = cosOf(lo, b), ready = !!(pool.data || pool.err);
+    const now = { sh: cur.find(h => DB.items[h] && DB.items[h].sh) || 0, orn: cur.find(isOrnamentPlug) || 0 };
+    if (!ready) pool.job.then(() => {}, () => {}).then(() => { const el = document.querySelector('[data-cos-row="' + b + '"]'); if (el) el.outerHTML = cosRowHtml(lo, x); });
+    const btn = (kind, label) => '<div class="cos-pick"><span>' + label + '</span><button type="button" class="cos-btn" data-cos-open="' + b + ":" + kind + '" aria-expanded="' + (cosOpen === b + ":" + kind) + '"' + (ready ? "" : " disabled") +
+      ' aria-label="' + esc(label + " for " + (d.n || "this slot") + ": " + (ready ? cosName(now[kind], kind) : "loading")) + '">' + (ready ? cosIcon(now[kind]) + "<span>" + esc(cosName(now[kind], kind)) + "</span>" : "<span>Loading…</span>") + '<span class="cos-caret" aria-hidden="true">▾</span></button></div>';
+    let panel = "";
+    const open = cosOpen && cosOpen.split(":");
+    if (ready && open && +open[0] === b){
+      const kind = open[1], list = pool.data ? pool.data[kind] : [], what = kind === "sh" ? "shaders" : "ornaments";
+      const opt = h => '<button type="button" class="cos-opt" data-cos-set="' + (h || 0) + '" aria-pressed="' + ((now[kind] || 0) === (h || 0)) + '" data-name="' + esc(cosName(h, kind).toLowerCase()) + '">' + cosIcon(h) + "<span>" + esc(cosName(h, kind)) + "</span></button>";
+      panel = '<div class="cos-panel" role="group" aria-label="' + esc("Choose " + (kind === "sh" ? "a shader" : "an ornament") + " for " + (d.n || "this slot")) + '">' +
+        '<input type="search" class="cos-q" placeholder="Search your ' + what + '…" aria-label="Search your ' + what + '" autocomplete="off" spellcheck="false">' +
+        '<p class="cos-count" aria-live="polite">' + (list.length ? list.length + " you own" : "You don't own any for this piece") + "</p>" +
+        '<div class="cos-opts">' + opt(0) + list.map(opt).join("") + (now[kind] && !list.includes(now[kind]) ? opt(now[kind]) : "") + "</div></div>";
+    }
     return '<div class="cos-row" data-cos-row="' + b + '">' +
       '<span class="cos-item">' + (d.i || mine ? '<img src="' + esc(img(mine ? iconOf(mine) : d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "<span><b>" + esc(d.n || "Unknown item") + "</b><small>" + esc(d.y || "") + "</small></span></span>" +
-      sel("sh", "Shader", curSh) + sel("orn", "Ornament", curOrn) +
-      (pool.err ? '<small class="cos-err">Couldn\'t load its choices from Bungie (' + esc(pool.err) + ").</small>" : "") + "</div>";
+      btn("sh", "Shader") + btn("orn", "Ornament") +
+      (pool.err ? '<small class="cos-err">Couldn\'t load its choices from Bungie (' + esc(pool.err) + ").</small>" : "") + panel + "</div>";
   }
   function cosmeticsHtml(lo){
     return '<div class="cos-list" data-cos-lo="' + esc(lo.id || "") + '">' + lo.items.filter(x => bucketOfHash(x.hash)).map(x => cosRowHtml(lo, x)).join("") + "</div>";
   }
-  // Menus change the loadout being edited (the draft or the import) directly.
+  // Clicks and typing change the loadout being edited (draft or import) directly.
   function wireCosmetics(box, lo){
-    box.querySelectorAll(".cos-list").forEach(list => list.addEventListener("change", e => {
-      const s = e.target.closest("[data-cos-b]");
-      if (s) setCosmetic(lo, +s.dataset.cosB, s.dataset.cosKind, +s.value || 0);
-    }));
+    box.querySelectorAll(".cos-list").forEach(list => {
+      const redraw = (b, focus) => {
+        const x = lo.items.find(y => bucketOfHash(y.hash) === b), el = list.querySelector('[data-cos-row="' + b + '"]');
+        if (x && el) el.outerHTML = cosRowHtml(lo, x);
+        const f = focus && list.querySelector(focus); if (f) f.focus();
+      };
+      list.addEventListener("click", e => {
+        const o = e.target.closest("[data-cos-open]"), s = e.target.closest("[data-cos-set]");
+        if (o){
+          const key = o.dataset.cosOpen, b = +key.split(":")[0], was = cosOpen && +cosOpen.split(":")[0];
+          cosOpen = cosOpen === key ? null : key;
+          if (was && was !== b) redraw(was);
+          redraw(b, cosOpen ? ".cos-q" : '[data-cos-open="' + key + '"]');
+        } else if (s){
+          const [b, kind] = cosOpen.split(":");
+          setCosmetic(lo, +b, kind, +s.dataset.cosSet || 0);
+          const key = cosOpen; cosOpen = null; redraw(+b, '[data-cos-open="' + key + '"]');
+        }
+      });
+      list.addEventListener("input", e => {
+        if (!e.target.classList.contains("cos-q")) return;
+        const q = e.target.value.trim().toLowerCase(), panel = e.target.closest(".cos-panel");
+        let n = 0;
+        panel.querySelectorAll("[data-cos-set]").forEach(o => { const hit = !q || o.dataset.name.includes(q); o.hidden = !hit; if (hit && o.dataset.cosSet !== "0") n++; });
+        panel.querySelector(".cos-count").textContent = q ? n + (n === 1 ? " match" : " matches") : n + " you own";
+      });
+      list.addEventListener("keydown", e => {
+        if (!cosOpen || !e.target.closest(".cos-panel")) return;
+        if (e.key === "Escape"){ e.preventDefault(); e.stopPropagation(); const key = cosOpen; cosOpen = null; redraw(+key.split(":")[0], '[data-cos-open="' + key + '"]'); }
+        else if (e.key === "Enter" && e.target.classList.contains("cos-q")){
+          e.preventDefault();
+          // Enter picks the first match (not "Don't change").
+          const first = e.target.value.trim() && [...e.target.closest(".cos-panel").querySelectorAll("[data-cos-set]")].find(o => !o.hidden && o.dataset.cosSet !== "0");
+          if (first) first.click();
+        }
+      });
+    });
   }
   // Destiny equips one exotic weapon and one exotic armor piece at a time,
   // so once a loadout has one of a kind, other slots of that kind only

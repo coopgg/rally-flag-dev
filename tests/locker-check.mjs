@@ -161,6 +161,7 @@ const status = p => p.evaluate(() => [...document.querySelectorAll("#view-loadou
 const comeBack = p => p.evaluate(() => { const now = Date.now; Date.now = () => now() + 120000; document.dispatchEvent(new Event("visibilitychange")); }).then(() => p.waitForTimeout(2200));
 const allItems = [].concat(DEMO.profileInventory.data.items, ...Object.values(DEMO.characterInventories.data).map(c => c.items), ...Object.values(DEMO.characterEquipment.data).map(c => c.items));
 const hashOf = id => (allItems.find(i => i.itemInstanceId === id) || {}).itemHash;
+const bucketOfDemo = id => (allItems.find(i => i.itemInstanceId === id) || {}).bucketHash;
 const SUBCLASS_BUCKET = 3284755031;
 // axe on what's showing now (site-check.js covers the Locker's other states).
 const AXE = fs.readFileSync(require.resolve("axe-core/axe.min.js"), "utf8");
@@ -1030,39 +1031,73 @@ await section("Shaders and ornaments", async () => {
   const p = await open({ hash: "#loadouts" });
   await p.fill("#lo-name", "Fashion"); await p.click('[data-lo-save="' + TITAN + '"]');
   const read = () => p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.name === "Fashion"));
-  const lo = await read(), id = lo.id;
-  // After creation: Edit > Choose opens a Shader and an Ornament menu per slot, from the piece's own sockets.
-  await p.click('[data-lo-edit="' + id + '"]'); await p.click("#ed-cos");
-  await p.waitForFunction(() => document.querySelectorAll(".cos-row select:not([disabled])").length === 16, null, { timeout: 90000 });
-  check("cosmetics: the editor has a Shader and an Ornament menu for each slot, starting with what the loadout sets", await p.locator(".cos-row").count() === 8 &&
-    await p.$$eval('.cos-row select[data-cos-kind="sh"]', s => s.filter(x => x.options.length > 50).length >= 6));
-  const helmet = 3448274439, shSel = '.cos-row select[data-cos-b="' + helmet + '"][data-cos-kind="sh"]';
-  const pick = await p.$eval(shSel, s => [...s.options].map(o => o.value).filter(v => v && v !== s.value)[5]);
-  await p.selectOption(shSel, pick);
-  await p.selectOption('.cos-row select[data-cos-b="' + helmet + '"][data-cos-kind="orn"]', "");
-  const v = await axe(p); check("cosmetics: the menus pass axe", !v.length, v.join(", "));
+  const lo = await read(), id = lo.id, helmet = 3448274439;
+  const ready = sel => p.waitForFunction(s => document.querySelectorAll(s + " .cos-btn:not([disabled])").length === 16, sel, { timeout: 90000 });
+  // After creation: Edit > Choose shows a Shader and an Ornament button per slot.
+  await p.click('[data-lo-edit="' + id + '"]'); await p.click("#ed-cos"); await ready(".lo-edit");
+  check("cosmetics: the editor has a Shader and an Ornament button for each slot", await p.locator(".lo-edit .cos-row").count() === 8);
+  // A button opens a searchable list of what you own for that piece.
+  await p.click('[data-cos-open="' + helmet + ':sh"]');
+  check("cosmetics: a button opens a search box (focused) and the owned list", await p.evaluate(() => document.activeElement.classList.contains("cos-q")) && await p.locator(".cos-panel .cos-opt").count() > 50 && /\d+ you own/.test(await p.textContent(".cos-count")));
+  const name = await p.$eval('.cos-opt:nth-child(7) span', x => x.textContent), part = name.slice(1, 6).toLowerCase();
+  await p.keyboard.type(part);
+  const shown = await p.$$eval(".cos-opt:not([hidden])", o => o.map(x => x.textContent));
+  check("cosmetics: typing filters the list", shown.includes(name) && shown.every(t => t === "Don't change" || t.toLowerCase().includes(part)) && /match/.test(await p.textContent(".cos-count")), shown.join(", "));
+  await p.click('.cos-opt:not([hidden]) >> text="' + name + '"');
+  check("cosmetics: picking one closes the list and shows it on the button, focus back on it", await p.locator(".cos-panel").count() === 0 && (await p.textContent('[data-cos-open="' + helmet + ':sh"]')).startsWith(name) && await p.evaluate(h => document.activeElement.dataset.cosOpen === h + ":sh", helmet));
+  await p.click('[data-cos-open="' + helmet + ':orn"]'); await p.click('.cos-panel [data-cos-set="0"]');
+  await p.click('[data-cos-open="' + helmet + ':orn"]'); await p.keyboard.press("Escape");
+  check("cosmetics: Escape closes the list and keeps the editor open", await p.locator(".cos-panel").count() === 0 && await p.locator(".lo-edit").count() === 1);
+  await p.click('[data-cos-open="' + helmet + ':sh"]');
+  const v = await axe(p); check("cosmetics: the picker passes axe", !v.length, v.join(", "));
+  await p.keyboard.press("Escape");
   await p.click("#ed-save"); await p.waitForTimeout(300);
   const after = (await read()).cosmetics[helmet] || [];
-  check("cosmetics: a picked shader is saved, and Don't change leaves the ornament out", after.includes(+pick) && after.length === 1, JSON.stringify(after));
+  check("cosmetics: the picked shader is saved, and Don't change leaves the ornament out", after.length === 1 && after[0] !== (lo.cosmetics[helmet] || [])[0], JSON.stringify(after));
   // At import: a DIM link with shaders/ornaments stops to choose them, even with every item owned.
   const fixture = { id: "chk010", name: "Fashion import", classType: 0, equipped: lo.items.map(x => ({ id: x.id, hash: x.hash })), unequipped: [], parameters: { mods: [], modsByBucket: lo.cosmetics } };
   await p.context_.unroute(RELAY + "**"); await p.context_.route(RELAY + "**", r => r.fulfill(json(fixture)));
   await p.fill("#lo-dim", "https://dim.gg/chk010/x"); await p.click("#lo-dim-go"); await p.waitForSelector("#lo-h-review");
   check("cosmetics: importing a DIM loadout with shaders and ornaments asks first, even when you have every item", /^Importing Fashion import/.test(await p.textContent("#lo-h-review")) && await p.locator(".lo-review .cos-row").count() === 8 && await p.locator(".lo-review .pick-slot").count() === 0);
+  const dimLabels = async () => { await ready(".lo-review"); return p.$$eval(".lo-review .cos-btn", b => b.map(x => x.textContent)); };
+  const fromDim = await dimLabels();
   await p.click("[data-cos-none]");
-  check("cosmetics: Don't change any clears DIM's picks", await p.$$eval(".lo-review .cos-row select", s => s.every(x => x.value === "" || x.disabled)));
-  await p.click("[data-cos-from]"); await p.waitForTimeout(200);
-  await p.waitForFunction(() => document.querySelectorAll(".lo-review .cos-row select:not([disabled])").length === 16, null, { timeout: 90000 });
-  const dimSh = (lo.cosmetics[helmet] || []).find(h => !(lo.cosmetics[helmet].length > 1 && h === lo.cosmetics[helmet][lo.cosmetics[helmet].length - 1])) || lo.cosmetics[helmet][0];
-  check("cosmetics: Use DIM's picks puts them back", await p.$eval('.lo-review select[data-cos-b="' + helmet + '"][data-cos-kind="sh"]', s => s.value) === String(dimSh) ||
-    await p.$eval('.lo-review select[data-cos-b="' + helmet + '"][data-cos-kind="orn"]', s => s.value) === String(lo.cosmetics[helmet].slice(-1)[0]), JSON.stringify(lo.cosmetics[helmet]));
-  await p.selectOption('.lo-review select[data-cos-b="' + helmet + '"][data-cos-kind="sh"]', "");
+  check("cosmetics: Don't change any clears DIM's picks", (await dimLabels()).every(t => t.startsWith("Don't change")));
+  await p.click("[data-cos-from]");
+  check("cosmetics: Use DIM's picks puts them back", JSON.stringify(await dimLabels()) === JSON.stringify(fromDim) && fromDim.some(t => !t.startsWith("Don't change")));
+  await p.click('.lo-review [data-cos-open="' + helmet + ':sh"]'); await p.click('.lo-review .cos-panel [data-cos-set="0"]');
   await p.click("#lo-review-save"); await p.waitForTimeout(300);
   const imp = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === "dim-chk010"));
   check("cosmetics: the import saves what you chose (the helmet keeps DIM's ornament, not its shader)", imp && JSON.stringify(Object.keys(imp.cosmetics).sort()) === JSON.stringify(Object.keys(lo.cosmetics).sort()) &&
     (imp.cosmetics[helmet] || []).length === (lo.cosmetics[helmet] || []).length - 1, JSON.stringify(imp && imp.cosmetics) + " vs " + JSON.stringify(lo.cosmetics));
   check("cosmetics: no script errors", !p.errors.length, p.errors.join("; "));
+  // Only what you own: with Bungie's plug sets, a piece lists the unlocked ones (and Default) only.
+  const helm = lo.items.find(x => bucketOfDemo(x.id) === helmet);
+  // The helmet's shader socket: the one whose default plug is "Default Shader"; its plug set lists every shader.
+  const { shaderSet, hashes } = await p.evaluate(async h => {
+    const get = async (k, x) => (await (await fetch("https://www.bungie.net/Platform/Destiny2/Manifest/" + k + "/" + x + "/", { headers: { "X-API-Key": window.RallyFlagAPI.BUNGIE_API_KEY } })).json()).Response;
+    const d = await get("DestinyInventoryItemDefinition", h);
+    for (const e of d.sockets.socketEntries){
+      if (!e.reusablePlugSetHash || !e.singleInitialItemHash) continue;
+      const init = await get("DestinyInventoryItemDefinition", e.singleInitialItemHash);
+      if (init.itemSubType === 20) return { shaderSet: e.reusablePlugSetHash, hashes: (await get("DestinyPlugSetDefinition", e.reusablePlugSetHash)).reusablePlugItems.map(x => x.plugItemHash) };
+    }
+    return { shaderSet: 0, hashes: [] };
+  }, helm.hash);
   await p.context_.close();
+  if (hashes.length > 10){
+    DEMO.profilePlugSets = { data: { plugs: { [shaderSet]: hashes.map((h, k) => ({ plugItemHash: h, canInsert: k < 3, enabled: true })) } } };
+    const q = await open({ real: true, hash: "#loadouts" });
+    await q.fill("#lo-name", "Owned"); await q.click('[data-lo-save="' + TITAN + '"]');
+    const qid = (await q.getAttribute('[data-lo-pick^="r-"]', "data-lo-pick")).slice(2);
+    await q.click('[data-lo-edit="' + qid + '"]'); await q.click("#ed-cos");
+    await q.waitForSelector('[data-cos-open="' + helmet + ':sh"]:not([disabled])', { timeout: 90000 });
+    await q.click('[data-cos-open="' + helmet + ':sh"]');
+    const n = await q.locator(".cos-panel .cos-opt").count();
+    check("cosmetics: with your unlocks from Bungie, only shaders you own are listed", n >= 2 && n <= 5, n + " options");
+    await q.context_.close();
+    delete DEMO.profilePlugSets;
+  } else check("cosmetics: could read the helmet's shader set from Bungie", false, String(shaderSet));
 });
 
 // ---------- 6. DIM apply: subclass and mods (mocked Bungie) ----------
