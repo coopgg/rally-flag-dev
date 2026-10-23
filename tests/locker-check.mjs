@@ -881,6 +881,21 @@ await section("Loadouts", async () => {
   check("edit: Save keeps the swap, the cleared slot and the mods", edited.items.length === 7 && edited.items.some(x => x.id === swap) && edited.mods.length === 1 && await p.evaluate(id => document.activeElement.dataset.loEdit === id, id), JSON.stringify(edited.items.length));
   await p.click('[data-lo-edit="' + id + '"]'); await p.click('[data-ed-clear="1498876634"]'); await p.keyboard.press("Escape");
   check("edit: Escape cancels without saving", (await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id), id)).items.length === 7 && !(await p.locator(".lo-edit").count()));
+  // Editor: with an exotic of a kind in the loadout, other slots of that kind offer no exotic.
+  await p.click("#tab-gear"); await p.fill("#locker-search", "is:exotic"); await p.waitForTimeout(400);
+  const exoIds = new Set(await p.$$eval("#buckets .item-tile[data-id]:not([hidden])", t => t.map(x => x.dataset.id)));
+  await p.fill("#locker-search", ""); await p.click("#tab-loadouts");
+  const WEAPON_B = [1498876634, 2465295065, 953998645], ARMOR_B = [3448274439, 3551918588, 14239492, 20886954, 1585787867];
+  const loNow = await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id), id);
+  const bucketOf = x => (allItems.find(i => i.itemInstanceId === x.id) || {}).bucketHash;
+  const kindB = [WEAPON_B, ARMOR_B].find(bs => loNow.items.some(x => exoIds.has(x.id) && bs.includes(bucketOf(x))));
+  if (kindB){
+    const exoB = bucketOf(loNow.items.find(x => exoIds.has(x.id) && kindB.includes(bucketOf(x)))), other = kindB.find(b => b !== exoB);
+    await p.click('[data-lo-edit="' + id + '"]'); await p.click('[data-ed-slot="' + other + '"]');
+    const picks = await p.$$eval("#ed-pick-list [data-ed-pick]", b => b.map(x => x.dataset.edPick));
+    check("edit: with an exotic in the loadout, another slot of that kind offers only Legendary and below, and says why", picks.length > 0 && picks.every(x => !exoIds.has(x)) && /already has an exotic/.test(await p.textContent("#ed-pick-list")), picks.length + " picks");
+    await p.keyboard.press("Escape"); await p.keyboard.press("Escape");
+  } else check("edit: the sample loadout has an exotic", false);
   // Armor optimizer: top 10 by stat total, minimums and an Exotic respected; Equip and Save work.
   await p.click("#opt-go"); await p.waitForSelector(".opt-build");
   const totals = await p.$$eval(".opt-total", t => t.map(x => +x.textContent.replace(/\D/g, "")));
@@ -988,6 +1003,23 @@ await section("DIM import", async () => {
   check("dim: Don't import leaves nothing behind", await p.locator("#lo-h-review").count() === 0 && await p.locator('[data-lo-pick="r-dim-chk001"]').count() === 1);
   await p.fill("#lo-dim", "hello"); await p.click("#lo-dim-go"); await p.waitForTimeout(500);
   check("dim: a non-link explains itself", /DIM loadout link/.test(await toastText(p)), await toastText(p));
+  // One exotic weapon at a time: a link with two exotic weapons in different
+  // slots offers no exotic for the second once the first has one.
+  await p.click("#tab-gear"); await p.fill("#locker-search", "is:exotic is:weapon"); await p.waitForTimeout(400);
+  const exo = await p.$$eval("#buckets .item-tile[data-id]:not([hidden])", t => t.map(x => x.dataset.id));
+  const byBucket = new Map(); for (const id of exo){ const it = allItems.find(i => i.itemInstanceId === id); if (it && !byBucket.has(it.bucketHash)) byBucket.set(it.bucketHash, it.itemHash); }
+  const two = [...byBucket.values()].slice(0, 2);
+  await p.fill("#locker-search", ""); await p.click("#tab-loadouts");
+  if (two.length === 2){
+    await p.context_.unroute(RELAY + "**"); await p.context_.route(RELAY + "**", r => r.fulfill(json({ id: "chk009", name: "Two exotics", classType: 0, equipped: two.map((h, k) => ({ id: "8000000" + k, hash: h })), unequipped: [], parameters: { mods: [] } })));
+    await p.fill("#lo-dim", "https://dim.gg/chk009/x"); await p.click("#lo-dim-go"); await p.waitForSelector("#lo-h-review");
+    const slots = await p.$$eval(".lo-review .pick-slot", s => s.map(x => ({ picks: x.querySelectorAll(".pick[data-pick]:not(.pick-empty)").length, note: /already has an exotic weapon/.test(x.textContent) })));
+    check("dim: with an exotic weapon in one slot, the other weapon slot offers no exotic and says why", slots.length === 2 && slots[0].picks > 0 && !slots[0].note && slots[1].picks === 0 && slots[1].note, JSON.stringify(slots));
+    // Leave the first empty: the second can have its exotic.
+    await p.click('.lo-review .pick-slot:first-of-type .pick-empty');
+    check("dim: emptying that slot offers the exotic in the other one again", await p.locator(".lo-review .pick-slot").nth(1).locator(".pick[data-pick]:not(.pick-empty)").count() > 0);
+    await p.click("#lo-review-cancel");
+  } else check("dim: sample data has exotic weapons in two slots", false, String(two.length));
   check("dim: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
 });

@@ -1438,6 +1438,15 @@
       slots.push({ k, want, cands, similar, pick: !similar && cands[0] ? cands[0].id : "" });
     });
     if (!slots.length) return false;
+    // Starting picks keep to one exotic weapon and one exotic armor piece
+    // (items already yours count first); a later slot of that kind starts empty.
+    const has = new Set(), byId = new Map(ITEMS.map(i => [i.id, i])), inReview = new Set(slots.map(x => x.k));
+    lo.items.forEach((x, k) => { const i = !inReview.has(k) && byId.get(x.id); if (isExotic(i)) has.add(i.def.t); });
+    for (const slot of slots){
+      const i = byId.get(slot.pick);
+      if (!isExotic(i)) continue;
+      if (has.has(i.def.t)) slot.pick = ""; else has.add(i.def.t);
+    }
     loReview = { lo, isNew, slots };
     return true;
   }
@@ -1478,18 +1487,31 @@
       (perks.length ? row("Artifact", "", perks) : "") + (mods.length ? row("Mods", "", mods) : "") +
       '<details class="lo-names"' + (open ? " open" : "") + '><summary>What it sets</summary><dl>' + groups.map(([g, list]) => "<dt>" + g + "</dt><dd>" + esc(counted(names(list)).join(", ")) + "</dd>").join("") + "</dl></details></div>";
   }
+  // Destiny equips one exotic weapon and one exotic armor piece at a time,
+  // so once a loadout has one of a kind, other slots of that kind only
+  // offer Legendary and below. others: the items in the loadout's other
+  // slots; returns the exotic among them of the same kind (weapon/armor).
+  const isExotic = i => !!i && i.def.r === 6;
+  const exoticAmong = (others, kind) => others.find(i => isExotic(i) && i.def.t === kind) || null;
+  const exoticNote = (ex, kind) => '<p class="pick-note">This loadout already has an exotic ' + (kind === 3 ? "weapon" : "armor piece") + " (" + esc(ex.def.n) + "), so only Legendary and below are offered here.</p>";
   function reviewHtml(){
     const r = loReview, lo = r.lo;
+    const byId = new Map(ITEMS.map(i => [i.id, i]));
+    // What each slot holds now: kept items, and the copies picked so far.
+    const held = k => { const s = r.slots.find(x => x.k === k); return s ? byId.get(s.pick) : byId.get((lo.items[k] || {}).id); };
     return '<section class="lo-review panel-card" aria-labelledby="lo-h-review"><h2 class="lo-review-title" id="lo-h-review" tabindex="-1">Choose your copies for ' + esc(lo.name) + "</h2>" +
       '<p class="muted lo-help">' + (lo.share ? "Someone shared this loadout with you. " : lo.dim ? "This loadout names items that aren't in your inventory. " : "Some of this loadout's items are gone. ") + "Pick which of yours goes in each slot. Perks are shown so you can compare rolls.</p>" +
       // What else it will set, before you save it.
       (loBuildHtml(lo) ? '<div class="pick-build" role="group" aria-labelledby="pick-h-build"><h3 class="pick-head" id="pick-h-build">Subclass, artifact and mods</h3>' + loBuildHtml(lo, true) + "</div>" : "") +
       r.slots.map(slot => {
         const d = DB.items[slot.want.hash] || {}, label = d.n || "Unknown item";
+        const ex = exoticAmong(lo.items.map((x, k) => k === slot.k ? null : held(k)).filter(Boolean), d.t);
+        const cands = ex ? slot.cands.filter(i => !isExotic(i)) : slot.cands;
         return '<div class="pick-slot" role="group" aria-labelledby="pick-h-' + slot.k + '"><h3 class="pick-head" id="pick-h-' + slot.k + '">' + esc(d.y || "Item") + ": " + esc(label) + "</h3>" +
-          (slot.similar ? '<p class="pick-note">' + (slot.cands.length ? "You don't have " + esc(label) + ". Use another " + esc(d.y || "item") + ", or leave it empty." : "You don't have " + esc(label) + " or anything like it. It'll be left empty.") + "</p>"
-            : slot.cands.length > 1 ? '<p class="pick-note">You have ' + slot.cands.length + " copies.</p>" : "") +
-          (slot.cands.length ? '<div class="pick-list">' + slot.cands.map(i => pickHtml(slot, i)).join("") + "</div>" : "") +
+          (slot.similar ? '<p class="pick-note">' + (cands.length ? "You don't have " + esc(label) + ". Use another " + esc(d.y || "item") + ", or leave it empty." : "You don't have " + esc(label) + " or anything like it. It'll be left empty.") + "</p>"
+            : cands.length > 1 ? '<p class="pick-note">You have ' + cands.length + " copies.</p>" : "") +
+          (ex && cands.length < slot.cands.length ? exoticNote(ex, d.t) : "") +
+          (cands.length ? '<div class="pick-list">' + cands.map(i => pickHtml(slot, i)).join("") + "</div>" : "") +
             '<button type="button" class="pick pick-empty' + (slot.pick === "" ? " on" : "") + '" data-pick-slot="' + slot.k + '" data-pick="" aria-pressed="' + (slot.pick === "") + '">Leave this slot empty' + (slot.pick === "" ? ' <span class="pick-chosen">Chosen</span>' : "") + "</button></div>";
       }).join("") +
       '<div class="act-row"><button type="button" class="act-btn" id="lo-review-save">Save loadout</button><button type="button" class="act-btn" id="lo-review-cancel">' + (r.isNew ? "Don't import" : "Cancel") + "</button></div></section>";
@@ -1674,10 +1696,13 @@
   }
   function editPicks(){
     const ed = loEditing, cur = ed.draft.items.find(x => bucketOfHash(x.hash) === ed.slot), q = ed.q.trim().toLowerCase();
-    const list = ITEMS.filter(i => i.def.b === ed.slot && fitsClass(i, ed.draft.cls) && (!q || i.text.includes(q) || (NOTES[i.id] || "").toLowerCase().includes(q)))
+    // One exotic weapon and one exotic armor piece (see exoticAmong).
+    const others = ed.draft.items.filter(x => bucketOfHash(x.hash) !== ed.slot).map(x => ITEMS.find(i => i.id === x.id)).filter(Boolean);
+    const kind = (DB.items[(ITEMS.find(i => i.def.b === ed.slot) || { hash: 0 }).hash] || {}).t, ex = exoticAmong(others, kind);
+    const list = ITEMS.filter(i => i.def.b === ed.slot && fitsClass(i, ed.draft.cls) && !(ex && isExotic(i)) && (!q || i.text.includes(q) || (NOTES[i.id] || "").toLowerCase().includes(q)))
       .sort((a, b) => (b.equipped - a.equipped) || rollRank(a, b) || a.def.n.localeCompare(b.def.n));
     const shown = list.slice(0, 24);
-    return (shown.length ? shown.map(i => pickHtml({ k: ed.slot, pick: cur ? cur.id : "" }, i, "ed-pick")).join("") : '<p class="muted">Nothing here matches.</p>') +
+    return (ex ? exoticNote(ex, kind) : "") + (shown.length ? shown.map(i => pickHtml({ k: ed.slot, pick: cur ? cur.id : "" }, i, "ed-pick")).join("") : '<p class="muted">Nothing here matches.</p>') +
       (list.length > shown.length ? '<p class="muted ed-more">' + (list.length - shown.length) + " more: type to narrow it down.</p>" : "");
   }
   function editorHtml(){
