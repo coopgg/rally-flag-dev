@@ -945,6 +945,7 @@ await section("Loadouts", async () => {
     await p.selectOption("#opt-exotic", "none"); await p.click("#opt-go"); await p.waitForSelector(".opt-build");
     check("optimizer: No Exotic leaves them all out", (await p.$$eval(".opt-build", b => b.map(x => x.textContent))).every(t => !exo.some(([, n]) => t.includes(n))));
   }
+  await p.waitForTimeout(800); // let the results and toast finish fading in (axe flaked mid-transition)
   v = await axe(p); check("optimizer passes axe", !v.length, v.join(", "));
   await p.click('[data-opt-equip="0"]'); await idle(p);
   check("optimizer: Equip puts the set on the character", /Equipped the optimized armor/.test(await toastText(p)), await toastText(p));
@@ -1171,8 +1172,24 @@ await section("Shaders and ornaments", async () => {
     await t.waitForSelector('[data-cos-open="' + key + '"]:not([disabled])', { timeout: 90000 });
     await t.click('[data-cos-open="' + key + '"]');
     const offered = await t.$$eval(".cos-panel [data-cos-set]", o => o.map(x => +x.dataset.cosSet));
-    check("cosmetics: an Exotic lists the ornaments you own for its slot, even when Bungie keeps them under another set", mine.every(h => offered.includes(h)) && offered.length <= mine.length + 3, offered.length + " offered");
+    check("cosmetics: an Exotic lists the ornaments you own for its slot, even when Bungie keeps them under another set", mine.every(h => offered.includes(h)) && offered.length < ornList.hashes.length / 4, offered.length + " offered of " + ornList.hashes.length);
     await t.context_.close();
+    // An ornament worn on another of your items counts as yours, whatever the plug sets say.
+    const wearer = allItems.find(i => i.itemInstanceId && i.itemInstanceId !== exo.itemInstanceId && i.bucketHash === exo.bucketHash);
+    const worn = ornList.hashes[0], before = wearer.overrideStyleItemHash;
+    DEMO.profilePlugSets = { data: { plugs: {} } };
+    wearer.overrideStyleItemHash = worn; // allItems shares DEMO's objects
+    const w = await open({ real: true, hash: "#loadouts" });
+    await w.fill("#lo-name", "Worn look"); await w.click('[data-lo-save="' + TITAN + '"]');
+    const wid = (await w.getAttribute('[data-lo-pick^="r-"]', "data-lo-pick")).slice(2);
+    await w.evaluate(([id, b, x]) => { const k = "rallyflag_locker_loadouts:4611686018400000000", l = JSON.parse(localStorage.getItem(k)), lo = l.find(y => y.id === id);
+      lo.items = lo.items.filter(y => !b.includes(String(y.id))).concat([x]); localStorage.setItem(k, JSON.stringify(l)); }, [wid, allItems.filter(i => i.bucketHash === exo.bucketHash).map(i => i.itemInstanceId), { id: exo.itemInstanceId, hash: exo.itemHash }]);
+    await w.click('[data-lo-edit="' + wid + '"]'); await w.click("#ed-cos");
+    await w.waitForSelector('[data-cos-open="' + key + '"]:not([disabled])', { timeout: 90000 }); await w.click('[data-cos-open="' + key + '"]');
+    const offered2 = await w.$$eval(".cos-panel [data-cos-set]", o => o.map(x => +x.dataset.cosSet));
+    check("cosmetics: an ornament worn by another of your items is offered on the Exotic", offered2.includes(worn), offered2.length + " offered");
+    await w.context_.close();
+    if (before === undefined) delete wearer.overrideStyleItemHash; else wearer.overrideStyleItemHash = before;
     delete DEMO.profilePlugSets;
   } else check("cosmetics: sample data has an Exotic armor piece worn with an ornament list", false, String(exoId));
 });

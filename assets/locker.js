@@ -1515,6 +1515,9 @@
     const prof = PROFILE.profilePlugSets && PROFILE.profilePlugSets.data, chars = (PROFILE.characterPlugSets && PROFILE.characterPlugSets.data) || {};
     if (!prof && !Object.keys(chars).length) return null;
     const lists = [(prof && prof.plugs || {})[setHash]].concat(Object.values(chars).map(c => (c.plugs || {})[setHash])).filter(Boolean), out = new Set(ownedPlugs() || []);
+    // An ornament worn by any of your items is yours (e.g. Beastly Visage on
+    // Mask of Bakris, offered on Celestial Nighthawk), however Bungie files it.
+    for (const i of ITEMS) if (i.ornament) out.add(i.ornament);
     for (const l of lists) for (const p of l) if (p.canInsert !== false && p.enabled !== false) out.add(p.plugItemHash);
     return out;
   }
