@@ -76,6 +76,10 @@ button, input, select, textarea{ font-family: inherit; }
 /* Native scrollbars, form controls and pickers follow the site's mode. */
 :root{ color-scheme: dark; }
 [data-mode="light"]{ color-scheme: light; }
+/* Native dropdown lists: a select with a see-through background makes
+   Windows draw its list white while the options keep the theme's light
+   text (unreadable). Give options a solid theme background and text. */
+select option, select optgroup{ background-color:var(--bg); color:var(--text); }
 
 /* Balanced line breaks on headings (no one-word last lines). */
 h1, h2, h3, .title{ text-wrap: balance; }

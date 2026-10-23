@@ -1541,7 +1541,8 @@
     const pool = cosmeticPool(x.hash), cur = cosOf(lo, b);
     const curSh = cur.find(h => DB.items[h] && DB.items[h].sh) || "", curOrn = cur.find(isOrnamentPlug) || "";
     if (!pool.data && !pool.err) pool.job.then(() => {}, () => {}).then(() => { const el = document.querySelector('[data-cos-row="' + b + '"]'); if (el) el.outerHTML = cosRowHtml(lo, x); });
-    const opts = (list, cur, kind) => '<option value="">Don\'t change</option>' + [...new Set((cur ? [cur] : []).concat(list || []))]
+    // Alphabetical (Default first); the current pick only added if it's not in the list.
+    const opts = (list, cur, kind) => '<option value="">Don\'t change</option>' + (list || []).concat(cur && !(list || []).includes(cur) ? [cur] : [])
       .map(h => '<option value="' + h + '"' + (h === cur ? " selected" : "") + ">" + esc(kind === "orn" && /^Default /.test(DB.items[h].n) ? "Default look" : DB.items[h].n) + "</option>").join("");
     const sel = (kind, label, cur) => '<label class="cos-pick"><span>' + label + '</span><select class="chip chip-select" data-cos-b="' + b + '" data-cos-kind="' + kind + '"' + (pool.data || pool.err ? "" : " disabled") + ' aria-label="' + esc(label + " for " + (d.n || "this slot")) + '">' +
       (pool.data || pool.err ? opts(pool.data ? pool.data[kind] : [], cur, kind) : "<option>Loading…</option>") + "</select></label>";
