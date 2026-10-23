@@ -631,7 +631,8 @@ await section("DIM extras", async () => {
   await p.click('[data-lo-dim="' + id + '"]'); await p.waitForTimeout(200);
   const url = await p.evaluate(() => navigator.clipboard.readText());
   const j = JSON.parse(decodeURIComponent(url.split("loadout=")[1]));
-  check("dim link: Copy DIM link makes a DIM loadout link with gear, subclass, mods and cosmetics", url.startsWith("https://app.destinyitemmanager.com/loadouts?loadout=") && j.name === "DIM out" && j.equipped.length >= 9 && j.parameters.mods.length > 0 && Object.keys(j.parameters.modsByBucket).length > 0);
+  check("dim link: Copy DIM link makes a DIM loadout link with gear, subclass and mods, but no shaders or ornaments", url.startsWith("https://app.destinyitemmanager.com/loadouts?loadout=") && j.name === "DIM out" && j.equipped.length >= 9 && j.parameters.mods.length > 0 && Object.keys(j.parameters.modsByBucket).length === 0 &&
+    Object.keys((await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.name === "DIM out"))).cosmetics).length > 0);
   await p.fill("#lo-dim", url); await p.click("#lo-dim-go"); await p.waitForTimeout(800);
   check("dim link: and it imports back", /Imported DIM out/.test(await toastText(p)), await toastText(p));
   // Materials and currencies.
@@ -1024,6 +1025,46 @@ await section("DIM import", async () => {
   await p.context_.close();
 });
 
+// ---------- 5b. Shaders and ornaments: choose them per slot ----------
+await section("Shaders and ornaments", async () => {
+  const p = await open({ hash: "#loadouts" });
+  await p.fill("#lo-name", "Fashion"); await p.click('[data-lo-save="' + TITAN + '"]');
+  const read = () => p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.name === "Fashion"));
+  const lo = await read(), id = lo.id;
+  // After creation: Edit > Choose opens a Shader and an Ornament menu per slot, from the piece's own sockets.
+  await p.click('[data-lo-edit="' + id + '"]'); await p.click("#ed-cos");
+  await p.waitForFunction(() => document.querySelectorAll(".cos-row select:not([disabled])").length === 16, null, { timeout: 90000 });
+  check("cosmetics: the editor has a Shader and an Ornament menu for each slot, starting with what the loadout sets", await p.locator(".cos-row").count() === 8 &&
+    await p.$$eval('.cos-row select[data-cos-kind="sh"]', s => s.filter(x => x.options.length > 50).length >= 6));
+  const helmet = 3448274439, shSel = '.cos-row select[data-cos-b="' + helmet + '"][data-cos-kind="sh"]';
+  const pick = await p.$eval(shSel, s => [...s.options].map(o => o.value).filter(v => v && v !== s.value)[5]);
+  await p.selectOption(shSel, pick);
+  await p.selectOption('.cos-row select[data-cos-b="' + helmet + '"][data-cos-kind="orn"]', "");
+  const v = await axe(p); check("cosmetics: the menus pass axe", !v.length, v.join(", "));
+  await p.click("#ed-save"); await p.waitForTimeout(300);
+  const after = (await read()).cosmetics[helmet] || [];
+  check("cosmetics: a picked shader is saved, and Don't change leaves the ornament out", after.includes(+pick) && after.length === 1, JSON.stringify(after));
+  // At import: a DIM link with shaders/ornaments stops to choose them, even with every item owned.
+  const fixture = { id: "chk010", name: "Fashion import", classType: 0, equipped: lo.items.map(x => ({ id: x.id, hash: x.hash })), unequipped: [], parameters: { mods: [], modsByBucket: lo.cosmetics } };
+  await p.context_.unroute(RELAY + "**"); await p.context_.route(RELAY + "**", r => r.fulfill(json(fixture)));
+  await p.fill("#lo-dim", "https://dim.gg/chk010/x"); await p.click("#lo-dim-go"); await p.waitForSelector("#lo-h-review");
+  check("cosmetics: importing a DIM loadout with shaders and ornaments asks first, even when you have every item", /^Importing Fashion import/.test(await p.textContent("#lo-h-review")) && await p.locator(".lo-review .cos-row").count() === 8 && await p.locator(".lo-review .pick-slot").count() === 0);
+  await p.click("[data-cos-none]");
+  check("cosmetics: Don't change any clears DIM's picks", await p.$$eval(".lo-review .cos-row select", s => s.every(x => x.value === "" || x.disabled)));
+  await p.click("[data-cos-from]"); await p.waitForTimeout(200);
+  await p.waitForFunction(() => document.querySelectorAll(".lo-review .cos-row select:not([disabled])").length === 16, null, { timeout: 90000 });
+  const dimSh = (lo.cosmetics[helmet] || []).find(h => !(lo.cosmetics[helmet].length > 1 && h === lo.cosmetics[helmet][lo.cosmetics[helmet].length - 1])) || lo.cosmetics[helmet][0];
+  check("cosmetics: Use DIM's picks puts them back", await p.$eval('.lo-review select[data-cos-b="' + helmet + '"][data-cos-kind="sh"]', s => s.value) === String(dimSh) ||
+    await p.$eval('.lo-review select[data-cos-b="' + helmet + '"][data-cos-kind="orn"]', s => s.value) === String(lo.cosmetics[helmet].slice(-1)[0]), JSON.stringify(lo.cosmetics[helmet]));
+  await p.selectOption('.lo-review select[data-cos-b="' + helmet + '"][data-cos-kind="sh"]', "");
+  await p.click("#lo-review-save"); await p.waitForTimeout(300);
+  const imp = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === "dim-chk010"));
+  check("cosmetics: the import saves what you chose (the helmet keeps DIM's ornament, not its shader)", imp && JSON.stringify(Object.keys(imp.cosmetics).sort()) === JSON.stringify(Object.keys(lo.cosmetics).sort()) &&
+    (imp.cosmetics[helmet] || []).length === (lo.cosmetics[helmet] || []).length - 1, JSON.stringify(imp && imp.cosmetics) + " vs " + JSON.stringify(lo.cosmetics));
+  check("cosmetics: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
 // ---------- 6. DIM apply: subclass and mods (mocked Bungie) ----------
 await section("DIM apply", async () => {
   // A: what the Titan wears; B: the in-game Beta loadout's gear and mods.
@@ -1138,6 +1179,8 @@ await section("Share links", async () => {
   check("share links: Share makes a rallyflag link and copies it", /locker\.html\?share=[a-z0-9]{8}$/.test(url) && url.startsWith(BASE) && await A.evaluate(() => navigator.clipboard.readText()) === url && /Link copied/.test(await toastText(A)), url);
   await shot(A, "share-box");
   await A.waitForTimeout(800);
+  const shared = await A.evaluate(async u => (await fetch(u)).json(), SYNC + "share/" + url.split("share=")[1]);
+  check("share links: the shared copy carries no shaders or ornaments", shared && JSON.stringify(shared).includes("Raid share") && Object.keys(shared.cosmetics || {}).length === 0, JSON.stringify(shared).slice(0, 200));
   check("share links: Delete my share links shows with the count", /made 1 share link\./.test(await A.textContent("#view-loadouts")) && await A.isVisible("#lo-shares-del"));
   // Signed out: a preview with names, and a sign-in that comes back here.
   const C = await open({ signedOut: true, env, url });

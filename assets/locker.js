@@ -864,10 +864,10 @@
     const equipped = lo.items.map(x => ({ id: x.id || "0", hash: x.hash }))
       .concat(lo.subclass ? [{ id: "0", hash: lo.subclass.hash, socketOverrides: lo.subclass.sockets || {} }] : [])
       .concat(lo.artifact ? [{ id: "0", hash: lo.artifact.hash, socketOverrides: lo.artifact.sockets || {} }] : []);
-    const json = { name: lo.name, classType: lo.cls, equipped, unequipped: [], parameters: { mods: lo.mods || [], modsByBucket: lo.cosmetics || {} } };
+    const json = { name: lo.name, classType: lo.cls, equipped, unequipped: [], parameters: { mods: lo.mods || [], modsByBucket: {} } }; // never shaders or ornaments (owner: they shouldn't travel)
     return "https://app.destinyitemmanager.com/loadouts?loadout=" + encodeURIComponent(JSON.stringify(json));
   }
-  const shareable = lo => ({ name: lo.name, cls: lo.cls, items: lo.items.map(x => ({ hash: x.hash })), subclass: lo.subclass || null, artifact: lo.artifact || null, mods: lo.mods || [], cosmetics: lo.cosmetics || {} });
+  const shareable = lo => ({ name: lo.name, cls: lo.cls, items: lo.items.map(x => ({ hash: x.hash })), subclass: lo.subclass || null, artifact: lo.artifact || null, mods: lo.mods || [], cosmetics: {} }); // no shaders or ornaments
   async function makeShare(lo){
     const { data } = await syncFetch("POST", { loadout: shareable(lo) }, "shares");
     SHARES.count = null; SHARES.asked = false; // count again (sharing the same loadout twice keeps one link)
@@ -1437,7 +1437,9 @@
       // Your best copy is picked to start with; a different item never is.
       slots.push({ k, want, cands, similar, pick: !similar && cands[0] ? cands[0].id : "" });
     });
-    if (!slots.length) return false;
+    // An import that brings shaders or ornaments always stops here, so you can choose them.
+    const cos = Object.keys(lo.cosmetics || {}).length > 0;
+    if (!slots.length && !(isNew && cos)) return false;
     // Starting picks keep to one exotic weapon and one exotic armor piece
     // (items already yours count first); a later slot of that kind starts empty.
     const has = new Set(), byId = new Map(ITEMS.map(i => [i.id, i])), inReview = new Set(slots.map(x => x.k));
@@ -1447,7 +1449,7 @@
       if (!isExotic(i)) continue;
       if (has.has(i.def.t)) slot.pick = ""; else has.add(i.def.t);
     }
-    loReview = { lo, isNew, slots };
+    loReview = { lo, isNew, slots, cosFrom: JSON.parse(JSON.stringify(lo.cosmetics || {})) };
     return true;
   }
   function pickHtml(slot, i, attr = "pick"){
@@ -1489,6 +1491,75 @@
       (perks.length ? row("Artifact", "", perks) : "") + (mods.length ? '<div class="lo-build-row"><span class="lo-build-label">Mods</span><span class="lo-build-icons">' + modIcons() + "</span></div>" : "") +
       '<details class="lo-names"' + (open ? " open" : "") + '><summary>What it sets</summary><dl>' + groups.map(([g, list]) => "<dt>" + g + "</dt><dd>" + esc(counted(names(list)).join(", ")) + "</dd>").join("") + "</dl></details></div>";
   }
+  // ---------------- shaders and ornaments per slot ----------------
+  // A loadout keeps them as lo.cosmetics: { bucketHash: [shader?, ornament?] }.
+  // Choices come from the piece's own shader and ornament sockets (its full
+  // definition, fetched once per item), limited to what you've unlocked
+  // (all of them in sample data). "Don't change" leaves whatever is on it.
+  const COSMETIC_POOLS = new Map();
+  async function manifestGet(kind, h){
+    const res = await fetch(BUNGIE + "/Platform/Destiny2/Manifest/" + kind + "/" + h + "/", { headers: { "X-API-Key": window.RallyFlagAPI.BUNGIE_API_KEY } });
+    const j = await res.json().catch(() => ({}));
+    if (!j.Response) throw new Error(j.ErrorStatus === "SystemDisabled" ? FRIENDLY.SystemDisabled : (j.Message || "HTTP " + res.status));
+    return j.Response;
+  }
+  function cosmeticPool(hash){
+    if (!COSMETIC_POOLS.has(hash)){
+      const job = (async () => {
+        const def = await manifestGet("DestinyInventoryItemDefinition", hash), out = { sh: [], orn: [] };
+        for (const e of (def.sockets && def.sockets.socketEntries) || []){
+          const init = DB.items[e.singleInitialItemHash] || {}, kind = init.sh ? "sh" : init.o ? "orn" : null;
+          if (!kind || !e.reusablePlugSetHash) continue;
+          const set = await manifestGet("DestinyPlugSetDefinition", e.reusablePlugSetHash).catch(() => ({}));
+          const owned = ownedPlugs(), seen = new Set();
+          for (const p of set.reusablePlugItems || []){
+            const h = p.plugItemHash, d = DB.items[h];
+            if (!d || seen.has(d.n) || !(kind === "sh" ? d.sh : isOrnamentPlug(h))) continue;
+            if (owned && !owned.has(h) && !/^Default /.test(d.n)) continue;
+            seen.add(d.n); out[kind].push(h);
+          }
+        }
+        const byName = (a, b) => (/^Default /.test(DB.items[b].n) - /^Default /.test(DB.items[a].n)) || DB.items[a].n.localeCompare(DB.items[b].n);
+        out.sh.sort(byName); out.orn.sort(byName);
+        return out;
+      })();
+      COSMETIC_POOLS.set(hash, { job, data: null, err: "" });
+      job.then(d => { COSMETIC_POOLS.get(hash).data = d; }, e => { COSMETIC_POOLS.get(hash).err = e.message || String(e); });
+    }
+    return COSMETIC_POOLS.get(hash);
+  }
+  const cosOf = (lo, b) => (lo.cosmetics || {})[b] || [];
+  function setCosmetic(lo, b, kind, h){
+    const keep = cosOf(lo, b).filter(x => kind === "sh" ? !(DB.items[x] && DB.items[x].sh) : !isOrnamentPlug(x));
+    if (h) keep.push(h);
+    lo.cosmetics = Object.assign({}, lo.cosmetics || {});
+    if (keep.length) lo.cosmetics[b] = keep; else delete lo.cosmetics[b];
+  }
+  // One row per slot: the piece, then a Shader and an Ornament menu.
+  function cosRowHtml(lo, x){
+    const b = bucketOfHash(x.hash), d = DB.items[x.hash] || {}, mine = x.id && ITEMS.find(i => i.id === x.id);
+    const pool = cosmeticPool(x.hash), cur = cosOf(lo, b);
+    const curSh = cur.find(h => DB.items[h] && DB.items[h].sh) || "", curOrn = cur.find(isOrnamentPlug) || "";
+    if (!pool.data && !pool.err) pool.job.then(() => {}, () => {}).then(() => { const el = document.querySelector('[data-cos-row="' + b + '"]'); if (el) el.outerHTML = cosRowHtml(lo, x); });
+    const opts = (list, cur, kind) => '<option value="">Don\'t change</option>' + [...new Set((cur ? [cur] : []).concat(list || []))]
+      .map(h => '<option value="' + h + '"' + (h === cur ? " selected" : "") + ">" + esc(kind === "orn" && /^Default /.test(DB.items[h].n) ? "Default look" : DB.items[h].n) + "</option>").join("");
+    const sel = (kind, label, cur) => '<label class="cos-pick"><span>' + label + '</span><select class="chip chip-select" data-cos-b="' + b + '" data-cos-kind="' + kind + '"' + (pool.data || pool.err ? "" : " disabled") + ' aria-label="' + esc(label + " for " + (d.n || "this slot")) + '">' +
+      (pool.data || pool.err ? opts(pool.data ? pool.data[kind] : [], cur, kind) : "<option>Loading…</option>") + "</select></label>";
+    return '<div class="cos-row" data-cos-row="' + b + '">' +
+      '<span class="cos-item">' + (d.i || mine ? '<img src="' + esc(img(mine ? iconOf(mine) : d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "<span><b>" + esc(d.n || "Unknown item") + "</b><small>" + esc(d.y || "") + "</small></span></span>" +
+      sel("sh", "Shader", curSh) + sel("orn", "Ornament", curOrn) +
+      (pool.err ? '<small class="cos-err">Couldn\'t load its choices from Bungie (' + esc(pool.err) + ").</small>" : "") + "</div>";
+  }
+  function cosmeticsHtml(lo){
+    return '<div class="cos-list" data-cos-lo="' + esc(lo.id || "") + '">' + lo.items.filter(x => bucketOfHash(x.hash)).map(x => cosRowHtml(lo, x)).join("") + "</div>";
+  }
+  // Menus change the loadout being edited (the draft or the import) directly.
+  function wireCosmetics(box, lo){
+    box.querySelectorAll(".cos-list").forEach(list => list.addEventListener("change", e => {
+      const s = e.target.closest("[data-cos-b]");
+      if (s) setCosmetic(lo, +s.dataset.cosB, s.dataset.cosKind, +s.value || 0);
+    }));
+  }
   // Destiny equips one exotic weapon and one exotic armor piece at a time,
   // so once a loadout has one of a kind, other slots of that kind only
   // offer Legendary and below. others: the items in the loadout's other
@@ -1501,8 +1572,10 @@
     const byId = new Map(ITEMS.map(i => [i.id, i]));
     // What each slot holds now: kept items, and the copies picked so far.
     const held = k => { const s = r.slots.find(x => x.k === k); return s ? byId.get(s.pick) : byId.get((lo.items[k] || {}).id); };
-    return '<section class="lo-review panel-card" aria-labelledby="lo-h-review"><h2 class="lo-review-title" id="lo-h-review" tabindex="-1">Choose your copies for ' + esc(lo.name) + "</h2>" +
-      '<p class="muted lo-help">' + (lo.share ? "Someone shared this loadout with you. " : lo.dim ? "This loadout names items that aren't in your inventory. " : "Some of this loadout's items are gone. ") + "Pick which of yours goes in each slot. Perks are shown so you can compare rolls.</p>" +
+    const fromCos = Object.keys(r.cosFrom).length > 0;
+    return '<section class="lo-review panel-card" aria-labelledby="lo-h-review"><h2 class="lo-review-title" id="lo-h-review" tabindex="-1">' + (r.slots.length ? "Choose your copies for " : "Importing ") + esc(lo.name) + "</h2>" +
+      (r.slots.length ? '<p class="muted lo-help">' + (lo.share ? "Someone shared this loadout with you. " : lo.dim ? "This loadout names items that aren't in your inventory. " : "Some of this loadout's items are gone. ") + "Pick which of yours goes in each slot. Perks are shown so you can compare rolls.</p>"
+        : '<p class="muted lo-help">You have every item. Check what it sets, and pick its shaders and ornaments, then save.</p>') +
       // What else it will set, before you save it.
       (loBuildHtml(lo) ? '<div class="pick-build" role="group" aria-labelledby="pick-h-build"><h3 class="pick-head" id="pick-h-build">Subclass, artifact and mods</h3>' + loBuildHtml(lo, true) + "</div>" : "") +
       r.slots.map(slot => {
@@ -1516,6 +1589,11 @@
           (cands.length ? '<div class="pick-list">' + cands.map(i => pickHtml(slot, i)).join("") + "</div>" : "") +
             '<button type="button" class="pick pick-empty' + (slot.pick === "" ? " on" : "") + '" data-pick-slot="' + slot.k + '" data-pick="" aria-pressed="' + (slot.pick === "") + '">Leave this slot empty' + (slot.pick === "" ? ' <span class="pick-chosen">Chosen</span>' : "") + "</button></div>";
       }).join("") +
+      // Shaders and ornaments: DIM's picks to start with; change any, or none.
+      (r.isNew ? '<div class="pick-build" role="group" aria-labelledby="pick-h-cos"><h3 class="pick-head" id="pick-h-cos">Shaders and ornaments</h3>' +
+        '<p class="pick-note">' + (fromCos ? (lo.dim ? "DIM's" : "The loadout's") + " picks are filled in. Change any, or leave a slot as it is." : "Pick any you want this loadout to put on, or leave them as they are.") + "</p>" +
+        '<div class="act-row"><button type="button" class="act-btn" data-cos-none>Don\'t change any</button>' + (fromCos ? '<button type="button" class="act-btn" data-cos-from>Use ' + (lo.dim ? "DIM's" : "the loadout's") + " picks</button>" : "") + "</div>" +
+        cosmeticsHtml(lo) + "</div>" : "") +
       '<div class="act-row"><button type="button" class="act-btn" id="lo-review-save">Save loadout</button><button type="button" class="act-btn" id="lo-review-cancel">' + (r.isNew ? "Don't import" : "Cancel") + "</button></div></section>";
   }
   function finishReview(){
@@ -1731,7 +1809,9 @@
       '<div class="ed-slots">' + slots + "</div>" +
       row("Subclass", lo.subclass ? esc(nm(lo.subclass.hash)) + " with " + plural(Object.keys(lo.subclass.sockets || {}).length, "choice") : '<span class="muted">None</span>', "subclass", !!lo.subclass) +
       row("Artifact", lo.artifact ? esc(nm(lo.artifact.hash)) + " with " + plural(Object.keys(lo.artifact.sockets || {}).length, "perk") : '<span class="muted">None</span>', "artifact", !!lo.artifact) +
-      row("Shaders &amp; ornaments", cos ? (cos === 1 ? "1 shader or ornament" : cos + " shaders and ornaments") : '<span class="muted">None</span>', "cosmetics", cos > 0) +
+      row("Shaders &amp; ornaments", (cos ? (cos === 1 ? "1 shader or ornament" : cos + " shaders and ornaments") : '<span class="muted">None</span>') +
+        ' <button type="button" class="act-btn" id="ed-cos" aria-expanded="' + !!ed.cos + '">' + (ed.cos ? "Done" : "Choose") + '<span class="sr-only"> shaders and ornaments</span></button>', "cosmetics", cos > 0) +
+      (ed.cos ? cosmeticsHtml(lo) : "") +
       row("Armor mods", (lo.mods || []).length ? plural(lo.mods.length, "mod") : '<span class="muted">None</span>', "mods", (lo.mods || []).length > 0) +
       ((lo.mods || []).length ? '<div class="ed-mods">' + mods + "</div>" : "") +
       '<div class="ed-add"><label class="lo-name"><span>Add mod</span><select id="ed-mod-add" class="chip chip-select">' + armorModOptions() + "</select></label>" +
@@ -1785,6 +1865,8 @@
       again("#ed-mod-go");
       toast("Added " + DB.items[h].n + ". Equipping the loadout puts it on a piece with a free socket for it.", "ok");
     });
+    $("ed-cos").addEventListener("click", () => { ed.cos = !ed.cos; again("#ed-cos"); });
+    wireCosmetics(box, lo);
     $("ed-cancel").addEventListener("click", close);
     $("ed-save").addEventListener("click", () => {
       const all = readLoadouts(), at = all.findIndex(x => x.id === ed.id);
@@ -2010,6 +2092,10 @@
         if (tile){ tile.focus(); tile.scrollIntoView({ block: "nearest" }); }
       });
       $("lo-review-cancel").addEventListener("click", () => { loReview = null; renderLoadouts(); $("lo-dim").focus(); });
+      wireCosmetics(box, loReview.lo);
+      const cosNone = box.querySelector("[data-cos-none]"), cosFrom = box.querySelector("[data-cos-from]");
+      if (cosNone) cosNone.addEventListener("click", () => { loReview.lo.cosmetics = {}; renderLoadouts(); box.querySelector("[data-cos-none]").focus(); toast("This loadout won't change any shaders or ornaments.", "ok"); });
+      if (cosFrom) cosFrom.addEventListener("click", () => { loReview.lo.cosmetics = JSON.parse(JSON.stringify(loReview.cosFrom)); renderLoadouts(); box.querySelector("[data-cos-from]").focus(); });
     }
     box.querySelectorAll("[data-lo-review]").forEach(b => b.addEventListener("click", () => {
       const lo = readLoadouts().find(x => x.id === b.dataset.loReview);
@@ -2108,7 +2194,7 @@
         if (startReview(lo, true)){
           renderLoadouts();
           const h = $("lo-h-review"); h.scrollIntoView({ block: "start" }); h.focus();
-          toast("Imported " + lo.name + ". Choose your copies, then save.", "ok");
+          toast("Imported " + lo.name + (loReview.slots.length ? ". Choose your copies, then save." : ". Pick its shaders and ornaments, then save."), "ok");
           return;
         }
         const all = readLoadouts().filter(x => x.id !== lo.id);
