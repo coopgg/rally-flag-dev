@@ -3094,10 +3094,28 @@
   // Model + journal update for one finished transfer step.
   const landed = (item, owner) => { item.owner = owner; item.equipped = false; rememberItems([item]); };
   async function equipCall(item, charId){
+    if (item.def.r === 6) await clearExoticFor(item, charId);
     await post("EquipItem", { itemId: item.id, characterId: charId });
     for (const i of ITEMS) if (i.owner === charId && i.equipped && i.def.b === item.def.b) i.equipped = false;
     item.equipped = true;
     rememberItems(ITEMS.filter(i => i.owner === charId && i.def.b === item.def.b));
+  }
+  // Destiny refuses a second Exotic weapon or armor piece, so before an
+  // Exotic goes on, the one already worn in another slot of that kind is
+  // swapped for your best Legendary there (fetched to the character if it
+  // isn't carrying one).
+  async function clearExoticFor(item, charId){
+    const worn = ITEMS.find(i => i.owner === charId && i.equipped && i.def.r === 6 && i.def.t === item.def.t && i.def.b !== item.def.b);
+    if (!worn) return;
+    const legendary = i => i.def.b === worn.def.b && i.def.r !== 6 && !i.equipped && classOk(i, charId);
+    let rep = ITEMS.filter(i => i.owner === charId && legendary(i)).sort((a, b) => b.power - a.power)[0];
+    if (!rep){
+      rep = ITEMS.filter(i => i.owner !== charId && legendary(i)).sort((a, b) => b.power - a.power)[0];
+      if (!rep) throw new Error("Your " + ownerLabel(charId) + " wears " + worn.def.n + " and you have no Legendary for that slot to swap in, so " + item.def.n + " can't go on (one Exotic " + (item.def.t === 3 ? "weapon" : "armor piece") + " at a time).");
+      await makeRoom(charId, rep.def.b, new Set([rep.id]));
+      await moveTo(rep, charId);
+    }
+    await equipCall(rep, charId);
   }
   // An equipped item can't leave: equip the best other item in that slot
   // first (a Legendary when there is one, so the Exotic limit can't bite).

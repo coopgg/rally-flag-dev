@@ -759,6 +759,33 @@ await section("Master surges", async () => {
   await down.context_.close();
 });
 
+// ---------- 2g1b. One Exotic at a time: the worn one comes off first ----------
+await section("Exotic swap", async () => {
+  const p = await open({ real: true, hash: "#gear" });
+  const find = async q => { await p.fill("#locker-search", q); await p.waitForTimeout(400); return p.$$eval("#buckets .item-tile[data-id]:not([hidden])", t => t.map(x => x.dataset.id)); };
+  const info = id => allItems.find(i => i.itemInstanceId === id) || {};
+  let worn = null, next = null;
+  for (const kind of ["armor", "weapon"]){
+    const on = (await find("is:exotic is:equipped is:" + kind + " in:titan"))[0];
+    if (!on) continue;
+    const cands = (await find("is:exotic -is:equipped is:" + kind + (kind === "armor" ? " class:titan" : ""))).filter(id => info(id).bucketHash !== info(on).bucketHash);
+    if (cands.length){ worn = on; next = cands[0]; break; }
+  }
+  await p.fill("#locker-search", ""); await p.waitForTimeout(300);
+  if (!worn) check("exotic swap: sample data has a worn exotic and another to try", false);
+  else {
+    p.calls.length = 0;
+    await p.click('#buckets .item-tile[data-id="' + next + '"]');
+    await p.click('#item-dialog [data-act="equip"][data-to="' + TITAN + '"]'); await idle(p);
+    const equips = p.calls.filter(c => c.ep === "EquipItem").map(c => c.body.itemId);
+    const first = equips[0] && info(equips[0]);
+    check("exotic swap: equipping a second Exotic first swaps the worn one for a Legendary in its slot, then equips the new one",
+      equips.length >= 2 && first.bucketHash === info(worn).bucketHash && equips[0] !== worn && equips[equips.length - 1] === next && /Equipped/.test(await toastText(p)), JSON.stringify(p.calls.map(c => c.ep + ":" + (c.body.itemId || ""))));
+  }
+  check("exotic swap: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
 // ---------- 2g2. Touch: long-press to move, swipe to switch character ----------
 await section("Touch", async () => {
   const p = await open({ width: 390, touch: true, hash: "#gear" });
