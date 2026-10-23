@@ -1140,6 +1140,41 @@ await section("Shaders and ornaments", async () => {
     await q.context_.close();
     delete DEMO.profilePlugSets;
   } else check("cosmetics: could read the helmet's shader set from Bungie", false, String(shaderSet));
+  // Exotic armor takes any ornament for its slot, but Bungie keeps those
+  // unlocks under other sets: owned ornaments still show on the Exotic.
+  const r = await open({ real: true, hash: "#gear" });
+  await r.fill("#locker-search", "is:exotic is:armor class:titan"); await r.waitForTimeout(400);
+  const exoId = await r.$$eval("#buckets .item-tile[data-id]:not([hidden])", t => t.map(x => x.dataset.id)[0]);
+  const exo = exoId && allItems.find(i => i.itemInstanceId === exoId);
+  const ornList = exo ? await r.evaluate(async h => {
+    const get = async (k, x) => (await (await fetch("https://www.bungie.net/Platform/Destiny2/Manifest/" + k + "/" + x + "/", { headers: { "X-API-Key": window.RallyFlagAPI.BUNGIE_API_KEY } })).json()).Response;
+    const d = await get("DestinyInventoryItemDefinition", h);
+    for (const e of d.sockets.socketEntries){
+      if (!e.reusablePlugSetHash || !e.singleInitialItemHash) continue;
+      const init = await get("DestinyInventoryItemDefinition", e.singleInitialItemHash);
+      if (init.itemSubType === 21) return { set: e.reusablePlugSetHash, hashes: (await get("DestinyPlugSetDefinition", e.reusablePlugSetHash)).reusablePlugItems.map(x => x.plugItemHash).filter(x => x !== e.singleInitialItemHash) };
+    }
+    return null;
+  }, exo.itemHash) : null;
+  await r.context_.close();
+  if (ornList && ornList.hashes.length > 5){
+    const mine = ornList.hashes.slice(-3); // e.g. universal ornaments, unlocked under another set
+    DEMO.profilePlugSets = { data: { plugs: { 1: mine.map(h => ({ plugItemHash: h, canInsert: true, enabled: true })) } } };
+    const t = await open({ real: true, hash: "#loadouts" });
+    await t.fill("#lo-name", "Exotic look"); await t.click('[data-lo-save="' + TITAN + '"]');
+    const tid = (await t.getAttribute('[data-lo-pick^="r-"]', "data-lo-pick")).slice(2);
+    // Put the Exotic in its slot of the saved loadout.
+    await t.evaluate(([id, b, x]) => { const k = "rallyflag_locker_loadouts:4611686018400000000", l = JSON.parse(localStorage.getItem(k)), lo = l.find(y => y.id === id);
+      lo.items = lo.items.filter(y => !b.includes(String(y.id))).concat([x]); localStorage.setItem(k, JSON.stringify(l)); }, [tid, allItems.filter(i => i.bucketHash === exo.bucketHash).map(i => i.itemInstanceId), { id: exo.itemInstanceId, hash: exo.itemHash }]);
+    await t.click('[data-lo-edit="' + tid + '"]'); await t.click("#ed-cos");
+    const key = exo.bucketHash + ":orn";
+    await t.waitForSelector('[data-cos-open="' + key + '"]:not([disabled])', { timeout: 90000 });
+    await t.click('[data-cos-open="' + key + '"]');
+    const offered = await t.$$eval(".cos-panel [data-cos-set]", o => o.map(x => +x.dataset.cosSet));
+    check("cosmetics: an Exotic lists the ornaments you own for its slot, even when Bungie keeps them under another set", mine.every(h => offered.includes(h)) && offered.length <= mine.length + 3, offered.length + " offered");
+    await t.context_.close();
+    delete DEMO.profilePlugSets;
+  } else check("cosmetics: sample data has an Exotic armor piece worn with an ornament list", false, String(exoId));
 });
 
 // ---------- 6. DIM apply: subclass and mods (mocked Bungie) ----------

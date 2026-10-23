@@ -1505,12 +1505,16 @@
     if (!j.Response) throw new Error(j.ErrorStatus === "SystemDisabled" ? FRIENDLY.SystemDisabled : (j.Message || "HTTP " + res.status));
     return j.Response;
   }
-  // Which plugs of one plug set you've unlocked (profile and character plug
-  // sets); null when Bungie sent no plug sets at all (sample data: offer all).
+  // Which plugs you've unlocked for a piece: its own plug set's entries in
+  // your profile and character plug sets, plus anything unlocked in any
+  // other set (ownedPlugs). Exotic armor takes every ornament for its slot,
+  // but Bungie keeps those unlocks under the regular armor sockets' sets,
+  // not the Exotic's; the piece's own socket list still decides what fits.
+  // null when Bungie sent no plug sets at all (sample data: offer all).
   function ownedInSet(setHash){
     const prof = PROFILE.profilePlugSets && PROFILE.profilePlugSets.data, chars = (PROFILE.characterPlugSets && PROFILE.characterPlugSets.data) || {};
     if (!prof && !Object.keys(chars).length) return null;
-    const lists = [(prof && prof.plugs || {})[setHash]].concat(Object.values(chars).map(c => (c.plugs || {})[setHash])).filter(Boolean), out = new Set();
+    const lists = [(prof && prof.plugs || {})[setHash]].concat(Object.values(chars).map(c => (c.plugs || {})[setHash])).filter(Boolean), out = new Set(ownedPlugs() || []);
     for (const l of lists) for (const p of l) if (p.canInsert !== false && p.enabled !== false) out.add(p.plugItemHash);
     return out;
   }
