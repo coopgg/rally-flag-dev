@@ -60,13 +60,15 @@ chars.forEach((c, ci) => {
     milestones, uninstancedItemObjectives: {}
   };
   const items = [];
+  // One open bounty per character expires within the hour, so "Before
+  // reset" always shows whenever the sample is opened.
   const add = (d, hours) => {
     const id = String(nextId++);
-    const done = rand() < 0.25;
+    const done = hours !== 1 && rand() < 0.25;
     objectives[id] = { objectives: d.objectives.objectiveHashes.map(h => objective(h, done)) };
     items.push(Object.assign({ itemHash: d.hash, itemInstanceId: id, quantity: 1, bindStatus: 0, location: 1, bucketHash: 1345459588, transferStatus: 2, lockable: false, state: 0 }, hours ? { _hours: hours } : {}));
   };
-  for (let k = 0; k < 8; k++) add(pick(bounties), 6 + Math.floor(rand() * 150));
+  for (let k = 0; k < 8; k++) add(pick(bounties), k === 0 ? 1 : 6 + Math.floor(rand() * 150));
   for (let k = 0; k < 4; k++) add(pick(quests), 0);
   characterInventories[c] = { items };
 });

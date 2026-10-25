@@ -759,6 +759,29 @@ await section("Master surges", async () => {
   await down.context_.close();
 });
 
+// ---------- 2g1a. Item popup layout ----------
+await section("Item popup layout", async () => {
+  const p = await open({ hash: "#gear" });
+  await p.click("#buckets .item-tile[data-id]");
+  const box = sel => p.$eval(sel, e => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
+  const body = await box("#item-dialog .dlg-body"), side = await box("#item-dialog .dlg-side"), info = await box("#plug-info");
+  check("popup: on desktop the item is on the left, the actions and details panel on the right", side.x >= body.x + body.w - 2 && await p.isVisible('#item-dialog [data-act="equip"]') && await p.isHidden("#act-toggle"));
+  const perks = p.locator("#item-dialog [data-plug]:not(.mod-sq)");
+  await perks.nth(0).click(); const h1 = (await box("#plug-info")).h;
+  await perks.nth((await perks.count()) - 1).click(); await p.waitForTimeout(300); const h2 = (await box("#plug-info")).h;
+  check("popup: the details panel keeps its height whatever it shows", Math.abs(h1 - info.h) < 1 && Math.abs(h2 - info.h) < 1, [info.h, h1, h2].join(" / "));
+  const v = await axe(p); check("popup layout passes axe (desktop)", !v.length, v.join(", "));
+  await p.context_.close();
+  const q = await open({ width: 390, hash: "#gear" });
+  await q.click("#buckets .item-tile[data-id]");
+  check("popup: on a phone the actions are folded behind a button, perks come first", await q.isVisible("#act-toggle") && await q.isHidden('#item-dialog [data-act="equip"]'));
+  await q.click("#act-toggle");
+  check("popup: the button shows the actions", await q.isVisible('#item-dialog [data-act="equip"]') && await q.getAttribute("#act-toggle", "aria-expanded") === "true");
+  const w = await axe(q); check("popup layout passes axe (phone)", !w.length, w.join(", "));
+  check("popup layout: no script errors", !p.errors.length && !q.errors.length, p.errors.concat(q.errors).join("; "));
+  await q.context_.close();
+});
+
 // ---------- 2g1b. One Exotic at a time: the worn one comes off first ----------
 await section("Exotic swap", async () => {
   const p = await open({ real: true, hash: "#gear" });

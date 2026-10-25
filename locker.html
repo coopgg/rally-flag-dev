@@ -360,16 +360,39 @@
   .mod-choice:hover{ border-color:var(--accent-text); }
   .mod-choice img{ width:32px; height:32px; flex:none; background:#1d2333; }
   .mod-sq[aria-pressed="true"]{ outline:2px solid var(--accent-text); outline-offset:2px; }
+  /* Item popup layout. Phones: one scrolling column, perks first, then the
+     details panel; the actions open from the Equip, move, tag… button.
+     Wide screens (below): item left, details panel + actions right. */
+  .act-toggle{ display:block; width:calc(100% - 32px); margin:10px 16px 0; padding:9px 12px; border-radius:8px; border:1px solid var(--panel-border); background:var(--panel); color:var(--text); font:inherit; font-size:14px; font-weight:600; text-align:left; cursor:pointer; }
+  .dlg-main{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+  .dlg-main > .dlg-body{ overflow:visible; }
+  .dlg-side{ display:contents; }
+  .dlg-main > *, .dlg-side > *{ flex-shrink:0; } /* the column scrolls; nothing in it shrinks */
+  .dlg-side > .plug-info, .dlg-side > .plug-change{ order:1; margin-left:16px; margin-right:16px; }
+  .dlg-side > .plug-change{ margin-bottom:16px; }
+  .dlg-side > .dlg-actions{ order:-1; display:none; }
+  dialog.acts-open .dlg-side > .dlg-actions{ display:flex; }
+  .dlg-side > .plug-info{ max-height:45vh; overflow-y:auto; }
+  @media (min-width:900px){
+    dialog.item-dialog[data-view="item"]{ width:min(900px, calc(100vw - 48px)); }
+    .act-toggle{ display:none; }
+    .dlg-main{ display:grid; grid-template-columns:minmax(0, 1fr) 360px; grid-template-rows:minmax(0, 1fr); overflow:hidden; }
+    .dlg-main > .dlg-body{ overflow-y:auto; min-height:0; }
+    .dlg-side{ display:flex; flex-direction:column; gap:10px; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:12px 14px 16px; border-left:1px solid var(--panel-border); background:var(--panel); }
+    .dlg-side > .plug-info, .dlg-side > .plug-change{ margin:0; }
+    /* Fixed height: a long description scrolls inside it, nothing below jumps. */
+    .dlg-side > .plug-info{ flex:none; height:260px; max-height:none; background:var(--bg); }
+    .dlg-side > .dlg-actions, dialog.acts-open .dlg-side > .dlg-actions{ display:flex; padding:0; border:0; background:none; }
+  }
   .plug-info{ margin-top:12px; padding:9px 11px; border-radius:8px; border:1px solid var(--panel-border); background:var(--panel); font-size:13.5px; color:var(--text-dim); }
   .plug-info b{ color:var(--text); }
   /* Clarity's text, framed as theirs: its own box, their name and links. */
   .clarity{ margin-top:10px; padding:9px 11px; border-radius:8px; border:1px dashed var(--panel-border); background:var(--bg); color:var(--text); font-size:13.5px; line-height:1.45; }
   .cl-head{ display:flex; justify-content:space-between; gap:10px; margin-bottom:6px; font-size:12px; font-weight:600; color:var(--text-dim); }
-  .cl-head a, .cl-foot a, .cl-line a{ color:var(--accent-text); }
+  .cl-head a, .cl-line a{ color:var(--accent-text); }
   .cl-line{ margin:0; }
   .cl-bold{ font-weight:600; }
   .cl-gap{ height:7px; }
-  .cl-foot{ margin:8px 0 0; font-size:12px; color:var(--text-dim); }
   .cl-ico{ display:inline-block; width:0.7em; height:0.7em; margin:0 3px 0 1px; border-radius:50%; background:var(--text-dim); vertical-align:0.02em; }
   .cl-solar{ background:#f0631e; } .cl-arc{ background:#7aecf3; } .cl-void{ background:#b185df; } .cl-stasis{ background:#4d88ff; } .cl-strand{ background:#35e366; } .cl-kinetic{ background:#c8c8c8; }
   .cl-primary{ border-radius:2px; background:#e6e6e6; } .cl-special{ border-radius:2px; background:#7af48b; } .cl-heavy{ border-radius:2px; background:#b286ff; }
@@ -379,7 +402,7 @@
   /* Stage 2: actions in the item popup */
   .dlg-actions{ display:flex; flex-direction:column; gap:8px; padding:10px 16px; border-bottom:1px solid var(--panel-border); background:var(--panel); }
   .act-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-  .act-label{ width:50px; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
+  .act-label{ width:64px; flex:none; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
   .act-btn{
     display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:4px 11px 4px 5px; border-radius:999px;
     border:1px solid var(--edge); background:var(--bg); color:var(--text); font:inherit; font-size:13px; font-weight:500; cursor:pointer;

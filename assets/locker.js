@@ -506,8 +506,10 @@
   function clarityHtml(hash){
     const blocks = CLARITY.data && CLARITY.data.perks[hash];
     if (!blocks) return "";
-    return '<div class="clarity" lang="en"><div class="cl-head"><span>Community Insights</span><a href="' + CLARITY_SITE + '"' + CL_TAB + ">by Clarity" + CL_NEW + "</a></div>" + clarityText(blocks) +
-      '<p class="cl-foot">Written by Clarity\'s community researchers, not Rally Flag. Something wrong? <a href="' + CLARITY_DISCORD + '"' + CL_TAB + ">Tell Clarity on Discord" + CL_NEW + "</a></p></div>";
+    // One line of credit (their rules: name and link next to the text, clearly
+    // not ours, a way to send them feedback); their Discord is also in Tools.
+    return '<div class="clarity" lang="en"><div class="cl-head"><span>Community Insights by <a href="' + CLARITY_SITE + '"' + CL_TAB + ">Clarity" + CL_NEW + '</a><span class="sr-only">, not Rally Flag</span></span>' +
+      '<a href="' + CLARITY_DISCORD + '"' + CL_TAB + ' title="Tell Clarity about a mistake in this description">Report<span class="sr-only"> a mistake to Clarity on Discord</span>' + CL_NEW + "</a></div>" + clarityText(blocks) + "</div>";
   }
   // A perk's name, Bungie's description and (when on) Clarity's, pinned to
   // the bottom of the popup: for the wish-list picker and Compare, whose
@@ -3820,7 +3822,7 @@
     // Equip on a character that can use it; move to any character or the vault.
     const ownerBtn = (o, act, current) => '<button type="button" class="act-btn' + (current ? " current" : "") + '" data-act="' + act + '" data-to="' + o.id + '"' + (current ? ' aria-disabled="true"' : "") + ">" +
       (o.emblem ? '<img src="' + esc(img(o.emblem)) + '" alt="" width="20" height="20">' : "") + esc(o.name) + "</button>";
-    const actions = '<div class="dlg-actions">' +
+    const actions = '<div class="dlg-actions" id="dlg-actions">' +
       '<div class="act-row"><span class="act-label">Equip</span>' + OWNERS.filter(o => classOk(item, o.id)).map(o => ownerBtn(o, "equip", item.owner === o.id && item.equipped)).join("") + "</div>" +
       '<div class="act-row"><span class="act-label">Move</span>' + OWNERS.concat([{ id: "vault", name: "Vault" }]).map(o => ownerBtn(o, "move", item.owner === o.id)).join("") +
         // Icon shows what a tap does: a closed lock locks it, an open lock unlocks it.
@@ -3855,10 +3857,16 @@
         '<div class="dlg-title"><div class="dlg-eyebrow">' + esc(eyebrow) + '</div><h2 class="dlg-name" id="dlg-name">' + esc(d.n) + '</h2><div class="dlg-sub">' + sub + "</div></div>" +
         (item.power ? '<div class="dlg-power"><small>Power</small><b>' + item.power + "</b></div>" : "") +
         '<button type="button" class="dlg-close" aria-label="Close">×</button></div>' +
-      actions +
-      '<div class="dlg-body">' + blocks.join("") +
-        (hasPlugs ? '<div class="plug-info" id="plug-info" aria-live="polite">Tap a perk or mod to see what it does' + (d.t === 3 ? ", or to switch to it" : "") + ".</div>" +
-          '<div class="plug-change" id="plug-change"></div>' : "") + "</div>");
+      // Wide screens: the item on the left; on the right a fixed-height
+      // details panel (what a tapped perk or mod does, Clarity's text, its
+      // swap list) above the actions, so nothing below it moves. Phones: one
+      // column, perks first, the actions folded behind an Actions button.
+      '<button type="button" class="act-toggle" id="act-toggle" aria-expanded="false" aria-controls="dlg-actions">Equip, move, tag…<span aria-hidden="true"> ▾</span></button>' +
+      '<div class="dlg-main"><div class="dlg-body">' + blocks.join("") + "</div>" +
+        '<div class="dlg-side">' + (hasPlugs ? '<div class="plug-info" id="plug-info" aria-live="polite" tabindex="0" role="region" aria-label="Perk and mod details">Tap a perk or mod to see what it does' + (d.t === 3 ? ", or to switch to it" : "") + ".</div>" +
+          '<div class="plug-change" id="plug-change"></div>' : "") + actions + "</div></div>");
+    const actToggle = $("act-toggle");
+    actToggle.addEventListener("click", () => { const open = !dlg.classList.contains("acts-open"); dlg.classList.toggle("acts-open", open); actToggle.setAttribute("aria-expanded", String(open)); });
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());
     // Switching perks and mods (DIM's popup): a perk you can switch to
     // gets "Use this perk"; a mod socket lists the mods you can put there.
