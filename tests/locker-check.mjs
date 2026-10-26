@@ -951,6 +951,18 @@ await section("Loadouts", async () => {
   check("edit: Save keeps the swap, the cleared slot and the mods", edited.items.length === 7 && edited.items.some(x => x.id === swap) && edited.mods.length === 1 && await p.evaluate(id => document.activeElement.dataset.loEdit === id, id), JSON.stringify(edited.items.length));
   await p.click('[data-lo-edit="' + id + '"]'); await p.click('[data-ed-clear="1498876634"]'); await p.keyboard.press("Escape");
   check("edit: Escape cancels without saving", (await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id), id)).items.length === 7 && !(await p.locator(".lo-edit").count()));
+  // Weapons only: saved from the form or made in the editor, any class can equip it.
+  await p.fill("#lo-name", "Any weapons"); await p.check("#lo-weapons"); await p.click('[data-lo-save="' + TITAN + '"]');
+  const wo = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.name === "Any weapons"));
+  check("weapons only: keeps the 3 weapons, any class, no subclass or mods", wo.items.length === 3 && wo.cls === 3 && !wo.subclass && !wo.mods.length && !(await p.isChecked("#lo-weapons")), JSON.stringify([wo.items.length, wo.cls]));
+  check("weapons only: every character gets an Equip button", await p.locator('[data-lo-equip="' + wo.id + '"]').count() === await p.locator("[data-lo-save]").count() && /Any class/.test(await p.textContent(".lo-detail:not([hidden]) .lo-main")));
+  await p.fill("#lo-name", "Full kit"); await p.click('[data-lo-save="' + TITAN + '"]');
+  const kit = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.name === "Full kit").id);
+  await p.click('[data-lo-edit="' + kit + '"]'); await p.click("#ed-weapons"); await p.click("#ed-save");
+  const wo2 = await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id), kit);
+  check("weapons only: the editor's button turns a loadout into one", wo2.cls === 3 && wo2.items.length === 3 && !wo2.mods.length && !wo2.subclass, JSON.stringify([wo2.items.length, wo2.cls]));
+  for (const x of [wo.id, kit]){ await p.click('[data-lo-pick="r-' + x + '"]'); await p.click('[data-lo-del="' + x + '"]'); await p.click('[data-lo-del="' + x + '"]'); }
+  await p.click('[data-lo-pick="r-' + id + '"]');
   // Editor: with an exotic of a kind in the loadout, other slots of that kind offer no exotic.
   await p.click("#tab-gear"); await p.fill("#locker-search", "is:exotic"); await p.waitForTimeout(400);
   const exoIds = new Set(await p.$$eval("#buckets .item-tile[data-id]:not([hidden])", t => t.map(x => x.dataset.id)));

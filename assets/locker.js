@@ -1397,6 +1397,15 @@
     return out;
   }
 
+  // A weapons-only loadout is for any class: its weapons (and their shaders
+  // and ornaments) and nothing that belongs to one class or character.
+  function weaponsOnly(lo){
+    const weapon = h => (DB.items[h] || {}).t === 3, weaponBuckets = new Set(BUCKETS.filter(b => b.kind === "weapons").map(b => String(b.hash)));
+    lo.items = lo.items.filter(x => weapon(x.hash));
+    lo.cosmetics = Object.fromEntries(Object.entries(lo.cosmetics || {}).filter(([b]) => weaponBuckets.has(b)));
+    Object.assign(lo, { cls: 3, subclass: null, artifact: null, mods: [] });
+    return lo;
+  }
   // What a character wears now, as a loadout: gear plus its subclass
   // choices, armor mods and each slot's shader/ornament (as DIM saves).
   function snapshot(charId){
@@ -1891,6 +1900,7 @@
       ((lo.mods || []).length ? '<div class="ed-mods">' + mods + "</div>" : "") +
       '<div class="ed-add"><label class="lo-name"><span>Add mod</span><select id="ed-mod-add" class="chip chip-select">' + armorModOptions() + "</select></label>" +
         '<button type="button" class="act-btn" id="ed-mod-go">Add</button></div>' +
+      (lo.cls !== 3 || lo.items.some(x => (DB.items[x.hash] || {}).t !== 3) || lo.subclass || (lo.mods || []).length ? '<div class="ed-extra"><span class="ed-label">Any class</span><span class="ed-value muted">Keep only the weapons, for any character</span><span class="ed-btns"><button type="button" class="act-btn" id="ed-weapons">Make it weapons only</button></span></div>' : "") +
       '<div class="act-row"><button type="button" class="act-btn" id="ed-save">Save changes</button><button type="button" class="act-btn" id="ed-cancel">Cancel</button></div></section>';
   }
   // Wire the open editor (called from renderLoadouts).
@@ -1941,6 +1951,8 @@
       toast("Added " + DB.items[h].n + ". Equipping the loadout puts it on a piece with a free socket for it.", "ok");
     });
     $("ed-cos").addEventListener("click", () => { ed.cos = !ed.cos; again("#ed-cos"); });
+    const weap = $("ed-weapons");
+    if (weap) weap.addEventListener("click", () => { weaponsOnly(lo); again("#ed-save"); toast("Now weapons only, for any class. Save changes to keep it.", "ok"); });
     wireCosmetics(box, lo);
     $("ed-cancel").addEventListener("click", close);
     $("ed-save").addEventListener("click", () => {
@@ -1978,7 +1990,7 @@
     const was = box.contains(document.activeElement) ? document.activeElement : null;
     const refocus = was && ["data-lo-max", "data-lo-equip", "data-lo-save", "data-game-lo", "data-lo-pick", "data-lo-rename", "data-game-edit", "data-game-snap", "data-lo-share", "data-lo-copy", "data-lo-edit", "data-lo-dim"].map(a => was.hasAttribute(a) ? "[" + a + '="' + was.getAttribute(a) + '"]' + (was.dataset.to ? '[data-to="' + was.dataset.to + '"]' : "") : "").find(Boolean)
       || (was && was.id ? "#" + was.id : null);
-    const typed = { name: ($("lo-name") || {}).value || "", dim: ($("lo-dim") || {}).value || "", rename: $("lo-rename-input") ? $("lo-rename-input").value : null };
+    const typed = { name: ($("lo-name") || {}).value || "", dim: ($("lo-dim") || {}).value || "", weapons: !!($("lo-weapons") || {}).checked, rename: $("lo-rename-input") ? $("lo-rename-input").value : null };
     const byId = new Map(ITEMS.map(i => [i.id, i]));
     const mini = (hash, have, item) => { const d = item ? { i: iconOf(item) } : DB.items[hash] || {}; return '<span class="lo-mini' + (have ? "" : " gone") + '">' + (d.i ? '<img src="' + esc(img(d.i)) + '" alt="" width="32" height="32" loading="lazy">' : "") + "</span>"; };
     const maxRows = OWNERS.map(o => {
@@ -2043,6 +2055,7 @@
           '<span id="lo-sync" role="status">' + esc(syncText()) + "</span></p>" +
         '<div class="lo-tools">' +
           '<div class="lo-tool"><label class="lo-name"><span>Name</span><input type="text" id="lo-name" maxlength="40" placeholder="e.g. Raid DPS" autocomplete="off"></label>' +
+            '<label class="lo-weapons"><input type="checkbox" id="lo-weapons"> Weapons only (any class: equip it on any character; leaves armor, subclass and mods alone)</label>' +
             '<div class="act-row">' + OWNERS.map(o => '<button type="button" class="act-btn" data-lo-save="' + o.id + '">Save ' + esc(o.name) + "'s loadout</button>").join("") + "</div></div>" +
           '<div class="lo-tool"><label class="lo-name"><span>DIM link</span><input type="url" id="lo-dim" placeholder="https://dim.gg/…" autocomplete="off" inputmode="url" spellcheck="false"></label>' +
             '<div class="act-row"><button type="button" class="act-btn" id="lo-dim-go">Import</button></div></div>' +
@@ -2054,7 +2067,7 @@
       '<section class="lo-section" aria-labelledby="lo-h-game"><h2 class="dlg-label" id="lo-h-game">In-game loadouts</h2><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first. Empty slots can save what a character wears now.</p>' + gameSection() + "</section>" +
       optimizerHtml() +
       '<section class="lo-section" aria-labelledby="lo-h-max"><h2 class="dlg-label" id="lo-h-max">Max Power</h2><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</section>";
-    $("lo-name").value = typed.name; $("lo-dim").value = typed.dim;
+    $("lo-name").value = typed.name; $("lo-dim").value = typed.dim; $("lo-weapons").checked = typed.weapons;
     if (typed.rename != null && $("lo-rename-input")) $("lo-rename-input").value = typed.rename;
     if (was) { const t = refocus && box.querySelector(refocus); if (t) t.focus(); }
     box.querySelectorAll("[data-lo-pick]").forEach(b => b.addEventListener("click", () => {
@@ -2304,8 +2317,9 @@
       const all = readLoadouts(), typed = $("lo-name").value.trim();
       const name = typed || o.name + " loadout " + (all.filter(x => x.cls === o.cls).length + 1);
       const lo = Object.assign({ id: Date.now().toString(36), name, cls: o.cls }, snap);
+      if ($("lo-weapons").checked) weaponsOnly(lo);
       all.push(lo); writeLoadouts(all);
-      loOpen = "r-" + lo.id; $("lo-name").value = "";
+      loOpen = "r-" + lo.id; $("lo-name").value = ""; $("lo-weapons").checked = false;
       renderLoadoutCount(); renderLoadouts(); toast("Saved " + name + ".", "ok");
       const tile = box.querySelector('[data-lo-pick="r-' + lo.id + '"]');
       if (tile) tile.focus();
