@@ -6,7 +6,7 @@ site's own rotation data straight out of `../assets/` (see
 from what the website shows:
 
 - `/distortion` — current Distortion location + what's up next.
-- `/thisweek` — this week's featured raid/dungeon + next week's predicted.
+- `/thisweek` — this week's featured raid/dungeon + next week's predicted, with each featured raid's Master surges from Bungie's public API (via the site's `assets/master-surges.js`; left out if Bungie doesn't answer within a few seconds). Uses `BUNGIE_API_KEY` from `.env` if set, else the site's rallyflag.gg key.
 
 Plus scheduled auto-posts: Distortion hourly, This Week at the Tuesday
 17:00 UTC reset.

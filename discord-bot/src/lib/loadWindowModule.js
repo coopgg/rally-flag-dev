@@ -10,10 +10,12 @@ const fs = require("fs");
 const path = require("path");
 const vm = require("vm");
 
-function loadWindowModule(relativePathFromAssets, globalName){
+// extra: { window: {...} } adds to the sandbox's window (other modules it
+// reads, a location), { globals: {...} } adds plain globals (e.g. fetch).
+function loadWindowModule(relativePathFromAssets, globalName, extra = {}){
   const filePath = path.join(__dirname, "..", "..", "..", "assets", relativePathFromAssets);
   const code = fs.readFileSync(filePath, "utf8");
-  const sandbox = { window: {}, Date, Math };
+  const sandbox = Object.assign({ window: Object.assign({}, extra.window), Date, Math }, extra.globals);
   vm.createContext(sandbox);
   vm.runInContext(code, sandbox, { filename: filePath });
   const value = sandbox.window[globalName];

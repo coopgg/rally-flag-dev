@@ -8,7 +8,7 @@ function armorSetLink(slug, setsBySlug){
   return `[${name}](https://rallyflag.gg/armor-set-bonuses.html?highlight=${slug}#set-${slug})`;
 }
 
-function describeEntries(slugs, list, guideKind, alwaysFeaturedSlug, setsBySlug){
+function describeEntries(slugs, list, guideKind, alwaysFeaturedSlug, setsBySlug, surges){
   const bySlug = {};
   list.forEach(item => { bySlug[item.slug] = item; });
 
@@ -22,8 +22,10 @@ function describeEntries(slugs, list, guideKind, alwaysFeaturedSlug, setsBySlug)
     const armorNames = (item.armorSlugs || []).map(s => armorSetLink(s, setsBySlug));
     const armorSuffix = armorNames.length ? ` (${armorNames.join(", ")})` : "";
     const alwaysSuffix = slug === alwaysFeaturedSlug ? " — Always Featured" : "";
+    const els = surges && surges.bySlug[slug];
+    const surgeSuffix = els && els.length ? ` — Master surges: ${els.map(e => surges.names[e]).join(", ")}` : "";
 
-    return `${title}${armorSuffix}${alwaysSuffix}`;
+    return `${title}${armorSuffix}${alwaysSuffix}${surgeSuffix}`;
   });
 }
 
@@ -35,7 +37,33 @@ const IRON_BANNER_WEEK_MOD = 2;
 const IRON_BANNER_CYCLE_WEEKS = 4;
 const IRON_BANNER_ARMOR_SLUGS = ["iron-battalion-set", "iron-panoply-set"];
 
-function getFeaturedUpdate(now = Date.now()){
+// This week's Master raid surges from Bungie's public milestones, through the
+// site's own assets/master-surges.js (same Master/surge tables as Home and
+// This Week). Uses BUNGIE_API_KEY from .env if set, else the site's
+// rallyflag.gg key (Bungie accepts it from a server). Gives up after
+// timeoutMs (a slash command must answer within 3s): null means "post
+// without surges".
+async function getMasterSurges(timeoutMs = 2500){
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const FeaturedRotationData = loadWindowModule("featured-rotation-data.js", "FeaturedRotationData");
+    const RallyFlagAPI = process.env.BUNGIE_API_KEY ? { BUNGIE_API_KEY: process.env.BUNGIE_API_KEY }
+      : loadWindowModule("api-keys.js", "RallyFlagAPI", { window: { location: { hostname: "rallyflag.gg" } } });
+    const Surges = loadWindowModule("master-surges.js", "RallyFlagSurges", {
+      window: { FeaturedRotationData, RallyFlagAPI },
+      globals: { fetch: (url, opts) => fetch(url, Object.assign({}, opts, { signal: ctrl.signal })) }
+    });
+    return { bySlug: await Surges.load(), names: Surges.NAMES };
+  } catch (e){
+    console.warn("Master surges unavailable:", e.message);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function getFeaturedUpdate(now = Date.now(), surges = null){
   const FeaturedRotationData = loadWindowModule("featured-rotation-data.js", "FeaturedRotationData");
   const RaidsData = loadWindowModule("raids-data.js", "RaidsData");
   const DungeonsData = loadWindowModule("dungeons-data.js", "DungeonsData");
@@ -53,7 +81,7 @@ function getFeaturedUpdate(now = Date.now()){
     ironBannerActive,
     ironBannerArmor: IRON_BANNER_ARMOR_SLUGS.map(slug => armorSetLink(slug, setsBySlug)),
     thisWeek: {
-      raids: describeEntries(thisWeek.raids, RaidsData.RAIDS, "raid", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug),
+      raids: describeEntries(thisWeek.raids, RaidsData.RAIDS, "raid", FeaturedRotationData.ALWAYS_FEATURED_RAID_SLUG, setsBySlug, surges),
       dungeons: describeEntries(thisWeek.dungeons, DungeonsData.DUNGEONS, "dungeon", FeaturedRotationData.ALWAYS_FEATURED_DUNGEON_SLUG, setsBySlug)
     }
   };
@@ -72,4 +100,4 @@ function formatThisWeekMessage({ thisWeek, ironBannerActive, ironBannerArmor }){
   ].join("\n");
 }
 
-module.exports = { getFeaturedUpdate, formatThisWeekMessage };
+module.exports = { getFeaturedUpdate, getMasterSurges, formatThisWeekMessage };

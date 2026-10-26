@@ -5,7 +5,7 @@ const { Client, GatewayIntentBits, Collection, MessageFlags } = require("discord
 const cron = require("node-cron");
 
 const { getDistortionUpdate, formatDistortionMessage } = require("./lib/distortion");
-const { getFeaturedUpdate, formatThisWeekMessage } = require("./lib/featuredRotation");
+const { getFeaturedUpdate, getMasterSurges, formatThisWeekMessage } = require("./lib/featuredRotation");
 const { readState, updateState } = require("./lib/state");
 
 const {
@@ -118,7 +118,7 @@ async function postFeaturedUpdate(){
     console.warn("THISWEEK_CHANNEL_ID not set — skipping scheduled This Week post.");
     return;
   }
-  const update = getFeaturedUpdate();
+  const update = getFeaturedUpdate(Date.now(), await getMasterSurges(8000)); // scheduled: no 3s limit
   const channel = await client.channels.fetch(THISWEEK_CHANNEL_ID);
   const before = readState();
   const failedDeletes = await deletePreviousPosts(channel, [
