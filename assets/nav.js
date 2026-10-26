@@ -64,14 +64,19 @@
       ]
     }
   ];
+  // The Locker stays on dev until the owner promotes it (its files are
+  // excluded from promotion). Pages that link into it (God Rolls) ask
+  // this too, so launching it means changing only this line.
+  window.rallyFlagHasLocker = () => window.location.hostname !== "rallyflag.gg";
+  if (window.rallyFlagHasLocker()){
+    // First in Loadouts, as it will be on prod.
+    NAV_SECTIONS.find(s => s.label === "Loadouts").items.unshift({ label: "Locker", href: "locker.html", group: "locker" });
+  }
   // Debug tools (debug.html and the throwaway/noindexed API test pages
   // it links to) only exist on the dev site. Hidden by hostname rather
   // than deleted so this exact file can ship to prod unmodified — no
   // manual "strip the Debug section" step at promotion time.
   if (window.location.hostname !== "rallyflag.gg"){
-    // The Locker stays on dev until the owner promotes it (its files are
-    // excluded from promotion); first in Loadouts, as it will be on prod.
-    NAV_SECTIONS.find(s => s.label === "Loadouts").items.unshift({ label: "Locker", href: "locker.html", group: "locker" });
     NAV_SECTIONS.push({
       label: "Debug",
       items: [

@@ -62,48 +62,34 @@
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/theme.css">
 <style>
-  .disclosure{
-    max-width:720px; margin:32px auto 0; padding:16px 20px;
-    font-size:14px; color:var(--text-dim); line-height:1.6;
-    text-align:center;
-  }
-  .disclosure strong{ color:var(--accent-bright); }
+  .hero-note{ color:var(--text-dimmer); font-size:13.5px; line-height:1.5; max-width:560px; margin:10px auto 0; }
 
   .owned-auth-row{
-    max-width:1000px; margin:16px auto 0; padding:0 24px;
-    font-size:12.5px; font-family:'JetBrains Mono', monospace; text-align:center;
+    max-width:1000px; margin:20px auto 0; padding:0 24px;
+    font-size:13px; line-height:1.5; text-align:center; color:var(--text-dimmer);
   }
-  .owned-auth-row a{ display:inline-block; padding:4px 0; color:var(--accent-bright); text-decoration:none; cursor:pointer; }
-  .owned-auth-row a:hover{ text-decoration:underline; }
-  .owned-auth-row .signed-in-text{ color:var(--text-dimmer); }
-  .weapon-unlock-badge{
-    font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.04em;
-    text-transform:uppercase; padding:3px 8px; border-radius:999px;
-    background:var(--accent-fill-deep); color:var(--on-accent);
+  .owned-auth-row a, .owned-auth-row button{
+    display:inline-block; padding:4px 0; color:var(--accent-text); text-decoration:underline; text-underline-offset:3px;
+    background:none; border:0; font:inherit; cursor:pointer;
   }
-  /* Light mode gives Owned and Unlocked the same deep fill, so Unlocked
-     switches to a tinted outline to stay distinguishable. */
-  [data-mode="light"] .weapon-unlock-badge:not(.missing):not(.exact-roll){
-    background:var(--accent-dim); color:var(--accent-text); box-shadow:inset 0 0 0 1px var(--accent-text);
+  .owned-auth-row a:hover, .owned-auth-row button:hover{ color:var(--accent-bright); }
+
+  /* Signed in: one line on each card, "You have this roll" / "Best copy: 3 of 5 perks". */
+  /* One line, so closed cards stay the same height. */
+  .weapon-own{ margin-top:6px; min-height:18px; font-size:12.5px; color:var(--text-dimmer); display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .weapon-own:empty{ display:none; }
+  .weapon-own.full{ color:var(--accent-text); font-weight:600; }
+  .weapon-own svg{ width:13px; height:13px; flex-shrink:0; }
+  .weapon-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
+  .weapon-actions:empty{ display:none; }
+  .weapon-act{
+    display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:6px 12px;
+    font-family:var(--font-sans); font-size:12.5px; font-weight:500; text-decoration:none;
+    color:var(--accent-text); background:var(--accent-dim); border:1px solid var(--panel-border); border-radius:999px; cursor:pointer;
+    transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
   }
-  .weapon-unlock-badge.missing{
-    background:none; border:1px solid var(--panel-border); color:var(--text-dimmer);
-  }
-  .weapon-unlock-badge.exact-roll{
-    background:var(--accent-fill); color:var(--on-accent);
-  }
-  .weapon-unlock-rating{
-    font-family:'JetBrains Mono', monospace; font-size:12px; color:var(--text-dimmer);
-  }
-  .unlock-legend{
-    max-width:1000px; margin:14px auto 0; padding:0 24px;
-    display:flex; flex-wrap:wrap; justify-content:center; gap:8px 28px;
-  }
-  .unlock-legend-item{
-    display:flex; align-items:center; gap:8px;
-    font-size:12px; color:var(--text-dimmer); white-space:nowrap;
-  }
-  .unlock-legend .weapon-unlock-badge{ flex-shrink:0; }
+  .weapon-act:hover, .weapon-act:focus-visible{ border-color:var(--accent-text); }
+  .weapon-act.done{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
 
   section{ max-width:1000px; margin:40px auto 0; padding:0 24px 90px; }
   /* Same width as the filter area above (was a ~700px centered column of
@@ -169,8 +155,6 @@
   /* Body font, not mono: "Exotic Grenade Launcher" fits on one line, so
      closed cards all match. */
   .weapon-meta{ font-size:12.5px; color:var(--text-dimmer); }
-  .weapon-unlock-row{ margin-top:8px; min-height:20px; display:flex; align-items:center; justify-content:flex-end; gap:8px; }
-  .weapon-unlock-row:empty{ display:none; } /* only filled when signed in */
   .weapon-flavor{ font-size:14px; color:var(--text-dim); font-style:italic; margin-top:8px; line-height:1.5; }
 
   .perk-section{ margin-top:16px; padding-top:16px; border-top:1px solid var(--panel-border); }
@@ -178,20 +162,31 @@
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em;
     text-transform:uppercase; color:var(--accent-text); margin-bottom:10px;
   }
-  .perk-grid{ display:flex; flex-wrap:wrap; gap:8px; }
-  .perk-chip{
-    display:flex; align-items:center; gap:8px;
-    background:var(--accent-dim); border:1px solid var(--panel-border);
-    border-radius:999px; padding:6px 12px 6px 6px;
+  /* Perks as icons; the name shows on hover, on focus and when tapped
+     (a tap focuses the button). It's in the button's text, so screen
+     readers and the search box still get it. Escape hides it. */
+  .perk-grid{ display:flex; flex-wrap:wrap; gap:8px; min-height:42px; }
+  .perk{
+    position:relative; width:42px; height:42px; padding:0; flex-shrink:0;
+    border-radius:50%; border:1px solid var(--panel-border); background:rgba(0,0,0,0.55);
+    color:#fff; font-family:'JetBrains Mono', monospace; font-size:12px; cursor:help;
+    transition: border-color 0.15s ease;
   }
-  .perk-chip-icon{
-    width:22px; height:22px; border-radius:50%; overflow:hidden;
-    background:rgba(0,0,0,0.55); flex-shrink:0;
-    display:flex; align-items:center; justify-content:center;
-    font-family:'JetBrains Mono', monospace; font-size:12px; color:#fff;
+  .perk img{ width:100%; height:100%; border-radius:50%; display:block; }
+  .perk:hover, .perk:focus-visible{ border-color:var(--accent-text); }
+  .perk-tip{
+    position:absolute; z-index:5; bottom:calc(100% + 8px); left:50%; transform:translate(-50%, 4px);
+    padding:5px 9px; border-radius:6px; white-space:nowrap; pointer-events:none;
+    background:var(--text); color:var(--bg); font-family:var(--font-sans); font-size:12.5px; font-weight:600;
+    opacity:0; transition: opacity 0.12s ease, transform 0.12s ease;
   }
-  .perk-chip-icon img{ width:100%; height:100%; object-fit:cover; }
-  .perk-chip-name{ font-size:12px; font-family:var(--font-sans); font-weight:500; color:var(--accent-bright); }
+  /* First and last stay inside the card instead of centring past its edge. */
+  .perk:first-child .perk-tip{ left:0; transform:translateY(4px); }
+  .perk:last-child .perk-tip{ left:auto; right:0; transform:translateY(4px); }
+  .perk:hover .perk-tip, .perk:focus .perk-tip{ opacity:1; transform:translate(-50%, 0); }
+  .perk:first-child:hover .perk-tip, .perk:first-child:focus .perk-tip,
+  .perk:last-child:hover .perk-tip, .perk:last-child:focus .perk-tip{ transform:none; }
+  .perk-grid.tips-off .perk-tip{ opacity:0; }
 
   .weapon-note{ margin-top:14px; font-size:15px; max-width:62ch; color:var(--text-dim); line-height:1.55; }
 
@@ -259,15 +254,29 @@
   }
   .expand-all-btn:hover{ color:var(--accent-bright); border-color:var(--accent); }
 
+  /* Label column, chips wrap beside it. */
   .filter-row{
-    display:flex; flex-wrap:wrap; align-items:baseline; gap:10px 14px;
+    display:grid; grid-template-columns:96px 1fr; align-items:baseline; gap:10px 14px;
     padding:12px 0; border-top:1px solid var(--panel-border);
   }
   .filter-row[hidden]{ display:none; }
-  .filter-row:last-child{ border-bottom:1px solid var(--panel-border); margin-bottom:30px; }
+  .filter-more[hidden]{ display:none; }
+  .filter-foot{
+    display:flex; align-items:center; gap:12px; padding:12px 0 0; margin-bottom:30px;
+    border-top:1px solid var(--panel-border);
+  }
+  .more-btn{
+    display:inline-flex; align-items:center; gap:6px; min-height:32px;
+    font-family:var(--font-sans); font-size:12.5px; font-weight:500; color:var(--text-dim);
+    background:var(--panel); border:1px solid var(--panel-border); border-radius:999px; padding:6px 14px; cursor:pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .more-btn::after{ content:""; width:6px; height:6px; border:solid currentColor; border-width:0 1.5px 1.5px 0; transform:translateY(-2px) rotate(45deg); transition:transform 0.15s ease; }
+  .more-btn[aria-expanded="true"]::after{ transform:translateY(1px) rotate(-135deg); }
+  .more-btn:hover{ color:var(--text); border-color:var(--accent); }
   .filter-label{
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
-    color:var(--text-dimmer); text-transform:uppercase; min-width:78px;
+    color:var(--text-dimmer); text-transform:uppercase;
   }
   .chip-group{ display:flex; flex-wrap:wrap; gap:8px; }
   .chip{
@@ -283,6 +292,7 @@
     background:none; border:none; cursor:pointer; min-height:24px; padding:4px 6px; text-decoration:underline;
     text-underline-offset:2px; margin-left:auto;
   }
+  .clear-btn[hidden]{ display:none; }
   .clear-btn:hover{ color:var(--accent-bright); }
   .no-results{
     text-align:center; padding:50px 20px; color:var(--text-dim);
@@ -293,7 +303,14 @@
     .search-row{ flex-wrap:wrap; gap:12px; }
     .search-box{ flex:1 0 100%; }
     .result-count{ margin-right:auto; }
-    .filter-label{ min-width:100%; margin-bottom:2px; }
+    .filter-row{ grid-template-columns:1fr; gap:8px; }
+    /* Type and Element: one row each that swipes sideways. */
+    .filter-row.strip .chip-group{
+      flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none;
+      margin:0 -24px; padding:0 24px 2px; scroll-padding:0 24px;
+    }
+    .filter-row.strip .chip-group::-webkit-scrollbar{ display:none; }
+    .filter-row.strip .chip{ flex-shrink:0; white-space:nowrap; }
   }
 </style>
 </head>
@@ -307,18 +324,10 @@
   <div class="eyebrow">Destiny 2 · Weapon Rolls</div>
   <h1 class="title">God Rolls</h1>
   <p class="subtitle">What we actually run and why: the rolls that have earned a permanent spot in our loadouts.</p>
-</div>
-
-<div class="disclosure panel-card">
-  These aren't community popularity stats. What's here is <strong>our own personal picks from our own playtime</strong>: the rolls we've actually chased and use, not a claim that they're the objectively best for everyone. Your mileage (and your subclass, your playstyle, your favorite activity) may vary.
+  <p class="hero-note">Our own picks from our own playtime, not community popularity stats. Your subclass and playstyle may call for something else.</p>
 </div>
 
 <div class="owned-auth-row" id="owned-auth-row"></div>
-<div class="unlock-legend">
-  <div class="unlock-legend-item"><span class="weapon-unlock-rating">5/5</span><span class="weapon-unlock-badge exact-roll">Owned</span><span>a copy has every perk in this roll</span></div>
-  <div class="unlock-legend-item"><span class="weapon-unlock-rating">3/5</span><span class="weapon-unlock-badge">Unlocked</span><span>X/N is your best copy's perk match</span></div>
-  <div class="unlock-legend-item"><span class="weapon-unlock-badge missing">Not Unlocked</span><span>never obtained</span></div>
-</div>
 
 <div class="controls">
   <div class="live-data-notice" id="live-data-notice" role="status" hidden>
@@ -333,26 +342,31 @@
     <button class="expand-all-btn" id="expand-all-btn">Expand all</button>
   </div>
 
-  <div class="filter-row">
-    <div class="filter-label">Ammo</div>
-    <div class="chip-group" id="ammo-chips"></div>
-  </div>
-  <div class="filter-row">
-    <div class="filter-label">Weapon Type</div>
+  <div class="filter-row strip" role="group" aria-labelledby="type-label">
+    <div class="filter-label" id="type-label">Type</div>
     <div class="chip-group" id="type-chips"></div>
   </div>
-  <div class="filter-row">
-    <div class="filter-label">Affinity</div>
+  <div class="filter-row strip" role="group" aria-labelledby="element-label">
+    <div class="filter-label" id="element-label">Element</div>
     <div class="chip-group" id="element-chips"></div>
   </div>
-  <div class="filter-row">
-    <div class="filter-label">Playstyle</div>
-    <div class="chip-group" id="build-chips"></div>
+  <div class="filter-more" id="filter-more" hidden>
+    <div class="filter-row" role="group" aria-labelledby="ammo-label">
+      <div class="filter-label" id="ammo-label">Ammo</div>
+      <div class="chip-group" id="ammo-chips"></div>
+    </div>
+    <div class="filter-row" role="group" aria-labelledby="build-label">
+      <div class="filter-label" id="build-label">Playstyle</div>
+      <div class="chip-group" id="build-chips"></div>
+    </div>
+    <div class="filter-row" role="group" aria-labelledby="buildref-label">
+      <div class="filter-label" id="buildref-label">Our builds</div>
+      <div class="chip-group" id="buildref-chips"></div>
+    </div>
   </div>
-  <div class="filter-row">
-    <div class="filter-label">Our Builds</div>
-    <div class="chip-group" id="buildref-chips"></div>
-    <button class="clear-btn" id="clear-btn">Clear filters</button>
+  <div class="filter-foot">
+    <button type="button" class="more-btn" id="more-btn" aria-expanded="false" aria-controls="filter-more">More filters</button>
+    <button class="clear-btn" id="clear-btn" hidden>Clear filters</button>
   </div>
 </div>
 
@@ -560,11 +574,11 @@
     const row = document.getElementById("owned-auth-row");
     if (RallyFlagAuth.isSignedIn()){
       const name = RallyFlagAuth.getDisplayName() || "Signed in";
-      row.innerHTML = '<span class="signed-in-text">Signed in as ' + name + ' — Owned/Unlocked badges shown below</span>';
+      row.textContent = "Signed in as " + name + ". Each card shows your best copy" + (HAS_LOCKER ? "; " : ".");
+      if (HAS_LOCKER) row.insertAdjacentHTML("beforeend", '<a href="locker.html?q=is%3Agodroll">see every match in your Locker</a>.');
     } else {
-      row.innerHTML = '<a href="#" id="owned-signin-link">Sign in with Bungie.net to see what you already own →</a>';
-      document.getElementById("owned-signin-link").addEventListener("click", (e) => {
-        e.preventDefault();
+      row.innerHTML = '<button type="button" id="owned-signin-link">Sign in with Bungie.net</button> to see which of these rolls you already have.';
+      document.getElementById("owned-signin-link").addEventListener("click", () => {
         RallyFlagAuth.signIn();
       });
     }
@@ -590,6 +604,54 @@
     return result;
   }
 
+  // ---------------------------------------------------------------
+  // The Locker (dev until it launches: rallyFlagHasLocker in nav.js).
+  // Each card can put its roll on the Locker's wish list, which lives
+  // in this browser's localStorage under the Locker's own keys and
+  // syncs from there next time the Locker opens. Wish lists are kept
+  // per weapon name, as columns of perk names any of which will do;
+  // our roll is one perk per column, the masterwork as "Masterwork: X".
+  // ---------------------------------------------------------------
+  const HAS_LOCKER = !!(window.rallyFlagHasLocker && window.rallyFlagHasLocker());
+  const WISH_KEY = "rallyflag_locker_wishes", WISH_TIME_KEY = "rallyflag_locker_tag_times";
+  const SHOWN = {};
+  const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12.5 10 17.5 19 7"></polyline></svg>';
+  const readJson = key => { try { return JSON.parse(localStorage.getItem(key) || "{}") || {}; } catch (e){ return {}; } };
+  function wishGroups(perks){
+    return perks.filter(Boolean).map(n => { const m = /^(?:tier \d+|masterworked):\s*(.+)$/i.exec(n); return [m ? "Masterwork: " + m[1] : n]; });
+  }
+  const sameRoll = (a, b) => a.length === b.length && a.every((g, k) => g.length === 1 && b[k].length === 1 && g[0].toLowerCase() === b[k][0].toLowerCase());
+  function wishIndex(shown){
+    const rolls = readJson(WISH_KEY)[shown.name.toLowerCase()] || [], ours = wishGroups(shown.perks);
+    return rolls.findIndex(r => sameRoll(r.groups || [], ours));
+  }
+  function toggleWish(weapon){
+    const shown = SHOWN[weapon.slug], key = shown.name.toLowerCase();
+    const wishes = readJson(WISH_KEY), times = readJson(WISH_TIME_KEY);
+    const rolls = (wishes[key] || []).slice(), k = wishIndex(shown);
+    if (k >= 0) rolls.splice(k, 1); else rolls.push({ groups: wishGroups(shown.perks) });
+    if (rolls.length) wishes[key] = rolls; else delete wishes[key];
+    times["wish:" + key] = Date.now();
+    try { localStorage.setItem(WISH_KEY, JSON.stringify(wishes)); localStorage.setItem(WISH_TIME_KEY, JSON.stringify(times)); }
+    catch (e){ return false; }
+    return true;
+  }
+  // "Find it in your Locker" (signed in, with a copy) and the wish-list button.
+  function renderActions(weapon){
+    const el = document.getElementById("acts-" + weapon.slug), shown = SHOWN[weapon.slug];
+    if (!el || !HAS_LOCKER || !shown || !shown.name || shown.perks.some(p => !p)){ if (el) el.innerHTML = ""; return; }
+    const on = wishIndex(shown) >= 0;
+    el.innerHTML = '<button type="button" class="weapon-act' + (on ? " done" : "") + '" aria-pressed="' + on + '">' + (on ? CHECK_SVG + "On wish list" : "Add to wish list") + "</button>" +
+      (shown.copies ? '<a class="weapon-act" href="locker.html?q=' + encodeURIComponent('name:"' + shown.name.replace(/["\u201c\u201d]/g, "") + '"') + '">Find in Locker \u2192</a>' : "");
+    el.querySelector("button").addEventListener("click", () => {
+      if (!toggleWish(weapon)) return;
+      renderActions(weapon);
+      el.querySelector("button").focus();
+    });
+  }
+  // Another tab (the Locker) changed the wish list.
+  window.addEventListener("storage", e => { if (e.key === WISH_KEY) window.GodRollsData.WEAPONS.forEach(renderActions); });
+
   function renderShell(weapon){
     const card = document.createElement("div");
     card.className = "weapon-card panel-card";
@@ -604,7 +666,7 @@
           '<div class="weapon-name" id="name-' + weapon.slug + '">' + weapon.name + '</div>' +
           '<span class="weapon-badges" id="badges-' + weapon.slug + '"></span>' +
           '<div class="weapon-meta" id="meta-' + weapon.slug + '">Loading live data\u2026</div>' +
-          '<div class="weapon-unlock-row" id="unlock-badge-' + weapon.slug + '"></div>' +
+          '<div class="weapon-own" id="own-' + weapon.slug + '"></div>' +
         '</div>' +
       '</div>' +
       '<div class="weapon-body">' +
@@ -620,6 +682,7 @@
           '<div class="pairing-note">' + weapon.pairing.note + '</div>' +
           (weapon.pairing.armorSlug ? '<a class="pairing-armor-link" href="armor-set-bonuses.html?highlight=' + weapon.pairing.armorSlug + '">View armor set \u2192</a>' : '') +
         '</div>' : '') +
+        '<div class="weapon-actions" id="acts-' + weapon.slug + '"></div>' +
         (weapon.raidSlug ? '<a class="cross-link" href="' + window.rallyFlagGuideHref("raid", weapon.raidSlug) + '">View the raid guide it drops from \u2192</a>' : '') +
         (weapon.dungeonSlug ? '<a class="cross-link" href="' + window.rallyFlagGuideHref("dungeon", weapon.dungeonSlug) + '">View the dungeon guide it drops from \u2192</a>' : '') +
         '<a class="light-gg-link" id="lightgg-' + weapon.slug + '" href="https://www.light.gg/db/items/' + weapon.itemHash + '/" target="_blank" rel="noopener">View on light.gg \u2192</a>' +
@@ -653,6 +716,8 @@
   async function hydrateWeapon(weapon, roll){
     roll = roll || { itemHash: weapon.itemHash, perkHashes: weapon.perkHashes };
     let ok = true;
+    // What this card shows right now (the alternate roll swaps it).
+    const shown = SHOWN[weapon.slug] = { name: "", perks: [], copies: 0 };
     const card = document.getElementById("weapon-" + weapon.slug);
 
     const lightGgEl = document.getElementById("lightgg-" + weapon.slug);
@@ -702,38 +767,29 @@
       }
       badgesEl.innerHTML = badgesHtml;
 
-      const unlockBadgeEl = document.getElementById("unlock-badge-" + weapon.slug);
-      if (unlockBadgeEl){
-        if (ownershipDataPromise){
-          const ownership = await ownershipDataPromise;
-          // Check both the "pattern" hash (roll.itemHash, what perks/
-          // light.gg use) and, when known, the crafted weapon's separate
-          // real item hash (weapon.craftedItemHash) — a player could own
-          // either, or both.
-          const candidateHashes = [roll.itemHash, weapon.craftedItemHash].filter(Boolean);
-          const totalPerks = roll.perkHashes.length;
-          const matchCount = bestRollMatchCount(candidateHashes, roll.perkHashes, ownership);
-          const owned = totalPerks > 0 && matchCount === totalPerks;
-          const hasAnyInstance = instancesFor(candidateHashes, ownership).length > 0;
-          // Some weapons (a lot of newer craftable ones) don't expose a
-          // normal collectibleHash at all, so Collectibles alone can't
-          // confirm "unlocked" for them — but finding an actual owned
-          // instance in vault/inventory/equipped is proof on its own,
-          // regardless of what Collections says.
-          const unlocked = owned || hasAnyInstance || (item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash)));
-          const label = owned ? "Owned" : (unlocked ? "Unlocked" : "Not Unlocked");
-          const cls = owned ? "exact-roll" : (unlocked ? "" : "missing");
-          // Fraction shown as its own separate element, not folded into
-          // the pill text — "Unlocked 5/5" read like a fourth, confusing
-          // state distinct from "Owned". Only shown when there's an
-          // actual owned instance to have counted perks on —
-          // collectibles-only "Unlocked" (no live copy found) has no
-          // roll to compare against.
-          const ratingHtml = hasAnyInstance ? '<span class="weapon-unlock-rating">' + matchCount + '/' + totalPerks + '</span>' : "";
-          unlockBadgeEl.innerHTML = ratingHtml + '<span class="weapon-unlock-badge' + (cls ? " " + cls : "") + '">' + label + '</span>';
-        } else {
-          unlockBadgeEl.innerHTML = "";
-        }
+      shown.name = item.name;
+      const ownEl = document.getElementById("own-" + weapon.slug);
+      if (ownershipDataPromise){
+        const ownership = await ownershipDataPromise;
+        // Check both the "pattern" hash (roll.itemHash, what perks/
+        // light.gg use) and, when known, the crafted weapon's separate
+        // real item hash (weapon.craftedItemHash): a player could own
+        // either, or both. Same test as the Locker's God Roll badge.
+        const candidateHashes = [roll.itemHash, weapon.craftedItemHash].filter(Boolean);
+        const totalPerks = roll.perkHashes.length;
+        const matchCount = bestRollMatchCount(candidateHashes, roll.perkHashes, ownership);
+        const copies = instancesFor(candidateHashes, ownership).length;
+        // Some weapons (a lot of newer craftable ones) don't expose a
+        // collectibleHash, so a copy in your gear is proof on its own.
+        const unlocked = copies > 0 || (item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash)));
+        const full = totalPerks > 0 && matchCount === totalPerks;
+        shown.copies = copies;
+        ownEl.className = "weapon-own" + (full ? " full" : "");
+        ownEl.innerHTML = full ? CHECK_SVG + "You have this roll"
+          : copies ? "Best copy: " + matchCount + " of " + totalPerks + " perks"
+          : unlocked ? "Unlocked, no copy" : "Not unlocked yet";
+      } else {
+        ownEl.innerHTML = "";
       }
     } catch (err){
       console.warn("Weapon fetch failed for " + weapon.name + ":", err.message);
@@ -747,16 +803,16 @@
     const chipsHtml = results.map((r, i) => {
       if (r.status === "fulfilled"){
         const p = r.value;
-        return '<div class="perk-chip">' +
-          '<div class="perk-chip-icon">' + (p.icon ? '<img src="' + p.icon + '" alt="' + p.name + '">' : '?') + '</div>' +
-          '<div class="perk-chip-name">' + p.name + '</div>' +
-        '</div>';
+        return '<button type="button" class="perk">' + (p.icon ? '<img src="' + p.icon + '" alt="" width="40" height="40">' : '?') +
+          '<span class="perk-tip">' + p.name + '</span></button>';
       }
       console.warn("Perk fetch failed for " + weapon.name + " (hash " + roll.perkHashes[i] + "):", r.reason.message);
       ok = false;
-      return '<div class="perk-chip"><div class="perk-chip-icon">?</div><div class="perk-chip-name">Perk name unavailable</div></div>';
+      return '<button type="button" class="perk">?<span class="perk-tip">Perk name unavailable</span></button>';
     }).join("");
     perksEl.innerHTML = chipsHtml;
+    shown.perks = results.map(r => r.status === "fulfilled" ? r.value.name : null);
+    renderActions(weapon);
     return ok;
   }
 
@@ -799,6 +855,14 @@
       wireAltRollToggle(weapon);
     }
     initFilters();
+    // Escape hides a perk name (hover content must be dismissible).
+    grid.addEventListener("keydown", e => {
+      const g = e.key === "Escape" && e.target.closest(".perk-grid");
+      if (g) g.classList.add("tips-off");
+    });
+    const tipsOn = e => { const g = e.target.closest && e.target.closest(".perk-grid"); if (g) g.classList.remove("tips-off"); };
+    grid.addEventListener("pointerover", tipsOn);
+    grid.addEventListener("focusin", tipsOn);
     // god-rolls.html#weapon-<slug> (the Locker links here) opens and
     // scrolls to that card; the cards are built by script, so the
     // browser's own jump to the anchor happens too early.
@@ -917,6 +981,13 @@
       filterState.search = e.target.value.trim().toLowerCase();
       applyFilters();
     });
+    const more = document.getElementById("more-btn");
+    more.addEventListener("click", () => {
+      const open = more.getAttribute("aria-expanded") !== "true";
+      more.setAttribute("aria-expanded", String(open));
+      document.getElementById("filter-more").hidden = !open;
+      applyFilters();
+    });
     document.getElementById("clear-btn").addEventListener("click", () => {
       filterState.search = "";
       filterState.ammo.clear();
@@ -927,6 +998,7 @@
       document.getElementById("search-input").value = "";
       document.querySelectorAll(".chip.on").forEach(c => { c.classList.remove("on"); c.setAttribute("aria-pressed", "false"); });
       applyFilters();
+      document.getElementById("search-input").focus();
     });
 
     applyFilters();
@@ -957,6 +1029,11 @@
       if (match) visibleCount++;
     });
     document.getElementById("count-num").textContent = visibleCount;
+    // Clear shows only with something to clear; More filters counts what it hides while closed.
+    const tucked = filterState.ammo.size + filterState.build.size + filterState.buildRef.size;
+    const more = document.getElementById("more-btn");
+    document.getElementById("clear-btn").hidden = !(tucked || filterState.search || filterState.type.size || filterState.element.size);
+    more.textContent = "More filters" + (tucked && more.getAttribute("aria-expanded") !== "true" ? " (" + tucked + ")" : "");
 
     let emptyMsg = document.getElementById("no-results-msg");
     if (visibleCount === 0){

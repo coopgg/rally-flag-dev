@@ -182,6 +182,13 @@
   .view-tab:hover{ color:var(--text); }
   .view-tab[aria-selected="true"]{ color:var(--accent-text); border-bottom-color:var(--accent); }
   .view-tab span{ font-family:var(--font-sans); font-weight:500; font-size:13px; letter-spacing:0; color:var(--text-dim); margin-left:4px; }
+  .view-tab{ white-space:nowrap; }
+  /* Four tabs fit a 360px phone on one line. */
+  @media (max-width:640px){
+    .view-tabs{ gap:0; }
+    .view-tab{ font-size:13.5px; letter-spacing:0.02em; padding:10px 6px; }
+    .view-tab span{ font-size:12px; margin-left:3px; }
+  }
   .sets-intro{ margin:20px 0 0; max-width:70ch; font-size:14px; color:var(--text-dim); }
   .set-grid{ margin-top:10px; }
   .set-class{ margin-top:16px; }
@@ -210,6 +217,27 @@
   .set-link{ display:inline-block; margin-top:8px; font-size:13px; color:var(--accent-text); }
   .set-none{ margin:0; font-size:13px; color:var(--text-dim); }
   .set-started{ margin-top:16px; }
+
+  /* God Rolls tab: one row per roll, perks lit where your best copy has them. */
+  .chase-list{ margin-top:6px; }
+  .chase-list .set-class-name{ margin-top:22px; }
+  .chase-rows{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 440px), 1fr)); gap:8px 12px; align-items:start; }
+  .chase-row{ display:grid; grid-template-columns:44px 1fr; gap:4px 12px; padding:10px 12px; border:1px solid var(--panel-border); border-radius:8px; background:var(--panel); }
+  .chase-row.full{ border-color:color-mix(in srgb, var(--accent-text) 45%, var(--panel-border)); }
+  .chase-icon{ width:44px; height:44px; border:1px solid var(--panel-border); }
+  .chase-main{ min-width:0; }
+  .chase-name{ margin:0; font-family:'Oswald', sans-serif; font-weight:600; font-size:15px; line-height:1.25; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .chase-state{ margin:2px 0 0; font-size:13px; color:var(--text-dim); display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+  .chase-row.full .chase-state{ color:var(--accent-text); font-weight:600; }
+  .chase-perks{ list-style:none; margin:8px 0 0; padding:0; display:flex; gap:6px; }
+  .chase-perk{ width:28px; height:28px; border-radius:50%; border:1px solid var(--panel-border); background:#1a1f2b; overflow:hidden; opacity:0.4; filter:grayscale(1); }
+  .chase-perk.got{ opacity:1; filter:none; border-color:var(--accent-text); }
+  .chase-row.none .chase-perk{ opacity:1; filter:none; } /* no copy yet: just our roll */
+  .chase-perk img{ width:100%; height:100%; display:block; }
+  .chase-acts{ grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin-top:6px; }
+  .chase-acts .act-btn{ padding:4px 11px; }
+  .chase-acts .act-btn.on{ border-color:var(--accent-text); color:var(--accent-text); }
+  .chase-link{ font-size:13px; color:var(--accent-text); }
 
   /* Gear by slot */
   .bucket{ margin-top:30px; }
@@ -908,6 +936,7 @@
       <button class="view-tab" type="button" role="tab" id="tab-gear" aria-controls="view-gear" aria-selected="true">Gear</button>
       <button class="view-tab" type="button" role="tab" id="tab-loadouts" aria-controls="view-loadouts" aria-selected="false" tabindex="-1">Loadouts <span id="lo-count"></span></button>
       <button class="view-tab" type="button" role="tab" id="tab-sets" aria-controls="view-sets" aria-selected="false" tabindex="-1">Armor Sets <span id="sets-count"></span></button>
+      <button class="view-tab" type="button" role="tab" id="tab-godrolls" aria-controls="view-godrolls" aria-selected="false" tabindex="-1">God Rolls <span id="godrolls-count"></span></button>
     </div>
 
     <div id="view-gear" role="tabpanel" aria-labelledby="tab-gear">
@@ -970,6 +999,11 @@
       <p class="sets-intro" id="sets-hint"></p>
       <div class="set-grid" id="set-grid"></div>
     </div>
+
+    <div id="view-godrolls" role="tabpanel" aria-labelledby="tab-godrolls" hidden>
+      <p class="sets-intro" id="chase-hint"></p>
+      <div class="chase-list" id="chase-list"></div>
+    </div>
   </div>
 </div>
 
@@ -986,6 +1020,7 @@
 <script src="assets/oauth.js"></script>
 <script src="assets/god-rolls-data.js"></script>
 <script src="assets/sets-data.js"></script>
+<script src="assets/activity-index.js"></script>
 <script src="assets/nav.js"></script>
 <script src="assets/locker.js"></script>
 </body>

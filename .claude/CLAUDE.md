@@ -111,9 +111,9 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   from real hashes (needs the full item, plug set, item set and stat
   tables). In nav.js's Loadouts section only off rallyflag.gg (added
   with the Debug section); its four files are excluded from promotion, and
-  it's out of the sitemap. To launch: drop the excludes, move the menu item
-  into the Loadouts list, add it to the sitemap, empty site-check's
-  DEV_ONLY. Stage 2 (moving, equipping,
+  it's out of the sitemap. To launch: drop the excludes, make `rallyFlagHasLocker()` in nav.js
+  return true (it gates the menu item and God Rolls' Locker buttons), add it
+  to the sitemap, empty site-check's DEV_ONLY. Stage 2 (moving, equipping,
   locking, postmaster pulls, desktop drag and drop) posts to
   /Platform/Destiny2/Actions/Items/{TransferItem,EquipItem,SetLockState,
   PullFromPostmaster}/ one at a time; these need the app's "Move or equip
@@ -156,7 +156,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   Share links (`?share=<id>`, HANDOFF item 55) use the same Worker's
   `shares` table; opening one needs no sign-in. Search filters, bulk
   actions, perk/mod switching and the loadout editor: HANDOFF item 56.
-  Armor optimizer: HANDOFF item 60. Materials, touch long-press/swipe,
+  Armor optimizer: HANDOFF item 60. God Rolls tab + links from
+  god-rolls.html (wish list, `?q=` search): HANDOFF item 79. Materials, touch long-press/swipe,
   keyboard shortcuts and the Compare bottom drawer (`showDialog`; the
   dialog's `close` event is async): HANDOFF item 64.
   Clarity perk descriptions (their usage rules, versions.json check;

@@ -217,7 +217,7 @@
     tagsChanged();
   }
   // Which view is open: gear (default), loadouts (#loadouts) or armor sets (#sets).
-  const VIEWS = ["gear", "loadouts", "sets"];
+  const VIEWS = ["gear", "loadouts", "sets", "godrolls"];
   function showView(name, focus){
     if (!VIEWS.includes(name)) name = "gear";
     for (const v of VIEWS){
@@ -2485,6 +2485,72 @@
       (setsShowStarted ? "Hide" : "Show") + " " + started + " started set" + (started === 1 ? "" : "s") + " (one piece)</button>" : "");
   }
 
+  // God Rolls: every roll on our God Rolls page with your best copy of
+  // it (the same perk test as the tile badge), still to chase first.
+  // Each can go on the wish list (as the God Rolls page's button does),
+  // show its copies in Gear, or link to where it drops.
+  const CHASE_ICON_OK = svg('<polyline points="5 12.5 10 17.5 19 7"/>');
+  function chaseRolls(){
+    return ((window.GodRollsData && GodRollsData.WEAPONS) || []).map(w => {
+      const copies = ITEMS.filter(i => i.roll && i.roll.weapon === w);
+      const best = copies.reduce((b, i) => !b || i.roll.matched > b.roll.matched ? i : b, null);
+      const def = DB.items[w.itemHash] || (w.craftedItemHash && DB.items[w.craftedItemHash]) || null;
+      return { w, def, copies, best, matched: best ? best.roll.matched : 0, total: w.perkHashes.length, full: !!(best && best.roll.full) };
+    }).filter(r => r.def);
+  }
+  // Our roll as wish-list columns: one perk each, the masterwork as "Masterwork: X".
+  const chaseGroups = r => r.w.perkHashes.map(h => (DB.items[h] || {}).n).filter(Boolean).map(n => { const m = MW_PLUG.exec(n); return [m ? "Masterwork: " + m[1] : n]; });
+  const chaseWishK = r => (WISHES[r.def.n.toLowerCase()] || []).findIndex(x => { const a = x.groups || [], b = chaseGroups(r);
+    return a.length === b.length && a.every((g, k) => g.length === 1 && g[0].toLowerCase() === b[k][0].toLowerCase()); });
+  const chaseQuery = r => 'name:"' + r.def.n.replace(/["\u201c\u201d]/g, "") + '"';
+  function renderChase(){
+    const all = chaseRolls(), have = all.filter(r => r.full), todo = all.filter(r => !r.full)
+      .sort((a, b) => (b.copies.length > 0) - (a.copies.length > 0) || b.matched / b.total - a.matched / a.total || a.def.n.localeCompare(b.def.n));
+    $("godrolls-count").textContent = have.length + "/" + all.length;
+    const best = r => r.best ? new Set([].concat(r.best.plugs, ...Object.values(r.best.alts).map(a => a.map(p => p.plugItemHash)))) : new Set();
+    const row = r => {
+      const got = best(r), wished = chaseWishK(r) >= 0, src = r.w.raidSlug ? ["raid", r.w.raidSlug] : r.w.dungeonSlug ? ["dungeon", r.w.dungeonSlug] : null;
+      const act = src && ((window.ActivityIndex || {})[src[0] + "s"] || []).find(a => a.slug === src[1]);
+      const state = r.full ? "You have this roll" : r.copies.length ? "Best copy: " + r.matched + " of " + r.total + " perks" : "No copy in your gear";
+      const perks = r.w.perkHashes.map(h => { const p = DB.items[h] || {}, on = got.has(h);
+        return '<li class="chase-perk' + (on ? " got" : "") + '" title="' + esc((p.n || "") + (on ? "" : " (missing)")) + '">' + (p.i ? '<img src="' + esc(img(p.i)) + '" alt="" width="26" height="26" loading="lazy">' : "") +
+          '<span class="sr-only">' + esc((p.n || "Perk") + (r.copies.length ? (on ? ", have it" : ", missing") : "")) + "</span></li>"; }).join("");
+      return '<li class="chase-row' + (r.full ? " full" : r.copies.length ? "" : " none") + '">' +
+        '<img class="chase-icon" src="' + esc(img(r.def.i)) + '" alt="" width="44" height="44" loading="lazy">' +
+        '<div class="chase-main"><h3 class="chase-name">' + esc(r.def.n) + '</h3><p class="chase-state">' + (r.full ? CHASE_ICON_OK : "") + esc(state) +
+          (r.copies.length > 1 ? '<span class="muted"> · ' + r.copies.length + " copies</span>" : "") + "</p>" +
+          '<ul class="chase-perks" aria-label="Our roll">' + perks + "</ul></div>" +
+        '<div class="chase-acts">' +
+          (r.copies.length ? '<button type="button" class="act-btn" data-chase-show="' + r.w.slug + '">Show ' + (r.copies.length === 1 ? "it" : "copies") + '<span class="sr-only"> of ' + esc(r.def.n) + "</span></button>" : "") +
+          (r.full ? "" : '<button type="button" class="act-btn' + (wished ? " on" : "") + '" data-chase-wish="' + r.w.slug + '" aria-pressed="' + wished + '">' + (wished ? "On wish list" : "Add to wish list") + '<span class="sr-only"> (' + esc(r.def.n) + ")</span></button>") +
+          (act ? '<a class="chase-link" href="' + PUBLIC_SITE + window.rallyFlagGuideHref(src[0], src[1]) + '"' + NEW_TAB + ">Drops in " + esc(act.name) + NEW_TAB_NOTE + "</a>" : "") +
+          '<a class="chase-link" href="' + PUBLIC_SITE + "god-rolls.html#weapon-" + esc(r.w.slug) + '"' + NEW_TAB + ">Why this roll" + NEW_TAB_NOTE + "</a>" +
+        "</div></li>";
+    };
+    $("chase-hint").textContent = "The rolls on our God Rolls page and your best copy of each. Perks you have on that copy, or can switch to, are lit.";
+    $("chase-list").innerHTML =
+      (todo.length ? '<h2 class="set-class-name">To chase (' + todo.length + ')</h2><ul class="chase-rows">' + todo.map(row).join("") + "</ul>" : "") +
+      (have.length ? '<h2 class="set-class-name chase-have">You have it (' + have.length + ')</h2><ul class="chase-rows">' + have.map(row).join("") + "</ul>" : "");
+  }
+  // Run a search; on a phone (one owner at a time) switch to whoever
+  // holds `item`, or the first match, when the shown owner has none.
+  function searchFor(q, item){
+    $("locker-search").value = state.q = q;
+    if (!isWide()){
+      const test = compileSearch(q), mine = ITEMS.filter(i => test.test(i));
+      const hit = item || mine[0];
+      if (hit && !mine.some(i => i.owner === state.focus)){ state.focus = hit.owner; render(); }
+    }
+    applySearch();
+  }
+  function showChaseCopies(slug){
+    const r = chaseRolls().find(x => x.w.slug === slug);
+    if (!r) return;
+    showView("gear");
+    searchFor(chaseQuery(r), r.best);
+    $("locker-search").focus();
+  }
+
   // Owner, type and chip filters decide which tiles get built; the search
   // text doesn't (applySearch hides and shows built tiles instead).
   // Sort order for tiles (DIM's sort menu): the equipped item first and
@@ -2593,7 +2659,7 @@
     if (key === "class") return CLASS_WORDS[val] != null ? i => i.def.t === 2 && i.def.c === CLASS_WORDS[val] : val === "any" ? i => i.def.t === 2 && i.def.c === 3 : "class:" + val;
     if (key === "slot") return SLOT_WORDS[squash(val)] ? i => i.def.b === SLOT_WORDS[squash(val)] : "slot:" + val;
     if (key === "type"){ const w = squash(val); return w ? i => squash(i.def.y || "").includes(w) : "type:"; }
-    if (key === "name") return val ? i => i.def.n.toLowerCase().includes(val) : "name:";
+    if (key === "name"){ const q = val.replace(/["\u201c\u201d]/g, ""); return val ? i => i.def.n.toLowerCase().replace(/["\u201c\u201d]/g, "").includes(q) : "name:"; }
     if (key === "perk") return val ? i => perkNames(i).includes(val) : "perk:";
     if (key === "note") return val ? i => (NOTES[i.id] || "").toLowerCase().includes(val) : "note:";
     if (key === "power" || key === "tier"){ const t = numTest(val); return t ? i => t(key === "power" ? i.power : i.tier) : key + ":" + val; }
@@ -3067,7 +3133,7 @@
       chips + '</div><div class="pm-body" id="pm-body"' + (open ? "" : " hidden") + ">" + tiles + "</div></section>";
   }
 
-  function render(){ dupeCount = null; renderOwners(); renderSets(); renderItems(); renderNewBtn(); }
+  function render(){ dupeCount = null; renderOwners(); renderSets(); renderChase(); renderItems(); renderNewBtn(); }
   WIDE.addEventListener("change", () => { if (ITEMS.length) render(); });
 
   // ---------------- actions (stage 2) ----------------
@@ -4329,6 +4395,19 @@
       }
       if (e.target.closest("#set-started")){ setsShowStarted = !setsShowStarted; renderSets(); $("set-started").focus(); }
     });
+    $("chase-list").addEventListener("click", e => {
+      const show = e.target.closest("[data-chase-show]");
+      if (show) return showChaseCopies(show.dataset.chaseShow);
+      const wish = e.target.closest("[data-chase-wish]");
+      if (!wish) return;
+      const r = chaseRolls().find(x => x.w.slug === wish.dataset.chaseWish), name = r.def.n.toLowerCase(), k = chaseWishK(r);
+      const rolls = (WISHES[name] || []).slice();
+      k >= 0 ? rolls.splice(k, 1) : rolls.push({ groups: chaseGroups(r) });
+      saveWish(name, rolls);
+      renderItems(); renderChase();
+      $("chase-list").querySelector('[data-chase-wish="' + r.w.slug + '"]').focus();
+      toast(k >= 0 ? "Taken off your wish list." : "On your wish list: copies with this roll get the wish-list mark.", "ok");
+    });
     document.querySelector(".view-tabs").addEventListener("click", e => {
       const t = e.target.closest(".view-tab");
       if (t) showView(t.id.slice(4));
@@ -4382,6 +4461,9 @@
       setFarmTimer();
       pullLoadouts();
       if (location.hash.length > 1) showView(location.hash.slice(1));
+      // locker.html?q=… (God Rolls links here) starts with that search.
+      const q0 = (new URLSearchParams(location.search).get("q") || "").trim();
+      if (q0) searchFor(q0);
       window.addEventListener("hashchange", () => showView(location.hash.slice(1)));
       openShare();
     } catch (e){

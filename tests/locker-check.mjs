@@ -1399,6 +1399,66 @@ await section("Share links", async () => {
   await A.context_.close(); await B.context_.close();
 });
 
+// ---------- God Rolls page ↔ Locker ----------
+await section("God Rolls", async () => {
+  // The page and the Locker's God Rolls tab read the same profile and must agree.
+  const g = await open({ real: true, url: BASE + "god-rolls.html", ready: "#weapon-grid .weapon-card" });
+  await g.waitForFunction(() => [...document.querySelectorAll(".weapon-own")].every(e => e.textContent), null, { timeout: 150000 });
+  const page = await g.$$eval(".weapon-card", cs => Object.fromEntries(cs.map(c => [c.id.slice(7), c.querySelector(".weapon-own").textContent])));
+  // Same browser (the wish list is shared through this browser's storage).
+  const L = await g.context_.newPage(); L.errors = []; L.on("pageerror", e => L.errors.push(e.message));
+  await L.goto(BASE + "locker.html#godrolls"); await L.waitForSelector("#locker-app:not([hidden])", { timeout: 120000 }); await L.waitForTimeout(1500);
+  const tab = await L.$$eval(".chase-row", rs => rs.map(r => [r.querySelector("[href*='#weapon-']").getAttribute("href").split("#weapon-")[1], r.querySelector(".chase-state").textContent]));
+  const norm = t => /You have this roll/.test(t) ? "full" : (t.match(/(\d+) of (\d+)/) || [, "none"]).slice(1).join("/");
+  const differ = tab.filter(([slug, t]) => page[slug] != null && norm(page[slug]) !== norm(t));
+  check("god rolls: the page and the Locker's tab agree on every roll", tab.length >= 25 && !differ.length, JSON.stringify(differ.slice(0, 3)));
+  check("god rolls: the tab lists to chase first, then the ones you have", await L.locator(".chase-list h2").first().textContent().then(t => /To chase/.test(t)) && /\d+\/\d+/.test(await L.textContent("#godrolls-count")));
+  let v = await axe(L); check("god rolls: the Locker tab passes axe", !v.length, v.join(", "));
+  // Wish list, both ways: added in the Locker, shown on the page; removed on the page, gone in the Locker.
+  const slug = await L.getAttribute("[data-chase-wish]", "data-chase-wish");
+  await L.click('[data-chase-wish="' + slug + '"]');
+  check("god rolls: Add to wish list in the tab", await L.getAttribute('[data-chase-wish="' + slug + '"]', "aria-pressed") === "true" && await L.evaluate(() => document.activeElement.dataset.chaseWish) === slug);
+  await g.reload(); await g.waitForSelector("#acts-" + slug + " button", { state: "attached", timeout: 120000 });
+  check("god rolls: the page shows it on your wish list", /On wish list/.test(await g.textContent("#acts-" + slug + " button")) && await g.getAttribute("#acts-" + slug + " button", "aria-pressed") === "true");
+  await g.click("#weapon-" + slug + " .weapon-head"); await g.click("#acts-" + slug + " button");
+  check("god rolls: removing it on the page", /Add to wish list/.test(await g.textContent("#acts-" + slug + " button")) && await g.evaluate(() => JSON.stringify(JSON.parse(localStorage.getItem("rallyflag_locker_wishes")))) === "{}");
+  await L.reload(); await L.waitForSelector("#locker-app:not([hidden])"); await L.click("#tab-godrolls");
+  check("god rolls: …and the Locker sees it gone", await L.getAttribute('[data-chase-wish="' + slug + '"]', "aria-pressed") === "false");
+  // Find it in your Locker: a copy's card links to a Locker search that shows it.
+  const find = g.locator(".weapon-actions a[href^='locker.html?q=']").first();
+  const href = await find.getAttribute("href");
+  check("god rolls: cards with a copy link to it in the Locker", await g.locator(".weapon-actions a[href^='locker.html?q=']").count() >= 10, href);
+  await L.goto(BASE + href); await L.waitForSelector("#locker-app:not([hidden])"); await L.waitForTimeout(800);
+  const q = new URLSearchParams(href.split("?")[1]).get("q");
+  check("god rolls: the link opens the Locker on that search", await L.inputValue("#locker-search") === q && await L.locator("#buckets .item-tile[data-id]:not([hidden])").count() >= 1);
+  await L.click("#tab-godrolls"); await L.click("[data-chase-show]");
+  check("god rolls: Show copies searches Gear for it", await L.isVisible("#view-gear") && /^name:"/.test(await L.inputValue("#locker-search")) && await L.locator("#buckets .item-tile[data-id]:not([hidden])").count() >= 1);
+  // Filters: Type and Element out, the rest behind More filters, which counts what it hides.
+  check("god rolls: More filters starts closed", await g.getAttribute("#more-btn", "aria-expanded") === "false" && await g.isHidden("#filter-more") && await g.isHidden("#clear-btn"));
+  await g.click("#more-btn"); await g.click("#build-chips .chip >> nth=0"); await g.click("#more-btn");
+  check("god rolls: closed, it counts the filters inside", /More filters \(1\)/.test(await g.textContent("#more-btn")) && await g.isVisible("#clear-btn"));
+  await g.click("#clear-btn");
+  check("god rolls: Clear resets and returns to search", await g.evaluate(() => document.activeElement.id === "search-input") && await g.textContent("#more-btn") === "More filters" && +(await g.textContent("#count-num")) >= 25);
+  v = await axe(g); check("god rolls: the page passes axe signed in", !v.length, v.join(", "));
+  // Perks are icons; the name shows on hover and focus (a tap focuses), Escape hides it, and it's the button's name.
+  const perk = g.locator("#perks-blast-furnace .perk").nth(2), tip = perk.locator(".perk-tip");
+  await g.click("#weapon-blast-furnace .weapon-head"); await perk.hover(); await g.waitForTimeout(250);
+  const op = () => tip.evaluate(t => +getComputedStyle(t).opacity);
+  check("god rolls: a perk's name shows on hover", await op() === 1 && (await tip.textContent()).length > 2);
+  await g.mouse.move(0, 0); await perk.focus(); await g.waitForTimeout(250);
+  const hidden1 = await op(); await g.keyboard.press("Escape"); await g.waitForTimeout(250);
+  check("god rolls: …and on focus, and Escape hides it", hidden1 === 1 && await op() === 0);
+  check("god rolls: the perk's name is its accessible name", (await perk.evaluate(b => b.textContent)).trim() === (await tip.textContent()).trim());
+  check("god rolls: no script errors", !g.errors.length && !L.errors.length, g.errors.concat(L.errors).join("; "));
+  await g.context_.close();
+  // Phone: the four Locker tabs fit on one line; the page's Type row swipes instead of wrapping.
+  const P = await open({ width: 360, touch: true, hash: "#godrolls" });
+  check("god rolls (phone): the Locker's four tabs fit on one line", await P.evaluate(() => { const t = document.querySelector(".view-tabs"); return t.scrollWidth <= t.clientWidth && [...t.children].every(c => c.getBoundingClientRect().height < 50); }));
+  await P.goto(BASE + "god-rolls.html"); await P.waitForSelector("#type-chips .chip", { timeout: 60000 }); await P.waitForTimeout(2500);
+  check("god rolls (phone): Type is one swipeable row and the weapons start within two screens", await P.evaluate(() => { const c = document.getElementById("type-chips"); return c.scrollWidth > c.clientWidth && c.getBoundingClientRect().height < 50 && document.getElementById("weapon-grid").getBoundingClientRect().top < 1000 && document.documentElement.scrollWidth <= innerWidth; }));
+  await P.context_.close();
+});
+
 // ---------- 8. Bungie maintenance ----------
 await section("Maintenance", async () => {
   const p = await open({ real: true, down: true });
