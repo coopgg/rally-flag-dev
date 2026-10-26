@@ -778,6 +778,11 @@ await section("Item popup layout", async () => {
   await q.click("#act-toggle");
   check("popup: the button shows the actions", await q.isVisible('#item-dialog [data-act="equip"]') && await q.getAttribute("#act-toggle", "aria-expanded") === "true");
   const w = await axe(q); check("popup layout passes axe (phone)", !w.length, w.join(", "));
+  // An armor piece with a mod tapped: the whole sheet scrolls as one, no small inner scroll boxes.
+  await q.keyboard.press("Escape");
+  await q.click("#buckets .item-tile[data-id]:has(.tile-total)"); await q.click("#item-dialog .mod-sq:not(.empty)"); await q.waitForTimeout(600);
+  const scrollers = await q.evaluate(() => [...document.querySelectorAll("#item-dialog *")].filter(e => e.scrollHeight > e.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(e).overflowY)).map(e => e.className || e.id));
+  check("popup: on a phone the sheet is the only thing that scrolls (the swap list doesn't scroll in a box)", scrollers.length === 1 && scrollers[0] === "dlg-main", scrollers.join(", "));
   check("popup layout: no script errors", !p.errors.length && !q.errors.length, p.errors.concat(q.errors).join("; "));
   await q.context_.close();
 });

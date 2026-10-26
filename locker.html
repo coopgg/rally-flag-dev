@@ -372,7 +372,10 @@
   .dlg-side > .plug-change{ margin-bottom:16px; }
   .dlg-side > .dlg-actions{ order:-1; display:none; }
   dialog.acts-open .dlg-side > .dlg-actions{ display:flex; }
-  .dlg-side > .plug-info{ max-height:45vh; overflow-y:auto; }
+  /* One scroller per sheet: the swap list and details grow with their
+     content instead of scrolling inside a small box (on a phone that left
+     a small area that scrolled and a sheet that didn't, owner report). */
+  .dlg-side .mod-pick{ max-height:none; overflow:visible; }
   @media (min-width:900px){
     dialog.item-dialog[data-view="item"]{ width:min(900px, calc(100vw - 48px)); }
     .act-toggle{ display:none; }
