@@ -382,9 +382,15 @@
   @media (max-width:899px){
     dialog.item-dialog[data-view="item"][open]{ display:block; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
     dialog.item-dialog[data-view="item"] .dlg-main{ overflow:visible; min-height:0; }
-    dialog.item-dialog[data-view="item"] .dlg-head{ position:sticky; top:0; z-index:3; isolation:isolate; }
-    dialog.item-dialog[data-view="item"] .dlg-head::before{ content:""; position:absolute; inset:0; z-index:-1; background:var(--bg); }
+    /* Pinned header: opaque (its own colour layer is see-through, and
+       ::before is the tier stripe), so the item scrolls under it, not through it. */
+    dialog.item-dialog[data-view="item"] .dlg-head{ position:sticky; top:0; z-index:3;
+      background:radial-gradient(ellipse 70% 120% at 100% 0%, color-mix(in srgb, var(--tier) 30%, transparent), transparent 70%), linear-gradient(var(--panel), var(--panel)), var(--bg); }
   }
+  /* The page never pans sideways (owner's phone showed it shifting left;
+     anything too wide is clipped, not scrollable). clip, unlike hidden,
+     keeps the pinned header working. */
+  html, body{ overflow-x:clip; }
   /* While a popup is open the page behind it doesn't scroll. */
   html.dlg-lock, html.dlg-lock body{ overflow:hidden; }
   @media (min-width:900px){
