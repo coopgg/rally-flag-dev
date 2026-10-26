@@ -781,8 +781,14 @@ await section("Item popup layout", async () => {
   // An armor piece with a mod tapped: the whole sheet scrolls as one, no small inner scroll boxes.
   await q.keyboard.press("Escape");
   await q.click("#buckets .item-tile[data-id]:has(.tile-total)"); await q.click("#item-dialog .mod-sq:not(.empty)"); await q.waitForTimeout(600);
-  const scrollers = await q.evaluate(() => [...document.querySelectorAll("#item-dialog *")].filter(e => e.scrollHeight > e.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(e).overflowY)).map(e => e.className || e.id));
-  check("popup: on a phone the sheet is the only thing that scrolls (the swap list doesn't scroll in a box)", scrollers.length === 1 && scrollers[0] === "dlg-main", scrollers.join(", "));
+  const scrollers = await q.evaluate(() => [document.getElementById("item-dialog"), ...document.querySelectorAll("#item-dialog *")].filter(e => e.scrollHeight > e.clientHeight + 2 && /auto|scroll/.test(getComputedStyle(e).overflowY)).map(e => e.id || e.className));
+  check("popup: on a phone the popup itself is the only thing that scrolls (no box inside it)", scrollers.length === 1 && scrollers[0] === "item-dialog", scrollers.join(", "));
+  const feel = await q.evaluate(() => { const d = document.getElementById("item-dialog"), c = getComputedStyle(d), h = d.querySelector(".dlg-head").getBoundingClientRect();
+    d.scrollTop = 300; const h2 = d.querySelector(".dlg-head").getBoundingClientRect(); d.scrollTop = 0;
+    return { x: c.overflowX, touch: c.touchAction, lock: document.documentElement.classList.contains("dlg-lock") && getComputedStyle(document.body).overflowY === "hidden", pinned: Math.abs(h2.top - h.top) < 1 }; });
+  check("popup: on a phone it swipes up and down only, the header stays put, and the page behind is locked", feel.x === "hidden" && feel.touch === "pan-y" && feel.lock && feel.pinned, JSON.stringify(feel));
+  await q.keyboard.press("Escape");
+  check("popup: closing it unlocks the page", !(await q.evaluate(() => document.documentElement.classList.contains("dlg-lock"))));
   check("popup layout: no script errors", !p.errors.length && !q.errors.length, p.errors.concat(q.errors).join("; "));
   await q.context_.close();
 });

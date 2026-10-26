@@ -3256,6 +3256,7 @@
     if (dlg.open) dlg.close(); // its "close" event comes later, when it's open again
     dlg.classList.toggle("drawer", drawer);
     if (drawer) dlg.show(); else dlg.showModal();
+    document.documentElement.classList.toggle("dlg-lock", !drawer);
     fitDrawer();
   }
   function fitDrawer(){
@@ -4332,6 +4333,7 @@
       if (e.currentTarget.open) return; // reopened as a drawer or a popup (showDialog)
       document.body.appendChild($("locker-toast"));
       wishView = null; e.currentTarget.classList.remove("drawer"); fitDrawer();
+      document.documentElement.classList.remove("dlg-lock");
     });
     // A drawer isn't modal, so Escape needs wiring (from inside it, or from
     // the page when nothing else wants the key).

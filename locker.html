@@ -376,6 +376,17 @@
      content instead of scrolling inside a small box (on a phone that left
      a small area that scrolled and a sheet that didn't, owner report). */
   .dlg-side .mod-pick{ max-height:none; overflow:visible; }
+  /* Phones and narrow windows: the popup itself is the one thing that
+     scrolls (no flex scroller inside a dialog, which iPhone Safari wouldn't
+     scroll, owner report), vertical swipes only, header pinned on top. */
+  @media (max-width:899px){
+    dialog.item-dialog[data-view="item"][open]{ display:block; overflow-x:hidden; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+    dialog.item-dialog[data-view="item"] .dlg-main{ overflow:visible; min-height:0; }
+    dialog.item-dialog[data-view="item"] .dlg-head{ position:sticky; top:0; z-index:3; isolation:isolate; }
+    dialog.item-dialog[data-view="item"] .dlg-head::before{ content:""; position:absolute; inset:0; z-index:-1; background:var(--bg); }
+  }
+  /* While a popup is open the page behind it doesn't scroll. */
+  html.dlg-lock, html.dlg-lock body{ overflow:hidden; }
   @media (min-width:900px){
     dialog.item-dialog[data-view="item"]{ width:min(900px, calc(100vw - 48px)); }
     .act-toggle{ display:none; }
