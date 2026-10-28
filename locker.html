@@ -422,11 +422,11 @@
   /* While a popup is open the page behind it doesn't scroll. */
   html.dlg-lock, html.dlg-lock body{ overflow:hidden; }
   @media (min-width:900px){
-    dialog.item-dialog[data-view="item"]{ width:min(900px, calc(100vw - 48px)); }
+    dialog.item-dialog[data-view="item"]{ width:min(980px, calc(100vw - 48px)); }
     .act-toggle{ display:none; }
-    .dlg-main{ display:grid; grid-template-columns:minmax(0, 1fr) 360px; grid-template-rows:minmax(0, 1fr); overflow:hidden; }
+    .dlg-main{ display:grid; grid-template-columns:minmax(0, 1fr) 400px; grid-template-rows:minmax(0, 1fr); overflow:hidden; }
     .dlg-main > .dlg-body{ overflow-y:auto; min-height:0; }
-    .dlg-side{ display:flex; flex-direction:column; gap:10px; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:12px 14px 16px; border-left:1px solid var(--panel-border); background:var(--panel); }
+    .dlg-side{ display:flex; flex-direction:column; gap:12px; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:12px 14px 16px; border-left:1px solid var(--panel-border); background:var(--panel); }
     .dlg-side > .plug-info, .dlg-side > .plug-change{ margin:0; }
     /* Fixed height: a long description scrolls inside it, nothing below jumps. */
     .dlg-side > .plug-info{ flex:none; height:260px; max-height:none; background:var(--bg); }
@@ -450,7 +450,8 @@
   /* Stage 2: actions in the item popup */
   .dlg-actions{ display:flex; flex-direction:column; gap:8px; padding:10px 16px; border-bottom:1px solid var(--panel-border); background:var(--panel); }
   .act-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-  .act-label{ width:64px; flex:none; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
+  /* Label on its own line, buttons below: a row of characters + Vault + lock fits one line. */
+  .act-label{ width:100%; flex:none; margin-bottom:-1px; font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); }
   .act-btn{
     display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:4px 11px 4px 5px; border-radius:999px;
     border:1px solid var(--edge); background:var(--bg); color:var(--text); font:inherit; font-size:13px; font-weight:500; cursor:pointer;
@@ -459,7 +460,12 @@
   .act-btn img{ width:20px; height:20px; border-radius:50%; }
   .act-btn:hover{ border-color:var(--accent); box-shadow:0 0 12px -4px var(--glow); }
   .act-btn.current{ color:var(--text-dim); border-style:dashed; cursor:default; box-shadow:none; }
-  .act-btn.lock{ margin-left:auto; padding-left:11px; }
+  /* Five tags: an even 3-column grid instead of a ragged wrap. */
+  .act-tags{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); }
+  .act-tags .act-label{ grid-column:1 / -1; }
+  .act-tags .act-btn{ justify-content:center; padding-left:8px; padding-right:8px; }
+  /* Infusion fuel: one per line (names vary in length). */
+  .act-fuel{ flex-direction:column; align-items:flex-start; }
   .act-btn.lock[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
   body.locker-busy .act-btn, body.locker-busy .pm-all{ border-style:dashed; cursor:progress; } /* no fade: text keeps its contrast */
   /* Status messages */
@@ -902,8 +908,6 @@
     .chip-meta{ flex:1 0 100%; margin-left:0; }
     .vault-class{ flex-direction:column; align-items:stretch; gap:6px; }
     .vault-class-label{ width:auto; padding-top:0; }
-    .act-label{ width:100%; }
-    .act-btn.lock{ margin-left:0; }
     /* Bottom sheet on phones, like DIM */
     dialog.item-dialog{ width:100%; max-width:100%; max-height:88vh; margin:auto 0 0; border-radius:14px 14px 0 0; border-bottom:0; }
     .stat-row{ grid-template-columns:100px 32px 1fr; }

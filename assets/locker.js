@@ -3824,7 +3824,7 @@
   function infuseHtml(item){
     const fuel = infuseFuel(item);
     if (!fuel.length) return "";
-    return '<div class="act-row"><span class="act-label">Infuse</span>' + fuel.map(i => '<button type="button" class="act-btn" data-fuel="' + i.id + '"><img src="' + esc(img(iconOf(i))) + '" alt="" width="20" height="20">' +
+    return '<div class="act-row act-fuel"><span class="act-label">Infuse</span>' + fuel.map(i => '<button type="button" class="act-btn" data-fuel="' + i.id + '"><img src="' + esc(img(iconOf(i))) + '" alt="" width="20" height="20">' +
       esc(i.def.n) + " " + i.power + ' <span class="fuel-gain">+' + (i.power - item.power) + '</span><span class="sr-only"> Power, in ' + esc(ownerLabel(i.owner)) + (TAGS[i.id] === "junk" ? ", tagged Junk" : "") + "</span></button>").join("") + "</div>";
   }
 
@@ -3906,12 +3906,13 @@
     const actions = '<div class="dlg-actions" id="dlg-actions">' +
       '<div class="act-row"><span class="act-label">Equip</span>' + OWNERS.filter(o => classOk(item, o.id)).map(o => ownerBtn(o, "equip", item.owner === o.id && item.equipped)).join("") + "</div>" +
       '<div class="act-row"><span class="act-label">Move</span>' + OWNERS.concat([{ id: "vault", name: "Vault" }]).map(o => ownerBtn(o, "move", item.owner === o.id)).join("") +
-        // Icon shows what a tap does: a closed lock locks it, an open lock unlocks it.
-        '<button type="button" class="act-btn lock icon-only" data-act="lock" aria-label="' + (item.state & STATE_LOCKED ? "Unlock (it's locked)" : "Lock") + '" title="' + (item.state & STATE_LOCKED ? "Unlock" : "Lock") + '">' + (item.state & STATE_LOCKED ? ICON_UNLOCK : ICON_LOCK) + "</button></div>" +
+        "</div>" +
       '<div class="act-row"><span class="act-label">Compare</span><button type="button" class="act-btn" id="open-compare">' + (copiesOf(item).length > 1 ? "Compare " + copiesOf(item).length + " copies" : "Compare with similar") + "</button></div>" +
       infuseHtml(item) +
-      '<div class="act-row"><span class="act-label">Tag</span>' +
-        TAG_LIST.map(([t, name, ico]) => '<button type="button" class="act-btn tag" data-tag="' + t + '" aria-pressed="' + (TAGS[item.id] === t) + '">' + (ico.charAt(0) === "<" ? ico : ico + " ") + name + "</button>").join("") + "</div>" +
+      '<div class="act-row act-tags"><span class="act-label">Tag</span>' +
+        TAG_LIST.map(([t, name, ico]) => '<button type="button" class="act-btn tag" data-tag="' + t + '" aria-pressed="' + (TAGS[item.id] === t) + '">' + (ico.charAt(0) === "<" ? ico : ico + " ") + name + "</button>").join("") +
+        // Bungie's lock fills the grid's sixth cell. The icon and word say what a tap does.
+        '<button type="button" class="act-btn lock" data-act="lock" aria-label="' + (item.state & STATE_LOCKED ? "Unlock (it's locked)" : "Lock") + '">' + (item.state & STATE_LOCKED ? ICON_UNLOCK + "Unlock" : ICON_LOCK + "Lock") + "</button></div>" +
       '<div class="act-row"><span class="act-label">Mode</span>' +
         USE_LIST.map(([u, name, ico, what]) => '<button type="button" class="act-btn tag use-' + u + '" data-use="' + u + '" aria-pressed="' + hasUse(item.id, u) + '" title="' + what + '">' + ico + name + '<span class="sr-only"> (' + what + ")</span></button>").join("") + "</div>" +
       '<form class="act-row note-row" id="note-form"><label class="act-label" for="item-note">Note</label>' +
