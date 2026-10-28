@@ -19,15 +19,14 @@ git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)debug.html' ':(exclude)clan-admin.html' ':(exclude)discord-bot' \
   ':(exclude)api-debug.html' ':(exclude)xur-debug.html' ':(exclude).claude' \
   ':(exclude)skills-lock.json' ':(exclude).gitignore' ':(exclude)tools' \
-  ':(exclude)tests' ':(exclude).github' ':(exclude)locker.html' \
-  ':(exclude)assets/locker.js' ':(exclude)assets/locker-worker.js' \
-  ':(exclude)assets/locker-demo.json' > /tmp/promote.patch
+  ':(exclude)tests' ':(exclude).github' > /tmp/promote.patch
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
 Nothing should reject; a reject means prod and dev drifted — stop and look.
 After applying, `diff -rq` the two trees: the only differences should be
-`CNAME`, `.gitignore` and the dev-only files above. (Until 2026-10-17,
+`CNAME`, `.gitignore` and the dev-only files above. (The Locker's
+files were excluded too until it launched on 2026-10-28.) (Until 2026-10-17,
 dev's `vendors.html` carried a Xûr "Predicted Next Drop" preview that
 always rejected; it now lives only in `xur-debug.html`. Keep unreleased
 experiments in the debug pages, not in public pages.) (`design-preview.html` and
@@ -100,7 +99,7 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   stay `align-items:start` and reserve the variable bits instead (fixed line
   counts / min-heights). New card content that can vary in length needs the
   same treatment or the grid stops matching.
-- **Locker (dev-only until the owner says; owner held it back on 2026-10-22).** `locker.html` + `assets/locker.js` show the
+- **Locker (live on rallyflag.gg since 2026-10-28, Preview).** `locker.html` + `assets/locker.js` show the
   signed-in player's weapons/armor (one GetProfile call) with God Roll
   matches and armor set progress. `assets/locker-worker.js` downloads
   Bungie's DestinyInventoryItemLiteDefinition (~3MB gz), trims it to ~6MB
@@ -109,11 +108,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   `locker.html?demo` uses `assets/locker-demo.json`, built by
   `node --max-old-space-size=6144 tools/build-locker-demo.js <manifest dir>`
   from real hashes (needs the full item, plug set, item set and stat
-  tables). In nav.js's Loadouts section only off rallyflag.gg (added
-  with the Debug section); its four files are excluded from promotion, and
-  it's out of the sitemap. To launch: drop the excludes, make `rallyFlagHasLocker()` in nav.js
-  return true (it gates the menu item and God Rolls' Locker buttons), add it
-  to the sitemap, empty site-check's DEV_ONLY. Stage 2 (moving, equipping,
+  tables). In nav.js's Loadouts section and the sitemap; `rallyFlagHasLocker()`
+  (nav.js, true) gates it and God Rolls' Locker buttons. Stage 2 (moving, equipping,
   locking, postmaster pulls, desktop drag and drop) posts to
   /Platform/Destiny2/Actions/Items/{TransferItem,EquipItem,SetLockState,
   PullFromPostmaster}/ one at a time; these need the app's "Move or equip
@@ -161,8 +157,7 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   keyboard shortcuts and the Compare bottom drawer (`showDialog`; the
   dialog's `close` event is async): HANDOFF item 64.
   Clarity perk descriptions (their usage rules, versions.json check;
-  off on rallyflag.gg via `CLARITY_ON_PROD` in locker.js until the
-  partnership is agreed): HANDOFF item 65.
+  `CLARITY_ON_PROD` in locker.js, on since launch): HANDOFF item 65.
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.

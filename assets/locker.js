@@ -464,9 +464,9 @@
   // feedback, show their text unedited and only their latest version.
   const CL_TAB = ' target="_blank" rel="noopener"', CL_NEW = '<span class="sr-only"> (opens in a new tab)</span>';
   const CLARITY_KEY = "rallyflag_locker_clarity", CLARITY_SITE = "https://d2clarity.com", CLARITY_DISCORD = "https://d2clarity.com/discord", CLARITY_KOFI = "https://url.d2clarity.com/ko-fi";
-  // Dev only until the Clarity partnership is agreed (their terms allow
-  // small projects; rallyflag.gg isn't one). Then set this to true.
-  const CLARITY_ON_PROD = false;
+  // On everywhere since the Locker launched (2026-10-28; Clarity said
+  // they're happy to go ahead). false would keep it off rallyflag.gg.
+  const CLARITY_ON_PROD = true;
   const CLARITY_ALLOWED = CLARITY_ON_PROD || !/(^|\.)rallyflag\.gg$/.test(location.hostname);
   const CLARITY = { on: CLARITY_ALLOWED && (() => { try { return localStorage.getItem(CLARITY_KEY) !== "off"; } catch (e){ return true; } })(), data: null, err: "", job: null };
   function loadClarity(){

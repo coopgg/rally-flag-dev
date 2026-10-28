@@ -64,10 +64,9 @@
       ]
     }
   ];
-  // The Locker stays on dev until the owner promotes it (its files are
-  // excluded from promotion). Pages that link into it (God Rolls) ask
-  // this too, so launching it means changing only this line.
-  window.rallyFlagHasLocker = () => window.location.hostname !== "rallyflag.gg";
+  // The Locker is live everywhere (launched 2026-10-28). Pages that link
+  // into it (God Rolls) ask this; returning false again would hide it.
+  window.rallyFlagHasLocker = () => true;
   if (window.rallyFlagHasLocker()){
     // First in Loadouts, as it will be on prod.
     NAV_SECTIONS.find(s => s.label === "Loadouts").items.unshift({ label: "Locker", href: "locker.html", group: "locker" });

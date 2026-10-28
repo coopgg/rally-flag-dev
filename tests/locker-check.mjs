@@ -715,11 +715,11 @@ await section("Clarity", async () => {
   await p.keyboard.press("Escape"); await p.click("#clarity-on");
   check("clarity: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
-  // rallyflag.gg: off until the partnership is agreed (CLARITY_ON_PROD).
+  // rallyflag.gg: on since the Locker launched (CLARITY_ON_PROD), and the menu links it.
   const q = await open({ url: "https://rallyflag.gg/locker.html?demo" });
   await q.click('#buckets .item-tile[data-id]'); await q.locator("#item-dialog [data-plug]:not(.mod-sq)").nth(2).click(); await q.waitForTimeout(800);
-  check("clarity: off on rallyflag.gg: no box, no download, no Tools row", !await q.locator("#plug-info .clarity").count() && !q.clarityCalls.length && await q.isHidden("#clarity-row"), q.clarityCalls.join());
-  check("rallyflag.gg: the site menu has no Locker link until it launches (dev does)", await q.locator('#site-nav a[href="locker.html"]').count() === 0);
+  check("clarity: on at rallyflag.gg too", q.clarityCalls.length > 0, q.clarityCalls.join());
+  check("rallyflag.gg: the site menu links the Locker", await q.locator('#site-nav a[href="locker.html"]').count() === 1);
   check("clarity: rallyflag.gg Locker has no script errors", !q.errors.length, q.errors.join("; "));
   await q.context_.close();
 });
@@ -1474,10 +1474,10 @@ await section("God Rolls", async () => {
   check("god rolls: the perk's name is its accessible name", (await perk.evaluate(b => b.textContent)).trim() === (await tip.textContent()).trim());
   check("god rolls: no script errors", !g.errors.length && !L.errors.length, g.errors.concat(L.errors).join("; "));
   await g.context_.close();
-  // rallyflag.gg (no Locker yet): no sign-in line, no profile call, no Locker buttons.
+  // rallyflag.gg: the same Locker bits as dev since launch.
   const prod = await open({ real: true, url: "https://rallyflag.gg/god-rolls.html", ready: "#weapon-grid .weapon-card" });
   await prod.waitForTimeout(6000);
-  check("god rolls (rallyflag.gg): no Locker bits until it launches", await prod.evaluate(() => rallyFlagHasLocker()) === false && await prod.isHidden("#owned-auth-row") && !prod.calls.some(c => c.ep === "Profile") && !(await prod.locator(".weapon-actions *").count()) && !prod.errors.length, prod.errors.join("; "));
+  check("god rolls (rallyflag.gg): the Locker line shows there too", await prod.evaluate(() => rallyFlagHasLocker()) === true && await prod.isVisible("#owned-auth-row") && !prod.errors.length, prod.errors.join("; "));
   await prod.context_.close();
   // Phone: the four Locker tabs fit on one line; the page's Type row swipes instead of wrapping.
   const P = await open({ width: 360, touch: true, hash: "#godrolls" });
