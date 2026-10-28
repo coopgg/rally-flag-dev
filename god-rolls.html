@@ -64,6 +64,7 @@
 <style>
   .hero-note{ color:var(--text-dimmer); font-size:13.5px; line-height:1.5; max-width:560px; margin:10px auto 0; }
 
+  .owned-auth-row[hidden]{ display:none; }
   .owned-auth-row{
     max-width:1000px; margin:20px auto 0; padding:0 24px;
     font-size:13px; line-height:1.5; text-align:center; color:var(--text-dimmer);
@@ -74,12 +75,6 @@
   }
   .owned-auth-row a:hover, .owned-auth-row button:hover{ color:var(--accent-bright); }
 
-  /* Signed in: one line on each card, "You have this roll" / "Best copy: 3 of 5 perks". */
-  /* One line, so closed cards stay the same height. */
-  .weapon-own{ margin-top:6px; min-height:18px; font-size:12.5px; color:var(--text-dimmer); display:flex; align-items:center; gap:6px; white-space:nowrap; }
-  .weapon-own:empty{ display:none; }
-  .weapon-own.full{ color:var(--accent-text); font-weight:600; }
-  .weapon-own svg{ width:13px; height:13px; flex-shrink:0; }
   .weapon-actions{ display:flex; flex-wrap:wrap; gap:8px; margin-top:16px; }
   .weapon-actions:empty{ display:none; }
   .weapon-act{
@@ -433,23 +428,15 @@
       flavorText: def.flavorText || "",
       ammoTypeName: AMMO_TYPE_NAMES[ammoType] || null,
       damageTypeHash: def.damageTypeHashes && def.damageTypeHashes.length ? def.damageTypeHashes[0] : null,
-      collectibleHash: def.collectibleHash || null
     };
   }
 
   // ---------------------------------------------------------------
-  // Ownership badges (signed-in only). Two separate checks:
-  //   - Unlocked: this weapon pattern has ever been obtained, via
-  //     Collectibles (component 800) — same approach as vendors.html's
-  //     Eververse/Ada-1 badges.
-  //   - Owned: an actual copy in your vault/inventory/equipped right
-  //     now has every perk in the recommended roll socketed. Needs the
-  //     full inventory (102 vault, 201 character inventories, 205
-  //     equipped) plus each instanced item's current sockets (305) —
-  //     all in the one bulk Profile call below, no per-item requests.
+  // Your copies (signed in, where the Locker exists): which of these
+  // weapons are in your vault/inventory/equipped (102, 201, 205), so a
+  // card can offer "Find in Locker". How good each copy is stays in the
+  // Locker (owner, 2026-10-26: the page doesn't repeat it).
   // ---------------------------------------------------------------
-  const COLLECTIBLE_STATE_NOT_ACQUIRED = 1;
-
   async function authedApiGet(path){
     const res = await RallyFlagAuth.authedFetch(path);
     const data = await res.json();
@@ -462,29 +449,10 @@
     const destinyMemberships = memberships.destinyMemberships || [];
     if (!destinyMemberships.length) throw new Error("This Bungie account has no linked Destiny 2 platform.");
     const primary = destinyMemberships.find(m => m.membershipId === memberships.primaryMembershipId) || destinyMemberships[0];
-
     const profile = await authedApiGet(
-      "/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId +
-      "/?components=102,201,205,305,310,800"
+      "/Platform/Destiny2/" + primary.membershipType + "/Profile/" + primary.membershipId + "/?components=102,201,205"
     );
-
-    const unlockedHashes = new Set();
-    const addAcquired = (collectibles) => {
-      for (const hash of Object.keys(collectibles || {})){
-        if (!(collectibles[hash].state & COLLECTIBLE_STATE_NOT_ACQUIRED)) unlockedHashes.add(hash);
-      }
-    };
-    // Most weapon collectibles are account-wide, but check per-character
-    // too — same bulk call returns both, and this was a real bug on the
-    // Eververse/Ada-1 badges when only account-wide was checked.
-    addAcquired(profile.profileCollectibles && profile.profileCollectibles.data && profile.profileCollectibles.data.collectibles);
-    const characterCollectibles = (profile.characterCollectibles && profile.characterCollectibles.data) || {};
-    for (const characterId of Object.keys(characterCollectibles)){
-      addAcquired(characterCollectibles[characterId].collectibles);
-    }
-
-    // instancesByHash: itemHash -> [itemInstanceId, ...], across vault,
-    // every character's inventory, and every character's equipped slot.
+    // itemHash -> [itemInstanceId, ...] across the vault and every character.
     const instancesByHash = new Map();
     const addItems = (items) => {
       for (const it of items || []){
@@ -494,55 +462,18 @@
       }
     };
     addItems(profile.profileInventory && profile.profileInventory.data && profile.profileInventory.data.items);
-    const characterInventories = (profile.characterInventories && profile.characterInventories.data) || {};
-    for (const characterId of Object.keys(characterInventories)) addItems(characterInventories[characterId].items);
-    const characterEquipment = (profile.characterEquipment && profile.characterEquipment.data) || {};
-    for (const characterId of Object.keys(characterEquipment)) addItems(characterEquipment[characterId].items);
-
-    const socketsByInstanceId = (profile.itemComponents && profile.itemComponents.sockets && profile.itemComponents.sockets.data) || {};
-    const reusablePlugsByInstanceId = (profile.itemComponents && profile.itemComponents.reusablePlugs && profile.itemComponents.reusablePlugs.data) || {};
-
-    return { unlockedHashes, instancesByHash, socketsByInstanceId, reusablePlugsByInstanceId };
+    for (const part of [profile.characterInventories, profile.characterEquipment]){
+      const byChar = (part && part.data) || {};
+      for (const characterId of Object.keys(byChar)) addItems(byChar[characterId].items);
+    }
+    return { instancesByHash };
   }
 
-  // itemHashes is a list, not a single hash — crafted weapons carry a
-  // separate item hash for the actual owned/craftable instance from the
-  // "pattern" hash used for perks/light.gg links, so a weapon can have
-  // real owned instances split across more than one hash (see
-  // craftedItemHash in god-rolls-data.js).
+  // Crafted weapons carry a separate item hash from the "pattern" hash
+  // used for perks/light.gg links (craftedItemHash in god-rolls-data.js),
+  // so a copy can be under either.
   function instancesFor(itemHashes, ownership){
     return itemHashes.flatMap(h => ownership.instancesByHash.get(h) || []);
-  }
-
-  // Highest number of perkHashes found available on any single owned
-  // instance across itemHashes (barrel/mag/traits/etc are all just
-  // sockets — a flat union across all of an instance's sockets is
-  // enough, no need to know which socket is which column). "Available"
-  // means either currently equipped (component 305) OR freely
-  // re-rollable into right now (component 310's reusable-plugs pool) —
-  // a weapon whose god-roll perks are all sitting in its per-socket
-  // pool but not currently selected is still functionally "owned", you
-  // could swap into that exact roll for free without a new drop.
-  // Takes the best copy, not just the first one found, in case you own
-  // more than one roll of the same weapon. Returns 0 if you don't own
-  // any copy at all — that's different from "owns it with 0 matching
-  // perks", but this page never has both perkHashes.length === 0 and
-  // an owned instance to confuse the two.
-  function bestRollMatchCount(itemHashes, perkHashes, ownership){
-    let best = 0;
-    for (const instanceId of instancesFor(itemHashes, ownership)){
-      const sockets = (ownership.socketsByInstanceId[instanceId] && ownership.socketsByInstanceId[instanceId].sockets) || [];
-      const plugHashes = new Set(sockets.map(s => s.plugHash).filter(Boolean));
-      const reusablePlugs = (ownership.reusablePlugsByInstanceId[instanceId] && ownership.reusablePlugsByInstanceId[instanceId].plugs) || {};
-      for (const socketIndex of Object.keys(reusablePlugs)){
-        for (const plug of reusablePlugs[socketIndex]){
-          if (plug.plugItemHash) plugHashes.add(plug.plugItemHash);
-        }
-      }
-      const matched = perkHashes.filter(h => plugHashes.has(h)).length;
-      if (matched > best) best = matched;
-    }
-    return best;
   }
 
   let ownershipDataPromise = null;
@@ -570,14 +501,15 @@
     return matches;
   };
 
+  // Only where the Locker exists: sign in to get "Find in Locker" on the cards.
   function renderAuthRow(){
     const row = document.getElementById("owned-auth-row");
+    row.hidden = !HAS_LOCKER;
+    if (!HAS_LOCKER) return;
     if (RallyFlagAuth.isSignedIn()){
-      const name = RallyFlagAuth.getDisplayName() || "Signed in";
-      row.textContent = "Signed in as " + name + ". Each card shows your best copy" + (HAS_LOCKER ? "; " : ".");
-      if (HAS_LOCKER) row.insertAdjacentHTML("beforeend", '<a href="locker.html?q=is%3Agodroll">see every match in your Locker</a>.');
+      row.innerHTML = '<a href="locker.html#godrolls">See how your copies compare in your Locker</a>';
     } else {
-      row.innerHTML = '<button type="button" id="owned-signin-link">Sign in with Bungie.net</button> to see which of these rolls you already have.';
+      row.innerHTML = '<button type="button" id="owned-signin-link">Sign in with Bungie.net</button> to find your copies in your Locker.';
       document.getElementById("owned-signin-link").addEventListener("click", () => {
         RallyFlagAuth.signIn();
       });
@@ -666,7 +598,6 @@
           '<div class="weapon-name" id="name-' + weapon.slug + '">' + weapon.name + '</div>' +
           '<span class="weapon-badges" id="badges-' + weapon.slug + '"></span>' +
           '<div class="weapon-meta" id="meta-' + weapon.slug + '">Loading live data\u2026</div>' +
-          '<div class="weapon-own" id="own-' + weapon.slug + '"></div>' +
         '</div>' +
       '</div>' +
       '<div class="weapon-body">' +
@@ -768,28 +699,9 @@
       badgesEl.innerHTML = badgesHtml;
 
       shown.name = item.name;
-      const ownEl = document.getElementById("own-" + weapon.slug);
       if (ownershipDataPromise){
         const ownership = await ownershipDataPromise;
-        // Check both the "pattern" hash (roll.itemHash, what perks/
-        // light.gg use) and, when known, the crafted weapon's separate
-        // real item hash (weapon.craftedItemHash): a player could own
-        // either, or both. Same test as the Locker's God Roll badge.
-        const candidateHashes = [roll.itemHash, weapon.craftedItemHash].filter(Boolean);
-        const totalPerks = roll.perkHashes.length;
-        const matchCount = bestRollMatchCount(candidateHashes, roll.perkHashes, ownership);
-        const copies = instancesFor(candidateHashes, ownership).length;
-        // Some weapons (a lot of newer craftable ones) don't expose a
-        // collectibleHash, so a copy in your gear is proof on its own.
-        const unlocked = copies > 0 || (item.collectibleHash && ownership.unlockedHashes.has(String(item.collectibleHash)));
-        const full = totalPerks > 0 && matchCount === totalPerks;
-        shown.copies = copies;
-        ownEl.className = "weapon-own" + (full ? " full" : "");
-        ownEl.innerHTML = full ? CHECK_SVG + "You have this roll"
-          : copies ? "Best copy: " + matchCount + " of " + totalPerks + " perks"
-          : unlocked ? "Unlocked, no copy" : "Not unlocked yet";
-      } else {
-        ownEl.innerHTML = "";
+        shown.copies = instancesFor([roll.itemHash, weapon.craftedItemHash].filter(Boolean), ownership).length;
       }
     } catch (err){
       console.warn("Weapon fetch failed for " + weapon.name + ":", err.message);
@@ -840,9 +752,9 @@
     // back to this page), so a fresh render() on page load already
     // picks up the signed-in state correctly without needing a live
     // re-subscription here.
-    ownershipDataPromise = RallyFlagAuth.isSignedIn() ? fetchOwnershipData().catch(err => {
+    ownershipDataPromise = HAS_LOCKER && RallyFlagAuth.isSignedIn() ? fetchOwnershipData().catch(err => {
       console.warn("Ownership data fetch failed:", err.message);
-      return { unlockedHashes: new Set(), instancesByHash: new Map(), socketsByInstanceId: {}, reusablePlugsByInstanceId: {} };
+      return { instancesByHash: new Map() };
     }) : null;
 
     // Every card and the static filters (search, playstyle, builds) come

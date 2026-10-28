@@ -1401,17 +1401,17 @@ await section("Share links", async () => {
 
 // ---------- God Rolls page ↔ Locker ----------
 await section("God Rolls", async () => {
-  // The page and the Locker's God Rolls tab read the same profile and must agree.
+  // The page and the Locker's God Rolls tab read the same profile: "Find in Locker" is on exactly the cards with a copy.
   const g = await open({ real: true, url: BASE + "god-rolls.html", ready: "#weapon-grid .weapon-card" });
-  await g.waitForFunction(() => [...document.querySelectorAll(".weapon-own")].every(e => e.textContent), null, { timeout: 150000 });
-  const page = await g.$$eval(".weapon-card", cs => Object.fromEntries(cs.map(c => [c.id.slice(7), c.querySelector(".weapon-own").textContent])));
+  await g.waitForFunction(() => document.querySelectorAll(".weapon-actions button").length === document.querySelectorAll(".weapon-card").length, null, { timeout: 150000 });
+  const page = await g.$$eval(".weapon-card", cs => Object.fromEntries(cs.map(c => [c.id.slice(7), !!c.querySelector(".weapon-actions a[href^='locker.html?q=']")])));
+  check("god rolls: the page doesn't repeat how good your copy is", !(await g.locator(".weapon-own").count()) && !/best copy/i.test(await g.textContent("#weapon-grid")) && /compare in your Locker/.test(await g.textContent("#owned-auth-row")));
   // Same browser (the wish list is shared through this browser's storage).
   const L = await g.context_.newPage(); L.errors = []; L.on("pageerror", e => L.errors.push(e.message));
   await L.goto(BASE + "locker.html#godrolls"); await L.waitForSelector("#locker-app:not([hidden])", { timeout: 120000 }); await L.waitForTimeout(1500);
-  const tab = await L.$$eval(".chase-row", rs => rs.map(r => [r.querySelector("[href*='#weapon-']").getAttribute("href").split("#weapon-")[1], r.querySelector(".chase-state").textContent]));
-  const norm = t => /You have this roll/.test(t) ? "full" : (t.match(/(\d+) of (\d+)/) || [, "none"]).slice(1).join("/");
-  const differ = tab.filter(([slug, t]) => page[slug] != null && norm(page[slug]) !== norm(t));
-  check("god rolls: the page and the Locker's tab agree on every roll", tab.length >= 25 && !differ.length, JSON.stringify(differ.slice(0, 3)));
+  const tab = await L.$$eval(".chase-row", rs => rs.map(r => [r.querySelector("[href*='#weapon-']").getAttribute("href").split("#weapon-")[1], !!r.querySelector("[data-chase-show]")]));
+  const differ = tab.filter(([slug, has]) => page[slug] != null && page[slug] !== has);
+  check("god rolls: Find in Locker is on exactly the cards the Locker has copies of", tab.length >= 25 && !differ.length, JSON.stringify(differ.slice(0, 3)));
   check("god rolls: the tab lists to chase first, then the ones you have", await L.locator(".chase-list h2").first().textContent().then(t => /To chase/.test(t)) && /\d+\/\d+/.test(await L.textContent("#godrolls-count")));
   let v = await axe(L); check("god rolls: the Locker tab passes axe", !v.length, v.join(", "));
   // Wish list, both ways: added in the Locker, shown on the page; removed on the page, gone in the Locker.
@@ -1451,6 +1451,11 @@ await section("God Rolls", async () => {
   check("god rolls: the perk's name is its accessible name", (await perk.evaluate(b => b.textContent)).trim() === (await tip.textContent()).trim());
   check("god rolls: no script errors", !g.errors.length && !L.errors.length, g.errors.concat(L.errors).join("; "));
   await g.context_.close();
+  // rallyflag.gg (no Locker yet): no sign-in line, no profile call, no Locker buttons.
+  const prod = await open({ real: true, url: "https://rallyflag.gg/god-rolls.html", ready: "#weapon-grid .weapon-card" });
+  await prod.waitForTimeout(6000);
+  check("god rolls (rallyflag.gg): no Locker bits until it launches", await prod.evaluate(() => rallyFlagHasLocker()) === false && await prod.isHidden("#owned-auth-row") && !prod.calls.some(c => c.ep === "Profile") && !(await prod.locator(".weapon-actions *").count()) && !prod.errors.length, prod.errors.join("; "));
+  await prod.context_.close();
   // Phone: the four Locker tabs fit on one line; the page's Type row swipes instead of wrapping.
   const P = await open({ width: 360, touch: true, hash: "#godrolls" });
   check("god rolls (phone): the Locker's four tabs fit on one line", await P.evaluate(() => { const t = document.querySelector(".view-tabs"); return t.scrollWidth <= t.clientWidth && [...t.children].every(c => c.getBoundingClientRect().height < 50); }));
