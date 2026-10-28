@@ -1039,31 +1039,33 @@ await section("In-game loadouts", async () => {
   if (!(await p.isVisible('[data-game-edit="' + TITAN + ':1"]'))) await p.click('[data-lo-pick="g-' + TITAN + '-1"]');
   await p.click('[data-game-edit="' + TITAN + ':1"]'); await p.selectOption("#ge-name", opts[0].v); p.calls.length = 0; await p.keyboard.press("Escape");
   check("in-game edit: Escape cancels without saving", !(await p.locator(".ge-editor").count()) && !p.calls.length && await p.evaluate(k => document.activeElement.dataset.gameEdit === k, TITAN + ":1"));
-  // All 10 slots show; an empty one saves what the character wears now.
-  check("in-game slots: all 10 slots show, empty ones too", await p.locator('[data-lo-pick^="g-' + TITAN + '-"]').count() === 10 && await p.locator('.lo-tile.empty[data-lo-pick^="g-' + TITAN + '-"]').count() >= 7);
-  await p.click('[data-lo-pick="g-' + TITAN + '-5"]');
+  // Filled slots show, and the empty ones as one tile (the first free slot) that saves what the character wears now.
+  const freeTile = '.lo-tile.empty[data-lo-pick^="g-' + TITAN + '-"]';
+  check("in-game slots: empty slots are one tile that counts them", await p.locator(freeTile).count() === 1 && /Free slots \(7\)/.test(await p.textContent(freeTile)) && await p.locator('[data-lo-pick^="g-' + TITAN + '-"]').count() === 4);
+  const FI = (await p.getAttribute(freeTile, "data-lo-pick")).split("-").pop();
+  await p.click('[data-lo-pick="g-' + TITAN + '-' + FI + '"]');
   check("in-game slots: an empty slot opens on Save current gear", /current gear here/.test(await p.textContent(".ge-editor [type=submit]")));
   const nm = await p.$$eval("#ge-name option", o => o.map(x => ({ v: x.value, t: x.textContent })));
   await p.selectOption("#ge-name", nm[6].v);
   p.calls.length = 0;
   await p.click(".ge-editor [type=submit]"); await idle(p);
   const snap = p.calls.find(c => c.ep === "Loadouts/SnapshotLoadout");
-  check("in-game slots: Save sends SnapshotLoadout with the name", snap && snap.body.loadoutIndex === 5 && snap.body.characterId === TITAN && String(snap.body.nameHash) === nm[6].v, JSON.stringify(snap && snap.body));
-  const tile5 = () => p.textContent('[data-lo-pick="g-' + TITAN + '-5"]');
-  check("in-game slots: the slot now holds the gear", (await tile5()).includes(nm[6].t) && await p.locator('.lo-tile.empty[data-lo-pick="g-' + TITAN + '-5"]').count() === 0);
-  if (!(await p.isVisible('[data-game-snap="' + TITAN + ':5"]'))) await p.click('[data-lo-pick="g-' + TITAN + '-5"]');
+  check("in-game slots: Save sends SnapshotLoadout with the name", snap && snap.body.loadoutIndex === +FI && snap.body.characterId === TITAN && String(snap.body.nameHash) === nm[6].v, JSON.stringify(snap && snap.body));
+  const tile5 = () => p.textContent('[data-lo-pick="g-' + TITAN + '-' + FI + '"]');
+  check("in-game slots: the slot now holds the gear", (await tile5()).includes(nm[6].t) && await p.locator('.lo-tile.empty[data-lo-pick="g-' + TITAN + '-' + FI + '"]').count() === 0);
+  if (!(await p.isVisible('[data-game-snap="' + TITAN + ':' + FI + '"]'))) await p.click('[data-lo-pick="g-' + TITAN + '-' + FI + '"]');
   check("in-game slots: it reads as on", /Equipped 8 of 8 · subclass on/.test(await p.evaluate(() => document.querySelector("#view-loadouts .lo-detail:not([hidden]) .lo-status").textContent)));
   p.calls.length = 0;
-  await p.click('[data-game-snap="' + TITAN + ':5"]');
-  check("in-game slots: Replace asks first", !p.calls.length && /Tap again/.test(await p.textContent('[data-game-snap="' + TITAN + ':5"]')));
-  await p.click('[data-game-snap="' + TITAN + ':5"]'); await idle(p);
-  check("in-game slots: Replace sends SnapshotLoadout keeping the name", p.calls.some(c => c.ep === "Loadouts/SnapshotLoadout" && c.body.loadoutIndex === 5 && String(c.body.nameHash) === nm[6].v));
-  if (!(await p.isVisible('[data-game-clear="' + TITAN + ':5"]'))) await p.click('[data-lo-pick="g-' + TITAN + '-5"]');
+  await p.click('[data-game-snap="' + TITAN + ':' + FI + '"]');
+  check("in-game slots: Replace asks first", !p.calls.length && /Tap again/.test(await p.textContent('[data-game-snap="' + TITAN + ':' + FI + '"]')));
+  await p.click('[data-game-snap="' + TITAN + ':' + FI + '"]'); await idle(p);
+  check("in-game slots: Replace sends SnapshotLoadout keeping the name", p.calls.some(c => c.ep === "Loadouts/SnapshotLoadout" && c.body.loadoutIndex === +FI && String(c.body.nameHash) === nm[6].v));
+  if (!(await p.isVisible('[data-game-clear="' + TITAN + ':' + FI + '"]'))) await p.click('[data-lo-pick="g-' + TITAN + '-' + FI + '"]');
   p.calls.length = 0;
-  await p.click('[data-game-clear="' + TITAN + ':5"]'); await p.click('[data-game-clear="' + TITAN + ':5"]'); await idle(p);
-  check("in-game slots: Clear sends ClearLoadout and empties the slot", p.calls.some(c => c.ep === "Loadouts/ClearLoadout" && c.body.loadoutIndex === 5) && await p.locator('.lo-tile.empty[data-lo-pick="g-' + TITAN + '-5"]').count() === 1);
+  await p.click('[data-game-clear="' + TITAN + ':' + FI + '"]'); await p.click('[data-game-clear="' + TITAN + ':' + FI + '"]'); await idle(p);
+  check("in-game slots: Clear sends ClearLoadout and empties the slot", p.calls.some(c => c.ep === "Loadouts/ClearLoadout" && c.body.loadoutIndex === +FI) && await p.locator('.lo-tile.empty[data-lo-pick="g-' + TITAN + '-' + FI + '"]').count() === 1);
   await p.waitForTimeout(2500); await idle(p);
-  check("in-game slots: still empty after a re-sync with Bungie's older copy", await p.locator('.lo-tile.empty[data-lo-pick="g-' + TITAN + '-5"]').count() === 1);
+  check("in-game slots: still empty after a re-sync with Bungie's older copy", await p.locator('.lo-tile.empty[data-lo-pick="g-' + TITAN + '-' + FI + '"]').count() === 1);
   await p.context_.close();
 });
 
@@ -1397,6 +1399,27 @@ await section("Share links", async () => {
   await D.context_.close();
   check("share links: no script errors", !A.errors.length && !B.errors.length, A.errors.concat(B.errors).join("; "));
   await A.context_.close(); await B.context_.close();
+});
+
+// ---------- Design check (2026-10-28) ----------
+await section("Design", async () => {
+  const p = await open();
+  const head = () => p.evaluate(() => document.getElementById("locker-head").classList.contains("stuck"));
+  const atTop = await head(); await p.evaluate(() => scrollTo(0, 1200)); await p.waitForTimeout(300);
+  check("design: the pinned bar is solid only once pinned", !atTop && await head());
+  await p.evaluate(() => scrollTo(0, 0));
+  check("design: count, Sort, Table and the actions share one row on desktop", await p.evaluate(() => new Set([...document.querySelectorAll(".chip-meta > *:not([hidden]), .chip-actions > *:not([hidden])")].map(e => Math.round(e.getBoundingClientRect().top + e.getBoundingClientRect().height / 2))).size <= 2 &&
+    [...document.querySelectorAll(".chip-actions .fold-all:not([hidden])")].every(b => getComputedStyle(b).textTransform === "none" && parseFloat(getComputedStyle(b).borderTopWidth) === 1)));
+  // Compare skips a group of one.
+  await p.locator("#buckets .item-tile[data-id]").first().click(); await p.click("#open-compare"); await p.waitForTimeout(400);
+  check("design: Compare opens on a group with two or more", await p.evaluate(() => { const on = document.querySelector('#item-dialog [aria-pressed="true"]'); return !!on && +(on.textContent.match(/\((\d+)\)/) || [, 0])[1] >= 2; }));
+  await p.keyboard.press("Escape"); await p.waitForTimeout(400);
+  await p.click("#tab-loadouts");
+  check("design: Max Power is one card per character, all the same height", await p.evaluate(() => { const c = [...document.querySelectorAll(".max-card")]; return c.length === 3 && new Set(c.map(x => Math.round(x.getBoundingClientRect().height))).size === 1; }));
+  check("design: optimizer stats in a 3 × 2 grid", await p.evaluate(() => { const m = [...document.querySelectorAll(".opt-min")]; return m.length === 6 && new Set(m.map(x => Math.round(x.getBoundingClientRect().top))).size === 2; }));
+  const v = await axe(p); check("design: Loadouts passes axe", !v.length, v.join(", "));
+  check("design: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
 });
 
 // ---------- God Rolls page ↔ Locker ----------

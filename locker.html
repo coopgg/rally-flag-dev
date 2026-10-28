@@ -96,8 +96,9 @@
      the same columns as the gear below, so each stays over its character.
      The 100vmax shadows paint the full-width background and line without
      widening the page; clip-path keeps them to the bar's own height. */
-  .locker-head{ position:sticky; top:0; z-index:20; margin-top:20px; padding:10px 0; background:var(--bg);
-    box-shadow:0 0 0 100vmax var(--bg), 0 2px 0 100vmax var(--edge); clip-path:inset(0 -100vmax -2px); }
+  .locker-head{ position:sticky; top:0; z-index:20; margin-top:20px; padding:10px 0; }
+  /* Solid only once pinned (.stuck, set by pinWatch); before that it sits on the page like everything else. */
+  .locker-head.stuck{ background:var(--bg); box-shadow:0 0 0 100vmax var(--bg), 0 2px 0 100vmax var(--edge); clip-path:inset(0 -100vmax -2px); }
   .locker-head .search-box{ margin-bottom:10px; }
   .locker-head .search-box input{ padding:10px 14px; }
   .search-box[hidden]{ display:none; }
@@ -165,11 +166,12 @@
   .chip-sep{ width:1px; height:22px; background:var(--panel-border); margin:0 4px; }
   /* Count + Refresh / Collapse all: never broken mid-phrase; on phones it's
      its own line under the chips (count left, actions right). */
-  .chip-meta{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:4px 14px; margin-left:auto; }
+  .chip-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 10px; }
+  .chip-meta .locker-count{ margin-right:auto; }
   /* Numbers line up as they change (counts, Power, stat totals). */
   .owner-meta, .owner-stats, .locker-count, .vis-count, .lo-status, .set-state, .pick-main small, .set-piece small{ font-variant-numeric:tabular-nums; }
   .locker-count{ font-size:13px; color:var(--text-dim); white-space:nowrap; }
-  .chip-actions{ display:flex; gap:14px; white-space:nowrap; }
+  .chip-actions{ display:flex; flex-wrap:wrap; gap:6px; padding-left:10px; border-left:1px solid var(--panel-border); }
 
   /* Armor set progress */
   /* Gear | Armor Sets views */
@@ -297,7 +299,11 @@
   #buckets.searching .owner-group.clipped .item-tile:not([hidden]){ display:block; }
   #buckets.searching .vault-more{ display:none; }
   .bucket[hidden], .vault-class[hidden], .locker-empty[hidden]{ display:none; }
-  .vault-more, .fold-all{ margin-top:8px; padding:4px 0; border:0; background:none; color:var(--accent-text); font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.06em; text-transform:uppercase; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+  /* Small secondary buttons (Materials, Show all…, Show started sets): the act-btn look, quieter. */
+  .vault-more, .fold-all{ display:inline-flex; align-items:center; min-height:32px; margin-top:8px; padding:4px 12px; border-radius:999px; border:1px solid var(--edge); background:transparent; color:var(--text-dim); font:inherit; font-size:13px; font-weight:500; white-space:nowrap; cursor:pointer; transition: color 0.15s ease, border-color 0.15s ease; }
+  .vault-more:hover, .fold-all:hover{ color:var(--text); border-color:var(--accent); }
+  .fold-all[aria-expanded="true"]{ color:var(--accent-text); border-color:var(--accent-text); }
+  .vault-more[hidden], .fold-all[hidden]{ display:none; }
   .fold-all{ margin-top:0; }
   .group-empty{ color:var(--text-dim); font-size:13px; }
 
@@ -493,7 +499,7 @@
   .pm-chip.nearly-full{ color:var(--text); font-weight:600; }
   .pm-chip.nearly-full > span:first-child::before{ content:""; display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%; background:#e5534b; box-shadow:0 0 8px #e5534b; }
   .bucket.postmaster:has(.nearly-full){ border-color:#d9534f; }
-  .pm-all{ min-height:24px; padding:3px 10px; border-radius:999px; border:1px solid var(--accent); background:none; color:var(--accent-text); font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.04em; cursor:pointer; }
+  .pm-all{ min-height:28px; padding:3px 12px; border-radius:999px; border:1px solid var(--accent-text); background:none; color:var(--accent-text); font:inherit; font-size:13px; font-weight:500; cursor:pointer; }
   .pm-all:hover{ background:var(--accent-dim); }
   .pm-body{ display:flex; flex-wrap:wrap; gap:10px 24px; margin-top:10px; }
   .pm-body[hidden]{ display:none; }
@@ -574,7 +580,9 @@
   .opt-row{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
   .opt-label{ font-size:13px; color:var(--text-dim); min-width:64px; }
   .opt-row select{ max-width:260px; }
-  .opt-mins{ display:grid; grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); gap:8px; }
+  /* Six stats: 3 × 2 (2 × 3 on phones), every box the same width. */
+  .opt-mins{ display:grid; grid-template-columns:repeat(3, minmax(0, 190px)); gap:8px 16px; }
+  @media (max-width:640px){ .opt-mins{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
   .opt-min{ display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); }
   .opt-min span{ flex:1; }
   .opt-min img{ width:16px; height:16px; }
@@ -799,6 +807,10 @@
   .lo-help{ margin:0 0 8px; max-width:70ch; font-size:13px; }
   .lo-row{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 10px; padding:8px 0; border-top:1px solid var(--panel-border); }
   .lo-row:first-of-type{ border-top:0; }
+  /* Max Power: one card per character, button at the bottom of each. */
+  .max-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 240px), 1fr)); grid-auto-rows:1fr; gap:10px; max-width:900px; }
+  .max-card{ display:flex; flex-direction:column; align-items:flex-start; justify-content:space-between; gap:10px; padding:12px 14px; border:1px solid var(--panel-border); border-radius:8px; background:var(--panel); }
+  .max-card .lo-main{ display:flex; flex-direction:column; gap:2px; }
   .lo-main{ font-size:14px; }
   .lo-main .muted, .lo-help.muted, .dlg-block > .muted{ color:var(--text-dim); }
   .lo-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(120px, 1fr)); grid-auto-rows:1fr; gap:6px; }
@@ -808,7 +820,8 @@
   .lo-tile[aria-expanded="true"]{ border-color:var(--accent-text); box-shadow:inset 0 0 0 1px var(--accent-text); }
   .lo-tile-name{ min-width:0; overflow:hidden; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow-wrap:anywhere; }
   .lo-tile.warn::after{ content:"!"; position:absolute; top:3px; right:4px; width:16px; height:16px; border-radius:50%; background:#e8912d; color:#111; font-size:12px; font-weight:700; line-height:16px; text-align:center; }
-  .lo-weapons{ display:flex; align-items:center; gap:8px; margin:-2px 0 10px; font-size:13px; color:var(--text-dim); cursor:pointer; }
+  .lo-weapons{ display:flex; align-items:center; gap:8px; margin:-2px 0 0; font-size:13px; color:var(--text); cursor:pointer; }
+  .lo-weapons-hint{ margin:2px 0 10px 26px; font-size:12.5px; color:var(--text-dim); }
   .lo-weapons input{ width:18px; height:18px; flex:none; accent-color:var(--accent-fill); }
   .lo-check{ position:absolute; top:3px; right:4px; width:16px; height:16px; }
   .lo-check svg{ display:block; fill:var(--text-dim); stroke:var(--bg); }
@@ -905,7 +918,11 @@
     .char-slot{ gap:8px; }
     .slot-equipped{ padding-right:8px; }
     .tile-power{ font-size:13px; }
-    .chip-meta{ flex:1 0 100%; margin-left:0; }
+    /* Phone: count + Table, then Sort, then the actions. */
+    .chip-meta #table-toggle{ order:1; }
+    .chip-meta .sort-label{ order:2; flex:1 0 100%; }
+    .chip-meta .sort-label select{ flex:1; }
+    .chip-actions{ order:3; flex:1 0 100%; padding-left:0; border-left:0; }
     .vault-class{ flex-direction:column; align-items:stretch; gap:6px; }
     .vault-class-label{ width:auto; padding-top:0; }
     /* Bottom sheet on phones, like DIM */
@@ -977,9 +994,10 @@
           <option value="note">Has a note</option>
         </select>
       </div>
-        <div class="chip-meta">
+      </div>
+      <!-- Count on the left; how it's shown and what you can do on the right. -->
+      <div class="chip-meta">
           <span class="locker-count" id="locker-count" aria-live="polite"></span>
-          <button type="button" class="chip" id="table-toggle" aria-pressed="false">Table</button>
           <label class="sort-label"><span>Sort</span><select class="chip chip-select" id="sort-by">
             <option value="power">Power</option>
             <option value="name">Name</option>
@@ -987,8 +1005,8 @@
             <option value="newest">Newest</option>
             <option value="stats">Armor stat total</option>
           </select></label>
+          <button type="button" class="chip" id="table-toggle" aria-pressed="false">Table</button>
           <span class="chip-actions"><button type="button" class="fold-all" id="new-clear" hidden></button><button type="button" class="fold-all" id="materials-btn">Materials</button><button type="button" class="fold-all" id="tools-btn" aria-expanded="false" aria-controls="tools-panel">Tools</button><button type="button" class="fold-all" id="locker-refresh">Refresh</button><button type="button" class="fold-all" id="fold-all">Collapse all</button></span>
-        </div>
       </div>
     </div>
 

@@ -603,6 +603,13 @@
     if (headWatched || !window.ResizeObserver) return;
     headWatched = true;
     new ResizeObserver(([e]) => document.documentElement.style.setProperty("--head-h", Math.round(e.target.getBoundingClientRect().height) + "px")).observe($("locker-head"));
+    // Pinned = a marker just above it has scrolled out of view.
+    if (window.IntersectionObserver){
+      const mark = document.createElement("div");
+      mark.setAttribute("aria-hidden", "true");
+      $("locker-head").before(mark);
+      new IntersectionObserver(([e]) => $("locker-head").classList.toggle("stuck", !e.isIntersecting && e.boundingClientRect.top < 0)).observe(mark);
+    } else $("locker-head").classList.add("stuck");
   }
   function renderOwners(){
     const counts = id => ITEMS.filter(i => i.owner === id).length;
@@ -1098,14 +1105,16 @@
     const byId = new Map(ITEMS.map(i => [i.id, i]));
     const ornName = h => h ? (DB.items[h] ? DB.items[h].n : "an unknown ornament") : "the default look";
     const groups = OWNERS.map(o => {
-      const list = gameLoadouts(o.id);
+      // Empty slots show as one tile (the first free one), not a row of blanks.
+      const all = gameLoadouts(o.id), free = all.filter(lo => lo.empty).length;
+      const list = all.filter(lo => !lo.empty || lo === all.find(x => x.empty));
       if (!list.length) return "";
       return '<div class="lo-owner">' + esc(o.name) + "</div>" + loGrid("g" + o.id, list.map(lo => {
         const key = o.id + ":" + lo.index, editing = gameEditing && gameEditing.key === key;
         if (lo.empty){
           // An empty slot opens straight into "save what you wear here".
           if (loOpen === "g-" + o.id + "-" + lo.index && !editing) gameEditing = { key, charId: o.id, index: lo.index, nameHash: lo.nameHash, iconHash: lo.iconHash, colorHash: lo.colorHash, mode: "snapshot" };
-          return { key: "g-" + o.id + "-" + lo.index, name: "Empty slot " + (lo.index + 1), empty: true, badge: '<span class="lo-badge lo-badge-empty" aria-hidden="true">+</span>',
+          return { key: "g-" + o.id + "-" + lo.index, name: "Free slots (" + free + ")", empty: true, badge: '<span class="lo-badge lo-badge-empty" aria-hidden="true">+</span>',
             detail: '<p class="lo-status muted">Empty slot. Save what your ' + esc(o.name) + " is wearing now (weapons, armor, subclass and mods) into it, with a name, icon and colour from Destiny's lists.</p>" +
               (gameEditing && gameEditing.key === key ? gameEditorHtml(o, lo) : "") };
         }
@@ -1996,7 +2005,7 @@
     const maxRows = OWNERS.map(o => {
       const plan = maxPowerPlan(o.id), now = gearPower(equippedOn(o.id));
       const done = plan.items.every(i => i.owner === o.id && i.equipped);
-      return '<div class="lo-row"><div class="lo-main"><b>' + esc(o.name) + "</b> " +
+      return '<div class="max-card"><div class="lo-main"><b>' + esc(o.name) + "</b>" +
           '<span class="muted">Gear now ' + fmtPower(now) + " · max " + fmtPower(plan.power) + "</span></div>" +
         '<button type="button" class="act-btn" data-lo-max="' + o.id + '"' + (done ? ' aria-disabled="true"' : "") + ">" +
           (done ? "At max Power" : 'Equip max Power<span class="sr-only"> on your ' + esc(o.name) + "</span>") + "</button></div>";
@@ -2048,14 +2057,15 @@
     const saved = list.length ? classes.map(c => {
       const mine = list.filter(lo => lo.cls === c);
       return mine.length ? '<h3 class="lo-owner">' + esc(c === 3 ? "Any class" : CLASS_NAMES[c] || "Other") + "</h3>" + loGrid("r" + c, mine.map(entry)) : "";
-    }).join("") : '<p class="muted">Nothing saved yet. Save what a character wears now, or import a DIM link.</p>';
+    }).join("") : '<p class="muted lo-help">Nothing saved yet. Save what a character wears now, or import a DIM link.</p>';
     box.innerHTML = (loReview ? reviewHtml() : "") +
       '<section class="lo-section" aria-labelledby="lo-h-saved"><h2 class="dlg-label" id="lo-h-saved">Saved in this browser</h2>' +
         '<p class="muted lo-help">Gear, subclass, artifact perks, mods, shaders and ornaments. ' + (DEMO ? "" : "Saved in this browser and to Rally Flag's sync service under your Bungie account, so they're on any device where you sign in. ") +
           '<span id="lo-sync" role="status">' + esc(syncText()) + "</span></p>" +
         '<div class="lo-tools">' +
           '<div class="lo-tool"><label class="lo-name"><span>Name</span><input type="text" id="lo-name" maxlength="40" placeholder="e.g. Raid DPS" autocomplete="off"></label>' +
-            '<label class="lo-weapons"><input type="checkbox" id="lo-weapons"> Weapons only (any class: equip it on any character; leaves armor, subclass and mods alone)</label>' +
+            '<label class="lo-weapons"><input type="checkbox" id="lo-weapons" aria-describedby="lo-weapons-hint"> Weapons only (any class)</label>' +
+            '<p class="lo-weapons-hint" id="lo-weapons-hint">Equips on any character and leaves armor, subclass and mods alone.</p>' +
             '<div class="act-row">' + OWNERS.map(o => '<button type="button" class="act-btn" data-lo-save="' + o.id + '">Save ' + esc(o.name) + "'s loadout</button>").join("") + "</div></div>" +
           '<div class="lo-tool"><label class="lo-name"><span>DIM link</span><input type="url" id="lo-dim" placeholder="https://dim.gg/…" autocomplete="off" inputmode="url" spellcheck="false"></label>' +
             '<div class="act-row"><button type="button" class="act-btn" id="lo-dim-go">Import</button></div></div>' +
@@ -2066,7 +2076,7 @@
         "</section>" +
       '<section class="lo-section" aria-labelledby="lo-h-game"><h2 class="dlg-label" id="lo-h-game">In-game loadouts</h2><p class="muted lo-help">The loadouts saved in Destiny, with their subclass and mods. Rally Flag brings any missing items over first. Empty slots can save what a character wears now.</p>' + gameSection() + "</section>" +
       optimizerHtml() +
-      '<section class="lo-section" aria-labelledby="lo-h-max"><h2 class="dlg-label" id="lo-h-max">Max Power</h2><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p>' + maxRows + "</section>";
+      '<section class="lo-section" aria-labelledby="lo-h-max"><h2 class="dlg-label" id="lo-h-max">Max Power</h2><p class="muted lo-help">Your highest-Power weapons and armor for each character, from anywhere, with one Exotic weapon and one Exotic armor piece.</p><div class="max-grid">' + maxRows + "</div></section>";
     $("lo-name").value = typed.name; $("lo-dim").value = typed.dim; $("lo-weapons").checked = typed.weapons;
     if (typed.rename != null && $("lo-rename-input")) $("lo-rename-input").value = typed.rename;
     if (was) { const t = refocus && box.querySelector(refocus); if (t) t.focus(); }
@@ -3484,7 +3494,8 @@
   function openCompare(fromId, opts){
     const from = ITEMS.find(i => i.id === fromId);
     if (!from) return;
-    if (!cmpState || cmpState.fromId !== fromId || !opts) cmpState = { fromId, scope: "same", sort: null };
+    // Opens on the narrowest group with something to compare against.
+    if (!cmpState || cmpState.fromId !== fromId || !opts) cmpState = { fromId, scope: (compareScopes(from).find(x => x[2].length > 1) || ["same"])[0], sort: null };
     const dlg = $("item-dialog");
     const keep = opts && opts.keep ? { x: (dlg.querySelector(".cmp-scroll") || {}).scrollLeft || 0, y: (dlg.querySelector(".dlg-body") || {}).scrollTop || 0, focus: opts.focus } : null;
     const scopes = compareScopes(from), scope = scopes.find(s => s[0] === cmpState.scope) || scopes[0];
