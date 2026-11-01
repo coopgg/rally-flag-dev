@@ -23,12 +23,18 @@
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const img = p => p ? (p.charAt(0) === "/" ? BUNGIE + p : p) : "";
 
-  async function api(path, body){
-    const res = await fetch(BUNGIE + "/Platform" + path, body ? { method: "POST", headers: { "X-API-Key": API_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) } : { headers: { "X-API-Key": API_KEY } });
-    const j = await res.json().catch(() => ({}));
-    if (j.ErrorStatus === "SystemDisabled") throw new Error("Bungie's servers are down for maintenance");
-    if (j.ErrorCode !== 1) throw new Error(j.Message || "HTTP " + res.status);
-    return j.Response;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  // Bungie asks callers to slow down (ThrottleSeconds, HTTP 429) when a lot
+  // is asked at once (counting sherpas); wait and try again, a few times.
+  async function api(path, body, host){
+    for (let tries = 0; ; tries++){
+      const res = await fetch((host || BUNGIE + "/Platform") + path, body ? { method: "POST", headers: { "X-API-Key": API_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) } : { headers: { "X-API-Key": API_KEY } });
+      const j = await res.json().catch(() => ({}));
+      if (j.ErrorStatus === "SystemDisabled") throw new Error("Bungie's servers are down for maintenance");
+      if ((res.status === 429 || j.ThrottleSeconds > 0) && tries < 4){ await wait(Math.max(1, j.ThrottleSeconds || 2) * 1000 * (tries + 1)); continue; }
+      if (j.ErrorCode !== 1) throw new Error(j.Message || "HTTP " + res.status);
+      return j.Response;
+    }
   }
   // A few requests at a time.
   async function pool(list, n, fn){
@@ -98,7 +104,7 @@
       '<div class="activity-name">' + esc(item.name) + "</div>" +
       '<div class="rr-clears"><b>' + (none ? 0 : e.clears.toLocaleString()) + "</b> " + ((e && e.clears) === 1 ? "clear" : "clears") + "</div>" +
       (none ? '<p class="rr-line">' + (e && e.seconds ? "Played " + fmtHours(e.seconds) + ", no clear yet" : "No clears yet") + "</p>"
-        : '<dl class="rr-meta"><div><dt>Fastest</dt><dd>' + (e.fastest ? fmtTime(e.fastest) : "–") + "</dd></div><div><dt>Time played</dt><dd>" + fmtHours(e.seconds) + "</dd></div></dl>" +
+        : '<dl class="rr-meta"><div><dt>Fastest</dt><dd>' + (e.fastest ? fmtTime(e.fastest) : "–") + "</dd></div><div><dt>Time played</dt><dd>" + fmtHours(e.seconds) + '</dd></div><div data-sherpas="' + esc(item.slug) + '" hidden><dt>Sherpas</dt><dd></dd></div></dl>' +
           '<p class="rr-line">' + versionsText(e.versions) + "</p>") +
       '<div class="rr-badges" data-badges="' + esc(item.slug) + '"></div>' +
       '<div class="activity-arrow">View guide →</div></a>';
@@ -118,9 +124,10 @@
         '<div class="rr-who"><h2 id="rr-name" tabindex="-1">' + esc(name) + "</h2>" +
           '<p class="rr-chars">' + chars.map(c => esc(CLASSES[c.classType] || "Guardian") + " " + c.light).join(" · ") + (r.deleted ? " · " + r.deleted + " deleted" : "") + "</p></div>" +
         '<dl class="rr-totals"><div><dt>Raid clears</dt><dd>' + raids.clears.toLocaleString() + "</dd></div><div><dt>Dungeon clears</dt><dd>" + dungeons.clears.toLocaleString() + "</dd></div>" +
-          "<div><dt>Time in both</dt><dd>" + fmtHours(raids.seconds + dungeons.seconds) + "</dd></div></dl>" +
+          "<div><dt>Time in both</dt><dd>" + fmtHours(raids.seconds + dungeons.seconds) + '</dd></div><div id="rr-sherpa-total" hidden><dt>Sherpas</dt><dd></dd></div></dl>' +
         '<button type="button" class="rr-btn rr-copy" id="rr-copy">Copy link</button></section>' +
       '<p class="rr-progress" id="rr-progress" role="status"></p>' +
+      '<div class="rr-sherpa" id="rr-sherpa"></div>' +
       '<h2 class="rr-h">Raids</h2>' + grid(idx.raids, "raid") +
       '<h2 class="rr-h">Dungeons</h2>' + grid(idx.dungeons, "dungeon") +
       (retired.length ? '<h2 class="rr-h">Retired raids</h2><ul class="rr-retired">' + retired.map(e => "<li><b>" + esc(e.name) + "</b> " + e.clears.toLocaleString() + (e.clears === 1 ? " clear" : " clears") + (e.fastest ? " · fastest " + fmtTime(e.fastest) : "") + "</li>").join("") + "</ul>" : "") +
@@ -144,29 +151,39 @@
   const BADGE_ORDER = ["Solo Flawless", "Solo", "Duo Flawless", "Duo", "Trio Flawless", "Trio", "Flawless", "Day One", "Contest", "Week One"];
   function store(){
     return new Promise((resolve, reject) => {
-      // Version 2: the "fresh" rule changed, so summaries saved before it are dropped.
-      const req = indexedDB.open("rallyflag-report", 2);
-      req.onupgradeneeded = () => { const d = req.result; if (d.objectStoreNames.contains("pgcr")) d.deleteObjectStore("pgcr"); d.createObjectStore("pgcr"); };
+      // Version 2: the "fresh" rule changed; 3: summaries keep the team (for
+      // sherpas). Each bump drops the saved run summaries. "first": a
+      // teammate's earliest clear of each raid/dungeon; "sherpa": a player's
+      // last count.
+      const req = indexedDB.open("rallyflag-report", 3);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        if (d.objectStoreNames.contains("pgcr")) d.deleteObjectStore("pgcr");
+        d.createObjectStore("pgcr");
+        for (const st of ["first", "sherpa"]) if (!d.objectStoreNames.contains(st)) d.createObjectStore(st);
+      };
       req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
     });
   }
   let dbJob = null;
   const db = () => dbJob || (dbJob = store().catch(() => null));
-  async function cacheGet(id){ const d = await db(); if (!d) return null; return new Promise(r => { const q = d.transaction("pgcr").objectStore("pgcr").get(id); q.onsuccess = () => r(q.result || null); q.onerror = () => r(null); }); }
-  async function cachePut(id, v){ const d = await db(); if (!d) return; try { d.transaction("pgcr", "readwrite").objectStore("pgcr").put(v, id); } catch (e){} }
-  // A run, boiled down: { fresh, players, flawless }.
+  async function cacheGet(id, st = "pgcr"){ const d = await db(); if (!d) return null; return new Promise(r => { try { const q = d.transaction(st).objectStore(st).get(id); q.onsuccess = () => r(q.result || null); q.onerror = () => r(null); } catch (e){ r(null); } }); }
+  async function cachePut(id, v, st = "pgcr"){ const d = await db(); if (!d) return; try { d.transaction(st, "readwrite").objectStore(st).put(v, id); } catch (e){} }
+  // A run, boiled down: { fresh, players, flawless, t (when), team: [[type, id, completed]] }.
   async function runOf(id){
     const hit = await cacheGet(id);
     if (hit) return hit;
-    const res = await fetch(STATS + "/Destiny2/Stats/PostGameCarnageReport/" + id + "/", { headers: { "X-API-Key": API_KEY } });
-    const j = await res.json().catch(() => ({}));
-    if (!j.Response) throw new Error(j.Message || "HTTP " + res.status);
-    const r = j.Response, entries = r.entries || [];
+    const r = await api("/Destiny2/Stats/PostGameCarnageReport/" + id + "/", null, STATS), entries = r.entries || [];
     // Bungie's own flag when the report has it; the starting phase only for
     // old reports without it (a checkpoint run can still say phase 0).
     const fresh = typeof r.activityWasStartedFromBeginning === "boolean" ? r.activityWasStartedFromBeginning : r.startingPhaseIndex === 0;
     const players = new Set(entries.map(e => e.player && e.player.destinyUserInfo && e.player.destinyUserInfo.membershipId)).size;
-    const v = { fresh, players, flawless: fresh && entries.every(e => !((e.values.deaths || {}).basic || {}).value) };
+    const team = new Map();
+    for (const e of entries){
+      const u = (e.player && e.player.destinyUserInfo) || {}, done = ((e.values.completed || {}).basic || {}).value === 1;
+      if (u.membershipId) team.set(u.membershipId, [u.membershipType, u.membershipId, (team.get(u.membershipId) || [0, 0, false])[2] || done]);
+    }
+    const v = { fresh, players, flawless: fresh && entries.every(e => !((e.values.deaths || {}).basic || {}).value), t: Date.parse(r.period) || 0, team: [...team.values()] };
     cachePut(id, v);
     return v;
   }
@@ -203,12 +220,13 @@
     const lists = await pool((account.characters || []).flatMap(c => [[c.characterId, 4], [c.characterId, 82]]), 4, ([c, mode]) => runHistory(type, id, c, mode));
     if (job !== loading) return;
     const found = new Map(), add = (slug, b) => { if (!found.has(slug)) found.set(slug, new Set()); found.get(slug).add(b); };
-    const candidates = [], seen = new Set();
+    const candidates = [], seen = new Set(), clears = [];
     for (const a of lists.flat()){
       const d = a.activityDetails || {}, m = MAP[d.referenceId] || MAP[d.directorActivityHash], v = a.values || {}, n = k => ((v[k] || {}).basic || {}).value || 0;
       if (!m || !m[0] || n("completed") !== 1 || n("completionReason") !== 0 || seen.has(d.instanceId)) continue;
       seen.add(d.instanceId);
       const slug = m[0], rel = REL[slug], t = Date.parse(a.period);
+      clears.push({ id: d.instanceId, slug, kind: m[1], t });
       if (/contest/i.test(m[2])) add(slug, "Contest");
       if (rel){
         const hours = (t - Date.parse(rel.start)) / 36e5;
@@ -239,6 +257,102 @@
     if (job !== loading) return;
     showBadges(found);
     progress("Badges from " + seen.size.toLocaleString() + " clears. Solo, duo, trio and flawless count only runs started from the beginning.");
+    sherpaPanel(type, id, clears, job);
+  }
+
+  // ---------------- sherpas ----------------
+  // A sherpa: a run of this player's where a teammate got their first clear
+  // of that raid or dungeon (any version). Bungie doesn't record it, so on
+  // request: read every clear's carnage report (saved), and since only the
+  // earliest run a teammate shared with this player can be their first,
+  // read each teammate's history once per kind (raids / dungeons) and save
+  // their earliest clear of each ("first" store). That never changes, so it
+  // is reused unless a shared run is newer than the saved look. The first
+  // count takes minutes for a busy player; later ones only check new runs
+  // and new teammates. Each player's last count is saved ("sherpa").
+  let sherpaStop = false;
+  const MODE = { raid: 4, dungeon: 82 };
+  async function firstClears(t, mid, kind, need){
+    const key = t + "-" + mid + "|" + kind, hit = await cacheGet(key, "first");
+    if (hit && hit.at >= need) return hit.firsts;
+    const acct = await api("/Destiny2/" + t + "/Account/" + mid + "/Stats/?groups=1");
+    const lists = await pool((acct.characters || []).map(c => c.characterId), 3, c => runHistory(t, mid, c, MODE[kind]));
+    const firsts = {}, MAP = window.RaidActivities || {};
+    for (const a of lists.flat()){
+      const d = a.activityDetails || {}, m = MAP[d.referenceId] || MAP[d.directorActivityHash], v = a.values || {};
+      if (!m || !m[0] || ((v.completed || {}).basic || {}).value !== 1 || ((v.completionReason || {}).basic || {}).value !== 0) continue;
+      const when = Date.parse(a.period);
+      if (!firsts[m[0]] || when < firsts[m[0]].t) firsts[m[0]] = { id: d.instanceId, t: when };
+    }
+    cachePut(key, { at: Date.now(), firsts }, "first");
+    return firsts;
+  }
+  const sumOf = counts => Object.values(counts).reduce((a, b) => a + b, 0);
+  function showSherpas(counts, total){
+    document.querySelectorAll("[data-sherpas]").forEach(el => { const n = counts[el.dataset.sherpas] || 0; el.hidden = !n; el.querySelector("dd").textContent = n.toLocaleString(); });
+    const t = $("rr-sherpa-total"); if (t){ t.hidden = total == null; t.querySelector("dd").textContent = (total || 0).toLocaleString(); }
+  }
+  function sherpaButton(box, text, label, type, id, clears, job){
+    box.innerHTML = "<p>" + text + '</p><button type="button" class="rr-btn ghost" id="rr-sherpa-go">' + label + "</button>";
+    $("rr-sherpa-go").addEventListener("click", () => countSherpas(type, id, clears, job));
+  }
+  async function sherpaPanel(type, id, clears, job){
+    const box = $("rr-sherpa"), saved = await cacheGet(type + "-" + id, "sherpa");
+    if (job !== loading || !box) return;
+    if (saved){
+      showSherpas(saved.counts, saved.total);
+      sherpaButton(box, "Sherpas counted " + new Date(saved.at).toLocaleDateString() + " from " + saved.clears.toLocaleString() + " clears.", "Update sherpas", type, id, clears, job);
+    } else sherpaButton(box, "Sherpas: runs where a teammate got their first clear. Bungie doesn't record that, so counting reads every clear and each teammate's history. The first count can take several minutes; your browser keeps the work, so later counts are quick.", "Count sherpas", type, id, clears, job);
+  }
+  async function countSherpas(type, id, clears, job){
+    const box = $("rr-sherpa");
+    sherpaStop = false;
+    box.innerHTML = '<p id="rr-sherpa-status" role="status">Starting…</p><button type="button" class="rr-btn ghost" id="rr-sherpa-stop">Stop</button>';
+    $("rr-sherpa-stop").addEventListener("click", () => { sherpaStop = true; });
+    const status = t => { const el = $("rr-sherpa-status"); if (el) el.textContent = t; };
+    const live = () => job === loading && !sherpaStop;
+    // 1. Every clear's team.
+    let done = 0;
+    const runs = await pool(clears, 6, async c => {
+      if (!live()) return null;
+      const r = await runOf(c.id).catch(() => null);
+      if (++done % 10 === 0) status("Reading your clears… " + done.toLocaleString() + " of " + clears.length.toLocaleString());
+      return r && Object.assign({}, c, { team: r.team || [] });
+    });
+    // 2. Each teammate's earliest run with this player, per raid/dungeon.
+    const pairs = new Map();
+    for (const r of runs){
+      if (!r) continue;
+      for (const [mt, mid, completed] of r.team){
+        if (mid === id || !completed) continue;
+        const k = mt + "-" + mid + "|" + r.kind;
+        let p = pairs.get(k);
+        if (!p){ p = { mt, mid, kind: r.kind, runs: {}, newest: 0 }; pairs.set(k, p); }
+        if (!p.runs[r.slug] || r.t < p.runs[r.slug].t) p.runs[r.slug] = { id: r.id, t: r.t };
+        p.newest = Math.max(p.newest, r.t);
+      }
+    }
+    // 3. Was that their first?
+    const counts = {}, list = [...pairs.values()];
+    let checked = 0, skipped = 0;
+    await pool(list, 6, async p => {
+      if (!live()) return;
+      try {
+        const firsts = await firstClears(p.mt, p.mid, p.kind, p.newest);
+        for (const slug in p.runs) if (firsts[slug] && firsts[slug].id === p.runs[slug].id) counts[slug] = (counts[slug] || 0) + 1;
+      } catch (e){ skipped++; }
+      if (++checked % 5 === 0 || checked === list.length){
+        status("Checking teammates' first clears… " + checked.toLocaleString() + " of " + list.length.toLocaleString());
+        showSherpas(counts, sumOf(counts));
+      }
+    });
+    if (job !== loading) return;
+    const total = sumOf(counts);
+    showSherpas(counts, total);
+    if (sherpaStop) return sherpaButton(box, "Stopped. The work so far is kept, so counting again picks up from here.", "Count sherpas", type, id, clears, job);
+    cachePut(type + "-" + id, { at: Date.now(), counts, total, clears: clears.length }, "sherpa");
+    sherpaButton(box, total.toLocaleString() + (total === 1 ? " sherpa" : " sherpas") + " across " + clears.length.toLocaleString() + " clears and " + list.length.toLocaleString() + " teammates" +
+      (skipped ? " (" + skipped + " teammates' histories didn't load and aren't counted)" : "") + ".", "Update sherpas", type, id, clears, job);
   }
 
   // ---------------- recent lookups ----------------
