@@ -100,6 +100,7 @@
       (none ? '<p class="rr-line">' + (e && e.seconds ? "Played " + fmtHours(e.seconds) + ", no clear yet" : "No clears yet") + "</p>"
         : '<dl class="rr-meta"><div><dt>Fastest</dt><dd>' + (e.fastest ? fmtTime(e.fastest) : "–") + "</dd></div><div><dt>Time played</dt><dd>" + fmtHours(e.seconds) + "</dd></div></dl>" +
           '<p class="rr-line">' + versionsText(e.versions) + "</p>") +
+      '<div class="rr-badges" data-badges="' + esc(item.slug) + '"></div>' +
       '<div class="activity-arrow">View guide →</div></a>';
   }
   function render(r, type, id){
@@ -119,6 +120,7 @@
         '<dl class="rr-totals"><div><dt>Raid clears</dt><dd>' + raids.clears.toLocaleString() + "</dd></div><div><dt>Dungeon clears</dt><dd>" + dungeons.clears.toLocaleString() + "</dd></div>" +
           "<div><dt>Time in both</dt><dd>" + fmtHours(raids.seconds + dungeons.seconds) + "</dd></div></dl>" +
         '<button type="button" class="rr-btn rr-copy" id="rr-copy">Copy link</button></section>' +
+      '<p class="rr-progress" id="rr-progress" role="status"></p>' +
       '<h2 class="rr-h">Raids</h2>' + grid(idx.raids, "raid") +
       '<h2 class="rr-h">Dungeons</h2>' + grid(idx.dungeons, "dungeon") +
       (retired.length ? '<h2 class="rr-h">Retired raids</h2><ul class="rr-retired">' + retired.map(e => "<li><b>" + esc(e.name) + "</b> " + e.clears.toLocaleString() + (e.clears === 1 ? " clear" : " clears") + (e.fastest ? " · fastest " + fmtTime(e.fastest) : "") + "</li>").join("") + "</ul>" : "") +
@@ -127,6 +129,108 @@
       const url = location.origin + location.pathname + "?p=" + type + "-" + id;
       (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => { $("rr-copy").textContent = "Link copied"; }, () => { $("rr-copy").textContent = url; });
     });
+  }
+
+  // ---------------- badges ----------------
+  // From the player's run history (raid mode 4, dungeon mode 82, every
+  // character): Contest / Day One / Week One by date (raid-releases.js) or
+  // Bungie's "Contest" versions. Solo, duo, trio and flawless need each
+  // run's carnage report (who was in it, any deaths, started from the
+  // beginning), fetched only for completed runs that could count (this
+  // player didn't die, or three players or fewer) and kept in IndexedDB,
+  // since a finished run's report never changes.
+  const STATS = "https://stats.bungie.net/Platform";
+  const BADGE_ORDER = ["Solo Flawless", "Solo", "Duo Flawless", "Duo", "Trio Flawless", "Trio", "Flawless", "Day One", "Contest", "Week One"];
+  function store(){
+    return new Promise((resolve, reject) => {
+      const req = indexedDB.open("rallyflag-report", 1);
+      req.onupgradeneeded = () => req.result.createObjectStore("pgcr");
+      req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
+    });
+  }
+  let dbJob = null;
+  const db = () => dbJob || (dbJob = store().catch(() => null));
+  async function cacheGet(id){ const d = await db(); if (!d) return null; return new Promise(r => { const q = d.transaction("pgcr").objectStore("pgcr").get(id); q.onsuccess = () => r(q.result || null); q.onerror = () => r(null); }); }
+  async function cachePut(id, v){ const d = await db(); if (!d) return; try { d.transaction("pgcr", "readwrite").objectStore("pgcr").put(v, id); } catch (e){} }
+  // A run, boiled down: { fresh, players, flawless }.
+  async function runOf(id){
+    const hit = await cacheGet(id);
+    if (hit) return hit;
+    const res = await fetch(STATS + "/Destiny2/Stats/PostGameCarnageReport/" + id + "/", { headers: { "X-API-Key": API_KEY } });
+    const j = await res.json().catch(() => ({}));
+    if (!j.Response) throw new Error(j.Message || "HTTP " + res.status);
+    const r = j.Response, entries = r.entries || [];
+    const fresh = r.activityWasStartedFromBeginning === true || r.startingPhaseIndex === 0;
+    const players = new Set(entries.map(e => e.player && e.player.destinyUserInfo && e.player.destinyUserInfo.membershipId)).size;
+    const v = { fresh, players, flawless: fresh && entries.every(e => !((e.values.deaths || {}).basic || {}).value) };
+    cachePut(id, v);
+    return v;
+  }
+  async function runHistory(type, id, c, mode){
+    const out = [];
+    for (let page = 0; page < 40; page++){
+      const r = await api("/Destiny2/" + type + "/Account/" + id + "/Character/" + c + "/Stats/Activities/?mode=" + mode + "&count=250&page=" + page).catch(() => ({}));
+      const list = r.activities || [];
+      out.push(...list);
+      if (list.length < 250) break;
+    }
+    return out;
+  }
+  function showBadges(found){
+    document.querySelectorAll("[data-badges]").forEach(el => {
+      const set = found.get(el.dataset.badges);
+      // A low-man badge hides when a smaller (or same) team did it at least as
+      // cleanly: Solo hides Duo and Trio, Duo Flawless hides Trio Flawless and
+      // Duo, but Trio Flawless stays next to a plain Duo. Plain Flawless hides
+      // behind any low-man flawless.
+      const SIZES = ["Solo", "Duo", "Trio"], rank = b => [SIZES.indexOf(b.replace(" Flawless", "")), / Flawless$/.test(b)];
+      const beaten = b => { const [n, f] = rank(b); return n >= 0 && [...set].some(o => { const [m, g] = rank(o); return o !== b && m >= 0 && m <= n && (g || !f); }); };
+      const shown = set ? BADGE_ORDER.filter(b => set.has(b) && !beaten(b) && !(b === "Flawless" && SIZES.some(x => set.has(x + " Flawless")))) : [];
+      el.innerHTML = shown.map(b => '<span class="rr-badge' + (/flawless/i.test(b) ? " gold" : "") + '">' + b + "</span>").join("");
+    });
+  }
+  async function badges(type, id, job){
+    const MAP = window.RaidActivities || {}, REL = window.RaidReleases || {};
+    const progress = t => { const el = $("rr-progress"); if (el && job === loading) el.textContent = t; };
+    progress("Reading every run for badges…");
+    const account = await api("/Destiny2/" + type + "/Account/" + id + "/Stats/?groups=1").catch(() => ({ characters: [] }));
+    const lists = await pool((account.characters || []).flatMap(c => [[c.characterId, 4], [c.characterId, 82]]), 4, ([c, mode]) => runHistory(type, id, c, mode));
+    if (job !== loading) return;
+    const found = new Map(), add = (slug, b) => { if (!found.has(slug)) found.set(slug, new Set()); found.get(slug).add(b); };
+    const candidates = [], seen = new Set();
+    for (const a of lists.flat()){
+      const d = a.activityDetails || {}, m = MAP[d.referenceId] || MAP[d.directorActivityHash], v = a.values || {}, n = k => ((v[k] || {}).basic || {}).value || 0;
+      if (!m || !m[0] || n("completed") !== 1 || n("completionReason") !== 0 || seen.has(d.instanceId)) continue;
+      seen.add(d.instanceId);
+      const slug = m[0], rel = REL[slug], t = Date.parse(a.period);
+      if (/contest/i.test(m[2])) add(slug, "Contest");
+      if (rel){
+        const hours = (t - Date.parse(rel.start)) / 36e5;
+        if (hours >= 0 && hours < (rel.dayOne || 0)) add(slug, "Day One");
+        if (hours >= 0 && hours < (rel.contest || 0)) add(slug, "Contest");
+        if (hours >= 0 && hours < 168) add(slug, "Week One");
+      }
+      if (n("deaths") === 0 || n("playerCount") <= 3) candidates.push({ id: d.instanceId, slug });
+    }
+    showBadges(found);
+    let done = 0;
+    progress("Checking " + candidates.length.toLocaleString() + " runs for solo, duo, trio and flawless clears… 0%");
+    await pool(candidates, 6, async c => {
+      if (job !== loading) return;
+      try {
+        const r = await runOf(c.id);
+        if (r.flawless) add(c.slug, "Flawless");
+        if (r.fresh && r.players >= 1 && r.players <= 3){
+          const size = ["Solo", "Duo", "Trio"][r.players - 1];
+          add(c.slug, size + (r.flawless ? " Flawless" : ""));
+        }
+      } catch (e){}
+      done++;
+      if (done % 10 === 0 || done === candidates.length){ showBadges(found); progress("Checking " + candidates.length.toLocaleString() + " runs for solo, duo, trio and flawless clears… " + Math.round(done / candidates.length * 100) + "%"); }
+    });
+    if (job !== loading) return;
+    showBadges(found);
+    progress("Badges from " + seen.size.toLocaleString() + " clears. Solo, duo, trio and flawless count only runs started from the beginning.");
   }
 
   // ---------------- recent lookups ----------------
@@ -155,6 +259,7 @@
       const r = await report(m[1], m[2]);
       if (job !== loading) return;
       render(r, m[1], m[2]);
+      badges(m[1], m[2], job);
       const h = $("rr-name"); if (h && push) h.focus();
     } catch (e){
       if (job === loading) $("rr-out").innerHTML = '<p class="rr-status error" role="status">Couldn\'t load this player (' + esc(e.message) + ").</p>";
