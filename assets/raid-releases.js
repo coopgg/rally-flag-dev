@@ -5,9 +5,9 @@
    contest: hours its first clears count as Contest (raids from Vault of
      Glass on ran Contest mode for 48 hours); dayOne: raids before that
      get "Day One" for the first 24 hours instead.
-   Missing here (start not confirmed yet): The Desert Perpetual and
-   Equilibrium. Their Contest runs still count, from Bungie's own
-   "Contest" activity versions; Week One waits for a date.
+   The Desert Perpetual (19 July 2025, 10:00 PT) and Equilibrium (13 Dec
+   2025, 9:00 PT) come from launch coverage (2026-11-01); both ran
+   Contest mode for 48 hours and also have Bungie "Contest" versions.
    ============================================================ */
 window.RaidReleases = {
   "last-wish": { start: "2018-09-14T17:00:00Z", dayOne: 24 },
@@ -19,6 +19,7 @@ window.RaidReleases = {
   "root-of-nightmares": { start: "2023-03-10T18:00:00Z", contest: 48 },
   "crotas-end": { start: "2023-09-01T17:00:00Z", contest: 48 },
   "salvations-edge": { start: "2024-06-07T17:00:00Z", contest: 48 },
+  "the-desert-perpetual": { start: "2025-07-19T17:00:00Z", contest: 48 },
   "shattered-throne": { start: "2018-09-25T17:00:00Z" },
   "pit-of-heresy": { start: "2019-10-29T17:00:00Z" },
   "prophecy": { start: "2020-06-09T17:00:00Z" },
@@ -28,5 +29,6 @@ window.RaidReleases = {
   "ghosts-of-the-deep": { start: "2023-05-26T17:00:00Z" },
   "warlords-ruin": { start: "2023-12-01T17:00:00Z" },
   "vespers-host": { start: "2024-10-11T17:00:00Z" },
-  "sundered-doctrine": { start: "2025-02-07T17:00:00Z" }
+  "sundered-doctrine": { start: "2025-02-07T17:00:00Z" },
+  "equilibrium": { start: "2025-12-13T17:00:00Z", contest: 48 }
 };

@@ -1435,6 +1435,34 @@ await section("Lore", async () => {
   await p.context_.close();
 });
 
+// ---------- Your clears on the guide pages ----------
+await section("Your clears", async () => {
+  // Signed out: nothing extra on the page, nothing loaded.
+  const out = await open({ url: BASE + "raid-vault-of-glass.html", ready: "#content" });
+  check("your clears: signed out, guides show nothing extra", !(await out.locator(".your-clears").count()) && !(await out.evaluate(() => !!window.RaidActivities)));
+  await out.context_.close();
+  // Signed in: two characters' Vault of Glass clears added up (Normal + Master).
+  // Starts on a page without the Home page's Twitch player (its iframe throws in headless Chrome).
+  const p = await open({ real: true, url: BASE + "faq.html", ready: "#site-nav" });
+  const ok = r => ({ status: 200, contentType: "application/json", body: JSON.stringify({ ErrorCode: 1, Response: r }) });
+  let aggCalls = 0;
+  await p.context_.route(new RegExp("/Account/" + MEMBER + "/Stats/\\?groups=1"), r => r.fulfill(ok({ characters: [{ characterId: "11", deleted: false }, { characterId: "12", deleted: true }] })));
+  await p.context_.route(/\/Character\/(11|12)\/Stats\/AggregateActivityStats\//, r => { aggCalls++; const c = r.request().url().match(/Character\/(\d+)\//)[1];
+    const v = (n, f, t) => ({ activityCompletions: { basic: { value: n } }, fastestCompletionMsForActivity: { basic: { value: f } }, activitySecondsPlayed: { basic: { value: t } } });
+    r.fulfill(ok({ activities: c === "11" ? [{ activityHash: 3711931140, values: v(5, 2400000, 18000) }, { activityHash: 1681562271, values: v(2, 3000000, 9000) }] : [{ activityHash: 3711931140, values: v(3, 2100000, 12000) }] })); });
+  await p.goto(BASE + "raid-vault-of-glass.html"); await p.waitForSelector(".your-clears .yc-n", { timeout: 20000 }).catch(() => {});
+  const line = (await p.textContent(".your-clears")) || "";
+  check("your clears: signed in, the guide shows your clears, fastest, time and versions", /Your clears:\s*10/.test(line) && /fastest 35:00/.test(line) && /10h 50m played/.test(line) && /Normal 8 · Master 2/.test(line), line);
+  check("your clears: it links to your full report", await p.locator('.your-clears a[href="report.html?p=3-' + MEMBER + '"]').count() === 1);
+  const before = aggCalls;
+  await p.goto(BASE + "dungeon-prophecy.html"); await p.waitForSelector(".your-clears .yc-line");
+  await p.waitForTimeout(800);
+  check("your clears: another guide reuses the numbers (no new requests) and says none yet", aggCalls === before && /none yet/.test(await p.textContent(".your-clears")));
+  const v = await axe(p); check("your clears: passes axe", !v.length, v.join(", "));
+  check("your clears: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
 // ---------- Seals & Triumphs (seals.html) ----------
 await section("Seals", async () => {
   // A real public profile (the owner's), so Bungie's live seal definitions are exercised.
