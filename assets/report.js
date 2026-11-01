@@ -309,8 +309,7 @@
     if (saved){
       showSherpas(saved.counts, saved.total);
       sherpaButton(box, "Sherpas counted " + new Date(saved.at).toLocaleDateString() + " from " + saved.clears.toLocaleString() + " clears. " + SHERPA_NOTE, "Update sherpas", type, id, clears, job);
-    } else sherpaButton(box, "Sherpas: runs where a teammate got their first clear. Bungie doesn't record that, so counting reads every clear and each teammate's history. " +
-      "The first count can take 10–20 minutes for players with lots of clears; you can stop and pick it up later, and your browser keeps the work, so later counts are quick.", "Count sherpas", type, id, clears, job);
+    } else sherpaButton(box, "Sherpas: runs where a teammate got their first clear. Counting reads every clear and each teammate's history: 10–20 minutes the first time for busy players, quick after that. You can stop and pick it up later.", "Count sherpas", type, id, clears, job);
   }
   async function countSherpas(type, id, clears, job){
     const box = $("rr-sherpa");

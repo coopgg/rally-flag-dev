@@ -164,12 +164,15 @@
       const chip = e.target.closest(".sl-chip[data-p]");
       if (chip){ $("sl-q").value = chip.dataset.name; return show(chip.dataset.p, true); }
       const f = e.target.closest("[data-filter]");
-      if (f && VIEW){ filter = f.dataset.filter; open = null; draw(); $("sl-out").querySelector('[data-filter="' + filter + '"]').focus(); return; }
+      if (f && VIEW){ filter = f.dataset.filter; open = null; draw();
+        // The filter rides along in the link (?p=…&f=done|all; in progress is the default).
+        const u = new URLSearchParams(location.search); filter === "progress" ? u.delete("f") : u.set("f", filter); history.replaceState(history.state, "", "?" + u.toString()); $("sl-out").querySelector('[data-filter="' + filter + '"]').focus(); return; }
       const head = e.target.closest("[data-seal]");
       if (head && VIEW){ open = open === head.dataset.seal ? null : head.dataset.seal; draw(); $("sl-out").querySelector('[data-seal="' + head.dataset.seal + '"]').focus(); }
     });
     window.addEventListener("popstate", () => { const p = new URLSearchParams(location.search).get("p"); if (p) show(p, false); });
-    const p = new URLSearchParams(location.search).get("p");
+    const p = new URLSearchParams(location.search).get("p"), f = new URLSearchParams(location.search).get("f");
+    if (f === "done" || f === "all") filter = f;
     if (p) show(p, false);
     else if (signedIn) mine();
   }

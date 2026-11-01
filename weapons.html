@@ -135,7 +135,12 @@
   .wl-recoil .spread{ fill:var(--accent-fill); }
   .wl-recoil line.spread{ stroke:var(--accent-fill); }
   .wl-frame{ display:flex; gap:10px; align-items:flex-start; }
-  .wl-frame img{ flex:none; width:40px; height:40px; }
+  .wl-frame img{ flex:none; width:40px; height:40px; padding:4px; border-radius:6px; background:#1a1f2b; } /* white-on-transparent icon */
+  /* Weapon view: a one-line header, so the weapon starts near the top. */
+  body.wl-detail-on .hero{ margin-top:16px; }
+  body.wl-detail-on .hero .eyebrow, body.wl-detail-on .hero .subtitle{ display:none; }
+  body.wl-detail-on .hero h1.title{ font-size:26px; }
+  body.wl-detail-on .wl-wrap{ margin-top:12px; }
   .wl-frame b{ display:block; font-size:14px; color:var(--text); }
   .wl-frame small{ display:block; font-size:13px; color:var(--text-dim); line-height:1.45; }
   .wl-cols{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:14px 12px; align-items:start; }
@@ -213,7 +218,7 @@
   <div id="wl-app" hidden>
     <section id="wl-search-view" aria-label="Find a weapon">
       <div class="wl-search">
-        <input type="search" id="wl-q" aria-label="Search weapons by name" placeholder="Search weapons by name…" autocomplete="off" spellcheck="false">
+        <input type="search" id="wl-q" name="q" aria-label="Search weapons by name" placeholder="Search weapons by name…" autocomplete="off" spellcheck="false">
       </div>
       <div class="wl-filters" id="wl-filters"></div>
       <div class="wl-bar-row"><span id="wl-count" aria-live="polite"></span><button type="button" class="wl-btn" id="wl-clear">Clear</button></div>

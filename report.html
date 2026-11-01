@@ -81,7 +81,14 @@
 
   /* The player: their emblem as the banner. */
   .rr-player{ position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:14px 28px; margin-top:24px; padding:22px; overflow:clip; isolation:isolate; }
-  .rr-emblem{ position:absolute; inset:0; z-index:-1; width:100%; height:100%; object-fit:cover; object-position:left center; opacity:0.35; }
+  /* The emblem at its own size (Bungie's are 474×96) in the top-left corner,
+     fading out to the right, so it never stretches or sits under the numbers. */
+  /* The emblem as the banner's left edge: its icon square (left 96px) shown
+     whole and sharp next to the name, the rest fading out. */
+  .rr-emblem{ position:absolute; top:0; left:0; z-index:-1; width:474px; max-width:100%; height:96px; object-fit:cover; object-position:left center; opacity:0.5;
+    -webkit-mask-image:linear-gradient(90deg, #000 20%, transparent 60%); mask-image:linear-gradient(90deg, #000 20%, transparent 60%); }
+  .rr-player:has(.rr-emblem) .rr-who{ padding-left:96px; min-height:52px; }
+  @media (max-width:640px){ .rr-player:has(.rr-emblem) .rr-who{ padding-left:84px; } .rr-emblem{ height:84px; width:415px; } }
   .rr-who{ min-width:0; flex:1 1 220px; }
   .rr-who h2{ margin:0; font-family:'Oswald', sans-serif; font-weight:600; font-size:28px; line-height:1.15; color:var(--text); overflow-wrap:anywhere; }
   .rr-links{ margin:4px 0 0; font-size:13px; color:var(--text-dim); }
@@ -146,7 +153,7 @@
 
 <div class="rr-wrap">
   <form class="rr-form" id="rr-form" role="search">
-    <input type="search" id="rr-q" aria-label="Bungie name, like Guardian#1234" placeholder="Bungie name, like Guardian#1234" autocomplete="off" spellcheck="false">
+    <input type="search" id="rr-q" name="player" aria-label="Bungie name, like Guardian#1234" placeholder="Bungie name, like Guardian#1234" autocomplete="off" spellcheck="false">
     <button type="submit" class="rr-btn">Look up</button>
     <button type="button" class="rr-btn ghost" id="rr-mine" hidden>Show mine</button>
   </form>

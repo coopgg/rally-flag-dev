@@ -126,7 +126,7 @@
   function renderSearch(){
     $("wl-filters").innerHTML = filtersHtml();
     for (const [id, key] of [["wl-type", "type"], ["wl-element", "element"], ["wl-ammo", "ammo"], ["wl-rarity", "rarity"]])
-      $(id).addEventListener("change", e => { view[key] = e.target.value; view.shown = PAGE; renderResults(); });
+      $(id).addEventListener("change", e => { view[key] = e.target.value; view.shown = PAGE; renderResults(); history.replaceState(history.state, "", listUrl()); });
     renderResults();
   }
 
@@ -290,6 +290,7 @@
 
   async function openWeapon(weapon, hash, push){
     current = { weapon, hash: null };
+    document.body.classList.add("wl-detail-on");
     $("wl-search-view").hidden = true; $("wl-detail").hidden = false;
     $("wl-detail").innerHTML = '<p class="wl-status" role="status">Loading ' + esc(weapon.name) + "…</p>";
     document.title = weapon.name + " - Weapon Lookup - Rally Flag";
@@ -397,11 +398,20 @@
     if (CLARITY.on && !CLARITY.data) loadClarity().then(() => { if (box.isConnected && box.dataset.h === String(h)) fill(); });
   }
 
+  // The search and filters as a link: ?q=…&type=…&element=…&ammo=…&rarity=…
+  const FILTERS = ["q", "type", "element", "ammo", "rarity"];
+  function listUrl(){
+    const u = new URLSearchParams();
+    for (const k of FILTERS) if (view[k]) u.set(k, view[k]);
+    const s = u.toString();
+    return location.pathname + (s ? "?" + s : "");
+  }
   function showList(push){
     current = null;
+    document.body.classList.remove("wl-detail-on");
     $("wl-detail").hidden = true; $("wl-detail").innerHTML = ""; $("wl-search-view").hidden = false;
     document.title = "Weapon Lookup - Rally Flag";
-    const url = location.pathname + (view.q ? "?q=" + encodeURIComponent(view.q) : "");
+    const url = listUrl();
     if (push) history.pushState({ list: true }, "", url);
     renderResults();
   }
@@ -411,8 +421,9 @@
     const params = new URLSearchParams(location.search), h = +params.get("w");
     if (h && BY_HASH.has(h)) return openWeapon(BY_HASH.get(h), h, push);
     if (h) setStatus("That weapon isn't in Bungie's database. Search for it below.");
-    view.q = params.get("q") || "";
+    for (const k of FILTERS) view[k] = params.get(k) || "";
     $("wl-q").value = view.q;
+    renderSearch();
     showList(false);
   }
   async function start(){
@@ -422,7 +433,7 @@
     setStatus("");
     buildIndex();
     renderSearch();
-    $("wl-q").addEventListener("input", e => { view.q = e.target.value; view.shown = PAGE; renderResults(); history.replaceState(history.state, "", location.pathname + (view.q ? "?q=" + encodeURIComponent(view.q) : "")); });
+    $("wl-q").addEventListener("input", e => { view.q = e.target.value; view.shown = PAGE; renderResults(); history.replaceState(history.state, "", listUrl()); });
     $("wl-clear").addEventListener("click", () => {
       Object.assign(view, { q: "", type: "", element: "", ammo: "", rarity: "", shown: PAGE });
       $("wl-q").value = ""; renderSearch(); $("wl-q").focus();
@@ -433,7 +444,7 @@
       const a = e.target.closest("a[data-w]");
       if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button) return;
       e.preventDefault();
-      history.replaceState({ list: true }, "", location.pathname + (view.q ? "?q=" + encodeURIComponent(view.q) : ""));
+      history.replaceState({ list: true }, "", listUrl());
       const w = WEAPONS.find(x => x.name === a.dataset.w);
       openWeapon(w, null, true).then(() => { history.replaceState(Object.assign({}, history.state, { fromList: true }), ""); const n = $("wl-name"); if (n) n.focus(); });
     });

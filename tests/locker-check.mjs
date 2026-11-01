@@ -1496,6 +1496,7 @@ await section("Weapon lookup", async () => {
   check("weapons: search narrows by name", (await p.$$eval("#wl-results b", b => b.map(x => x.textContent))).includes("Blast Furnace"));
   await p.selectOption("#wl-rarity", "6");
   check("weapons: filters combine with the search", /^0 weapons/.test(await p.textContent("#wl-count")));
+  check("weapons: the search and filters are in the link", /q=blast\+furn/.test(p.url()) && /rarity=6/.test(p.url()), p.url());
   await p.click("#wl-clear");
   check("weapons: Clear resets and returns to the box", await p.inputValue("#wl-q") === "" && await p.inputValue("#wl-rarity") === "" && await p.evaluate(() => document.activeElement.id === "wl-q"));
   await p.fill("#wl-q", "blast furnace"); await p.click("#wl-results a"); await p.waitForSelector(".wl-cols", { timeout: 60000 }); await p.waitForTimeout(800);
