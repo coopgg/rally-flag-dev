@@ -1454,7 +1454,9 @@ await section("Weapon lookup", async () => {
   await p.click("#wl-clarity-on");
   let v = await axe(p); check("weapons: a weapon passes axe", !v.length, v.join(", "));
   const other = await p.getAttribute('.wl-version[aria-pressed="false"]', "data-version");
-  await p.click('.wl-version[data-version="' + other + '"]'); await p.waitForTimeout(800);
+  await p.click('.wl-version[data-version="' + other + '"]');
+  // Waits for Bungie's live data for that version, however long it takes.
+  await p.waitForFunction(o => location.search.endsWith("?w=" + o) && document.querySelector('.wl-version[data-version="' + o + '"][aria-pressed="true"]'), other, { timeout: 30000 }).catch(() => {});
   check("weapons: switching version updates the page and the link", p.url().endsWith("?w=" + other) && await p.getAttribute('.wl-version[data-version="' + other + '"]', "aria-pressed") === "true");
   await p.goBack(); await p.waitForTimeout(500);
   check("weapons: Back returns to the search as it was", await p.isVisible("#wl-search-view") && await p.inputValue("#wl-q") === "blast furnace");
@@ -1467,6 +1469,46 @@ await section("Weapon lookup", async () => {
   await q.goto(BASE + "god-rolls.html"); await q.waitForSelector(".weapon-card");
   check("weapons: God Rolls cards link to every perk", await q.locator('#weapon-blast-furnace a[href="weapons.html?w=52683113"]').count() === 1);
   await q.context_.close();
+});
+
+// ---------- Raid & Dungeon Report (report.html) ----------
+await section("Report", async () => {
+  // Bungie's public stats, answered here: one player, two characters (one deleted).
+  const P = "4611686018400000999", C1 = "2305843009300000001", C2 = "2305843009300000002";
+  const vals = (clears, fastest, secs) => ({ activityCompletions: { basic: { value: clears } }, fastestCompletionMsForActivity: { basic: { value: fastest } }, activitySecondsPlayed: { basic: { value: secs } }, activityKills: { basic: { value: 10 } }, activityDeaths: { basic: { value: 1 } } });
+  const AGG = {
+    [C1]: [{ activityHash: 3711931140, values: vals(5, 2400000, 18000) }, { activityHash: 1681562271, values: vals(2, 3000000, 9000) }, { activityHash: 960175301, values: vals(1, 5400000, 6000) }],
+    [C2]: [{ activityHash: 3711931140, values: vals(3, 2100000, 12000) }, { activityHash: 1077850348, values: vals(4, 1500000, 7200) }]
+  };
+  const ok = r => ({ status: 200, contentType: "application/json", body: JSON.stringify({ ErrorCode: 1, Response: r }) });
+  // Starts on the report itself (it calls nothing until a lookup), so the routes below are in place in time.
+  const p = await open({ url: BASE + "report.html", ready: "#rr-form" });
+  const ctx = p.context_;
+  await ctx.route(/\/User\/Search\/GlobalName\/0\//, r => r.fulfill(ok({ searchResults: [{ bungieGlobalDisplayName: "Testguard", bungieGlobalDisplayNameCode: 42, destinyMemberships: [{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }] }] })));
+  await ctx.route(/SearchDestinyPlayerByBungieName/, r => { const b = JSON.parse(r.request().postData()); r.fulfill(ok(b.displayNameCode === 42 ? [{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }] : [])); });
+  await ctx.route(new RegExp("/Profile/" + P + "/\\?components=100,200"), r => r.fulfill(ok({ profile: { data: { userInfo: { bungieGlobalDisplayName: "Testguard", bungieGlobalDisplayNameCode: 42 } } },
+    characters: { data: { [C1]: { characterId: C1, classType: 0, light: 2010, dateLastPlayed: "2026-10-30T00:00:00Z" } } } })));
+  await ctx.route(new RegExp("/Account/" + P + "/Stats/\\?groups=1"), r => r.fulfill(ok({ characters: [{ characterId: C1, deleted: false }, { characterId: C2, deleted: true }] })));
+  await ctx.route(/\/Character\/(\d+)\/Stats\/AggregateActivityStats\//, r => r.fulfill(ok({ activities: AGG[r.request().url().match(/Character\/(\d+)\//)[1]] || [] })));
+  await p.fill("#rr-q", "Testg"); await p.waitForSelector("#rr-suggest button");
+  check("report: typing a name suggests players, with their 4-digit codes", (await p.textContent("#rr-suggest")) === "Testguard#0042");
+  await p.fill("#rr-q", "Nobody#1"); await p.click("#rr-form [type=submit]"); await p.waitForTimeout(400);
+  check("report: an unknown name says so", /No Destiny player called Nobody#1/.test(await p.textContent("#rr-out")));
+  await p.fill("#rr-q", "Testguard#42"); await p.click("#rr-form [type=submit]"); await p.waitForSelector("#rr-name");
+  check("report: a lookup adds every character, deleted ones too (retired raids count toward raid clears)", /\?p=3-4611686018400000999$/.test(p.url()) && await p.textContent("#rr-name") === "Testguard#0042" &&
+    /Raid clears11\s*Dungeon clears4/.test((await p.textContent(".rr-totals")).replace(/\s+/g, " ").replace(/ (?=\d)/g, "")) && /1 deleted/.test(await p.textContent(".rr-chars")), await p.textContent(".rr-totals"));
+  const vog = p.locator('.rr-card[href="raid-vault-of-glass.html"]');
+  check("report: a raid card has clears, fastest, time and versions", (await vog.locator(".rr-clears b").textContent()) === "10" && /Fastest\s*35:00/.test(await vog.textContent()) && /Time played\s*10h 50m/.test(await vog.textContent()) && /Normal 8 · Master 2/.test(await vog.textContent()));
+  check("report: every guide has a card in the guides' art style, uncleared ones greyed", await p.locator(".rr-card").count() === 22 && await p.locator(".rr-card .art-thumb").count() === 22 && await p.locator(".rr-card.none").count() === 20);
+  check("report: raids with no guide are listed as retired", /Crown of Sorrow 1 clear · fastest 1h 30m/.test(await p.textContent(".rr-retired")));
+  check("report: the page says what Bungie's numbers count", /checkpoint/.test(await p.textContent(".rr-note")));
+  let v = await axe(p); check("report: passes axe", !v.length, v.join(", "));
+  await p.reload(); await p.waitForSelector("#rr-name");
+  check("report: a shared link opens the same report, and it's under Recent", await p.textContent("#rr-name") === "Testguard#0042" && /Testguard#0042/.test(await p.textContent("#rr-recent")));
+  await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
+  check("report (phone): two cards per row, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".rr-card")].slice(0, 2).map(x => x.getBoundingClientRect().top); return c[0] === c[1] && document.documentElement.scrollWidth <= innerWidth; }));
+  check("report: no script errors", !p.errors.length, p.errors.join("; "));
+  await ctx.close();
 });
 
 // ---------- God Rolls page ↔ Locker ----------
