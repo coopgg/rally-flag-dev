@@ -40,6 +40,7 @@
       items: [
         { label: "This Week", href: "this-week.html", group: "thisweek" },
         { label: "Your Week", href: "your-week.html", group: "yourweek" },
+        { label: "Seals & Triumphs", href: "seals.html", group: "seals" },
         { label: "Tracker", href: "tracker.html", group: "tracker" },
         { label: "Vendors", href: "vendors.html", group: "vendors" },
         { label: "Distortions", href: "distortions.html", group: "distortions" }

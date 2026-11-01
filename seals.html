@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* Boot script: theme, light/dark mode, load guard. Generated from tools/boot-script.js; edit there and run node tools/sync-boot-script.js. */
+(function(){
+  var d = document.documentElement;
+  // Valid saved themes; a first visit gets a random subclass (not Cosmic).
+  var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
+  var theme = null, modePref = null, legacyMode = null;
+  try {
+    theme = localStorage.getItem("rallyflag_theme");
+    if (THEMES.indexOf(theme) < 0){
+      theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+      localStorage.setItem("rallyflag_theme", theme);
+    }
+    modePref = localStorage.getItem("rallyflag_mode_pref");
+    legacyMode = localStorage.getItem("rallyflag_mode");
+  } catch (e) {}
+  if (THEMES.indexOf(theme) < 0) theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+  if (modePref !== "light" && modePref !== "dark"){
+    modePref = legacyMode === "light" ? "light"
+      : (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  }
+  d.setAttribute("data-theme", theme);
+  d.setAttribute("data-mode", modePref);
+
+  d.classList.add("rf-boot");
+  var reveal = function(){ d.classList.remove("rf-boot"); };
+  document.addEventListener("DOMContentLoaded", function(){
+    Promise.race([
+      document.fonts ? document.fonts.ready : 0,
+      new Promise(function(r){ setTimeout(r, 400); })
+    ]).then(function(){ requestAnimationFrame(reveal); });
+  });
+  setTimeout(reveal, 2500);
+})();
+</script>
+<title>Seals &amp; Triumphs - Rally Flag</title>
+<meta name="description" content="Every Destiny 2 seal for you or any player: progress, gildings and the triumphs each one still needs.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rally Flag">
+<meta property="og:title" content="Seals &amp; Triumphs">
+<meta property="og:description" content="Every Destiny 2 seal for you or any player: progress, gildings and the triumphs each one still needs.">
+<meta property="og:url" content="https://rallyflag.gg/seals.html">
+<link rel="canonical" href="https://rallyflag.gg/seals.html">
+<meta property="og:image" content="https://rallyflag.gg/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Rally Flag: Destiny 2 raid and dungeon guides, weapon god rolls, builds and live trackers">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Seals &amp; Triumphs">
+<meta name="twitter:description" content="Every Destiny 2 seal for you or any player: progress, gildings and the triumphs each one still needs.">
+<meta name="twitter:image" content="https://rallyflag.gg/assets/og-image.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.bungie.net">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  /* Seals & Triumphs. Script: assets/seals.js */
+  .sl-wrap{ max-width:1000px; margin:28px auto 0; padding:0 24px 90px; min-height:60vh; }
+  .sl-form{ display:flex; gap:10px; }
+  .sl-form input{ flex:1; min-width:0; background:var(--panel); border:1px solid var(--panel-border); color:var(--text); font-family:var(--font-sans); font-size:15px; padding:13px 16px; border-radius:10px; outline:none; transition:border-color 0.2s ease; }
+  .sl-form input:focus{ border-color:var(--accent); }
+  .sl-form input::placeholder{ color:var(--text-dimmer); }
+  .sl-btn{ display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:6px 18px; border-radius:10px; border:1px solid var(--accent-fill); background:var(--accent-fill); color:var(--on-accent); font:inherit; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .sl-btn.ghost{ background:transparent; color:var(--accent-text); border-color:var(--edge); }
+  .sl-btn[hidden]{ display:none; }
+  .sl-suggest{ display:flex; flex-wrap:wrap; gap:6px; list-style:none; margin:10px 0 0; padding:0; }
+  .sl-suggest[hidden]{ display:none; }
+  .sl-chip{ min-height:32px; padding:4px 12px; border-radius:999px; border:1px solid var(--edge); background:transparent; color:var(--text-dim); font:inherit; font-size:13px; font-weight:500; cursor:pointer; }
+  .sl-chip:hover, .sl-chip:focus-visible{ color:var(--text); border-color:var(--accent); }
+  .sl-chip[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
+  .sl-status{ margin:22px 0 0; padding:12px 16px; border:1px solid var(--panel-border); border-radius:10px; background:var(--panel); color:var(--text-dim); font-size:14px; }
+  .sl-status.error{ border-color:var(--accent-text); color:var(--text); }
+  .sl-player{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px 28px; margin-top:24px; padding:20px 22px; }
+  .sl-player h2{ margin:0; font-family:'Oswald', sans-serif; font-weight:600; font-size:26px; color:var(--text); overflow-wrap:anywhere; }
+  .sl-sub{ margin:4px 0 0; font-size:13.5px; color:var(--text-dim); }
+  .sl-totals{ display:flex; gap:24px; margin:0; }
+  .sl-totals dt{ font-size:12px; color:var(--text-dim); }
+  .sl-totals dd{ margin:2px 0 0; font-family:'Oswald', sans-serif; font-weight:600; font-size:24px; color:var(--text); font-variant-numeric:tabular-nums; }
+  .sl-filters{ display:flex; flex-wrap:wrap; gap:6px; margin-top:18px; }
+  .sl-h{ margin:28px 0 12px; font-family:'Oswald', sans-serif; font-weight:600; font-size:20px; letter-spacing:0.04em; text-transform:uppercase; color:var(--text); }
+  .sl-none{ font-size:14px; color:var(--text-dim); }
+  /* Cards open in place, so the grid keeps rows to their own height (align-items:start). */
+  .sl-grid{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap:10px; align-items:start; }
+  .sl-card{ padding:0; overflow:clip; }
+  .sl-card.done{ border-color:color-mix(in srgb, var(--accent-text) 45%, var(--panel-border)); }
+  .sl-head{ display:flex; align-items:center; gap:14px; width:100%; padding:14px 16px; background:none; border:0; color:var(--text); font:inherit; text-align:left; cursor:pointer; }
+  .sl-head:hover{ background:color-mix(in srgb, var(--text) 4%, transparent); }
+  /* Bungie's seal icons are white on transparent: a dark tile keeps them visible in light mode. */
+  .sl-head img, .sl-noicon{ flex:none; width:52px; height:52px; padding:4px; border-radius:8px; background:#1a1f2b; }
+  .sl-text{ display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
+  .sl-text b{ font-family:'Oswald', sans-serif; font-weight:600; font-size:17px; line-height:1.2; }
+  .sl-text small{ font-size:12.5px; color:var(--text-dim); }
+  .sl-bar{ display:block; height:6px; margin-top:4px; border-radius:3px; background:var(--panel-border); overflow:hidden; }
+  .sl-bar i{ display:block; height:100%; background:var(--accent-fill); }
+  .sl-bar.small{ display:inline-block; width:70px; height:5px; margin:0 6px 0 0; vertical-align:middle; }
+  .sl-prog{ font-size:13px; color:var(--text-dim); }
+  .sl-card.done .sl-prog{ color:var(--accent-text); font-weight:600; }
+  .sl-gild{ color:#b8860b; font-weight:600; }
+  [data-mode="dark"] .sl-gild{ color:#e6c34a; }
+  .sl-more{ padding:0 16px 14px; }
+  .sl-more[hidden]{ display:none; }
+  .sl-triumphs{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; border-top:1px solid var(--panel-border); padding-top:12px; }
+  .sl-triumphs li{ display:grid; grid-template-columns:18px 1fr; gap:8px; font-size:13.5px; }
+  .sl-triumphs b{ display:block; font-weight:600; color:var(--text); }
+  .sl-triumphs small{ display:block; color:var(--text-dim); line-height:1.4; margin-top:1px; }
+  .sl-triumphs li.ok b{ color:var(--text-dim); font-weight:500; }
+  .sl-tick{ color:var(--accent-text); font-weight:700; }
+  .sl-obj{ display:block; margin-top:3px; font-size:12.5px; color:var(--text-dim); }
+  @media (max-width:640px){
+    .sl-wrap{ padding:0 16px 70px; }
+    .sl-form{ flex-wrap:wrap; }
+    .sl-form input{ flex:1 0 100%; }
+    .sl-btn{ flex:1; }
+  }
+</style>
+</head>
+<body data-nav-group="seals">
+
+<div id="site-nav"></div>
+
+<main id="main-content" tabindex="-1">
+
+<div class="hero">
+  <div class="eyebrow">Destiny 2 · Seals &amp; Triumphs</div>
+  <h1 class="title">Seals &amp; Triumphs</h1>
+  <p class="subtitle">Every seal, how close you are, your gildings, and the triumphs each one still needs. For you or any player.</p>
+</div>
+
+<div class="sl-wrap">
+  <form class="sl-form" id="sl-form" role="search">
+    <input type="search" id="sl-q" aria-label="Bungie name, like Guardian#1234" placeholder="Bungie name, like Guardian#1234" autocomplete="off" spellcheck="false">
+    <button type="submit" class="sl-btn">Look up</button>
+    <button type="button" class="sl-btn ghost" id="sl-mine" hidden>Show mine</button>
+  </form>
+  <ul class="sl-suggest" id="sl-suggest" aria-label="Matching players" hidden></ul>
+  <div id="sl-out" aria-live="polite"></div>
+</div>
+
+</main>
+
+<footer>
+  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
+</footer>
+
+<script src="assets/nav.js"></script>
+<script src="assets/api-keys.js"></script>
+<script src="assets/oauth.js"></script>
+<script src="assets/seals.js"></script>
+</body>
+</html>

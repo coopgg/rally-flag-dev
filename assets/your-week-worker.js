@@ -7,14 +7,19 @@
      objectives: hash -> progress description,
      milestones: hash -> { n, d, i },
      seasons: hash -> { n, num, passes: [{ h, start, end }] }, passes: hash -> { n, r, p } (reward / prestige progression),
-     seals: node hash -> { n, i, title },
+     seals: node hash -> { n, i, title, rec (title record), gild (gilding record),
+       recs: [the triumphs it needs, child groups' too] },
+     kids: node hash -> [child node hashes] (nodes whose children are seals:
+       the Titles and Legacy Titles lists), legacyTitles: that node's hash,
+     records: record hash -> { n, d, obj: [objective hashes], c 1 = per character }
+       (the seals' triumphs only),
      pursuits: item hash -> { n, i, y, x, t } (bounties, quests, quest steps),
      activities: hash -> name (raids and dungeons only) }
    ============================================================ */
 const BUNGIE = "https://www.bungie.net";
 const DB_NAME = "rallyflag-your-week", STORE = "defs", KEY = "defs";
 // Bump when the stored shape changes, so cached copies are rebuilt.
-const SCHEMA = 1;
+const SCHEMA = 2;
 const RAID_TYPE = 2043403989, DUNGEON_TYPE = 608898761;
 
 function idb(){
@@ -82,7 +87,23 @@ self.onmessage = async (msg) => {
       const n = nodeDefs[h];
       if (!n.completionRecordHash || n.redacted) continue;
       const rec = recDefs[n.completionRecordHash] || {}, t = rec.titleInfo && rec.titleInfo.hasTitle && rec.titleInfo.titlesByGender ? (rec.titleInfo.titlesByGender.Male || Object.values(rec.titleInfo.titlesByGender)[0]) : "";
-      seals[h] = { n: (n.displayProperties || {}).name || "", i: (n.displayProperties || {}).icon || "", title: t || "" };
+      // The triumphs a seal needs: its own records, and its child groups' records.
+      const kidsOf = x => ((x.children || {}).presentationNodes || []).map(c => nodeDefs[c.presentationNodeHash]).filter(Boolean);
+      const recs = ((n.children || {}).records || []).map(r => r.recordHash).concat(...kidsOf(n).map(k => ((k.children || {}).records || []).map(r => r.recordHash)));
+      seals[h] = { n: (n.displayProperties || {}).name || "", i: (n.displayProperties || {}).icon || "", title: t || "", rec: n.completionRecordHash, gild: (rec.titleInfo || {}).gildingTrackingRecordHash || 0, recs };
+    }
+    const kids = {}, records = {};
+    let legacyTitles = 0;
+    for (const h in nodeDefs){
+      const list = ((nodeDefs[h].children || {}).presentationNodes || []).map(c => c.presentationNodeHash);
+      if (list.some(c => seals[c])) kids[h] = list.filter(c => seals[c]);
+      if (((nodeDefs[h].displayProperties || {}).name || "") === "Legacy Titles" && kids[h]) legacyTitles = +h;
+    }
+    for (const h in seals) for (const r of seals[h].recs){
+      const d = recDefs[r];
+      if (!d || records[r]) continue;
+      const dp = d.displayProperties || {};
+      records[r] = { n: dp.name || "", d: (dp.description || "").slice(0, 240), obj: d.objectiveHashes || [], c: d.scope === 1 ? 1 : 0 };
     }
     const activities = {};
     for (const h in actDefs){
@@ -95,7 +116,7 @@ self.onmessage = async (msg) => {
       if (!dp || !dp.name || ![12, 13, 15, 26].includes(v.itemType)) continue;
       pursuits[h] = { n: dp.name, i: dp.icon || "", y: v.itemTypeDisplayName || "", x: (dp.description || "").slice(0, 160), t: v.itemType };
     }
-    const db = { schema: SCHEMA, version, objectives, milestones, seasons, passes, seals, pursuits, activities };
+    const db = { schema: SCHEMA, version, objectives, milestones, seasons, passes, seals, kids, legacyTitles, records, pursuits, activities };
     await idbPut(db);
     self.postMessage({ type: "done", db });
   } catch (e){

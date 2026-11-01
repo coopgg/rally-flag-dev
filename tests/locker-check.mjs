@@ -1435,6 +1435,30 @@ await section("Lore", async () => {
   await p.context_.close();
 });
 
+// ---------- Seals & Triumphs (seals.html) ----------
+await section("Seals", async () => {
+  // A real public profile (the owner's), so Bungie's live seal definitions are exercised.
+  const p = await open({ url: BASE + "seals.html?p=3-4611686018486090875", ready: "#sl-form" });
+  await p.waitForSelector("#sl-name", { timeout: 180000 });
+  const head = await p.textContent(".sl-player");
+  check("seals: the header counts seals done and the triumph score", /\d+ of \d+ seals done/.test(head) && /Triumph score\s*[\d,]+/.test(head), head);
+  check("seals: in progress first, as a grid of seal cards with icons", await p.locator(".sl-card").count() > 10 && !(await p.locator(".sl-card.done").count()) && await p.locator(".sl-head img").count() > 10);
+  await p.click('[data-filter="all"]');
+  const all = await p.locator(".sl-card").count(), doneN = await p.locator(".sl-card.done").count();
+  check("seals: All shows current and legacy seals", all > 60 && (await p.locator(".sl-h").allTextContents()).join() === "Seals,Legacy seals", String(all));
+  await p.click('[data-filter="done"]');
+  check("seals: Done shows only finished seals, with full bars", await p.locator(".sl-card").count() === doneN && await p.$$eval(".sl-card .sl-bar i", b => b.every(x => x.style.width === "100%")));
+  await p.click('[data-filter="progress"]');
+  const first = p.locator(".sl-head").first(); const sealId = await first.getAttribute("data-seal");
+  await first.click();
+  check("seals: opening a seal lists its triumphs, focus stays on it", await p.locator(".sl-triumphs li").count() > 2 && await p.getAttribute('[data-seal="' + sealId + '"]', "aria-expanded") === "true" && await p.evaluate(id => document.activeElement.dataset.seal === id, sealId));
+  let v = await axe(p); check("seals: passes axe", !v.length, v.join(", "));
+  await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
+  check("seals (phone): no sideways scroll", await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  check("seals: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
 // ---------- Weapon lookup (weapons.html) ----------
 await section("Weapon lookup", async () => {
   const p = await open({ real: true, url: BASE + "weapons.html", ready: "#wl-app:not([hidden])" });
