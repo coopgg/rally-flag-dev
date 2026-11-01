@@ -137,14 +137,16 @@
   // Bungie's "Contest" versions. Solo, duo, trio and flawless need each
   // run's carnage report (who was in it, any deaths, started from the
   // beginning), fetched only for completed runs that could count (this
-  // player didn't die, or three players or fewer) and kept in IndexedDB,
+  // player didn't die, or three players or fewer; two for dungeons, whose
+  // fireteam is three, so Trio is a raid badge only) and kept in IndexedDB,
   // since a finished run's report never changes.
   const STATS = "https://stats.bungie.net/Platform";
   const BADGE_ORDER = ["Solo Flawless", "Solo", "Duo Flawless", "Duo", "Trio Flawless", "Trio", "Flawless", "Day One", "Contest", "Week One"];
   function store(){
     return new Promise((resolve, reject) => {
-      const req = indexedDB.open("rallyflag-report", 1);
-      req.onupgradeneeded = () => req.result.createObjectStore("pgcr");
+      // Version 2: the "fresh" rule changed, so summaries saved before it are dropped.
+      const req = indexedDB.open("rallyflag-report", 2);
+      req.onupgradeneeded = () => { const d = req.result; if (d.objectStoreNames.contains("pgcr")) d.deleteObjectStore("pgcr"); d.createObjectStore("pgcr"); };
       req.onsuccess = () => resolve(req.result); req.onerror = () => reject(req.error);
     });
   }
@@ -160,7 +162,9 @@
     const j = await res.json().catch(() => ({}));
     if (!j.Response) throw new Error(j.Message || "HTTP " + res.status);
     const r = j.Response, entries = r.entries || [];
-    const fresh = r.activityWasStartedFromBeginning === true || r.startingPhaseIndex === 0;
+    // Bungie's own flag when the report has it; the starting phase only for
+    // old reports without it (a checkpoint run can still say phase 0).
+    const fresh = typeof r.activityWasStartedFromBeginning === "boolean" ? r.activityWasStartedFromBeginning : r.startingPhaseIndex === 0;
     const players = new Set(entries.map(e => e.player && e.player.destinyUserInfo && e.player.destinyUserInfo.membershipId)).size;
     const v = { fresh, players, flawless: fresh && entries.every(e => !((e.values.deaths || {}).basic || {}).value) };
     cachePut(id, v);
@@ -185,7 +189,9 @@
       // behind any low-man flawless.
       const SIZES = ["Solo", "Duo", "Trio"], rank = b => [SIZES.indexOf(b.replace(" Flawless", "")), / Flawless$/.test(b)];
       const beaten = b => { const [n, f] = rank(b); return n >= 0 && [...set].some(o => { const [m, g] = rank(o); return o !== b && m >= 0 && m <= n && (g || !f); }); };
-      const shown = set ? BADGE_ORDER.filter(b => set.has(b) && !beaten(b) && !(b === "Flawless" && SIZES.some(x => set.has(x + " Flawless")))) : [];
+      // Week One hides behind Contest or Day One (those clears were in week one too), as raid.report does.
+      const shown = set ? BADGE_ORDER.filter(b => set.has(b) && !beaten(b) && !(b === "Flawless" && SIZES.some(x => set.has(x + " Flawless"))) &&
+        !(b === "Week One" && (set.has("Contest") || set.has("Day One")))) : [];
       el.innerHTML = shown.map(b => '<span class="rr-badge' + (/flawless/i.test(b) ? " gold" : "") + '">' + b + "</span>").join("");
     });
   }
@@ -210,7 +216,9 @@
         if (hours >= 0 && hours < (rel.contest || 0)) add(slug, "Contest");
         if (hours >= 0 && hours < 168) add(slug, "Week One");
       }
-      if (n("deaths") === 0 || n("playerCount") <= 3) candidates.push({ id: d.instanceId, slug });
+      // Dungeons are three-player activities, so only solo and duo count as low-man there.
+      const most = m[1] === "dungeon" ? 2 : 3;
+      if (n("deaths") === 0 || n("playerCount") <= most) candidates.push({ id: d.instanceId, slug, most });
     }
     showBadges(found);
     let done = 0;
@@ -220,7 +228,7 @@
       try {
         const r = await runOf(c.id);
         if (r.flawless) add(c.slug, "Flawless");
-        if (r.fresh && r.players >= 1 && r.players <= 3){
+        if (r.fresh && r.players >= 1 && r.players <= c.most){
           const size = ["Solo", "Duo", "Trio"][r.players - 1];
           add(c.slug, size + (r.flawless ? " Flawless" : ""));
         }

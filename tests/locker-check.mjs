@@ -1497,10 +1497,13 @@ await section("Report", async () => {
   const run = (id, hash, period, players, deaths) => ({ period, activityDetails: { referenceId: hash, directorActivityHash: hash, instanceId: id, mode: 4 },
     values: { completed: { basic: { value: 1 } }, completionReason: { basic: { value: 0 } }, playerCount: { basic: { value: players } }, deaths: { basic: { value: deaths } } } });
   const HIST = { [C1 + ":4"]: [run("901", 3711931140, "2021-05-23T20:00:00Z", 1, 0)],
-    [C2 + ":82"]: [run("902", 1077850348, "2024-01-01T00:00:00Z", 2, 1), run("903", 1077850348, "2024-02-01T00:00:00Z", 3, 0), run("904", 1077850348, "2024-03-01T00:00:00Z", 1, 0), run("905", 1077850348, "2024-04-01T00:00:00Z", 6, 4)] };
+    [C2 + ":82"]: [run("902", 1077850348, "2024-01-01T00:00:00Z", 2, 1), run("903", 1077850348, "2024-02-01T00:00:00Z", 3, 0), run("904", 1077850348, "2024-03-01T00:00:00Z", 1, 0), run("905", 1077850348, "2024-04-01T00:00:00Z", 6, 4)],
+    [C1 + ":82"]: [run("906", 1077850348, "2024-05-01T00:00:00Z", 2, 0), run("907", 1077850348, "2024-06-01T00:00:00Z", 3, 2)] };
   const entry = (m, d) => ({ player: { destinyUserInfo: { membershipId: m } }, values: { deaths: { basic: { value: d } } } });
   const PGCR = { 901: { activityWasStartedFromBeginning: true, entries: [entry(P, 0)] }, 902: { startingPhaseIndex: 0, entries: [entry(P, 1), entry("2", 0)] },
-    903: { startingPhaseIndex: 0, entries: [entry(P, 0), entry("2", 0), entry("3", 0), entry("4", 0), entry("5", 0), entry("6", 0)] }, 904: { startingPhaseIndex: 2, entries: [entry(P, 0)] } };
+    903: { startingPhaseIndex: 0, entries: [entry(P, 0), entry("2", 0), entry("3", 0), entry("4", 0), entry("5", 0), entry("6", 0)] }, 904: { startingPhaseIndex: 2, entries: [entry(P, 0)] },
+    // From a checkpoint but at phase 0 (seen on a real Root of Nightmares run): not flawless.
+    906: { activityWasStartedFromBeginning: false, startingPhaseIndex: 0, entries: [entry(P, 0), entry("2", 0)] } };
   const pgcrCalls = [];
   await ctx.route(/\/Character\/(\d+)\/Stats\/Activities\/\?mode=(\d+)/, r => { const [, c, mode] = r.request().url().match(/Character\/(\d+)\/Stats\/Activities\/\?mode=(\d+)/); r.fulfill(ok({ activities: HIST[c + ":" + mode] || [] })); });
   await ctx.route(/stats\.bungie\.net\/Platform\/Destiny2\/Stats\/PostGameCarnageReport\/(\d+)\//, r => { const id = r.request().url().match(/PostGameCarnageReport\/(\d+)\//)[1]; pgcrCalls.push(id); r.fulfill(ok(PGCR[id])); });
@@ -1516,16 +1519,16 @@ await section("Report", async () => {
   check("report: every guide has a card in the guides' art style, uncleared ones greyed", await p.locator(".rr-card").count() === 22 && await p.locator(".rr-card .art-thumb").count() === 22 && await p.locator(".rr-card.none").count() === 20);
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
   const badgesOf = slug => p.$$eval('[data-badges="' + slug + '"] .rr-badge', b => b.map(x => x.textContent).join(", "));
-  check("report: badges: a fresh solo flawless on day two is Solo Flawless, Contest and Week One", await badgesOf("vault-of-glass") === "Solo Flawless, Contest, Week One", await badgesOf("vault-of-glass"));
-  check("report: badges: a duo with a death is Duo, a deathless full team is Flawless, a checkpoint solo is nothing", await badgesOf("prophecy") === "Duo, Flawless", await badgesOf("prophecy"));
-  check("report: badges: carnage reports only for runs that could count", pgcrCalls.sort().join() === "901,902,903,904", pgcrCalls.join());
+  check("report: badges: a fresh solo flawless on day two is Solo Flawless and Contest (Contest covers Week One)", await badgesOf("vault-of-glass") === "Solo Flawless, Contest", await badgesOf("vault-of-glass"));
+  check("report: badges: a duo with a death is Duo, a deathless full team is Flawless, checkpoint runs (even at phase 0) and a dungeon trio are nothing", await badgesOf("prophecy") === "Duo, Flawless", await badgesOf("prophecy"));
+  check("report: badges: carnage reports only for runs that could count", pgcrCalls.sort().join() === "901,902,903,904,906", pgcrCalls.join());
   check("report: raids with no guide are listed as retired", /Crown of Sorrow 1 clear · fastest 1h 30m/.test(await p.textContent(".rr-retired")));
   check("report: the page says what Bungie's numbers count", /checkpoint/.test(await p.textContent(".rr-note")));
   let v = await axe(p); check("report: passes axe", !v.length, v.join(", "));
   pgcrCalls.length = 0;
   await p.reload(); await p.waitForSelector("#rr-name");
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
-  check("report: badges: run reports are kept, so a second look fetches none", !pgcrCalls.length && await badgesOf("vault-of-glass") === "Solo Flawless, Contest, Week One", pgcrCalls.join());
+  check("report: badges: run reports are kept, so a second look fetches none", !pgcrCalls.length && await badgesOf("vault-of-glass") === "Solo Flawless, Contest", pgcrCalls.join());
   check("report: a shared link opens the same report, and it's under Recent", await p.textContent("#rr-name") === "Testguard#0042" && /Testguard#0042/.test(await p.textContent("#rr-recent")));
   await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
   check("report (phone): two cards per row, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".rr-card")].slice(0, 2).map(x => x.getBoundingClientRect().top); return c[0] === c[1] && document.documentElement.scrollWidth <= innerWidth; }));
