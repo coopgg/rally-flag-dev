@@ -1525,6 +1525,33 @@
     if (!j.Response) throw new Error(j.ErrorStatus === "SystemDisabled" ? FRIENDLY.SystemDisabled : (j.Message || "HTTP " + res.status));
     return j.Response;
   }
+  // An item's lore (DestinyLoreDefinition via its full definition's
+  // loreHash): the subtitle and paragraphs, as Bungie wrote them. Cached
+  // for the session; most weapons and armor have some, older ones may not.
+  // An item's lore hash (`lo`, from the item database), or another version
+  // of the same item's when this one has none (reissues often lack it).
+  let LORE_BY_NAME = null;
+  function loreHashOf(hash){
+    const d = DB.items[hash] || {};
+    if (d.lo) return d.lo;
+    if (!LORE_BY_NAME){ LORE_BY_NAME = new Map(); for (const h in DB.items){ const x = DB.items[h]; if (x.lo && (x.t === 2 || x.t === 3) && !LORE_BY_NAME.has(x.n)) LORE_BY_NAME.set(x.n, x.lo); } }
+    return LORE_BY_NAME.get(d.n) || 0;
+  }
+  const LORE = new Map();
+  function loreOf(lo){
+    if (!LORE.has(lo)) LORE.set(lo, manifestGet("DestinyLoreDefinition", lo).catch(e => { LORE.delete(lo); throw e; }));
+    return LORE.get(lo);
+  }
+  function loreInto(box, lo){
+    if (box.dataset.done) return;
+    box.innerHTML = '<p class="muted">Loading the lore…</p>';
+    loreOf(lo).then(l => {
+      const dp = (l && l.displayProperties) || {};
+      box.dataset.done = "1";
+      box.innerHTML = dp.description ? (l.subtitle ? '<p class="lore-sub">' + esc(l.subtitle) + "</p>" : "") + dp.description.split(/\n\s*\n|\n/).filter(x => x.trim()).map(x => "<p>" + esc(x) + "</p>").join("")
+        : '<p class="muted">Bungie has no lore for this item.</p>';
+    }, e => { box.innerHTML = '<p class="muted">The lore didn\'t load (' + esc(e.message) + "). Close and open it to try again.</p>"; });
+  }
   // Which plugs you've unlocked for a piece: its own plug set's entries in
   // your profile and character plug sets, plus anything unlocked in any
   // other set (ownedPlugs). Exotic armor takes every ornament for its slot,
@@ -3939,7 +3966,9 @@
       cols.length ? label("Perks") + '<div class="perk-cols" role="group" aria-label="Perks">' + cols.join("") + "</div>" : "",
       mwHtml(item),
       cols.length && d.t === 3 ? wishHtml(item) : "",
-      mods.length ? label("Mods") + '<div class="mod-row" role="group" aria-label="Mods">' + mods.join("") + "</div>" : ""
+      mods.length ? label("Mods") + '<div class="mod-row" role="group" aria-label="Mods">' + mods.join("") + "</div>" : "",
+      // Bungie's lore, only when the item (or another version of it) has some; fetched when opened.
+      loreHashOf(item.hash) ? '<details class="lore" id="item-lore"><summary>Lore</summary><div class="lore-text" aria-live="polite"></div></details>' : ""
     ].filter(Boolean).map(b => '<div class="dlg-block">' + b + "</div>");
     const hasPlugs = cols.length || mods.length;
 
@@ -3958,6 +3987,8 @@
       '<div class="dlg-main"><div class="dlg-body">' + blocks.join("") + "</div>" +
         '<div class="dlg-side">' + (hasPlugs ? '<div class="plug-info" id="plug-info" aria-live="polite" tabindex="0" role="region" aria-label="Perk and mod details">Tap a perk or mod to see what it does' + (d.t === 3 ? ", or to switch to it" : "") + ".</div>" +
           '<div class="plug-change" id="plug-change"></div>' : "") + actions + "</div></div>");
+    const lore = $("item-lore");
+    if (lore) lore.addEventListener("toggle", () => { if (lore.open) loreInto(lore.querySelector(".lore-text"), loreHashOf(item.hash)); });
     const actToggle = $("act-toggle");
     actToggle.addEventListener("click", () => { const open = !dlg.classList.contains("acts-open"); dlg.classList.toggle("acts-open", open); actToggle.setAttribute("aria-expanded", String(open)); });
     dlg.querySelector(".dlg-close").addEventListener("click", () => dlg.close());

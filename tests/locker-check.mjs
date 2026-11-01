@@ -1422,6 +1422,19 @@ await section("Design", async () => {
   await p.context_.close();
 });
 
+// ---------- Lore (Locker popup) ----------
+await section("Lore", async () => {
+  const p = await open();
+  await p.locator("#buckets .item-tile[data-id]").first().click(); await p.waitForTimeout(500);
+  check("lore: the popup has a closed Lore section", await p.locator("#item-lore").count() === 1 && !(await p.getAttribute("#item-lore", "open")));
+  await p.click("#item-lore summary");
+  await p.waitForFunction(() => document.querySelector("#item-lore .lore-text").dataset.done, null, { timeout: 30000 }).catch(() => {});
+  check("lore: opening it loads Bungie's lore (another version's when this one has none)", (await p.locator("#item-lore .lore-text p").count()) > 2, (await p.textContent("#item-lore")).slice(0, 80));
+  const v = await axe(p); check("lore: passes axe", !v.length, v.join(", "));
+  check("lore: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+});
+
 // ---------- Weapon lookup (weapons.html) ----------
 await section("Weapon lookup", async () => {
   const p = await open({ real: true, url: BASE + "weapons.html", ready: "#wl-app:not([hidden])" });
@@ -1466,6 +1479,8 @@ await section("Weapon lookup", async () => {
   // A shared link opens straight on that version; God Rolls cards link here.
   const q = await open({ url: BASE + "weapons.html?w=52683113", ready: ".wl-cols" });
   check("weapons: ?w= opens that version", await q.textContent("#wl-name") === "Blast Furnace" && /our pick/.test(await q.textContent('.wl-version[aria-pressed="true"]')));
+  await q.click(".wl-lore summary"); await q.waitForFunction(() => document.querySelector(".wl-lore .lore-text").dataset.done, null, { timeout: 30000 }).catch(() => {});
+  check("weapons: a weapon's lore opens on request", /Forged in the hottest fires|Blast Furnace/.test(await q.textContent(".wl-lore .lore-text")));
   await q.goto(BASE + "god-rolls.html"); await q.waitForSelector(".weapon-card");
   check("weapons: God Rolls cards link to every perk", await q.locator('#weapon-blast-furnace a[href="weapons.html?w=52683113"]').count() === 1);
   await q.context_.close();

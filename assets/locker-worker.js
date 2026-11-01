@@ -17,7 +17,8 @@
      r tierType, b bucketHash, c classType, d damageTypeHash,
      y itemTypeDisplayName, x description (plugs), o 1 = ornament, sh 1 = shader,
      q infusion category (weapons, armor), a ammo type (weapons: 1 primary,
-     2 special, 3 heavy), l 1 = has a collectible (weapons),
+     2 special, 3 heavy), l 1 = has a collectible (weapons), lo lore hash
+     (weapons, armor; only about 40% have lore),
      k armor mod kind }; currencies keep n, i.
    buckets: hash -> { n name, c capacity } (vault space in the banner).
    loadouts: { names: hash -> name, icons: hash -> path, colors: hash -> path,
@@ -26,7 +27,7 @@
 const BUNGIE = "https://www.bungie.net";
 const DB_NAME = "rallyflag-locker", STORE = "manifest", KEY = "lite";
 // Bump when the stored shape changes, so cached copies are rebuilt.
-const SCHEMA = 9;
+const SCHEMA = 10;
 
 function idb(){
   return new Promise((resolve, reject) => {
@@ -88,6 +89,7 @@ function trimItems(lite){
       if (v.iconWatermark) e.w = v.iconWatermark;
       // Infusion: an item takes Power from another of the same category.
       if (v.quality && v.quality.infusionCategoryHash) e.q = v.quality.infusionCategoryHash;
+      if (v.loreHash) e.lo = v.loreHash;
       if (v.itemType === 3){
         if (v.equippingBlock && v.equippingBlock.ammoType) e.a = v.equippingBlock.ammoType;
         if (v.collectibleHash) e.l = 1;

@@ -310,6 +310,8 @@
   async function showVersion(weapon, versions, v, ours){
     current = { weapon, hash: v.h };
     const def = v.def, d = DB.items[v.h] || weapon.d, el = DB.damage[d.d];
+    // This version's lore, or another version's (reissues often have none).
+    const loreHash = def.loreHash || (weapon.hashes.map(h => (DB.items[h] || {}).lo).find(Boolean)) || 0;
     const [roll, source, copies] = await Promise.all([
       rollOf(def),
       // Only a real "Source: …" line (some say things like "Random Perks: …").
@@ -352,6 +354,7 @@
             (cols || mwCol ? '<div class="wl-cols">' + cols + mwCol + "</div>" : '<p class="muted">Bungie lists no perk choices for this version.</p>') +
             '<p class="wl-links"><a href="https://www.light.gg/db/items/' + v.h + '/" target="_blank" rel="noopener">light.gg<span class="sr-only"> (opens in a new tab)</span> ↗</a></p>' +
             clarityCredits() +
+            (loreHash ? '<details class="wl-lore" data-lore="' + loreHash + '"><summary>Lore</summary><div class="lore-text" aria-live="polite"></div></details>' : "") +
           "</section>" +
           '<div class="wl-perk-info" id="wl-perk-info" role="status" tabindex="0" hidden></div>' +
         "</div></article>";
@@ -360,6 +363,19 @@
       const x = versions.find(y => y.h === +b.dataset.version);
       showVersion(weapon, versions, x, ours).then(() => { history.replaceState(Object.assign({}, history.state, { w: x.h }), "", "?w=" + x.h); const again = $("wl-detail").querySelector('[data-version="' + x.h + '"]'); if (again) again.focus(); });
     }));
+    // Lore: fetched when opened.
+    const lore = $("wl-detail").querySelector(".wl-lore");
+    if (lore) lore.addEventListener("toggle", () => {
+      const box = lore.querySelector(".lore-text");
+      if (!lore.open || box.dataset.done) return;
+      box.innerHTML = '<p class="muted">Loading the lore…</p>';
+      manifestGet("DestinyLoreDefinition", lore.dataset.lore).then(l => {
+        const dp = l.displayProperties || {};
+        box.dataset.done = "1";
+        box.innerHTML = dp.description ? (l.subtitle ? '<p class="lore-sub">' + esc(l.subtitle) + "</p>" : "") + dp.description.split(/\n\s*\n|\n/).filter(x => x.trim()).map(x => "<p>" + esc(x) + "</p>").join("")
+          : '<p class="muted">Bungie has no lore for this weapon.</p>';
+      }, e => { box.innerHTML = '<p class="muted">The lore didn\'t load (' + esc(e.message) + ").</p>"; });
+    });
     // Tap a perk to read it; tap it again to close.
     $("wl-detail").querySelectorAll("[data-plug]").forEach(b => b.addEventListener("click", () => {
       const open = b.getAttribute("aria-pressed") === "true";
