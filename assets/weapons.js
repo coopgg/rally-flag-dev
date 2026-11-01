@@ -326,7 +326,7 @@
     const ourName = n => ours && ours.names.has(n.toLowerCase());
     const versionsHtml = versions.length > 1 ? '<div class="wl-versions" role="group" aria-label="Versions">' + versions.map((x, k) => {
       const xd = DB.items[x.h] || {};
-      return '<button type="button" class="wl-version" data-version="' + x.h + '" aria-pressed="' + (x === v) + '">' + (xd.w ? '<img src="' + esc(img(xd.w)) + '" alt="" width="20" height="20">' : "") +
+      return '<button type="button" class="wl-version" data-version="' + x.h + '" aria-pressed="' + (x === v) + '">' + (xd.w ? '<span class="wl-season" aria-hidden="true"><img src="' + esc(img(xd.w)) + '" alt="" width="80" height="80"></span>' : "") +
         (k === 0 ? "Newest" : "Version " + (versions.length - k)) + (ours && x.h === ours.g.itemHash ? " · our pick" : "") + "</button>"; }).join("") + "</div>" : "";
     const cols = roll.cols.map(c => '<div class="wl-col" role="group" aria-label="' + esc(c.label) + '"><div class="wl-col-h">' + esc(c.label) + "</div>" +
       c.perks.map(h => perkHtml(h, ourName(DB.items[h].n), have.has(DB.items[h].n.toLowerCase()))).join("") + "</div>").join("");
@@ -346,7 +346,8 @@
           '<div class="wl-title"><h2 id="wl-name" tabindex="-1">' + esc(weapon.name) + "</h2>" +
             '<p class="wl-meta">' + (el && el.i ? '<img src="' + esc(img(el.i)) + '" alt="" width="16" height="16">' : "") + esc([el && el.n, AMMO[d.a], (d.r === 6 ? "Exotic " : "Legendary ") + (d.y || "weapon")].filter(Boolean).join(" · ")) + "</p>" +
             (source ? '<p class="wl-source">' + esc(source) + "</p>" : "") + "</div></header>" +
-        (def.flavorText ? '<p class="wl-flavor">“' + esc(def.flavorText) + '”</p>' : "") +
+        // Some flavor text already has its own quote marks; don't double them.
+        (def.flavorText ? '<p class="wl-flavor">' + (/^\s*["“]/.test(def.flavorText) ? esc(def.flavorText) : "“" + esc(def.flavorText) + "”") + "</p>" : "") +
         versionsHtml + notes +
         '<div class="wl-body"><section class="wl-side" aria-labelledby="wl-h-stats"><h3 class="wl-h" id="wl-h-stats">Base stats</h3>' + statsHtml(def) +
           (frame ? '<h3 class="wl-h">Frame</h3>' + frame : "") + "</section>" +

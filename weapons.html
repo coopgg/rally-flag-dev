@@ -109,7 +109,10 @@
   .wl-flavor{ margin:0; padding:0 22px; font-size:14px; font-style:italic; color:var(--text-dim); max-width:80ch; }
   .wl-versions{ display:flex; flex-wrap:wrap; gap:6px; padding:14px 22px 0; }
   .wl-version{ display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:4px 12px 4px 6px; border-radius:999px; border:1px solid var(--edge); background:transparent; color:var(--text-dim); font:inherit; font-size:13px; font-weight:500; cursor:pointer; }
-  .wl-version img{ width:20px; height:20px; }
+  /* Just the season emblem: Bungie's watermark is a 96px overlay whose
+     emblem sits in the top-left 24px (a banner strip runs below it). */
+  .wl-season{ flex:none; width:20px; height:20px; overflow:hidden; border-radius:4px; background:#1a1f2b; }
+  .wl-season img{ display:block; width:80px; height:80px; max-width:none; margin:-1.67px 0 0 -1.67px; }
   .wl-version[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
   .wl-note{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 14px; margin:14px 22px 0; padding:10px 14px; border:1px solid var(--panel-border); border-radius:8px; font-size:13.5px; color:var(--text-dim); }
   .wl-note.ours{ border-color:#c9a227; }
