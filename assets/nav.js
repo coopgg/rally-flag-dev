@@ -62,7 +62,8 @@
         { label: "Raid & Dungeon Report", href: "report.html", group: "report" },
         { label: "Public Events", href: "public-events.html", group: "publicevents" },
         { label: "Puzzle Helper", href: "puzzle-helper.html", group: "puzzlehelper" },
-        { label: "Codes", href: "codes.html", group: "codes" }
+        { label: "Codes", href: "codes.html", group: "codes" },
+        { label: "Tools", href: "tools.html", group: "tools" }
       ]
     }
   ];

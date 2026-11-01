@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* Boot script: theme, light/dark mode, load guard. Generated from tools/boot-script.js; edit there and run node tools/sync-boot-script.js. */
+(function(){
+  var d = document.documentElement;
+  // Valid saved themes; a first visit gets a random subclass (not Cosmic).
+  var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
+  var theme = null, modePref = null, legacyMode = null;
+  try {
+    theme = localStorage.getItem("rallyflag_theme");
+    if (THEMES.indexOf(theme) < 0){
+      theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+      localStorage.setItem("rallyflag_theme", theme);
+    }
+    modePref = localStorage.getItem("rallyflag_mode_pref");
+    legacyMode = localStorage.getItem("rallyflag_mode");
+  } catch (e) {}
+  if (THEMES.indexOf(theme) < 0) theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+  if (modePref !== "light" && modePref !== "dark"){
+    modePref = legacyMode === "light" ? "light"
+      : (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  }
+  d.setAttribute("data-theme", theme);
+  d.setAttribute("data-mode", modePref);
+
+  d.classList.add("rf-boot");
+  var reveal = function(){ d.classList.remove("rf-boot"); };
+  document.addEventListener("DOMContentLoaded", function(){
+    Promise.race([
+      document.fonts ? document.fonts.ready : 0,
+      new Promise(function(r){ setTimeout(r, 400); })
+    ]).then(function(){ requestAnimationFrame(reveal); });
+  });
+  setTimeout(reveal, 2500);
+})();
+</script>
+<title>Tools - Rally Flag</title>
+<meta name="description" content="The outside Destiny 2 tools we use and recommend, from item managers to raid reports, and where Rally Flag has its own.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rally Flag">
+<meta property="og:title" content="Tools">
+<meta property="og:description" content="The outside Destiny 2 tools we use and recommend, from item managers to raid reports, and where Rally Flag has its own.">
+<meta property="og:url" content="https://rallyflag.gg/tools.html">
+<link rel="canonical" href="https://rallyflag.gg/tools.html">
+<meta property="og:image" content="https://rallyflag.gg/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Rally Flag: Destiny 2 raid and dungeon guides, weapon god rolls, builds and live trackers">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Tools">
+<meta name="twitter:description" content="The outside Destiny 2 tools we use and recommend, from item managers to raid reports, and where Rally Flag has its own.">
+<meta name="twitter:image" content="https://rallyflag.gg/assets/og-image.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.bungie.net">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  /* Tools: outside sites we recommend. Static; edit the list here. */
+  .tools-wrap{ max-width:1000px; margin:28px auto 0; padding:0 24px 90px; }
+  .tool-note{ margin:0 0 8px; font-size:14px; color:var(--text-dim); max-width:70ch; }
+  .tool-h{ margin:32px 0 12px; font-family:'Oswald', sans-serif; font-weight:600; font-size:20px; letter-spacing:0.04em; text-transform:uppercase; color:var(--text); }
+  .tool-grid{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 280px), 1fr)); grid-auto-rows:1fr; gap:12px; }
+  .tool-card{ display:flex; flex-direction:column; padding:18px 20px; position:relative; transition:border-color 0.2s ease, background 0.2s ease; }
+  .tool-card:hover, .tool-card:focus-within{ border-color:var(--accent); }
+  .tool-name{ margin:0; font-family:'Oswald', sans-serif; font-weight:600; font-size:18px; }
+  .tool-name a{ color:var(--text); text-decoration:none; }
+  .tool-name a::after{ content:" ↗"; font-size:14px; color:var(--accent-text); }
+  .tool-name a:hover, .tool-name a:focus-visible{ text-decoration:underline; text-underline-offset:3px; }
+  .tool-host{ margin:2px 0 0; font-size:12.5px; color:var(--text-dim); }
+  .tool-desc{ margin:8px 0 0; font-size:14px; line-height:1.5; color:var(--text); }
+  .tool-ours{ margin:auto 0 0; padding-top:12px; font-size:13px; color:var(--text-dim); }
+  .tool-ours a{ color:var(--accent-text); }
+  @media (max-width:640px){ .tools-wrap{ padding:0 16px 70px; } }
+</style>
+</head>
+<body data-nav-group="tools">
+
+<div id="site-nav"></div>
+
+<main id="main-content" tabindex="-1">
+
+<div class="hero">
+  <div class="eyebrow">Destiny 2 · Tools</div>
+  <h1 class="title">Tools</h1>
+  <p class="subtitle">The outside tools we use and recommend, and where Rally Flag has its own.</p>
+</div>
+
+<div class="tools-wrap">
+  <p class="tool-note">None of these are part of Rally Flag; they open in a new tab.</p>
+<section class="tool-group" aria-labelledby="tg-0"><h2 class="tool-h" id="tg-0">Gear and weapons</h2><ul class="tool-grid"><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://app.destinyitemmanager.com" target="_blank" rel="noopener">Destiny Item Manager<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">app.destinyitemmanager.com</p><p class="tool-desc">Move gear between characters and the vault, tag it and build loadouts.</p><p class="tool-ours">On Rally Flag: <a href="locker.html">Locker →</a></p></li><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://d2armorpicker.com" target="_blank" rel="noopener">D2 Armor Picker<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">d2armorpicker.com</p><p class="tool-desc">Finds the best armor stat spread from what you own.</p><p class="tool-ours">On Rally Flag: <a href="locker.html#loadouts">Locker armor optimizer →</a></p></li><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://www.light.gg" target="_blank" rel="noopener">light.gg<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">light.gg</p><p class="tool-desc">Every weapon's possible rolls, and what most of the community runs.</p><p class="tool-ours">On Rally Flag: <a href="weapons.html">Weapon Lookup →</a></p></li><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://godroll.tv" target="_blank" rel="noopener">Godroll.tv<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">godroll.tv</p><p class="tool-desc">Weapon rolls with their hidden stats and community picks.</p><p class="tool-ours">On Rally Flag: <a href="weapons.html">Weapon Lookup →</a></p></li><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://d2foundry.gg" target="_blank" rel="noopener">D2 Foundry<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">d2foundry.gg</p><p class="tool-desc">The original weapon roll and stat tool.</p></li></ul></section><section class="tool-group" aria-labelledby="tg-1"><h2 class="tool-h" id="tg-1">Builds and perks</h2><ul class="tool-grid"><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://mobalytics.gg/destiny-2" target="_blank" rel="noopener">Mobalytics Destiny 2<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">mobalytics.gg</p><p class="tool-desc">Build guides for every class and subclass.</p><p class="tool-ours">On Rally Flag: <a href="builds.html">Builds →</a></p></li><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://d2clarity.com" target="_blank" rel="noopener">Clarity<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">d2clarity.com</p><p class="tool-desc">Community research on what perks and abilities really do, with the numbers.</p><p class="tool-ours">On Rally Flag: <a href="weapons.html">Weapon Lookup →</a></p></li></ul></section><section class="tool-group" aria-labelledby="tg-2"><h2 class="tool-h" id="tg-2">Raids and dungeons</h2><ul class="tool-grid"><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://raid.report" target="_blank" rel="noopener">Raid Report<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">raid.report</p><p class="tool-desc">Raid clears, fastest times and special runs for any player.</p><p class="tool-ours">On Rally Flag: <a href="report.html">Raid & Dungeon Report →</a></p></li><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://dungeon.report" target="_blank" rel="noopener">Dungeon Report<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">dungeon.report</p><p class="tool-desc">The same for dungeons.</p><p class="tool-ours">On Rally Flag: <a href="report.html">Raid & Dungeon Report →</a></p></li><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://raidhub.io" target="_blank" rel="noopener">Raid Hub<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">raidhub.io</p><p class="tool-desc">Raid history, leaderboards and clear details.</p></li><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://d2checkpoint.com" target="_blank" rel="noopener">D2 Checkpoints<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">d2checkpoint.com</p><p class="tool-desc">Join a bot holding a raid or dungeon checkpoint, then wipe and leave with it.</p></li></ul></section><section class="tool-group" aria-labelledby="tg-3"><h2 class="tool-h" id="tg-3">PvP</h2><ul class="tool-grid"><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://trials.report" target="_blank" rel="noopener">Trials Report<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">trials.report</p><p class="tool-desc">Anyone's Trials of Osiris record and K/D.</p></li><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://crucible.report" target="_blank" rel="noopener">Crucible Report<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">crucible.report</p><p class="tool-desc">Anyone's Crucible record and K/D.</p></li></ul></section><section class="tool-group" aria-labelledby="tg-4"><h2 class="tool-h" id="tg-4">Progress and lore</h2><ul class="tool-grid"><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://bray.tech" target="_blank" rel="noopener">Braytech<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">bray.tech</p><p class="tool-desc">Triumphs, seals, collections and the daily and weekly resets.</p><p class="tool-ours">On Rally Flag: <a href="your-week.html">Your Week →</a></p></li><li class="tool-card panel-card"><h3 class="tool-name"><a href="https://www.ishtar-collective.net" target="_blank" rel="noopener">Ishtar Collective<span class="sr-only"> (opens in a new tab)</span></a></h3><p class="tool-host">ishtar-collective.net</p><p class="tool-desc">All of Destiny's lore, searchable and in order.</p></li></ul></section>
+</div>
+
+</main>
+
+<footer>
+  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
+</footer>
+
+<script src="assets/nav.js"></script>
+</body>
+</html>
