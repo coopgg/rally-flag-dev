@@ -6,8 +6,10 @@
      Glass on ran Contest mode for 48 hours); dayOne: raids before that
      get "Day One" for the first 24 hours instead.
    The Desert Perpetual (19 July 2025, 10:00 PT) and Equilibrium (13 Dec
-   2025, 9:00 PT) come from launch coverage (2026-11-01); both ran
-   Contest mode for 48 hours and also have Bungie "Contest" versions.
+   2025, 9:00 PT), confirmed by the owner (2026-11-01); both ran Contest
+   mode for 48 hours and also have Bungie "Contest" versions.
+   epic: an Epic version's own start (The Desert Perpetual's Epic raid,
+     27 Sept 2025, 10:00 PT); its runs count Contest / Week One from then.
    ============================================================ */
 window.RaidReleases = {
   "last-wish": { start: "2018-09-14T17:00:00Z", dayOne: 24 },
@@ -19,7 +21,7 @@ window.RaidReleases = {
   "root-of-nightmares": { start: "2023-03-10T18:00:00Z", contest: 48 },
   "crotas-end": { start: "2023-09-01T17:00:00Z", contest: 48 },
   "salvations-edge": { start: "2024-06-07T17:00:00Z", contest: 48 },
-  "the-desert-perpetual": { start: "2025-07-19T17:00:00Z", contest: 48 },
+  "the-desert-perpetual": { start: "2025-07-19T17:00:00Z", contest: 48, epic: { start: "2025-09-27T17:00:00Z", contest: 48 } },
   "shattered-throne": { start: "2018-09-25T17:00:00Z" },
   "pit-of-heresy": { start: "2019-10-29T17:00:00Z" },
   "prophecy": { start: "2020-06-09T17:00:00Z" },

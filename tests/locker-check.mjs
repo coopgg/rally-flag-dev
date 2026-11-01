@@ -1563,7 +1563,8 @@ await section("Report", async () => {
   // run (not even fetched).
   const run = (id, hash, period, players, deaths) => ({ period, activityDetails: { referenceId: hash, directorActivityHash: hash, instanceId: id, mode: 4 },
     values: { completed: { basic: { value: 1 } }, completionReason: { basic: { value: 0 } }, playerCount: { basic: { value: players } }, deaths: { basic: { value: deaths } } } });
-  const HIST = { [C1 + ":4"]: [run("901", 3711931140, "2021-05-23T20:00:00Z", 1, 0)],
+  // Plus an Epic Desert Perpetual clear four days after the Epic launch (27 Sept 2025): Week One from its own date.
+  const HIST = { [C1 + ":4"]: [run("901", 3711931140, "2021-05-23T20:00:00Z", 1, 0), run("908", 3817322389, "2025-10-01T00:00:00Z", 6, 1)],
     [C2 + ":82"]: [run("902", 1077850348, "2024-01-01T00:00:00Z", 2, 1), run("903", 1077850348, "2024-02-01T00:00:00Z", 3, 0), run("904", 1077850348, "2024-03-01T00:00:00Z", 1, 0), run("905", 1077850348, "2024-04-01T00:00:00Z", 6, 4)],
     [C1 + ":82"]: [run("906", 1077850348, "2024-05-01T00:00:00Z", 2, 0), run("907", 1077850348, "2024-06-01T00:00:00Z", 3, 2)] };
   const entry = (m, d) => ({ player: { destinyUserInfo: { membershipId: m, membershipType: 3 } }, values: { deaths: { basic: { value: d } }, completed: { basic: { value: 1 } } } });
@@ -1595,6 +1596,7 @@ await section("Report", async () => {
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
   const badgesOf = slug => p.$$eval('[data-badges="' + slug + '"] .rr-badge', b => b.map(x => x.textContent).join(", "));
   check("report: badges: a fresh solo flawless on day two is Solo Flawless and Contest (Contest covers Week One)", await badgesOf("vault-of-glass") === "Solo Flawless, Contest", await badgesOf("vault-of-glass"));
+  check("report: badges: an Epic run counts Week One from the Epic launch", await badgesOf("the-desert-perpetual") === "Week One", await badgesOf("the-desert-perpetual"));
   check("report: badges: a duo with a death is Duo, a deathless full team is Flawless, checkpoint runs (even at phase 0) and a dungeon trio are nothing", await badgesOf("prophecy") === "Duo, Flawless", await badgesOf("prophecy"));
   check("report: badges: carnage reports only for runs that could count", pgcrCalls.sort().join() === "901,902,903,904,906", pgcrCalls.join());
   await p.click("#rr-sherpa-go");

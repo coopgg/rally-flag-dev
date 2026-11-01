@@ -230,7 +230,8 @@
       const d = a.activityDetails || {}, m = MAP[d.referenceId] || MAP[d.directorActivityHash], v = a.values || {}, n = k => ((v[k] || {}).basic || {}).value || 0;
       if (!m || !m[0] || n("completed") !== 1 || n("completionReason") !== 0 || seen.has(d.instanceId)) continue;
       seen.add(d.instanceId);
-      const slug = m[0], rel = REL[slug], t = Date.parse(a.period);
+      // An Epic version (The Desert Perpetual) counts from its own launch.
+      const slug = m[0], rel = REL[slug] && /^epic/i.test(m[2]) && REL[slug].epic ? REL[slug].epic : REL[slug], t = Date.parse(a.period);
       clears.push({ id: d.instanceId, slug, kind: m[1], t });
       if (/contest/i.test(m[2])) add(slug, "Contest");
       if (rel){
