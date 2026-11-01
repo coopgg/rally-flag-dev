@@ -19,6 +19,8 @@
   const API_KEY = window.RallyFlagAPI.BUNGIE_API_KEY;
   const RECENT_KEY = "rallyflag_report_recent";
   const CLASSES = ["Titan", "Hunter", "Warlock"];
+  // raid.report / dungeon.report path per Bungie membership type (Xbox 1, PlayStation 2, everything else pc).
+  const PLATFORM = t => ({ 1: "xb", 2: "ps" })[t] || "pc";
   const $ = id => document.getElementById(id);
   const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const img = p => p ? (p.charAt(0) === "/" ? BUNGIE + p : p) : "";
@@ -122,7 +124,10 @@
     $("rr-out").innerHTML =
       '<section class="rr-player panel-card" aria-labelledby="rr-name">' + (chars[0] && chars[0].emblemBackgroundPath ? '<img class="rr-emblem" src="' + esc(img(chars[0].emblemBackgroundPath)) + '" alt="">' : "") +
         '<div class="rr-who"><h2 id="rr-name" tabindex="-1">' + esc(name) + "</h2>" +
-          '<p class="rr-chars">' + chars.map(c => esc(CLASSES[c.classType] || "Guardian") + " " + c.light).join(" · ") + (r.deleted ? " · " + r.deleted + " deleted" : "") + "</p></div>" +
+          '<p class="rr-chars">' + chars.map(c => esc(CLASSES[c.classType] || "Guardian") + " " + c.light).join(" · ") + (r.deleted ? " · " + r.deleted + " deleted" : "") + "</p>" +
+          // The full records live on raid.report and dungeon.report (same platform/id paths).
+          '<p class="rr-links">Full record on <a href="https://raid.report/' + PLATFORM(type) + "/" + id + '" target="_blank" rel="noopener">raid.report<span class="sr-only"> (opens in a new tab)</span></a> · ' +
+          '<a href="https://dungeon.report/' + PLATFORM(type) + "/" + id + '" target="_blank" rel="noopener">dungeon.report<span class="sr-only"> (opens in a new tab)</span></a></p></div>' +
         '<dl class="rr-totals"><div><dt>Raid clears</dt><dd>' + raids.clears.toLocaleString() + "</dd></div><div><dt>Dungeon clears</dt><dd>" + dungeons.clears.toLocaleString() + "</dd></div>" +
           "<div><dt>Time in both</dt><dd>" + fmtHours(raids.seconds + dungeons.seconds) + '</dd></div><div id="rr-sherpa-total" hidden><dt>Sherpas</dt><dd></dd></div></dl>' +
         '<button type="button" class="rr-btn rr-copy" id="rr-copy">Copy link</button></section>' +
@@ -271,6 +276,7 @@
   // count takes minutes for a busy player; later ones only check new runs
   // and new teammates. Each player's last count is saved ("sherpa").
   let sherpaStop = false;
+  const SHERPA_NOTE = "Counted by Rally Flag from Bungie's data; can differ slightly from raid.report.";
   const MODE = { raid: 4, dungeon: 82 };
   async function firstClears(t, mid, kind, need){
     const key = t + "-" + mid + "|" + kind, hit = await cacheGet(key, "first");
@@ -301,8 +307,9 @@
     if (job !== loading || !box) return;
     if (saved){
       showSherpas(saved.counts, saved.total);
-      sherpaButton(box, "Sherpas counted " + new Date(saved.at).toLocaleDateString() + " from " + saved.clears.toLocaleString() + " clears.", "Update sherpas", type, id, clears, job);
-    } else sherpaButton(box, "Sherpas: runs where a teammate got their first clear. Bungie doesn't record that, so counting reads every clear and each teammate's history. The first count can take several minutes; your browser keeps the work, so later counts are quick.", "Count sherpas", type, id, clears, job);
+      sherpaButton(box, "Sherpas counted " + new Date(saved.at).toLocaleDateString() + " from " + saved.clears.toLocaleString() + " clears. " + SHERPA_NOTE, "Update sherpas", type, id, clears, job);
+    } else sherpaButton(box, "Sherpas: runs where a teammate got their first clear. Bungie doesn't record that, so counting reads every clear and each teammate's history. " +
+      "The first count can take 10–20 minutes for players with lots of clears; you can stop and pick it up later, and your browser keeps the work, so later counts are quick.", "Count sherpas", type, id, clears, job);
   }
   async function countSherpas(type, id, clears, job){
     const box = $("rr-sherpa");
@@ -352,7 +359,7 @@
     if (sherpaStop) return sherpaButton(box, "Stopped. The work so far is kept, so counting again picks up from here.", "Count sherpas", type, id, clears, job);
     cachePut(type + "-" + id, { at: Date.now(), counts, total, clears: clears.length }, "sherpa");
     sherpaButton(box, total.toLocaleString() + (total === 1 ? " sherpa" : " sherpas") + " across " + clears.length.toLocaleString() + " clears and " + list.length.toLocaleString() + " teammates" +
-      (skipped ? " (" + skipped + " teammates' histories didn't load and aren't counted)" : "") + ".", "Update sherpas", type, id, clears, job);
+      (skipped ? " (" + skipped + " teammates' histories didn't load and aren't counted)" : "") + ". " + SHERPA_NOTE, "Update sherpas", type, id, clears, job);
   }
 
   // ---------------- recent lookups ----------------

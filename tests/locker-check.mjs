@@ -1535,6 +1535,8 @@ await section("Report", async () => {
   check("report: sherpas: a teammate's first clear with this player counts, earlier clears elsewhere don't", await p.textContent('[data-sherpas="prophecy"] dd') === "3" &&
     await p.isHidden('[data-sherpas="vault-of-glass"]') && await p.textContent("#rr-sherpa-total dd") === "3", await p.textContent("#rr-sherpa"));
   check("report: raids with no guide are listed as retired", /Crown of Sorrow 1 clear · fastest 1h 30m/.test(await p.textContent(".rr-retired")));
+  check("report: links to the player's full record on raid.report and dungeon.report", await p.locator('.rr-links a[href="https://raid.report/pc/4611686018400000999"]').count() === 1 && await p.locator('.rr-links a[href="https://dungeon.report/pc/4611686018400000999"]').count() === 1);
+  check("report: sherpas say they're Rally Flag's own count", /can differ slightly from raid\.report/.test(await p.textContent("#rr-sherpa")));
   check("report: the page says what Bungie's numbers count", /checkpoint/.test(await p.textContent(".rr-note")));
   let v = await axe(p); check("report: passes axe", !v.length, v.join(", "));
   pgcrCalls.length = 0;
