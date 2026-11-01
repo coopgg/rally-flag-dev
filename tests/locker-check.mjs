@@ -141,7 +141,7 @@ async function open(opts = {}){
   await context.route(SYNC + "**", r => viaWorker(SyncWorker, r, syncEnv));
   await context.route(RELAY + "**", r => opts.relay ? r.fulfill(json(opts.relay)) : viaWorker(RelayWorker, r, {}));
   const page = await context.newPage();
-  page.errors = []; page.on("pageerror", e => page.errors.push(e.message));
+  page.errors = []; page.on("pageerror", e => page.errors.push(process.env.DEBUG ? e.stack : e.message));
   page.calls = calls; page.context_ = context; page.clarityCalls = clarityCalls;
   await page.goto(opts.url || BASE + "locker.html" + (opts.real ? "" : "?demo") + (opts.hash || ""));
   if (!opts.down && !opts.signedOut) await page.waitForSelector(opts.ready || "#locker-app:not([hidden])", { timeout: 120000 });
@@ -1441,6 +1441,14 @@ await section("Weapon lookup", async () => {
   check("weapons: signed in, your copies' perks have a dot and the Locker is linked", await p.locator(".wl-perk.have").count() >= 3 && /You have \d+ cop/.test(await p.textContent("#wl-detail")) && await p.locator('.wl-note a[href^="locker.html?q="]').count() === 1);
   await p.click(".wl-perk >> nth=2");
   check("weapons: tapping a perk shows what it does", /\S/.test(await p.textContent("#wl-perk-info p")) && await p.getAttribute(".wl-perk >> nth=2", "aria-pressed") === "true");
+  const zen = await p.getAttribute(".wl-col:nth-child(3) .wl-perk >> nth=0", "data-plug");
+  CLARITY_FIX.version += 10; CLARITY_FIX.perks[zen] = { hash: +zen, name: "Test", descriptions: { en: [{ linesContent: [{ text: "Stacks up to 5 times." }] }] } };
+  await p.click(".wl-col:nth-child(3) .wl-perk >> nth=0"); await p.waitForSelector("#wl-perk-info .clarity", { timeout: 30000 }).catch(() => {});
+  check("weapons: a perk shows Clarity's notes, credited, with a way to report mistakes", await p.locator('#wl-perk-info .clarity a[href="https://d2clarity.com"]').count() === 1 &&
+    await p.locator('#wl-perk-info .clarity a[href="https://d2clarity.com/discord"]').count() === 1 && await p.locator('#wl-clarity a[href="https://url.d2clarity.com/ko-fi"]').count() === 1);
+  await p.click("#wl-clarity-on");
+  check("weapons: Clarity notes switch off, remembered with the Locker's setting", !(await p.locator("#wl-perk-info .clarity").count()) && await p.evaluate(() => localStorage.getItem("rallyflag_locker_clarity")) === "off" && await p.evaluate(() => document.activeElement.id === "wl-clarity-on"));
+  await p.click("#wl-clarity-on");
   let v = await axe(p); check("weapons: a weapon passes axe", !v.length, v.join(", "));
   const other = await p.getAttribute('.wl-version[aria-pressed="false"]', "data-version");
   await p.click('.wl-version[data-version="' + other + '"]'); await p.waitForTimeout(800);

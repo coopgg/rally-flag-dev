@@ -211,6 +211,56 @@
     return profileJob;
   }
 
+  // ---------------- Clarity (community perk research) ----------------
+  // The Locker's code and rules (HANDOFF item 65): their text unedited,
+  // credited with a link next to it, clearly not ours, a way to send them
+  // feedback, only their latest version (the worker checks versions.json).
+  // Loaded the first time a perk is tapped; the same on/off setting as
+  // the Locker's Tools → Perk insights.
+  const CL_TAB = ' target="_blank" rel="noopener"', CL_NEW = '<span class="sr-only"> (opens in a new tab)</span>';
+  const CLARITY_KEY = "rallyflag_locker_clarity", CLARITY_SITE = "https://d2clarity.com", CLARITY_DISCORD = "https://d2clarity.com/discord", CLARITY_KOFI = "https://url.d2clarity.com/ko-fi";
+  const CLARITY = { on: (() => { try { return localStorage.getItem(CLARITY_KEY) !== "off"; } catch (e){ return true; } })(), data: null, job: null, err: "" };
+  function loadClarity(){
+    if (CLARITY.data || !CLARITY.on) return Promise.resolve(CLARITY.data);
+    if (!CLARITY.job) CLARITY.job = new Promise(resolve => {
+      const w = new Worker("assets/locker-worker.js");
+      const end = (data, err) => { w.terminate(); CLARITY.data = data; CLARITY.err = err || ""; CLARITY.job = null; resolve(data); };
+      w.onmessage = e => e.data.type === "done" ? end(e.data.db) : e.data.type === "error" ? end(null, e.data.message) : 0;
+      w.onerror = e => end(null, e.message || "worker failed");
+      w.postMessage({ kind: "clarity" });
+    });
+    return CLARITY.job;
+  }
+  const CLARITY_ICON = { solar: "Solar", arc: "Arc", void: "Void", stasis: "Stasis", strand: "Strand", kinetic: "Kinetic", primary: "Primary ammo", special: "Special ammo", heavy: "Heavy ammo",
+    barrier: "Barrier", overload: "Overload", unstoppable: "Unstoppable", hunter: "Hunter", titan: "Titan", warlock: "Warlock", enhancedArrow: "Enhanced" };
+  function clarityText(blocks){
+    const piece = s => {
+      const cls = s.classNames || [];
+      if (!s.text){ const k = cls.find(c => CLARITY_ICON[c]); return k ? '<span class="cl-ico cl-' + k + '" role="img" aria-label="' + CLARITY_ICON[k] + '"></span>' : ""; }
+      let t = esc(s.text);
+      if (s.link && /^https:\/\//.test(s.link)) t = '<a href="' + esc(s.link) + '"' + CL_TAB + ">" + t + CL_NEW + "</a>";
+      return cls.includes("bold") ? "<b>" + t + "</b>" : t;
+    };
+    return blocks.map(b => (b.classNames || []).includes("spacer") && !b.linesContent ? '<div class="cl-gap"></div>'
+      : '<p class="cl-line' + ((b.classNames || []).includes("bold") ? " cl-bold" : "") + '">' + (b.linesContent || []).map(piece).join("") + "</p>").join("");
+  }
+  function clarityHtml(h){
+    if (!CLARITY.on || !CLARITY.data) return CLARITY.on && CLARITY.err ? '<p class="cl-wait">Clarity\'s notes didn\'t load (' + esc(CLARITY.err) + ").</p>" : "";
+    // Their entry is under this perk's hash, or another copy of it (enhanced, older).
+    const name = (DB.items[h] || {}).n;
+    let blocks = CLARITY.data.perks[h];
+    if (!blocks && name) for (const k in CLARITY.data.perks) if ((DB.items[k] || {}).n === name){ blocks = CLARITY.data.perks[k]; break; }
+    if (!blocks) return "";
+    return '<div class="clarity" lang="en"><div class="cl-head"><span>Community Insights by <a href="' + CLARITY_SITE + '"' + CL_TAB + ">Clarity" + CL_NEW + '</a><span class="sr-only">, not Rally Flag</span></span>' +
+      '<a href="' + CLARITY_DISCORD + '"' + CL_TAB + ' title="Tell Clarity about a mistake in this description">Report<span class="sr-only"> a mistake to Clarity on Discord</span>' + CL_NEW + "</a></div>" + clarityText(blocks) + "</div>";
+  }
+  // Credits under the perks, with the switch.
+  function clarityCredits(){
+    return '<p class="wl-clarity" id="wl-clarity"><button type="button" class="wl-btn" id="wl-clarity-on" aria-pressed="' + CLARITY.on + '">Clarity notes ' + (CLARITY.on ? "on" : "off") + "</button>" +
+      '<span>Perk numbers come from <a href="' + CLARITY_SITE + '"' + CL_TAB + ">Clarity" + CL_NEW + "</a>, a community research project (not part of Rally Flag). " +
+      'Spot a mistake? Tell <a href="' + CLARITY_DISCORD + '"' + CL_TAB + ">Clarity's Discord" + CL_NEW + '</a>. You can <a href="' + CLARITY_KOFI + '"' + CL_TAB + ">support them on Ko-fi" + CL_NEW + "</a>.</span></p>";
+  }
+
   // ---------------- detail view ----------------
   let current = null; // { weapon, hash, defs: Map(hash -> def) }
   function statsHtml(def){
@@ -247,7 +297,7 @@
     let defs;
     try { defs = await Promise.all(weapon.versions.map(h => manifestGet("DestinyInventoryItemDefinition", h))); }
     catch (e){ $("wl-detail").innerHTML = '<p class="wl-status error" role="status">Bungie didn\'t send this weapon (' + esc(e.message) + '). <button type="button" class="wl-btn" id="wl-again">Try again</button></p>'; $("wl-again").addEventListener("click", () => openWeapon(weapon, hash)); return; }
-    if (current.weapon !== weapon) return;
+    if (!current || current.weapon !== weapon) return; // left it while loading
     // Newest version first (Bungie's definition index grows with each release).
     const versions = weapon.versions.map((h, k) => ({ h, def: defs[k] })).sort((a, b) => (b.def.index || 0) - (a.def.index || 0));
     const ours = ourRoll(weapon);
@@ -266,7 +316,7 @@
       def.collectibleHash ? manifestGet("DestinyCollectibleDefinition", def.collectibleHash).then(c => /^source:/i.test(c.sourceString || "") ? c.sourceString : "").catch(() => "") : "",
       profile()
     ]);
-    if (current.hash !== v.h) return;
+    if (!current || current.hash !== v.h) return; // moved on while loading
     // Your copies of any version of this weapon, and the perks they have.
     const mine = copies ? weapon.hashes.flatMap(h => copies.get(h) || []) : [];
     const have = new Set(mine.flatMap(s => [...s]));
@@ -300,8 +350,9 @@
           '<section class="wl-main" aria-labelledby="wl-h-perks"><h3 class="wl-h" id="wl-h-perks">' + (roll.cols.length ? "Every perk it can roll" : "Perks") + "</h3>" +
             (cols || mwCol ? '<div class="wl-cols">' + cols + mwCol + "</div>" : '<p class="muted">Bungie lists no perk choices for this version.</p>') +
             '<p class="wl-links"><a href="https://www.light.gg/db/items/' + v.h + '/" target="_blank" rel="noopener">light.gg<span class="sr-only"> (opens in a new tab)</span> ↗</a></p>' +
+            clarityCredits() +
           "</section>" +
-          '<div class="wl-perk-info" id="wl-perk-info" role="status">Tap a perk to read what it does.</div>' +
+          '<div class="wl-perk-info" id="wl-perk-info" role="status" tabindex="0">Tap a perk to read what it does.</div>' +
         "</div></article>";
     $("wl-back").addEventListener("click", () => { if (history.state && history.state.fromList) history.back(); else showList(true); });
     $("wl-detail").querySelectorAll("[data-version]").forEach(b => b.addEventListener("click", () => {
@@ -311,8 +362,14 @@
     $("wl-detail").querySelectorAll("[data-plug]").forEach(b => b.addEventListener("click", () => {
       $("wl-detail").querySelectorAll('[data-plug][aria-pressed="true"]').forEach(x => x.setAttribute("aria-pressed", "false"));
       b.setAttribute("aria-pressed", "true");
-      const p = DB.items[+b.dataset.plug] || {};
-      $("wl-perk-info").innerHTML = "<b>" + esc(b.querySelector(".wl-perk-name").textContent) + "</b>" + (p.y ? ' <span class="muted">' + esc(p.y) + "</span>" : "") + "<p>" + esc(p.x || "Bungie gives no description for this one.") + "</p>";
+      const h = +b.dataset.plug, p = DB.items[h] || {}, name = b.querySelector(".wl-perk-name").textContent;
+      const fill = () => {
+        $("wl-perk-info").dataset.h = h;
+        $("wl-perk-info").innerHTML = "<b>" + esc(name) + "</b>" + (p.y ? ' <span class="muted">' + esc(p.y) + "</span>" : "") + "<p>" + esc(p.x || "Bungie gives no description for this one.") + "</p>" +
+          (CLARITY.on && !CLARITY.data && CLARITY.job ? '<p class="cl-wait">Loading Clarity\'s notes…</p>' : clarityHtml(h));
+      };
+      fill();
+      if (CLARITY.on && !CLARITY.data) loadClarity().then(() => { const box = $("wl-perk-info"); if (box && box.dataset.h === String(h)) fill(); });
     }));
   }
 
@@ -357,6 +414,16 @@
       openWeapon(w, null, true).then(() => { history.replaceState(Object.assign({}, history.state, { fromList: true }), ""); const n = $("wl-name"); if (n) n.focus(); });
     });
     window.addEventListener("popstate", () => route(false));
+    // Clarity notes on/off (remembered, shared with the Locker).
+    $("wl-detail").addEventListener("click", e => {
+      if (!e.target.closest("#wl-clarity-on")) return;
+      CLARITY.on = !CLARITY.on;
+      try { CLARITY.on ? localStorage.removeItem(CLARITY_KEY) : localStorage.setItem(CLARITY_KEY, "off"); } catch (err){}
+      $("wl-clarity").outerHTML = clarityCredits();
+      const open = $("wl-detail").querySelector('[data-plug][aria-pressed="true"]');
+      if (open) open.click();
+      $("wl-clarity-on").focus();
+    });
     $("wl-app").hidden = false;
     route(false);
   }

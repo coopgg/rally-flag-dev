@@ -154,11 +154,27 @@
   .wl-perk-info b{ color:var(--text); }
   .wl-perk-info p{ margin:4px 0 0; color:var(--text); line-height:1.5; }
   .wl-links{ margin:12px 0 0; font-size:13px; }
+  .wl-clarity{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; margin:12px 0 0; font-size:12.5px; color:var(--text-dim); }
+  .wl-clarity a{ color:var(--accent-text); }
+  .wl-clarity .wl-btn[aria-pressed="true"]{ color:var(--accent-text); border-color:var(--accent-text); }
+  .cl-wait{ font-size:12.5px; color:var(--text-dim); }
+  /* Clarity's text, framed as theirs (the Locker's styles). */
+  .clarity{ margin-top:10px; padding:9px 11px; border-radius:8px; border:1px dashed var(--panel-border); background:var(--bg); color:var(--text); font-size:13.5px; line-height:1.45; }
+  .cl-head{ display:flex; justify-content:space-between; gap:10px; margin-bottom:6px; font-size:12px; font-weight:600; color:var(--text-dim); }
+  .cl-head a, .cl-line a{ color:var(--accent-text); }
+  .wl-perk-info .cl-line{ margin:0; }
+  .cl-bold{ font-weight:600; }
+  .cl-gap{ height:7px; }
+  .cl-ico{ display:inline-block; width:0.7em; height:0.7em; margin:0 3px 0 1px; border-radius:50%; background:var(--text-dim); vertical-align:0.02em; }
+  .cl-solar{ background:#f0631e; } .cl-arc{ background:#7aecf3; } .cl-void{ background:#b185df; } .cl-stasis{ background:#4d88ff; } .cl-strand{ background:#35e366; } .cl-kinetic{ background:#c8c8c8; }
+  .cl-primary{ border-radius:2px; background:#e6e6e6; } .cl-special{ border-radius:2px; background:#7af48b; } .cl-heavy{ border-radius:2px; background:#b286ff; }
+  .cl-barrier, .cl-overload, .cl-unstoppable, .cl-hunter, .cl-titan, .cl-warlock{ border-radius:2px; transform:rotate(45deg); background:#d9a441; }
+  .cl-enhancedArrow{ width:0; height:0; border-radius:0; background:none; border:0.38em solid transparent; border-bottom:0.62em solid #e6b84c; border-top:0; vertical-align:0.05em; }
   .wl-links a{ color:var(--accent-text); }
   @media (max-width:800px){
     .wl-body{ grid-template-columns:1fr; grid-template-areas:"side" "main" "info"; grid-template-rows:auto; }
     /* Pinned to the bottom of the screen while the perks are in view. */
-    .wl-body > .wl-perk-info{ position:sticky; top:auto; bottom:12px; min-height:0; box-shadow:0 8px 30px -6px rgba(0,0,0,0.5); }
+    .wl-body > .wl-perk-info{ position:sticky; top:auto; bottom:12px; min-height:0; max-height:45vh; overflow-y:auto; overscroll-behavior:contain; box-shadow:0 8px 30px -6px rgba(0,0,0,0.5); }
     .wl-filters{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width:640px){
