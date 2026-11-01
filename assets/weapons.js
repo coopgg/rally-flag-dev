@@ -348,29 +348,37 @@
         '<div class="wl-body"><section class="wl-side" aria-labelledby="wl-h-stats"><h3 class="wl-h" id="wl-h-stats">Base stats</h3>' + statsHtml(def) +
           (frame ? '<h3 class="wl-h">Frame</h3>' + frame : "") + "</section>" +
           '<section class="wl-main" aria-labelledby="wl-h-perks"><h3 class="wl-h" id="wl-h-perks">' + (roll.cols.length ? "Every perk it can roll" : "Perks") + "</h3>" +
+            '<p class="wl-hint">Tap a perk to read what it does; tap it again to close.</p>' +
             (cols || mwCol ? '<div class="wl-cols">' + cols + mwCol + "</div>" : '<p class="muted">Bungie lists no perk choices for this version.</p>') +
             '<p class="wl-links"><a href="https://www.light.gg/db/items/' + v.h + '/" target="_blank" rel="noopener">light.gg<span class="sr-only"> (opens in a new tab)</span> ↗</a></p>' +
             clarityCredits() +
           "</section>" +
-          '<div class="wl-perk-info" id="wl-perk-info" role="status" tabindex="0">Tap a perk to read what it does.</div>' +
+          '<div class="wl-perk-info" id="wl-perk-info" role="status" tabindex="0" hidden></div>' +
         "</div></article>";
     $("wl-back").addEventListener("click", () => { if (history.state && history.state.fromList) history.back(); else showList(true); });
     $("wl-detail").querySelectorAll("[data-version]").forEach(b => b.addEventListener("click", () => {
       const x = versions.find(y => y.h === +b.dataset.version);
       showVersion(weapon, versions, x, ours).then(() => { history.replaceState(Object.assign({}, history.state, { w: x.h }), "", "?w=" + x.h); const again = $("wl-detail").querySelector('[data-version="' + x.h + '"]'); if (again) again.focus(); });
     }));
+    // Tap a perk to read it; tap it again to close.
     $("wl-detail").querySelectorAll("[data-plug]").forEach(b => b.addEventListener("click", () => {
+      const open = b.getAttribute("aria-pressed") === "true";
       $("wl-detail").querySelectorAll('[data-plug][aria-pressed="true"]').forEach(x => x.setAttribute("aria-pressed", "false"));
+      if (open){ const box = $("wl-perk-info"); box.hidden = true; box.innerHTML = ""; delete box.dataset.h; return; }
       b.setAttribute("aria-pressed", "true");
-      const h = +b.dataset.plug, p = DB.items[h] || {}, name = b.querySelector(".wl-perk-name").textContent;
-      const fill = () => {
-        $("wl-perk-info").dataset.h = h;
-        $("wl-perk-info").innerHTML = "<b>" + esc(name) + "</b>" + (p.y ? ' <span class="muted">' + esc(p.y) + "</span>" : "") + "<p>" + esc(p.x || "Bungie gives no description for this one.") + "</p>" +
-          (CLARITY.on && !CLARITY.data && CLARITY.job ? '<p class="cl-wait">Loading Clarity\'s notes…</p>' : clarityHtml(h));
-      };
-      fill();
-      if (CLARITY.on && !CLARITY.data) loadClarity().then(() => { const box = $("wl-perk-info"); if (box && box.dataset.h === String(h)) fill(); });
+      showPerk(b);
     }));
+  }
+  // The description box for a perk button: Bungie's text, then Clarity's.
+  function showPerk(b){
+    const box = $("wl-perk-info"), h = +b.dataset.plug, p = DB.items[h] || {}, name = b.querySelector(".wl-perk-name").textContent;
+    const fill = () => {
+      box.hidden = false; box.dataset.h = h;
+      box.innerHTML = "<b>" + esc(name) + "</b>" + (p.y ? ' <span class="muted">' + esc(p.y) + "</span>" : "") + "<p>" + esc(p.x || "Bungie gives no description for this one.") + "</p>" +
+        (CLARITY.on && !CLARITY.data && CLARITY.job ? '<p class="cl-wait">Loading Clarity\'s notes…</p>' : clarityHtml(h));
+    };
+    fill();
+    if (CLARITY.on && !CLARITY.data) loadClarity().then(() => { if (box.isConnected && box.dataset.h === String(h)) fill(); });
   }
 
   function showList(push){
@@ -421,7 +429,7 @@
       try { CLARITY.on ? localStorage.removeItem(CLARITY_KEY) : localStorage.setItem(CLARITY_KEY, "off"); } catch (err){}
       $("wl-clarity").outerHTML = clarityCredits();
       const open = $("wl-detail").querySelector('[data-plug][aria-pressed="true"]');
-      if (open) open.click();
+      if (open) showPerk(open);
       $("wl-clarity-on").focus();
     });
     $("wl-app").hidden = false;

@@ -1439,10 +1439,13 @@ await section("Weapon lookup", async () => {
   check("weapons: our God Roll's five perks are marked, with a link to why", await p.locator(".wl-perk.ours").count() === 5 && await p.locator('.wl-note a[href="god-rolls.html#weapon-blast-furnace"]').count() === 1);
   check("weapons: masterwork offers only this weapon's stats", (await p.$$eval(".wl-col:last-child .wl-perk-name", x => x.map(y => y.textContent))).every(n => ["Stability", "Range", "Handling", "Impact", "Reload Speed"].includes(n)));
   check("weapons: signed in, your copies' perks have a dot and the Locker is linked", await p.locator(".wl-perk.have").count() >= 3 && /You have \d+ cop/.test(await p.textContent("#wl-detail")) && await p.locator('.wl-note a[href^="locker.html?q="]').count() === 1);
-  await p.click(".wl-perk >> nth=2");
-  check("weapons: tapping a perk shows what it does", /\S/.test(await p.textContent("#wl-perk-info p")) && await p.getAttribute(".wl-perk >> nth=2", "aria-pressed") === "true");
+  // A Clarity entry for the first trait, in place before any perk loads Clarity.
   const zen = await p.getAttribute(".wl-col:nth-child(3) .wl-perk >> nth=0", "data-plug");
   CLARITY_FIX.version += 10; CLARITY_FIX.perks[zen] = { hash: +zen, name: "Test", descriptions: { en: [{ linesContent: [{ text: "Stacks up to 5 times." }] }] } };
+  await p.click(".wl-perk >> nth=2");
+  check("weapons: tapping a perk shows what it does", /\S/.test(await p.textContent("#wl-perk-info p")) && await p.getAttribute(".wl-perk >> nth=2", "aria-pressed") === "true");
+  await p.click(".wl-perk >> nth=2");
+  check("weapons: tapping it again closes it", await p.isHidden("#wl-perk-info") && await p.getAttribute(".wl-perk >> nth=2", "aria-pressed") === "false");
   await p.click(".wl-col:nth-child(3) .wl-perk >> nth=0"); await p.waitForSelector("#wl-perk-info .clarity", { timeout: 30000 }).catch(() => {});
   check("weapons: a perk shows Clarity's notes, credited, with a way to report mistakes", await p.locator('#wl-perk-info .clarity a[href="https://d2clarity.com"]').count() === 1 &&
     await p.locator('#wl-perk-info .clarity a[href="https://d2clarity.com/discord"]').count() === 1 && await p.locator('#wl-clarity a[href="https://url.d2clarity.com/ko-fi"]').count() === 1);
