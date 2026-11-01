@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* Boot script: theme, light/dark mode, load guard. Generated from tools/boot-script.js; edit there and run node tools/sync-boot-script.js. */
+(function(){
+  var d = document.documentElement;
+  // Valid saved themes; a first visit gets a random subclass (not Cosmic).
+  var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
+  var theme = null, modePref = null, legacyMode = null;
+  try {
+    theme = localStorage.getItem("rallyflag_theme");
+    if (THEMES.indexOf(theme) < 0){
+      theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+      localStorage.setItem("rallyflag_theme", theme);
+    }
+    modePref = localStorage.getItem("rallyflag_mode_pref");
+    legacyMode = localStorage.getItem("rallyflag_mode");
+  } catch (e) {}
+  if (THEMES.indexOf(theme) < 0) theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+  if (modePref !== "light" && modePref !== "dark"){
+    modePref = legacyMode === "light" ? "light"
+      : (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  }
+  d.setAttribute("data-theme", theme);
+  d.setAttribute("data-mode", modePref);
+
+  d.classList.add("rf-boot");
+  var reveal = function(){ d.classList.remove("rf-boot"); };
+  document.addEventListener("DOMContentLoaded", function(){
+    Promise.race([
+      document.fonts ? document.fonts.ready : 0,
+      new Promise(function(r){ setTimeout(r, 400); })
+    ]).then(function(){ requestAnimationFrame(reveal); });
+  });
+  setTimeout(reveal, 2500);
+})();
+</script>
+<title>Weapon Lookup - Rally Flag</title>
+<meta name="description" content="Every Destiny 2 weapon: all the perks it can roll, its base and hidden stats, and our God Roll.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rally Flag">
+<meta property="og:title" content="Weapon Lookup">
+<meta property="og:description" content="Every Destiny 2 weapon: all the perks it can roll, its base and hidden stats, and our God Roll.">
+<meta property="og:url" content="https://rallyflag.gg/weapons.html">
+<link rel="canonical" href="https://rallyflag.gg/weapons.html">
+<meta property="og:image" content="https://rallyflag.gg/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Rally Flag: Destiny 2 raid and dungeon guides, weapon god rolls, builds and live trackers">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Weapon Lookup">
+<meta name="twitter:description" content="Every Destiny 2 weapon: all the perks it can roll, its base and hidden stats, and our God Roll.">
+<meta name="twitter:image" content="https://rallyflag.gg/assets/og-image.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.bungie.net">
+<link rel="preconnect" href="https://www.bungie.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  /* Weapon lookup. Script: assets/weapons.js */
+  .wl-wrap{ max-width:1100px; margin:28px auto 0; padding:0 24px 90px; min-height:70vh; }
+  .wl-status{ margin:0 0 16px; padding:12px 16px; border:1px solid var(--panel-border); border-radius:10px; background:var(--panel); color:var(--text-dim); font-size:14px; }
+  .wl-status[hidden]{ display:none; }
+  .wl-status.error{ border-color:var(--accent-text); color:var(--text); }
+  .wl-btn{ display:inline-flex; align-items:center; min-height:32px; padding:4px 12px; border-radius:999px; border:1px solid var(--edge); background:transparent; color:var(--text-dim); font:inherit; font-size:13px; font-weight:500; cursor:pointer; transition: color 0.15s ease, border-color 0.15s ease; }
+  .wl-btn:hover{ color:var(--text); border-color:var(--accent); }
+  .wl-btn[hidden]{ display:none; }
+
+  /* Search */
+  .wl-search{ display:flex; gap:10px; }
+  .wl-search input{ flex:1; min-width:0; background:var(--panel); border:1px solid var(--panel-border); color:var(--text); font-family:var(--font-sans); font-size:15px; padding:13px 16px; border-radius:10px; outline:none; transition:border-color 0.2s ease; }
+  .wl-search input:focus{ border-color:var(--accent); }
+  .wl-search input::placeholder{ color:var(--text-dimmer); }
+  .wl-filters{ display:grid; grid-template-columns:repeat(4, minmax(0, 1fr)); gap:10px; margin-top:12px; }
+  .wl-filter{ display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--text-dim); }
+  .wl-select{ min-height:38px; padding:6px 10px; border-radius:8px; border:1px solid var(--panel-border); background:var(--panel); color:var(--text); font:inherit; font-size:14px; }
+  .wl-select option{ background:var(--bg); color:var(--text); }
+  .wl-bar-row{ display:flex; align-items:center; gap:12px; margin:16px 0 10px; font-size:13px; color:var(--text-dim); }
+  .wl-bar-row .wl-btn{ margin-left:auto; }
+  .wl-results{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 250px), 1fr)); grid-auto-rows:1fr; gap:8px; }
+  .wl-tile{ display:flex; align-items:center; gap:12px; height:100%; padding:8px 10px; border:1px solid var(--panel-border); border-radius:8px; background:var(--panel); color:var(--text); text-decoration:none; transition:border-color 0.15s ease; }
+  .wl-tile:hover, .wl-tile:focus-visible{ border-color:var(--accent); }
+  .wl-icon{ position:relative; flex:none; width:48px; height:48px; border:1px solid #4f3a72; background:#1a1f2b; }
+  .exotic .wl-icon, .wl-tile.exotic .wl-icon{ border-color:#c9a227; }
+  .wl-icon img{ position:absolute; inset:0; width:100%; height:100%; }
+  .wl-icon.big{ width:72px; height:72px; }
+  .wl-tile-text{ min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .wl-tile-text b{ font-family:'Oswald', sans-serif; font-weight:600; font-size:15px; line-height:1.25; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wl-tile-text small{ display:flex; align-items:center; gap:5px; font-size:12.5px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .wl-none{ grid-column:1 / -1; padding:30px 0; color:var(--text-dim); font-size:14px; }
+  .wl-more{ display:block; margin:16px auto 0; }
+
+  /* A weapon */
+  .wl-back{ margin-bottom:14px; }
+  .wl-card{ overflow:clip; } /* clip, not hidden: the perk description sticks inside it */
+  .wl-head{ position:relative; display:flex; align-items:center; gap:16px; padding:22px 22px 18px; isolation:isolate; }
+  .wl-shot{ position:absolute; inset:0; z-index:-1; width:100%; height:100%; object-fit:cover; opacity:0.22; -webkit-mask-image:linear-gradient(90deg, transparent, #000 40%); mask-image:linear-gradient(90deg, transparent, #000 40%); }
+  .wl-title{ min-width:0; }
+  .wl-title h2{ margin:0; font-family:'Oswald', sans-serif; font-weight:600; font-size:28px; line-height:1.15; color:var(--text); }
+  .wl-card.exotic .wl-title h2{ color:#ceae33; }
+  [data-mode="light"] .wl-card.exotic .wl-title h2{ color:#7a5c00; }
+  .wl-meta{ display:flex; align-items:center; gap:6px; margin:4px 0 0; font-size:14px; color:var(--text-dim); }
+  .wl-source{ margin:4px 0 0; font-size:13px; color:var(--text-dim); }
+  .wl-flavor{ margin:0; padding:0 22px; font-size:14px; font-style:italic; color:var(--text-dim); max-width:80ch; }
+  .wl-versions{ display:flex; flex-wrap:wrap; gap:6px; padding:14px 22px 0; }
+  .wl-version{ display:inline-flex; align-items:center; gap:6px; min-height:32px; padding:4px 12px 4px 6px; border-radius:999px; border:1px solid var(--edge); background:transparent; color:var(--text-dim); font:inherit; font-size:13px; font-weight:500; cursor:pointer; }
+  .wl-version img{ width:20px; height:20px; }
+  .wl-version[aria-pressed="true"]{ color:var(--on-accent); background:var(--accent-fill); border-color:var(--accent-fill); }
+  .wl-note{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 14px; margin:14px 22px 0; padding:10px 14px; border:1px solid var(--panel-border); border-radius:8px; font-size:13.5px; color:var(--text-dim); }
+  .wl-note.ours{ border-color:#c9a227; }
+  .wl-note strong{ color:var(--text); }
+  .wl-note a{ color:var(--accent-text); white-space:nowrap; }
+  /* Desktop: stats, frame and the perk description on the left (the description
+     stays in view while you scan the columns); phones: one column, description last. */
+  .wl-body{ display:grid; grid-template-columns:minmax(0, 330px) minmax(0, 1fr); grid-template-areas:"side main" "info main"; grid-template-rows:auto 1fr; gap:20px 28px; padding:20px 22px 24px; }
+  .wl-side{ grid-area:side; } .wl-main{ grid-area:main; }
+  .wl-body > .wl-perk-info{ grid-area:info; align-self:start; position:sticky; top:16px; margin-top:0; }
+  .wl-h{ margin:0 0 10px; font-family:'JetBrains Mono', monospace; font-weight:400; font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent-text); }
+  .wl-h:not(:first-child){ margin-top:20px; }
+  .wl-stats{ display:flex; flex-direction:column; gap:3px; }
+  .wl-stat{ display:grid; grid-template-columns:130px 34px 1fr; align-items:center; gap:10px; font-size:13px; line-height:21px; }
+  .wl-stat span{ color:var(--text-dim); white-space:nowrap; display:flex; align-items:center; gap:6px; }
+  .wl-stat b{ font-family:'JetBrains Mono', monospace; font-weight:600; color:var(--text); text-align:right; }
+  .wl-hidden{ font-style:normal; font-size:11px; letter-spacing:0.02em; padding:0 5px; border-radius:4px; border:1px solid var(--panel-border); color:var(--text-dim); line-height:16px; }
+  .wl-bar{ position:relative; height:8px; background:var(--panel-border); }
+  .wl-bar i{ display:block; height:100%; background:var(--accent-fill); }
+  .wl-bar::after{ content:""; position:absolute; inset:0; background:repeating-linear-gradient(90deg, transparent 0 calc(10% - 2px), var(--bg) calc(10% - 2px) 10%); }
+  .wl-recoil{ width:48px; height:24px; display:block; }
+  .wl-recoil .dial{ fill:color-mix(in srgb, var(--text) 16%, transparent); }
+  .wl-recoil .spread{ fill:var(--accent-fill); }
+  .wl-recoil line.spread{ stroke:var(--accent-fill); }
+  .wl-frame{ display:flex; gap:10px; align-items:flex-start; }
+  .wl-frame img{ flex:none; width:40px; height:40px; }
+  .wl-frame b{ display:block; font-size:14px; color:var(--text); }
+  .wl-frame small{ display:block; font-size:13px; color:var(--text-dim); line-height:1.45; }
+  .wl-cols{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:14px 12px; align-items:start; }
+  .wl-col{ display:flex; flex-direction:column; gap:4px; min-width:0; }
+  .wl-col-h{ font-size:12.5px; font-weight:600; color:var(--text-dim); margin-bottom:2px; }
+  .wl-perk{ position:relative; display:flex; align-items:center; gap:8px; width:100%; min-height:40px; padding:2px 8px 2px 2px; border-radius:999px; border:1px solid transparent; background:none; color:var(--text); font:inherit; font-size:13px; text-align:left; cursor:pointer; }
+  .wl-perk:hover{ border-color:var(--panel-border); }
+  .wl-perk[aria-pressed="true"]{ border-color:var(--accent-text); background:var(--accent-dim); }
+  .wl-perk-icon{ flex:none; width:36px; height:36px; border-radius:50%; overflow:hidden; background:#1a1f2b; border:1px solid var(--panel-border); }
+  .wl-perk-icon img{ width:100%; height:100%; display:block; }
+  .wl-perk-name{ min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .wl-perk.ours .wl-perk-icon{ border:2px solid #c9a227; box-shadow:0 0 8px -1px #c9a227; }
+  .wl-perk.ours .wl-perk-name{ font-weight:600; }
+  .wl-perk.have::after{ content:""; position:absolute; left:28px; top:2px; width:9px; height:9px; border-radius:50%; background:var(--accent-fill); box-shadow:0 0 0 2px var(--bg); }
+  .wl-perk-info{ margin-top:16px; padding:10px 12px; min-height:64px; border:1px solid var(--panel-border); border-radius:8px; background:var(--bg); font-size:13.5px; color:var(--text-dim); }
+  .wl-perk-info b{ color:var(--text); }
+  .wl-perk-info p{ margin:4px 0 0; color:var(--text); line-height:1.5; }
+  .wl-links{ margin:12px 0 0; font-size:13px; }
+  .wl-links a{ color:var(--accent-text); }
+  @media (max-width:800px){
+    .wl-body{ grid-template-columns:1fr; grid-template-areas:"side" "main" "info"; grid-template-rows:auto; }
+    /* Pinned to the bottom of the screen while the perks are in view. */
+    .wl-body > .wl-perk-info{ position:sticky; top:auto; bottom:12px; min-height:0; box-shadow:0 8px 30px -6px rgba(0,0,0,0.5); }
+    .wl-filters{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width:640px){
+    .wl-wrap{ padding:0 16px 70px; }
+    .wl-head{ padding:16px; gap:12px; }
+    .wl-title h2{ font-size:23px; }
+    .wl-flavor, .wl-versions{ padding-left:16px; padding-right:16px; }
+    .wl-note{ margin-left:16px; margin-right:16px; }
+    .wl-body{ padding:16px; }
+    .wl-cols{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+    .wl-stat{ grid-template-columns:154px 30px 1fr; gap:8px; }
+  }
+</style>
+</head>
+<body data-nav-group="weapons">
+
+<div id="site-nav"></div>
+
+<main id="main-content" tabindex="-1">
+
+<div class="hero">
+  <div class="eyebrow">Destiny 2 · Weapons</div>
+  <h1 class="title">Weapon Lookup</h1>
+  <p class="subtitle">Every weapon in the game: all the perks it can roll, its stats (the hidden ones too), where it drops and our God Roll.</p>
+</div>
+
+<div class="wl-wrap">
+  <p class="wl-status" id="wl-status" role="status">Loading…</p>
+  <div id="wl-app" hidden>
+    <section id="wl-search-view" aria-label="Find a weapon">
+      <div class="wl-search">
+        <input type="search" id="wl-q" aria-label="Search weapons by name" placeholder="Search weapons by name…" autocomplete="off" spellcheck="false">
+      </div>
+      <div class="wl-filters" id="wl-filters"></div>
+      <div class="wl-bar-row"><span id="wl-count" aria-live="polite"></span><button type="button" class="wl-btn" id="wl-clear">Clear</button></div>
+      <ul class="wl-results" id="wl-results"></ul>
+      <button type="button" class="wl-btn wl-more" id="wl-more" hidden>Show more</button>
+    </section>
+    <div id="wl-detail" hidden></div>
+  </div>
+</div>
+
+</main>
+
+<footer>
+  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
+</footer>
+
+<script src="assets/nav.js"></script>
+<script src="assets/api-keys.js"></script>
+<script src="assets/oauth.js"></script>
+<script src="assets/god-rolls-data.js"></script>
+<script src="assets/weapons.js"></script>
+</body>
+</html>

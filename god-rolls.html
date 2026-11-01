@@ -616,6 +616,7 @@
         '<div class="weapon-actions" id="acts-' + weapon.slug + '"></div>' +
         (weapon.raidSlug ? '<a class="cross-link" href="' + window.rallyFlagGuideHref("raid", weapon.raidSlug) + '">View the raid guide it drops from \u2192</a>' : '') +
         (weapon.dungeonSlug ? '<a class="cross-link" href="' + window.rallyFlagGuideHref("dungeon", weapon.dungeonSlug) + '">View the dungeon guide it drops from \u2192</a>' : '') +
+        '<a class="cross-link" href="weapons.html?w=' + weapon.itemHash + '">Every perk it can roll \u2192</a>' +
         '<a class="light-gg-link" id="lightgg-' + weapon.slug + '" href="https://www.light.gg/db/items/' + weapon.itemHash + '/" target="_blank" rel="noopener">View on light.gg \u2192</a>' +
       '</div>';
 

@@ -161,6 +161,10 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   `?demo` simulates every action locally. Test the
   real path with Playwright: a fake session in sessionStorage
   (`rallyflag_bungie_auth`) plus routed Profile/Actions endpoints.
+- **Weapon lookup** (`weapons.html` + `assets/weapons.js`, HANDOFF item 83):
+  every Legendary/Exotic weapon from the Locker's item database (same worker
+  and IndexedDB cache, so a SCHEMA bump there rebuilds both), details from
+  Bungie's API per weapon. `?w=<hash>` links a version.
 - **Your Week (live on rallyflag.gg since 2026-10-22, Preview).** `your-week.html` + `assets/your-week.js`
   (+ `your-week-worker.js` for Bungie's definitions, `your-week-demo.json`
   for `?demo`, built by `tools/build-your-week-demo.js`): the signed-in

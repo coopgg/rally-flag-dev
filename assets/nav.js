@@ -50,6 +50,7 @@
       items: [
         { label: "Builds", href: "builds.html", group: "builds" },
         { label: "God Rolls", href: "god-rolls.html", group: "godrolls" },
+        { label: "Weapon Lookup", href: "weapons.html", group: "weapons" },
         { label: "Armor Sets", href: "armor-set-bonuses.html", group: "setbonuses" },
         { label: "Artifacts", href: "artifacts.html", group: "artifacts" }
       ]

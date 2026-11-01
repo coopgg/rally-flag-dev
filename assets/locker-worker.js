@@ -1,5 +1,6 @@
 /* ============================================================
-   Locker item database (dev-only, used by locker.html).
+   Item database for the Locker (locker.html) and the weapon lookup
+   (weapons.html); both pages share this cached copy.
 
    Downloads Bungie's DestinyInventoryItemLiteDefinition (~3MB over the
    wire, ~61MB of JSON) plus the small stat, damage-type, armor-set,
@@ -15,7 +16,8 @@
    items: hash -> { n name, i icon, w watermark, t itemType, s subType,
      r tierType, b bucketHash, c classType, d damageTypeHash,
      y itemTypeDisplayName, x description (plugs), o 1 = ornament, sh 1 = shader,
-     q infusion category (weapons, armor),
+     q infusion category (weapons, armor), a ammo type (weapons: 1 primary,
+     2 special, 3 heavy), l 1 = has a collectible (weapons),
      k armor mod kind }; currencies keep n, i.
    buckets: hash -> { n name, c capacity } (vault space in the banner).
    loadouts: { names: hash -> name, icons: hash -> path, colors: hash -> path,
@@ -24,7 +26,7 @@
 const BUNGIE = "https://www.bungie.net";
 const DB_NAME = "rallyflag-locker", STORE = "manifest", KEY = "lite";
 // Bump when the stored shape changes, so cached copies are rebuilt.
-const SCHEMA = 8;
+const SCHEMA = 9;
 
 function idb(){
   return new Promise((resolve, reject) => {
@@ -86,6 +88,10 @@ function trimItems(lite){
       if (v.iconWatermark) e.w = v.iconWatermark;
       // Infusion: an item takes Power from another of the same category.
       if (v.quality && v.quality.infusionCategoryHash) e.q = v.quality.infusionCategoryHash;
+      if (v.itemType === 3){
+        if (v.equippingBlock && v.equippingBlock.ammoType) e.a = v.equippingBlock.ammoType;
+        if (v.collectibleHash) e.l = 1;
+      }
     } else {
       e.y = v.itemTypeDisplayName || "";
       if (dp.description) e.x = dp.description.slice(0, 300);

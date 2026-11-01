@@ -1422,6 +1422,42 @@ await section("Design", async () => {
   await p.context_.close();
 });
 
+// ---------- Weapon lookup (weapons.html) ----------
+await section("Weapon lookup", async () => {
+  const p = await open({ real: true, url: BASE + "weapons.html", ready: "#wl-app:not([hidden])" });
+  const total = +(await p.textContent("#wl-count")).replace(/\D/g, "");
+  check("weapons: every Legendary and Exotic weapon is listed, one per name", total > 900 && await p.locator("#wl-results li").count() === 48, String(total));
+  await p.fill("#wl-q", "blast furn"); await p.waitForTimeout(200);
+  check("weapons: search narrows by name", (await p.$$eval("#wl-results b", b => b.map(x => x.textContent))).includes("Blast Furnace"));
+  await p.selectOption("#wl-rarity", "6");
+  check("weapons: filters combine with the search", /^0 weapons/.test(await p.textContent("#wl-count")));
+  await p.click("#wl-clear");
+  check("weapons: Clear resets and returns to the box", await p.inputValue("#wl-q") === "" && await p.inputValue("#wl-rarity") === "" && await p.evaluate(() => document.activeElement.id === "wl-q"));
+  await p.fill("#wl-q", "blast furnace"); await p.click("#wl-results a"); await p.waitForSelector(".wl-cols", { timeout: 60000 }); await p.waitForTimeout(800);
+  check("weapons: opening one shows its versions, stats with hidden ones, frame and perk columns", /\?w=\d+/.test(p.url()) && await p.locator(".wl-version").count() >= 2 && await p.locator(".wl-hidden").count() >= 3 && await p.locator(".wl-frame").count() === 1 &&
+    (await p.$$eval(".wl-col-h", c => c.map(x => x.textContent))).join() === "Barrel,Magazine,Trait,Trait,Origin Trait,Masterwork", p.url());
+  check("weapons: our God Roll's five perks are marked, with a link to why", await p.locator(".wl-perk.ours").count() === 5 && await p.locator('.wl-note a[href="god-rolls.html#weapon-blast-furnace"]').count() === 1);
+  check("weapons: masterwork offers only this weapon's stats", (await p.$$eval(".wl-col:last-child .wl-perk-name", x => x.map(y => y.textContent))).every(n => ["Stability", "Range", "Handling", "Impact", "Reload Speed"].includes(n)));
+  check("weapons: signed in, your copies' perks have a dot and the Locker is linked", await p.locator(".wl-perk.have").count() >= 3 && /You have \d+ cop/.test(await p.textContent("#wl-detail")) && await p.locator('.wl-note a[href^="locker.html?q="]').count() === 1);
+  await p.click(".wl-perk >> nth=2");
+  check("weapons: tapping a perk shows what it does", /\S/.test(await p.textContent("#wl-perk-info p")) && await p.getAttribute(".wl-perk >> nth=2", "aria-pressed") === "true");
+  let v = await axe(p); check("weapons: a weapon passes axe", !v.length, v.join(", "));
+  const other = await p.getAttribute('.wl-version[aria-pressed="false"]', "data-version");
+  await p.click('.wl-version[data-version="' + other + '"]'); await p.waitForTimeout(800);
+  check("weapons: switching version updates the page and the link", p.url().endsWith("?w=" + other) && await p.getAttribute('.wl-version[data-version="' + other + '"]', "aria-pressed") === "true");
+  await p.goBack(); await p.waitForTimeout(500);
+  check("weapons: Back returns to the search as it was", await p.isVisible("#wl-search-view") && await p.inputValue("#wl-q") === "blast furnace");
+  v = await axe(p); check("weapons: the search passes axe", !v.length, v.join(", "));
+  check("weapons: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+  // A shared link opens straight on that version; God Rolls cards link here.
+  const q = await open({ url: BASE + "weapons.html?w=52683113", ready: ".wl-cols" });
+  check("weapons: ?w= opens that version", await q.textContent("#wl-name") === "Blast Furnace" && /our pick/.test(await q.textContent('.wl-version[aria-pressed="true"]')));
+  await q.goto(BASE + "god-rolls.html"); await q.waitForSelector(".weapon-card");
+  check("weapons: God Rolls cards link to every perk", await q.locator('#weapon-blast-furnace a[href="weapons.html?w=52683113"]').count() === 1);
+  await q.context_.close();
+});
+
 // ---------- God Rolls page ↔ Locker ----------
 await section("God Rolls", async () => {
   // The page and the Locker's God Rolls tab read the same profile: "Find in Locker" is on exactly the cards with a copy.
