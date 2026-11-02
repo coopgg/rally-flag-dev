@@ -1609,7 +1609,7 @@ await section("Report", async () => {
   check("report: every guide has a card in the guides' art style, uncleared ones greyed", await p.locator(".rr-card").count() === 22 && await p.locator(".rr-card .art-thumb").count() === 22 && await p.locator(".rr-card.none").count() === 20);
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
   const badgesOf = slug => p.$$eval('[data-badges="' + slug + '"] .rr-badge', b => b.map(x => x.textContent).join(", "));
-  check("report: badges: a fresh solo flawless on day two is Solo Flawless and Week One (VoG has no Contest badge)", await badgesOf("vault-of-glass") === "Solo Flawless, Week One", await badgesOf("vault-of-glass"));
+  check("report: badges: a fresh solo flawless on day two is Flawless Solo (raid.report's wording) and Week One (VoG has no Contest badge)", await badgesOf("vault-of-glass") === "Flawless Solo, Week One", await badgesOf("vault-of-glass"));
   check("report: badges: a Normal dungeon clear in its first 24h is Day One, not Contest", await badgesOf("equilibrium") === "Day One", await badgesOf("equilibrium"));
   check("report: badges: an earned Contest triumph is Contest (one timing badge only)", await badgesOf("sundered-doctrine") === "Contest", await badgesOf("sundered-doctrine"));
   check("report: badges: a Contest version clear in its first 24h is Contest Day One", await badgesOf("vespers-host") === "Contest Day One", await badgesOf("vespers-host"));
@@ -1631,7 +1631,7 @@ await section("Report", async () => {
   await p.reload(); await p.waitForSelector("#rr-name");
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
   check("report: sherpas: the last count shows straight away on a later visit", await p.textContent('[data-sherpas="prophecy"] dd') === "3" && /Sherpas counted/.test(await p.textContent("#rr-sherpa")));
-  check("report: badges: run reports are kept, so a second look fetches none", !pgcrCalls.length && await badgesOf("vault-of-glass") === "Solo Flawless, Week One", pgcrCalls.join());
+  check("report: badges: run reports are kept, so a second look fetches none", !pgcrCalls.length && await badgesOf("vault-of-glass") === "Flawless Solo, Week One", pgcrCalls.join());
   check("report: a shared link opens the same report, and it's under Recent", await p.textContent("#rr-name") === "Testguard#0042" && /Testguard#0042/.test(await p.textContent("#rr-recent")));
   await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
   check("report (phone): two cards per row, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".rr-card")].slice(0, 2).map(x => x.getBoundingClientRect().top); return c[0] === c[1] && document.documentElement.scrollWidth <= innerWidth; }));

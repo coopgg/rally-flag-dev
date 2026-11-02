@@ -103,8 +103,8 @@
   function card(item, kind, e){
     const none = !e || !e.clears;
     return '<a class="activity-card panel-card rr-card' + (none ? " none" : "") + '" href="' + window.rallyFlagGuideHref(kind, item.slug) + '">' +
-      // Badges sit on the art, so a card's height never depends on how many it has.
-      '<div class="rr-art">' + window.rallyFlagArtThumb(item) + '<div class="rr-badges" data-badges="' + esc(item.slug) + '"></div></div>' +
+      // Badges in a bar under the art (one row kept even when empty, so cards line up).
+      '<div class="rr-art">' + window.rallyFlagArtThumb(item) + '<div class="rr-badges" data-badges="' + esc(item.slug) + '" data-kind="' + kind + '"></div></div>' +
       '<div class="activity-name">' + esc(item.name) + "</div>" +
       '<div class="rr-clears"><b>' + (none ? 0 : e.clears.toLocaleString()) + "</b> " + ((e && e.clears) === 1 ? "clear" : "clears") + "</div>" +
       (none ? '<p class="rr-line">' + (e && e.seconds ? "Played " + fmtHours(e.seconds) + ", no clear yet" : "No clears yet") + "</p>"
@@ -156,7 +156,8 @@
   // fireteam is three, so Trio is a raid badge only) and kept in IndexedDB,
   // since a finished run's report never changes.
   const STATS = "https://stats.bungie.net/Platform";
-  const BADGE_ORDER = ["Solo Flawless", "Solo", "Duo Flawless", "Duo", "Trio Flawless", "Trio", "Flawless", "Challenge Day One", "Contest Day One", "Day One", "Challenge", "Contest", "Week One"];
+  // Flawless, then low-man, then timing: raid.report's order ("Flawless Trio", "Duo", "Challenge Day One").
+  const BADGE_ORDER = ["Solo Flawless", "Duo Flawless", "Trio Flawless", "Flawless", "Solo", "Duo", "Trio", "Challenge Day One", "Contest Day One", "Day One", "Challenge", "Contest", "Week One"];
   function store(){
     return new Promise((resolve, reject) => {
       // Version 2: the "fresh" rule changed; 3: summaries keep the team (for
@@ -216,9 +217,24 @@
       const beaten = b => { const [n, f] = rank(b); return n >= 0 && [...set].some(o => { const [m, g] = rank(o); return o !== b && m >= 0 && m <= n && (g || !f); }); };
       // Timing badges: badges() adds at most one per card.
       const shown = set ? BADGE_ORDER.filter(b => set.has(b) && !beaten(b) && !(b === "Flawless" && SIZES.some(x => set.has(x + " Flawless")))) : [];
-      el.innerHTML = shown.map(b => '<span class="rr-badge' + (/flawless/i.test(b) ? " gold" : "") + '">' + b + "</span>").join("");
+      // Worded as each site does: raid.report "Flawless Trio", dungeon.report "Solo Flawless".
+      const word = b => el.dataset.kind === "raid" ? b.replace(/^(Solo|Duo|Trio) Flawless$/, "Flawless $1") : b;
+      el.innerHTML = shown.map(b => '<span class="rr-badge' + (/flawless/i.test(b) ? " gold" : "") + '">' + word(b) + "</span>").join("");
+    });
+    evenBars();
+  }
+  // Every badge bar in a grid as tall as its tallest (a second row of badges
+  // on one card would otherwise push its name below its neighbours'). Again on resize.
+  function evenBars(){
+    document.querySelectorAll(".activity-grid").forEach(g => {
+      const bars = [...g.querySelectorAll(".rr-badges")];
+      bars.forEach(b => { b.style.minHeight = ""; });
+      const h = Math.max(0, ...bars.map(b => b.getBoundingClientRect().height));
+      bars.forEach(b => { b.style.minHeight = h + "px"; });
     });
   }
+  let evenJob = 0;
+  addEventListener("resize", () => { cancelAnimationFrame(evenJob); evenJob = requestAnimationFrame(evenBars); });
   // Each dungeon's own solo flawless triumph (DestinyRecordDefinition). A
   // second source for Solo Flawless: some runs that earned it read as
   // started from a checkpoint in their carnage report (the owner's Grasp of
