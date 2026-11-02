@@ -1681,6 +1681,7 @@ await section("PvP", async () => {
   check("pvp: the banner has matches, K/D, win rate and flawless (tickets + passages)", /Crucible matches 1,000 K\/D 1\.13 Win rate 55\.0% Flawless 23/.test(await text(".rr-totals")), await text(".rr-totals"));
   const cards = await p.$$eval(".pv-card", cs => cs.map(c => c.innerText.replace(/\s+/g, " ")));
   check("pvp: a card per playlist, with K/D, matches, win rate, KDA, kills and time (past 100h in hours)", cards.length === 8 && /All Crucible 1\.13 K\/D Matches 1,000 Win rate 55\.0%.*Time played 335h/.test(cards[0]), cards[0]);
+  check("pvp: every playlist card has its own Bungie art, as the raid cards", await p.$$eval(".pv-card .art-thumb img", i => i.map(x => x.getAttribute("src"))).then(l => l.length === 8 && new Set(l).size === 8 && l[0] === "assets/art/crucible.jpg" && l.slice(1).every(u => /^https:\/\/www\.bungie\.net\/img\/destiny_content\/pgcr\/[a-z_]+\.jpg$/.test(u)) && /trials\.jpg$/.test(l[7])));
   check("pvp: playlists with no matches say so", /Quickplay No matches yet/.test(cards[2]), cards[2]);
   check("pvp: Rumble (free-for-all) says first place, not win rate", /Rumble.*First place 10\.0%/.test(cards[6]), cards[6]);
   check("pvp: Trials counters come from Bungie's metrics; a missing one shows a dash", /Flawless .*23 Wins 500/.test(await p.$$eval(".pv-tiles", t => t[1].innerText.replace(/\s+/g, " "))) && /Gold medals 321/.test(await text(".pv-tiles")) && /Undefeated matches –/.test(await text(".pv-tiles")), await text(".pv-tiles"));

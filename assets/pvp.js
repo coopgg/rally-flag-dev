@@ -31,17 +31,22 @@
   const fmtHours = s => { const t = Math.round(s / 60), h = Math.floor(t / 60), m = t % 60; return h >= 100 ? Math.round(s / 3600).toLocaleString() + "h" : h ? h + "h " + m + "m" : m + "m"; };
   const ICON = h => "/common/destiny2_content/icons/DestinyActivityModeDefinition_" + h + ".png";
 
-  // The playlists shown, in order: Bungie's stats key, mode number, name, icon.
+  // Art: the playlist activities' own pgcrImage (DestinyActivityDefinition,
+  // "<mode>: Matchmade"). All Crucible: the Crucible crest (owner's image,
+  // assets/art/crucible.jpg); Quickplay has none of its own, so the
+  // Meltdown map shot.
+  const ART = n => "/img/destiny_content/pgcr/" + n + ".jpg";
+  // The playlists shown, in order: Bungie's stats key, mode number, name, icon, art.
   const MODES = [
-    ["allPvP", 5, "All Crucible", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe")],
-    ["pvpCompetitive", 69, "Competitive", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe")],
-    ["pvpQuickplay", 70, "Quickplay", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe")],
-    ["control", 10, "Control", ICON("922ae83203f6134bae00937d12eab3a2")],
-    ["ironBanner", 19, "Iron Banner", ICON("fe57052d7cf971f7502daa75a2ca2437")],
-    ["clash", 12, "Clash", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe")],
-    ["rumble", 48, "Rumble", ICON("5b371fef4ecafe733ad487a8fae3b9f5")]
+    ["allPvP", 5, "All Crucible", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe"), "assets/art/crucible.jpg"],
+    ["pvpCompetitive", 69, "Competitive", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe"), ART("competitive")],
+    ["pvpQuickplay", 70, "Quickplay", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe"), ART("crucible_meltdown")],
+    ["control", 10, "Control", ICON("922ae83203f6134bae00937d12eab3a2"), ART("control")],
+    ["ironBanner", 19, "Iron Banner", ICON("fe57052d7cf971f7502daa75a2ca2437"), ART("iron_banner")],
+    ["clash", 12, "Clash", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe"), ART("clash")],
+    ["rumble", 48, "Rumble", ICON("5b371fef4ecafe733ad487a8fae3b9f5"), ART("rumble")]
   ];
-  const TRIALS_MODE = ["trials_of_osiris", 84, "Trials of Osiris", ICON("e35792b49b249ca5dcdb1e7657ca42b6")];
+  const TRIALS_MODE = ["trials_of_osiris", 84, "Trials of Osiris", ICON("e35792b49b249ca5dcdb1e7657ca42b6"), ART("trials")];
   // Bungie metric hashes (DestinyMetricDefinition).
   const M = {
     trialsWins: 1365664208, trialsWinsSeason: 2367472811, trialsDefeats: 2082314848,
@@ -117,9 +122,9 @@
   const pct = x => PCT.format(x / 100);
 
   // Rumble is free-for-all: a "win" there is first place.
-  function card(name, icon, s, winLabel = "Win rate"){
+  function card(name, icon, s, winLabel = "Win rate", art){
     const none = !s || !s.matches;
-    return '<li class="pv-card panel-card' + (none ? " none" : "") + '"><h3 class="pv-mode"><img src="' + esc(img(icon)) + '" alt="" width="28" height="28" loading="lazy">' + esc(name) + "</h3>" +
+    return '<li class="pv-card panel-card' + (none ? " none" : "") + '">' + (art ? '<div class="pv-art">' + window.rallyFlagArtThumb({ art, name }) + "</div>" : "") + '<h3 class="pv-mode"><img src="' + esc(img(icon)) + '" alt="" width="28" height="28" loading="lazy">' + esc(name) + "</h3>" +
       (none ? '<p class="pv-big">No matches yet</p>'
         : '<p class="pv-big"><b>' + ratio(s.kd) + "</b> K/D</p>" +
           '<dl class="pv-stats"><div><dt>Matches</dt><dd>' + num(s.matches) + "</dd></div><div><dt>" + winLabel + "</dt><dd>" + pct(s.rate) + "</dd></div><div><dt>KDA</dt><dd>" + ratio(s.kda) + "</dd></div>" +
@@ -149,7 +154,7 @@
           "<div><dt>Win rate</dt><dd>" + pct(all.rate) + "</dd></div><div><dt>Flawless</dt><dd>" + (flawless == null ? "–" : num(flawless)) + "</dd></div></dl>" +
         '<button type="button" class="rr-btn rr-copy" id="rr-copy">Copy link</button></section>' +
       '<h2 class="rr-h">Crucible</h2><p class="pv-sub">Every match on every character, deleted ones too.</p>' +
-      '<ul class="pv-grid">' + MODES.map(m => card(m[2], m[3], mode(r.stats, m[0]), m[1] === 48 ? "First place" : undefined)).join("") + "</ul>" +
+      '<ul class="pv-grid">' + MODES.map(m => card(m[2], m[3], mode(r.stats, m[0]), m[1] === 48 ? "First place" : undefined, m[4])).join("") + "</ul>" +
       '<h3 class="pv-h3">Crucible records</h3><dl class="pv-tiles">' +
         tile("Opponents defeated", metric(ms, M.crucibleDefeats)) + tile("Gold medals", metric(ms, M.goldMedals)) + tile("Undefeated matches", metric(ms, M.undefeated)) +
         tile("Annihilations", metric(ms, M.annihilation)) + tile("Longest Glory win streak", metric(ms, M.gloryStreak)) + tile("Iron Banner gold medals", metric(ms, M.ironGold)) +
@@ -158,7 +163,7 @@
       '<dl class="pv-tiles">' + tile("Flawless", flawless, "Flawless tickets and passages") + tile("Wins", metric(ms, M.trialsWins)) + tile("Opponents defeated", metric(ms, M.trialsDefeats)) +
         tile("Flawless title gildings", metric(ms, M.flawlessGildings)) + tile("Best flawless win streak", metric(ms, M.flawlessStreak), "From Episode 3") + "</dl>" +
       '<h3 class="pv-h3">This season</h3><dl class="pv-tiles">' + tile("Wins", metric(ms, M.trialsWinsSeason)) + tile("Best win streak", metric(ms, M.trialsStreakSeason)) + tile("Best shutout streak", metric(ms, M.trialsShutoutSeason)) + "</dl>" +
-      '<h3 class="pv-h3">Match stats</h3><ul class="pv-grid">' + card(TRIALS_MODE[2], TRIALS_MODE[3], trials) + "</ul>" +
+      '<h3 class="pv-h3">Match stats</h3><ul class="pv-grid">' + card(TRIALS_MODE[2], TRIALS_MODE[3], trials, undefined, TRIALS_MODE[4]) + "</ul>" +
       '<p class="rr-note">All numbers are Bungie\'s own. Bungie\'s Trials match stats (the card above) cover only part of most players\' history, so they can show far fewer wins than the Wins counter; ' +
         'trials.report and crucible.report keep the complete match history. Win rate is matches won out of matches played.</p>';
     const live = $("rr-live"); if (live) live.textContent = name + "'s Crucible and Trials stats are ready.";
