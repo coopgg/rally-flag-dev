@@ -671,7 +671,8 @@
       card.dataset.type = item.typeName || "";
       card.dataset.ammo = item.ammoTypeName || "";
       if (item.flavorText){
-        document.getElementById("flavor-" + weapon.slug).textContent = "\u201c" + item.flavorText + "\u201d";
+        // As the game shows it: Bungie's own words and quote marks, nothing added.
+        document.getElementById("flavor-" + weapon.slug).textContent = item.flavorText;
       }
       if (item.icon){
         let iconHtml = '<img src="' + item.icon + '" alt="' + item.name + '">';

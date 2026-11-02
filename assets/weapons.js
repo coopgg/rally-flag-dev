@@ -346,8 +346,8 @@
           '<div class="wl-title"><h2 id="wl-name" tabindex="-1">' + esc(weapon.name) + "</h2>" +
             '<p class="wl-meta">' + (el && el.i ? '<img src="' + esc(img(el.i)) + '" alt="" width="16" height="16">' : "") + esc([el && el.n, AMMO[d.a], (d.r === 6 ? "Exotic " : "Legendary ") + (d.y || "weapon")].filter(Boolean).join(" · ")) + "</p>" +
             (source ? '<p class="wl-source">' + esc(source) + "</p>" : "") + "</div></header>" +
-        // Some flavor text already has its own quote marks; don't double them.
-        (def.flavorText ? '<p class="wl-flavor">' + (/^\s*["“]/.test(def.flavorText) ? esc(def.flavorText) : "“" + esc(def.flavorText) + "”") + "</p>" : "") +
+        // Flavor text as the game shows it: Bungie's own words and quote marks, nothing added.
+        (def.flavorText ? '<p class="wl-flavor">' + esc(def.flavorText) + "</p>" : "") +
         versionsHtml + notes +
         '<div class="wl-body"><section class="wl-side" aria-labelledby="wl-h-stats"><h3 class="wl-h" id="wl-h-stats">Base stats</h3>' + statsHtml(def) +
           (frame ? '<h3 class="wl-h">Frame</h3>' + frame : "") + "</section>" +
