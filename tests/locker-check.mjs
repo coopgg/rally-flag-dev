@@ -1559,7 +1559,7 @@ await section("Report", async () => {
   await ctx.route(/\/User\/Search\/GlobalName\/0\//, r => r.fulfill(ok({ searchResults: [{ bungieGlobalDisplayName: "Testguard", bungieGlobalDisplayNameCode: 42, destinyMemberships: [{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }] }] })));
   await ctx.route(/SearchDestinyPlayerByBungieName/, r => { const b = JSON.parse(r.request().postData()); r.fulfill(ok(b.displayNameCode === 42 ? [{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }] : [])); });
   // Solo flawless triumphs: Prophecy's earned on a character (the run reports alone wouldn't show it).
-  await ctx.route(new RegExp("/Profile/" + P + "/\\?components=900$"), r => r.fulfill(ok({ profileRecords: { data: { records: {} } }, characterRecords: { data: { [C1]: { records: { 3191784400: { state: 67 }, 781401026: { state: 67 } } } } } })));
+  await ctx.route(new RegExp("/Profile/" + P + "/\\?components=900$"), r => r.fulfill(ok({ profileRecords: { data: { records: {} } }, characterRecords: { data: { [C1]: { records: { 3191784400: { state: 67 }, 781401026: { state: 67 }, 1287928420: { state: 67 }, 4184277958: { state: 6 } } } } } })));
   await ctx.route(new RegExp("/Profile/" + P + "/\\?components=100,200"), r => r.fulfill(ok({ profile: { data: { userInfo: { bungieGlobalDisplayName: "Testguard", bungieGlobalDisplayNameCode: 42 } } },
     characters: { data: { [C1]: { characterId: C1, classType: 0, light: 2010, dateLastPlayed: "2026-10-30T00:00:00Z" } } } })));
   await ctx.route(new RegExp("/Account/" + P + "/Stats/\\?groups=1"), r => r.fulfill(ok({ characters: [{ characterId: C1, deleted: false }, { characterId: C2, deleted: true }] })));
@@ -1586,7 +1586,9 @@ await section("Report", async () => {
     903: { startingPhaseIndex: 0, entries: [entry(P, 0), entry("2", 0), entry("3", 0), entry("4", 0), entry("5", 0), entry("6", 0)] }, 904: { startingPhaseIndex: 2, entries: [entry(P, 0)] },
     // From a checkpoint but at phase 0 (seen on a real Root of Nightmares run): not flawless.
     906: { activityWasStartedFromBeginning: false, startingPhaseIndex: 0, entries: [entry(P, 0), entry("2", 0)] },
-    907: { startingPhaseIndex: 0, entries: [entry(P, 1), entry("8", 1), entry("9", 0)] } };
+    907: { startingPhaseIndex: 0, entries: [entry(P, 1), entry("8", 1), entry("9", 0)] },
+    // Equilibrium with every feat on (dungeon.report's All Feats; its triumph above is unearned).
+    909: { activityWasStartedFromBeginning: true, selectedSkullHashes: [525411852, 251257575, 2392637702, 991354116, 2673088233, 790421403], entries: [entry(P, 1)] } };
   for (const id in PGCR) PGCR[id].period = { 901: "2021-05-23T20:00:00Z", 902: "2024-01-01T00:00:00Z", 903: "2024-02-01T00:00:00Z", 904: "2024-03-01T00:00:00Z", 906: "2024-05-01T00:00:00Z", 907: "2024-06-01T00:00:00Z" }[id];
   // Sherpas: teammates' own histories (one character each, "77" + their id). 2's first
   // Prophecy is 902 and 3's is 903 (both with this player); 4 and 9 cleared it earlier
@@ -1610,13 +1612,14 @@ await section("Report", async () => {
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
   const badgesOf = slug => p.$$eval('[data-badges="' + slug + '"] .rr-badge', b => b.map(x => x.textContent).join(", "));
   check("report: badges: a fresh solo flawless on day two is Flawless Solo (raid.report's wording) and Week One (VoG has no Contest badge)", await badgesOf("vault-of-glass") === "Flawless Solo, Week One", await badgesOf("vault-of-glass"));
-  check("report: badges: a Normal dungeon clear in its first 24h is Day One, not Contest", await badgesOf("equilibrium") === "Day One", await badgesOf("equilibrium"));
+  check("report: badges: a Normal dungeon clear in its first 24h is Day One, not Contest; every Equilibrium feat on is All Feats", await badgesOf("equilibrium") === "All Feats, Day One", await badgesOf("equilibrium"));
+  check("report: badges: Pantheon's all-feats triumph is All Feats", await badgesOf("pantheon") === "All Feats", await badgesOf("pantheon"));
   check("report: badges: an earned Contest triumph is Contest (one timing badge only)", await badgesOf("sundered-doctrine") === "Contest", await badgesOf("sundered-doctrine"));
   check("report: badges: a Contest version clear in its first 24h is Contest Day One", await badgesOf("vespers-host") === "Contest Day One", await badgesOf("vespers-host"));
   check("report: badges: a run that ends after 24h isn't Day One", await badgesOf("duality") === "Week One", await badgesOf("duality"));
   check("report: badges: a clear after the first weekly reset gets no timing badge", await badgesOf("the-desert-perpetual") === "", await badgesOf("the-desert-perpetual"));
   check("report: badges: an earned solo flawless triumph shows Solo Flawless (and covers Duo and Flawless)", await badgesOf("prophecy") === "Solo Flawless", await badgesOf("prophecy"));
-  check("report: badges: carnage reports only for runs that could count", pgcrCalls.sort().join() === "901,902,903,904,906", pgcrCalls.join());
+  check("report: badges: carnage reports only for runs that could count", pgcrCalls.sort().join() === "901,902,903,904,906,909", pgcrCalls.join());
   await p.click("#rr-sherpa-go");
   await p.waitForFunction(() => /sherpas? across/.test(document.getElementById("rr-sherpa").textContent), null, { timeout: 30000 }).catch(() => {});
   check("report: sherpas: a teammate's first clear with this player counts, earlier clears elsewhere don't", await p.textContent('[data-sherpas="prophecy"] dd') === "3" &&

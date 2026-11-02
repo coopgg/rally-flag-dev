@@ -157,7 +157,7 @@
   // since a finished run's report never changes.
   const STATS = "https://stats.bungie.net/Platform";
   // Flawless, then low-man, then timing: raid.report's order ("Flawless Trio", "Duo", "Challenge Day One").
-  const BADGE_ORDER = ["Solo Flawless", "Duo Flawless", "Trio Flawless", "Flawless", "Solo", "Duo", "Trio", "Challenge Day One", "Contest Day One", "Day One", "Challenge", "Contest", "Week One"];
+  const BADGE_ORDER = ["All Feats", "Feats", "Solo Flawless", "Duo Flawless", "Trio Flawless", "Flawless", "Solo", "Duo", "Trio", "Challenge Day One", "Contest Day One", "Day One", "Challenge", "Contest", "Week One"];
   function store(){
     return new Promise((resolve, reject) => {
       // Version 2: the "fresh" rule changed; 3: summaries keep the team (for
@@ -179,9 +179,9 @@
   async function cacheGet(id, st = "pgcr"){ const d = await db(); if (!d) return null; return new Promise(r => { try { const q = d.transaction(st).objectStore(st).get(id); q.onsuccess = () => r(q.result || null); q.onerror = () => r(null); } catch (e){ r(null); } }); }
   async function cachePut(id, v, st = "pgcr"){ const d = await db(); if (!d) return; try { d.transaction(st, "readwrite").objectStore(st).put(v, id); } catch (e){} }
   // A run, boiled down: { fresh, players, flawless, t (when), team: [[type, id, completed]] }.
-  async function runOf(id){
+  async function runOf(id, needSkulls){
     const hit = await cacheGet(id);
-    if (hit) return hit;
+    if (hit && (!needSkulls || hit.skulls)) return hit;
     const r = await api("/Destiny2/Stats/PostGameCarnageReport/" + id + "/", null, STATS), entries = r.entries || [];
     // Bungie's own flag when the report has it; the starting phase only for
     // old reports without it (a checkpoint run can still say phase 0).
@@ -192,7 +192,8 @@
       const u = (e.player && e.player.destinyUserInfo) || {}, done = ((e.values.completed || {}).basic || {}).value === 1;
       if (u.membershipId) team.set(u.membershipId, [u.membershipType, u.membershipId, (team.get(u.membershipId) || [0, 0, false])[2] || done]);
     }
-    const v = { fresh, players, flawless: fresh && entries.every(e => !((e.values.deaths || {}).basic || {}).value), t: Date.parse(r.period) || 0, team: [...team.values()] };
+    const v = { fresh, players, flawless: fresh && entries.every(e => !((e.values.deaths || {}).basic || {}).value), t: Date.parse(r.period) || 0, team: [...team.values()],
+      skulls: [...new Set(r.selectedSkullHashes || [])] };
     cachePut(id, v);
     return v;
   }
@@ -216,7 +217,7 @@
       const SIZES = ["Solo", "Duo", "Trio"], rank = b => [SIZES.indexOf(b.replace(" Flawless", "")), / Flawless$/.test(b)];
       const beaten = b => { const [n, f] = rank(b); return n >= 0 && [...set].some(o => { const [m, g] = rank(o); return o !== b && m >= 0 && m <= n && (g || !f); }); };
       // Timing badges: badges() adds at most one per card.
-      const shown = set ? BADGE_ORDER.filter(b => set.has(b) && !beaten(b) && !(b === "Flawless" && SIZES.some(x => set.has(x + " Flawless")))) : [];
+      const shown = set ? BADGE_ORDER.filter(b => set.has(b) && !beaten(b) && !(b === "Flawless" && SIZES.some(x => set.has(x + " Flawless"))) && !(b === "Feats" && set.has("All Feats"))) : [];
       // Worded as each site does: raid.report "Flawless Trio", dungeon.report "Solo Flawless".
       const word = b => el.dataset.kind === "raid" ? b.replace(/^(Solo|Duo|Trio) Flawless$/, "Flawless $1") : b;
       el.innerHTML = shown.map(b => '<span class="rr-badge' + (/flawless/i.test(b) ? " gold" : "") + '">' + word(b) + "</span>").join("");
@@ -245,6 +246,15 @@
     "vespers-host": 1553599507, "sundered-doctrine": 28261116, "equilibrium": 1204858125
   };
   // Returns earned(recordHash) for the timing badges' triumphs too.
+  // Feats, as raid.report (Pantheon) and dungeon.report (Equilibrium) give
+  // them, and nowhere else: the triumph (Total Revolution: every Pantheon
+  // feat → "All Feats"; Never De-Feated: three or more Equilibrium feats →
+  // "Feats"), or a clear whose carnage report has every listed feat
+  // (selectedSkullHashes) → "All Feats". Only the 2026 Pantheon's versions count.
+  const FEATS = {
+    "pantheon": { label: "All Feats", record: 1287928420, hashes: [747671496, 2530656885, 1516551982], skulls: [3123804375, 251257575, 2392637702, 991354116, 2673088233] },
+    "equilibrium": { label: "Feats", record: 4184277958, hashes: [2727361621, 1754635208], skulls: [525411852, 251257575, 2392637702, 991354116, 2673088233] }
+  };
   async function triumphBadges(type, id, add){
     const P = await api("/Destiny2/" + type + "/Profile/" + id + "/?components=900").catch(() => null);
     if (!P) return () => false;
@@ -253,6 +263,7 @@
     const done = r => !!r && ((r.objectives || []).length && r.objectives.every(o => o.complete) || (r.state & 1) || !(r.state & 4));
     const earned = h => [prof[h]].concat(chars.map(c => (c.records || {})[h])).some(done);
     for (const slug in SOLO_FLAWLESS_TRIUMPH) if (earned(SOLO_FLAWLESS_TRIUMPH[slug])) add(slug, "Solo Flawless");
+    for (const slug in FEATS) if (earned(FEATS[slug].record)) add(slug, FEATS[slug].label);
     return earned;
   }
   // The one timing badge: the first rule whose clear (that version's, or any
@@ -289,24 +300,26 @@
       if (!f[h] || end < f[h]) f[h] = end;
       // Dungeons are three-player activities, so only solo and duo count as low-man there.
       const most = m[1] === "dungeon" ? 2 : 3;
-      if (n("deaths") === 0 || n("playerCount") <= most) candidates.push({ id: d.instanceId, slug, most });
+      const lowman = n("deaths") === 0 || n("playerCount") <= most, feats = FEATS[slug] && FEATS[slug].hashes.includes(d.referenceId) ? FEATS[slug].skulls : null;
+      if (lowman || feats) candidates.push({ id: d.instanceId, slug, most, lowman, feats });
     }
     for (const slug in REL){ const b = timingBadge(REL[slug], firsts[slug] || {}, earned); if (b) add(slug, b); }
     showBadges(found);
     let done = 0;
-    progress("Checking " + candidates.length.toLocaleString() + " runs for solo, duo, trio and flawless clears… 0%");
+    progress("Checking " + candidates.length.toLocaleString() + " runs for solo, duo, trio, flawless and feats… 0%");
     await pool(candidates, 6, async c => {
       if (job !== loading) return;
       try {
-        const r = await runOf(c.id);
-        if (r.flawless) add(c.slug, "Flawless");
-        if (r.fresh && r.players >= 1 && r.players <= c.most){
+        const r = await runOf(c.id, !!c.feats);
+        if (c.feats && c.feats.every(h => r.skulls.includes(h))) add(c.slug, "All Feats");
+        if (c.lowman && r.flawless) add(c.slug, "Flawless");
+        if (c.lowman && r.fresh && r.players >= 1 && r.players <= c.most){
           const size = ["Solo", "Duo", "Trio"][r.players - 1];
           add(c.slug, size + (r.flawless ? " Flawless" : ""));
         }
       } catch (e){}
       done++;
-      if (done % 10 === 0 || done === candidates.length){ showBadges(found); progress("Checking " + candidates.length.toLocaleString() + " runs for solo, duo, trio and flawless clears… " + Math.round(done / candidates.length * 100) + "%"); }
+      if (done % 10 === 0 || done === candidates.length){ showBadges(found); progress("Checking " + candidates.length.toLocaleString() + " runs for solo, duo, trio, flawless and feats… " + Math.round(done / candidates.length * 100) + "%"); }
     });
     if (job !== loading) return;
     showBadges(found);
