@@ -32,15 +32,15 @@
   const ICON = h => "/common/destiny2_content/icons/DestinyActivityModeDefinition_" + h + ".png";
 
   // Art: the playlist activities' own pgcrImage (DestinyActivityDefinition,
-  // "<mode>: Matchmade"). All Crucible: the Crucible crest (owner's image,
-  // assets/art/crucible.jpg); Quickplay has none of its own, so the
-  // Meltdown map shot.
+  // "<mode>: Matchmade"). All Crucible and Quickplay (which has no art of
+  // its own; Bungie's other options are a map shot or a Destiny 1 photo)
+  // use the Crucible crest, the owner's image (assets/art/crucible.jpg).
   const ART = n => "/img/destiny_content/pgcr/" + n + ".jpg";
   // The playlists shown, in order: Bungie's stats key, mode number, name, icon, art.
   const MODES = [
     ["allPvP", 5, "All Crucible", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe"), "assets/art/crucible.jpg"],
     ["pvpCompetitive", 69, "Competitive", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe"), ART("competitive")],
-    ["pvpQuickplay", 70, "Quickplay", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe"), ART("crucible_meltdown")],
+    ["pvpQuickplay", 70, "Quickplay", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe"), "assets/art/crucible.jpg"],
     ["control", 10, "Control", ICON("922ae83203f6134bae00937d12eab3a2"), ART("control")],
     ["ironBanner", 19, "Iron Banner", ICON("fe57052d7cf971f7502daa75a2ca2437"), ART("iron_banner")],
     ["clash", 12, "Clash", ICON("fb3e9149c43f7a2e8f8b66cbea7845fe"), ART("clash")],
