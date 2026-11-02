@@ -110,8 +110,11 @@
     const matches = v("activitiesEntered"), won = v("activitiesWon");
     return { matches, won, rate: matches ? won / matches * 100 : 0, kd: v("killsDeathsRatio"), kda: v("killsDeathsAssists"), kills: v("kills"), deaths: v("deaths"), best: v("bestSingleGameKills"), spree: v("longestKillSpree"), seconds: v("secondsPlayed"), kdText: d("killsDeathsRatio") };
   }
-  const ratio = x => x.toFixed(2);
-  const pct = x => x.toFixed(1) + "%";
+  // In the reader's number format (1.26 / 1,26; 53.6% / 53,6 %).
+  const RATIO = new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const PCT = new Intl.NumberFormat(undefined, { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const ratio = x => RATIO.format(x);
+  const pct = x => PCT.format(x / 100);
 
   // Rumble is free-for-all: a "win" there is first place.
   function card(name, icon, s, winLabel = "Win rate"){
@@ -123,7 +126,8 @@
           "<div><dt>Kills</dt><dd>" + num(s.kills) + "</dd></div><div><dt>Best game</dt><dd>" + num(s.best) + " kills</dd></div><div><dt>Time played</dt><dd>" + fmtHours(s.seconds) + "</dd></div></dl>") + "</li>";
   }
   // A number tile; null shows a dash (Bungie has no count for this player).
-  const tile = (label, n, note) => '<div class="panel-card"><dt>' + esc(label) + "</dt><dd>" + (n == null ? "–" : num(n)) + (note ? '<span class="pv-note">' + esc(note) + "</span>" : "") + "</dd></div>";
+  // A note sits under the label, so every tile's number stays at the bottom, in line.
+  const tile = (label, n, note) => '<div class="panel-card"><dt>' + esc(label) + (note ? '<span class="pv-note">' + esc(note) + "</span>" : "") + "</dt><dd>" + (n == null ? "–" : num(n)) + "</dd></div>";
 
   function render(r, type, id){
     const ud = (r.profile.profile && r.profile.profile.data && r.profile.profile.data.userInfo) || {};
