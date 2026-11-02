@@ -1568,12 +1568,15 @@ await section("Report", async () => {
   // run on day two (Contest, Week One); Prophecy: a duo with a death, a full
   // fireteam flawless, a checkpoint solo (no badge) and a deathy six-player
   // run (not even fetched).
+  // Dungeons, timed as dungeon.report: Equilibrium (13 Dec 2025 17:00 UTC) 6h in is Day One only;
+  // Sundered Doctrine (7 Feb 2025 17:00 UTC) 30h in is Contest. Neither needs a carnage report.
+  const EQ = 2727361621, SD = 3834447244;
   const run = (id, hash, period, players, deaths) => ({ period, activityDetails: { referenceId: hash, directorActivityHash: hash, instanceId: id, mode: 4 },
     values: { completed: { basic: { value: 1 } }, completionReason: { basic: { value: 0 } }, playerCount: { basic: { value: players } }, deaths: { basic: { value: deaths } } } });
   // Plus an Epic Desert Perpetual clear four days after the Epic launch (27 Sept 2025): Week One from its own date.
   const HIST = { [C1 + ":4"]: [run("901", 3711931140, "2021-05-23T20:00:00Z", 1, 0), run("908", 3817322389, "2025-10-01T00:00:00Z", 6, 1)],
     [C2 + ":82"]: [run("902", 1077850348, "2024-01-01T00:00:00Z", 2, 1), run("903", 1077850348, "2024-02-01T00:00:00Z", 3, 0), run("904", 1077850348, "2024-03-01T00:00:00Z", 1, 0), run("905", 1077850348, "2024-04-01T00:00:00Z", 6, 4)],
-    [C1 + ":82"]: [run("906", 1077850348, "2024-05-01T00:00:00Z", 2, 0), run("907", 1077850348, "2024-06-01T00:00:00Z", 3, 2)] };
+    [C1 + ":82"]: [run("906", 1077850348, "2024-05-01T00:00:00Z", 2, 0), run("907", 1077850348, "2024-06-01T00:00:00Z", 3, 2), run("909", EQ, "2025-12-13T23:00:00Z", 6, 2), run("910", SD, "2025-02-08T23:00:00Z", 6, 2)] };
   const entry = (m, d) => ({ player: { destinyUserInfo: { membershipId: m, membershipType: 3 } }, values: { deaths: { basic: { value: d } }, completed: { basic: { value: 1 } } } });
   const PGCR = { 901: { activityWasStartedFromBeginning: true, entries: [entry(P, 0)] }, 902: { startingPhaseIndex: 0, entries: [entry(P, 1), entry("2", 0)] },
     903: { startingPhaseIndex: 0, entries: [entry(P, 0), entry("2", 0), entry("3", 0), entry("4", 0), entry("5", 0), entry("6", 0)] }, 904: { startingPhaseIndex: 2, entries: [entry(P, 0)] },
@@ -1603,6 +1606,8 @@ await section("Report", async () => {
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
   const badgesOf = slug => p.$$eval('[data-badges="' + slug + '"] .rr-badge', b => b.map(x => x.textContent).join(", "));
   check("report: badges: a fresh solo flawless on day two is Solo Flawless and Contest (Contest covers Week One)", await badgesOf("vault-of-glass") === "Solo Flawless, Contest", await badgesOf("vault-of-glass"));
+  check("report: badges: a dungeon clear in its first 24h is Day One (not also Contest)", await badgesOf("equilibrium") === "Day One", await badgesOf("equilibrium"));
+  check("report: badges: a dungeon clear 24-48h in is Contest", await badgesOf("sundered-doctrine") === "Contest", await badgesOf("sundered-doctrine"));
   check("report: badges: an Epic run counts Week One from the Epic launch", await badgesOf("the-desert-perpetual") === "Week One", await badgesOf("the-desert-perpetual"));
   check("report: badges: an earned solo flawless triumph shows Solo Flawless (and covers Duo and Flawless)", await badgesOf("prophecy") === "Solo Flawless", await badgesOf("prophecy"));
   check("report: badges: carnage reports only for runs that could count", pgcrCalls.sort().join() === "901,902,903,904,906", pgcrCalls.join());

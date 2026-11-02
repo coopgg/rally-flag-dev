@@ -215,7 +215,9 @@
       const beaten = b => { const [n, f] = rank(b); return n >= 0 && [...set].some(o => { const [m, g] = rank(o); return o !== b && m >= 0 && m <= n && (g || !f); }); };
       // Week One hides behind Contest or Day One (those clears were in week one too), as raid.report does.
       const shown = set ? BADGE_ORDER.filter(b => set.has(b) && !beaten(b) && !(b === "Flawless" && SIZES.some(x => set.has(x + " Flawless"))) &&
-        !(b === "Week One" && (set.has("Contest") || set.has("Day One")))) : [];
+        !(b === "Week One" && (set.has("Contest") || set.has("Day One"))) &&
+        // A Day One clear was in the contest window too; dungeon.report shows Day One only.
+        !(b === "Contest" && set.has("Day One"))) : [];
       el.innerHTML = shown.map(b => '<span class="rr-badge' + (/flawless/i.test(b) ? " gold" : "") + '">' + b + "</span>").join("");
     });
   }
