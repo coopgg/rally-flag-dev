@@ -128,7 +128,8 @@
           '<p class="rr-chars">' + chars.map(c => esc(CLASSES[c.classType] || "Guardian") + " " + c.light).join(" · ") + (r.deleted ? " · " + r.deleted + " deleted" : "") + "</p>" +
           // The full records live on raid.report and dungeon.report (same platform/id paths).
           '<p class="rr-links">Full record on <a href="https://raid.report/' + PLATFORM(type) + "/" + id + '" target="_blank" rel="noopener">raid.report<span class="sr-only"> (opens in a new tab)</span></a> · ' +
-          '<a href="https://dungeon.report/' + PLATFORM(type) + "/" + id + '" target="_blank" rel="noopener">dungeon.report<span class="sr-only"> (opens in a new tab)</span></a></p></div>' +
+          '<a href="https://dungeon.report/' + PLATFORM(type) + "/" + id + '" target="_blank" rel="noopener">dungeon.report<span class="sr-only"> (opens in a new tab)</span></a>' +
+          ' · <a href="seals.html?p=' + type + "-" + id + '">Their seals →</a></p></div>' +
         '<dl class="rr-totals"><div><dt>Raid clears</dt><dd>' + raids.clears.toLocaleString() + "</dd></div><div><dt>Dungeon clears</dt><dd>" + dungeons.clears.toLocaleString() + "</dd></div>" +
           "<div><dt>Time in both</dt><dd>" + fmtHours(raids.seconds + dungeons.seconds) + '</dd></div><div id="rr-sherpa-total" hidden><dt>Sherpas</dt><dd></dd></div></dl>' +
         '<button type="button" class="rr-btn rr-copy" id="rr-copy">Copy link</button></section>' +

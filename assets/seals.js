@@ -117,14 +117,15 @@
     }).join("") + "</ul>";
   }
   function draw(){
-    const { P, name, current, legacy } = VIEW;
+    const { P, name, p, current, legacy } = VIEW;
     const shown = list => list.filter(x => filter === "all" || (filter === "done" ? x.done : !x.done))
       .sort((a, b) => filter === "progress" ? b.p / (b.c || 1) - a.p / (a.c || 1) : 0);
     const cur = shown(current), leg = shown(legacy);
     const d = (P.profileRecords || {}).data || {};
     $("sl-out").innerHTML =
       '<section class="sl-player panel-card" aria-labelledby="sl-name"><div><h2 id="sl-name" tabindex="-1">' + esc(name) + "</h2>" +
-        '<p class="sl-sub">' + current.filter(x => x.done).length + " of " + current.length + " seals done" + (legacy.length ? " · " + legacy.filter(x => x.done).length + " of " + legacy.length + " legacy" : "") + "</p></div>" +
+        '<p class="sl-sub">' + current.filter(x => x.done).length + " of " + current.length + " seals done" + (legacy.length ? " · " + legacy.filter(x => x.done).length + " of " + legacy.length + " legacy" : "") + "</p>" +
+        '<p class="sl-sub"><a class="sl-link" href="report.html?p=' + esc(p) + '">Their raid &amp; dungeon report →</a></p></div>' +
         '<dl class="sl-totals"><div><dt>Triumph score</dt><dd>' + (d.activeScore || 0).toLocaleString() + "</dd></div><div><dt>Lifetime</dt><dd>" + (d.lifetimeScore || 0).toLocaleString() + "</dd></div></dl></section>" +
       '<div class="sl-filters" role="group" aria-label="Show">' + [["progress", "In progress"], ["done", "Done"], ["all", "All"]].map(([k, t]) => '<button type="button" class="sl-chip" data-filter="' + k + '" aria-pressed="' + (filter === k) + '">' + t + "</button>").join("") + "</div>" +
       '<h2 class="sl-h">Seals</h2>' + (cur.length ? '<ul class="sl-grid">' + cur.map(cardHtml).join("") + "</ul>" : '<p class="sl-none">None here.</p>') +
@@ -145,7 +146,7 @@
       const name = ud.bungieGlobalDisplayName ? ud.bungieGlobalDisplayName + "#" + String(ud.bungieGlobalDisplayNameCode || 0).padStart(4, "0") : ud.displayName || "Guardian";
       const root = ((P.profileRecords || {}).data || {}).recordSealsRootNodeHash;
       const list = hs => (hs || []).filter(h => DEFS.seals[h] && DEFS.seals[h].recs.length).map(h => sealOf(P, h)).filter(x => x.c > 0);
-      VIEW = { P, name, current: list(DEFS.kids[root]), legacy: list(DEFS.kids[DEFS.legacyTitles]) };
+      VIEW = { P, name, p, current: list(DEFS.kids[root]), legacy: list(DEFS.kids[DEFS.legacyTitles]) };
       open = null;
       document.title = name + " - Seals & Triumphs - Rally Flag";
       draw();

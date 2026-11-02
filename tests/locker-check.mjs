@@ -1450,9 +1450,12 @@ await section("Your clears", async () => {
   await p.context_.route(/\/Character\/(11|12)\/Stats\/AggregateActivityStats\//, r => { aggCalls++; const c = r.request().url().match(/Character\/(\d+)\//)[1];
     const v = (n, f, t) => ({ activityCompletions: { basic: { value: n } }, fastestCompletionMsForActivity: { basic: { value: f } }, activitySecondsPlayed: { basic: { value: t } } });
     r.fulfill(ok({ activities: c === "11" ? [{ activityHash: 3711931140, values: v(5, 2400000, 18000) }, { activityHash: 1681562271, values: v(2, 3000000, 9000) }] : [{ activityHash: 3711931140, values: v(3, 2100000, 12000) }] })); });
+  // Seal progress: Fatebreaker (Vault of Glass) 12 of 20.
+  await p.context_.route(/\/Profile\/\d+\/\?components=700$/, r => r.fulfill(ok({ profilePresentationNodes: { data: { nodes: { 3734352323: { progressValue: 12, completionValue: 20 } } } } })));
   await p.goto(BASE + "raid-vault-of-glass.html"); await p.waitForSelector(".your-clears .yc-n", { timeout: 20000 }).catch(() => {});
   const line = (await p.textContent(".your-clears")) || "";
   check("your clears: signed in, the guide shows your clears, fastest, time and versions", /Your clears:\s*10/.test(line) && /fastest 35:00/.test(line) && /10h 50m played/.test(line) && /Normal 8 · Master 2/.test(line), line);
+  check("your clears: the raid's seal shows with its progress, linking to Seals & Triumphs", /Fatebreaker\s*12 of 20 triumphs/.test(await p.textContent(".your-clears .yc-seal")) && await p.getAttribute(".your-clears .yc-seal", "href") === "seals.html?p=3-" + MEMBER);
   check("your clears: it links to your full report", await p.locator('.your-clears a[href="report.html?p=3-' + MEMBER + '"]').count() === 1);
   const before = aggCalls;
   await p.goto(BASE + "dungeon-prophecy.html"); await p.waitForSelector(".your-clears .yc-line");
@@ -1480,6 +1483,7 @@ await section("Seals", async () => {
   const first = p.locator(".sl-head").first(); const sealId = await first.getAttribute("data-seal");
   await first.click();
   check("seals: opening a seal lists its triumphs, focus stays on it", await p.locator(".sl-triumphs li").count() > 2 && await p.getAttribute('[data-seal="' + sealId + '"]', "aria-expanded") === "true" && await p.evaluate(id => document.activeElement.dataset.seal === id, sealId));
+  check("seals: links to the same player's raid & dungeon report", await p.locator('.sl-link[href="report.html?p=3-4611686018486090875"]').count() === 1);
   let v = await axe(p); check("seals: passes axe", !v.length, v.join(", "));
   await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
   check("seals (phone): no sideways scroll", await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -1605,6 +1609,7 @@ await section("Report", async () => {
   check("report: sherpas: a teammate's first clear with this player counts, earlier clears elsewhere don't", await p.textContent('[data-sherpas="prophecy"] dd') === "3" &&
     await p.isHidden('[data-sherpas="vault-of-glass"]') && await p.textContent("#rr-sherpa-total dd") === "3", await p.textContent("#rr-sherpa"));
   check("report: raids with no guide are listed as retired", /Crown of Sorrow 1 clear · fastest 1h 30m/.test(await p.textContent(".rr-retired")));
+  check("report: links to the same player's seals", await p.locator('.rr-links a[href="seals.html?p=3-4611686018400000999"]').count() === 1);
   check("report: links to the player's full record on raid.report and dungeon.report", await p.locator('.rr-links a[href="https://raid.report/pc/4611686018400000999"]').count() === 1 && await p.locator('.rr-links a[href="https://dungeon.report/pc/4611686018400000999"]').count() === 1);
   check("report: sherpas say they're Rally Flag's own count", /can differ slightly from raid\.report/.test(await p.textContent("#rr-sherpa")));
   check("report: the page says what Bungie's numbers count", /checkpoint/.test(await p.textContent(".rr-note")));
@@ -1666,6 +1671,14 @@ await section("God Rolls", async () => {
   const perk = g.locator("#perks-blast-furnace .perk").nth(2), tip = perk.locator(".perk-tip");
   await g.click("#weapon-blast-furnace .weapon-head"); await perk.hover(); await g.waitForTimeout(250);
   const op = () => tip.evaluate(t => +getComputedStyle(t).opacity);
+  // Tapping a perk opens Bungie's description and Clarity's notes (credited); tapping again closes it.
+  const plug = await perk.getAttribute("data-plug");
+  CLARITY_FIX.version += 10; CLARITY_FIX.perks[plug] = { hash: +plug, name: "Test", descriptions: { en: [{ linesContent: [{ text: "Stacks 3 times." }] }] } };
+  await perk.click(); await g.waitForSelector("#perkinfo-blast-furnace .clarity", { timeout: 30000 }).catch(() => {});
+  check("god rolls: tapping a perk shows its description and Clarity's notes, credited", await g.isVisible("#perkinfo-blast-furnace") && /Stacks 3 times/.test(await g.textContent("#perkinfo-blast-furnace")) &&
+    await g.locator('#perkinfo-blast-furnace a[href="https://d2clarity.com/discord"]').count() === 1 && await perk.getAttribute("aria-pressed") === "true");
+  await perk.click();
+  check("god rolls: tapping it again closes it", await g.isHidden("#perkinfo-blast-furnace") && await perk.getAttribute("aria-pressed") === "false");
   check("god rolls: a perk's name shows on hover", await op() === 1 && (await tip.textContent()).length > 2);
   await g.mouse.move(0, 0); await perk.focus(); await g.waitForTimeout(250);
   const hidden1 = await op(); await g.keyboard.press("Escape"); await g.waitForTimeout(250);

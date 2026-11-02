@@ -2,7 +2,10 @@
    "Your clears" on the raid and dungeon guide pages (raid-<slug>.html,
    dungeon-<slug>.html): signed in, a line under the guide's header with
    your clears of that activity, fastest, time played and clears per
-   version, linking to your full Raid & Dungeon Report (badges, sherpas).
+   version, linking to your full Raid & Dungeon Report (badges, sherpas),
+   and, when the activity has a seal of its own name (assets/raid-seals.js,
+   tools/build-raid-seals.js), your progress on it, linking to Seals &
+   Triumphs (presentation nodes, component 700, from the same profile).
 
    Signed out it does nothing and loads nothing. Signed in, a placeholder
    goes in at once (before the page is shown, so nothing moves), then it
@@ -12,7 +15,7 @@
    guides doesn't ask Bungie again.
    ============================================================ */
 (function(){
-  const AUTH_KEY = "rallyflag_bungie_auth", CACHE_KEY = "rallyflag_your_clears";
+  const AUTH_KEY = "rallyflag_bungie_auth", CACHE_KEY = "rallyflag_your_clears2"; // 2: with seal progress
   let signedIn = false;
   try { const a = JSON.parse(sessionStorage.getItem(AUTH_KEY) || "null"); signedIn = !!(a && a.access_token && a.access_expires_at > Date.now()); } catch (e){}
   const slug = window.GUIDE_SLUG, kind = /(^|\/)dungeon-/.test(location.pathname) ? "dungeon" : "raid";
@@ -55,7 +58,14 @@
       if (c) e.versions[hit[2]] = (e.versions[hit[2]] || 0) + c;
       if (c && f > 0 && (!e.fastest || f < e.fastest)) e.fastest = f;
     }
-    const out = { at: Date.now(), p: me.membershipType + "-" + me.membershipId, by };
+    // Seal progress for every guide's seal, in the same cached answer.
+    const seals = {}, RS = window.RaidSeals || {};
+    try {
+      const prof = await api("/Platform/Destiny2/" + me.membershipType + "/Profile/" + me.membershipId + "/?components=700");
+      const nodes = ((prof.profilePresentationNodes || {}).data || {}).nodes || {};
+      for (const k in RS){ const n = nodes[RS[k].node]; if (n && n.completionValue) seals[k] = [Math.min(n.progressValue || 0, n.completionValue), n.completionValue]; }
+    } catch (e){}
+    const out = { at: Date.now(), p: me.membershipType + "-" + me.membershipId, by, seals };
     try { sessionStorage.setItem(CACHE_KEY, JSON.stringify(out)); } catch (e){}
     return out;
   }
@@ -65,16 +75,20 @@
       if (!window.RallyFlagAPI) await load("assets/api-keys.js");
       if (!window.RallyFlagAuth) await load("assets/oauth.js");
       if (!window.RaidActivities) await load("assets/raid-activities.js");
-      const s = await stats(), e = s.by[slug];
+      if (!window.RaidSeals) await load("assets/raid-seals.js");
+      const s = await stats(), e = s.by[slug], seal = (window.RaidSeals || {})[slug], sp = seal && (s.seals || {})[slug];
       const report = '<a class="yc-link" href="report.html?p=' + esc(s.p) + '">Your full report, with badges →</a>';
+      // The activity's seal: "Kingslayer 18 of 21" or "Kingslayer ✓", to Seals & Triumphs.
+      const sealHtml = sp ? '<a class="yc-seal" href="seals.html?p=' + esc(s.p) + '">' + (seal.icon ? '<img src="https://www.bungie.net' + esc(seal.icon) + '" alt="" width="22" height="22">' : "") +
+        "<span><b>" + esc(seal.title) + "</b> " + (sp[0] >= sp[1] ? "seal done" : sp[0] + " of " + sp[1] + " triumphs") + "</span></a>" : "";
       if (!e || !e.clears){
-        box.innerHTML = '<p class="yc-line"><b>Your clears:</b> none yet' + (e && e.seconds ? " (" + fmtHours(e.seconds) + " played)" : "") + ". " + report + "</p>";
+        box.innerHTML = '<p class="yc-line"><b>Your clears:</b> none yet' + (e && e.seconds ? " (" + fmtHours(e.seconds) + " played)" : "") + ". " + report + "</p>" + sealHtml;
         return;
       }
       const versions = Object.entries(e.versions).sort((a, b) => (b[0] === "Normal") - (a[0] === "Normal") || b[1] - a[1]).map(([k, n]) => esc(k) + " " + n.toLocaleString()).join(" · ");
       box.innerHTML = '<p class="yc-line"><b>Your clears:</b> <span class="yc-n">' + e.clears.toLocaleString() + "</span>" +
         '<span class="yc-dot">·</span>fastest ' + (e.fastest ? fmtTime(e.fastest) : "–") + '<span class="yc-dot">·</span>' + fmtHours(e.seconds) + " played" +
-        (Object.keys(e.versions).length > 1 ? '<span class="yc-dot">·</span>' + versions : "") + "</p>" + report;
+        (Object.keys(e.versions).length > 1 ? '<span class="yc-dot">·</span>' + versions : "") + "</p>" + sealHtml + report;
     } catch (err){
       box.innerHTML = '<p class="yc-line">Your clears didn\'t load (' + esc(err.message) + ").</p>";
     }

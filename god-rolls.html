@@ -182,6 +182,30 @@
   .perk:first-child:hover .perk-tip, .perk:first-child:focus .perk-tip,
   .perk:last-child:hover .perk-tip, .perk:last-child:focus .perk-tip{ transform:none; }
   .perk-grid.tips-off .perk-tip{ opacity:0; }
+  .perk[aria-pressed="true"]{ border-color:var(--accent-text); box-shadow:0 0 0 2px var(--accent-dim); }
+  .perk-hint{ margin:8px 0 0; font-size:12.5px; color:var(--text-dim); }
+  /* A tapped perk: Bungie's description, then Clarity's (framed as theirs). */
+  .perk-info{ margin-top:10px; padding:10px 12px; border:1px solid var(--panel-border); border-radius:8px; background:var(--bg); font-size:13.5px; color:var(--text-dim); }
+  .perk-info[hidden]{ display:none; }
+  .perk-info > b{ color:var(--text); }
+  .perk-info > p{ margin:4px 0 0; color:var(--text); line-height:1.5; }
+  .perk-info-type{ color:var(--text-dim); }
+  .perk-info .perk-info-credit{ margin-top:10px; font-size:12.5px; color:var(--text-dim); }
+  .perk-info-credit a{ color:var(--accent-text); }
+  .perk-cl-toggle{ min-height:28px; margin-right:6px; padding:2px 10px; border-radius:999px; border:1px solid var(--edge); background:transparent; color:var(--text-dim); font:inherit; font-size:12.5px; cursor:pointer; }
+  .perk-cl-toggle[aria-pressed="true"]{ color:var(--accent-text); border-color:var(--accent-text); }
+  .cl-wait{ font-size:12.5px; color:var(--text-dim); }
+  .clarity{ margin-top:10px; padding:9px 11px; border-radius:8px; border:1px dashed var(--panel-border); background:var(--panel); color:var(--text); font-size:13.5px; line-height:1.45; }
+  .cl-head{ display:flex; justify-content:space-between; gap:10px; margin-bottom:6px; font-size:12px; font-weight:600; color:var(--text-dim); }
+  .cl-head a, .cl-line a{ color:var(--accent-text); }
+  .cl-line{ margin:0; }
+  .cl-bold{ font-weight:600; }
+  .cl-gap{ height:7px; }
+  .cl-ico{ display:inline-block; width:0.7em; height:0.7em; margin:0 3px 0 1px; border-radius:50%; background:var(--text-dim); vertical-align:0.02em; }
+  .cl-solar{ background:#f0631e; } .cl-arc{ background:#7aecf3; } .cl-void{ background:#b185df; } .cl-stasis{ background:#4d88ff; } .cl-strand{ background:#35e366; } .cl-kinetic{ background:#c8c8c8; }
+  .cl-primary{ border-radius:2px; background:#e6e6e6; } .cl-special{ border-radius:2px; background:#7af48b; } .cl-heavy{ border-radius:2px; background:#b286ff; }
+  .cl-barrier, .cl-overload, .cl-unstoppable, .cl-hunter, .cl-titan, .cl-warlock{ border-radius:2px; transform:rotate(45deg); background:#d9a441; }
+  .cl-enhancedArrow{ width:0; height:0; border-radius:0; background:none; border:0.38em solid transparent; border-bottom:0.62em solid #e6b84c; border-top:0; vertical-align:0.05em; }
 
   .weapon-note{ margin-top:14px; font-size:15px; max-width:62ch; color:var(--text-dim); line-height:1.55; }
 
@@ -421,6 +445,7 @@
 
     return {
       name: def.displayProperties?.name || ("Unknown (" + hash + ")"),
+      description: def.displayProperties?.description || "",
       icon: def.displayProperties?.icon ? BUNGIE_ROOT + def.displayProperties.icon : null,
       watermark: def.iconWatermark ? BUNGIE_ROOT + def.iconWatermark : null,
       typeName: def.itemTypeDisplayName || "",
@@ -584,6 +609,77 @@
   // Another tab (the Locker) changed the wish list.
   window.addEventListener("storage", e => { if (e.key === WISH_KEY) window.GodRollsData.WEAPONS.forEach(renderActions); });
 
+  // ---------------------------------------------------------------
+  // Perk details: tapping a perk shows Bungie's description and, when
+  // on, Clarity's community numbers (same worker job, IndexedDB copy and
+  // on/off setting as the Locker and Weapon Lookup; their rules in
+  // HANDOFF item 65: credited with links next to the text, clearly not
+  // ours, a way to report mistakes, their latest text unedited).
+  // ---------------------------------------------------------------
+  const PERKS = {};
+  const CL_TAB = ' target="_blank" rel="noopener"', CL_NEW = '<span class="sr-only"> (opens in a new tab)</span>';
+  const CLARITY_KEY = "rallyflag_locker_clarity";
+  const CLARITY = { on: (() => { try { return localStorage.getItem(CLARITY_KEY) !== "off"; } catch (e){ return true; } })(), data: null, job: null, err: "" };
+  const escHtml = s => String(s == null ? "" : s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  function loadClarity(){
+    if (CLARITY.data || !CLARITY.on) return Promise.resolve(CLARITY.data);
+    if (!CLARITY.job) CLARITY.job = new Promise(resolve => {
+      const w = new Worker("assets/locker-worker.js");
+      const end = (data, err) => { w.terminate(); CLARITY.data = data; CLARITY.err = err || ""; CLARITY.job = null; resolve(data); };
+      w.onmessage = e => e.data.type === "done" ? end(e.data.db) : e.data.type === "error" ? end(null, e.data.message) : 0;
+      w.onerror = e => end(null, e.message || "worker failed");
+      w.postMessage({ kind: "clarity" });
+    });
+    return CLARITY.job;
+  }
+  const CLARITY_ICON = { solar: "Solar", arc: "Arc", void: "Void", stasis: "Stasis", strand: "Strand", kinetic: "Kinetic", primary: "Primary ammo", special: "Special ammo", heavy: "Heavy ammo",
+    barrier: "Barrier", overload: "Overload", unstoppable: "Unstoppable", hunter: "Hunter", titan: "Titan", warlock: "Warlock", enhancedArrow: "Enhanced" };
+  function clarityText(blocks){
+    const piece = x => {
+      const cls = x.classNames || [];
+      if (!x.text){ const k = cls.find(c => CLARITY_ICON[c]); return k ? '<span class="cl-ico cl-' + k + '" role="img" aria-label="' + CLARITY_ICON[k] + '"></span>' : ""; }
+      let t = escHtml(x.text);
+      if (x.link && /^https:\/\//.test(x.link)) t = '<a href="' + escHtml(x.link) + '"' + CL_TAB + ">" + t + CL_NEW + "</a>";
+      return cls.includes("bold") ? "<b>" + t + "</b>" : t;
+    };
+    return blocks.map(b => (b.classNames || []).includes("spacer") && !b.linesContent ? '<div class="cl-gap"></div>'
+      : '<p class="cl-line' + ((b.classNames || []).includes("bold") ? " cl-bold" : "") + '">' + (b.linesContent || []).map(piece).join("") + "</p>").join("");
+  }
+  function clarityHtml(h){
+    if (!CLARITY.on) return "";
+    if (!CLARITY.data) return CLARITY.err ? '<p class="cl-wait">Clarity\'s notes didn\'t load (' + escHtml(CLARITY.err) + ").</p>" : '<p class="cl-wait">Loading Clarity\'s notes\u2026</p>';
+    const blocks = CLARITY.data.perks[h];
+    if (!blocks) return "";
+    return '<div class="clarity" lang="en"><div class="cl-head"><span>Community Insights by <a href="https://d2clarity.com"' + CL_TAB + ">Clarity" + CL_NEW + '</a><span class="sr-only">, not Rally Flag</span></span>' +
+      '<a href="https://d2clarity.com/discord"' + CL_TAB + ' title="Tell Clarity about a mistake in this description">Report<span class="sr-only"> a mistake to Clarity on Discord</span>' + CL_NEW + "</a></div>" + clarityText(blocks) + "</div>";
+  }
+  function showPerk(box, h){
+    const p = PERKS[h] || {};
+    box.hidden = false; box.dataset.h = h;
+    box.innerHTML = "<b>" + escHtml(p.name || "Perk") + "</b>" + (p.typeName ? ' <span class="perk-info-type">' + escHtml(p.typeName) + "</span>" : "") +
+      "<p>" + escHtml(p.description || "Bungie gives no description for this one.") + "</p>" + clarityHtml(h) +
+      '<p class="perk-info-credit"><button type="button" class="perk-cl-toggle" aria-pressed="' + CLARITY.on + '">Clarity notes ' + (CLARITY.on ? "on" : "off") + "</button>" +
+      ' Numbers from <a href="https://d2clarity.com"' + CL_TAB + ">Clarity" + CL_NEW + '</a>, a community project (not Rally Flag). <a href="https://url.d2clarity.com/ko-fi"' + CL_TAB + ">Support them" + CL_NEW + "</a>.</p>";
+    if (CLARITY.on && !CLARITY.data) loadClarity().then(() => { if (box.dataset.h === String(h) && !box.hidden) showPerk(box, h); });
+  }
+  // Tap a perk to open its details; tap it again to close.
+  document.addEventListener("click", e => {
+    const tog = e.target.closest(".perk-cl-toggle");
+    if (tog){
+      CLARITY.on = !CLARITY.on;
+      try { CLARITY.on ? localStorage.removeItem(CLARITY_KEY) : localStorage.setItem(CLARITY_KEY, "off"); } catch (err){}
+      const box = tog.closest(".perk-info"); showPerk(box, box.dataset.h); box.querySelector(".perk-cl-toggle").focus();
+      return;
+    }
+    const b = e.target.closest(".perk[data-plug]");
+    if (!b) return;
+    const box = document.getElementById(b.getAttribute("aria-controls")), open = b.getAttribute("aria-pressed") === "true";
+    b.closest(".perk-grid").querySelectorAll(".perk[aria-pressed=\"true\"]").forEach(x => x.setAttribute("aria-pressed", "false"));
+    if (open){ box.hidden = true; box.innerHTML = ""; delete box.dataset.h; return; }
+    b.setAttribute("aria-pressed", "true");
+    showPerk(box, b.dataset.plug);
+  });
+
   function renderShell(weapon){
     const card = document.createElement("div");
     card.className = "weapon-card panel-card";
@@ -605,6 +701,8 @@
         '<div class="perk-section">' +
           '<div class="perk-section-label">Recommended Perks</div>' +
           '<div class="perk-grid" id="perks-' + weapon.slug + '"><span class="load-error">Loading\u2026</span></div>' +
+          '<p class="perk-hint">Tap a perk to read what it does.</p>' +
+          '<div class="perk-info" id="perkinfo-' + weapon.slug + '" role="status" hidden></div>' +
         '</div>' +
         (weapon.altRoll ? '<button class="alt-roll-btn" id="alt-btn-' + weapon.slug + '" type="button">Show alternate roll</button>' : '') +
         (weapon.note ? '<div class="weapon-note">' + weapon.note + '</div>' : '') +
@@ -717,7 +815,8 @@
     const chipsHtml = results.map((r, i) => {
       if (r.status === "fulfilled"){
         const p = r.value;
-        return '<button type="button" class="perk">' + (p.icon ? '<img src="' + p.icon + '" alt="" width="40" height="40">' : '?') +
+        PERKS[roll.perkHashes[i]] = p;
+        return '<button type="button" class="perk" data-plug="' + roll.perkHashes[i] + '" aria-pressed="false" aria-controls="perkinfo-' + weapon.slug + '">' + (p.icon ? '<img src="' + p.icon + '" alt="" width="40" height="40">' : '?') +
           '<span class="perk-tip">' + p.name + '</span></button>';
       }
       console.warn("Perk fetch failed for " + weapon.name + " (hash " + roll.perkHashes[i] + "):", r.reason.message);
