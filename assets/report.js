@@ -104,7 +104,7 @@
 
   // ---------------- drawing ----------------
   const fmtTime = ms => { const s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60; return h ? h + "h " + String(m).padStart(2, "0") + "m" : m + ":" + String(sec).padStart(2, "0"); };
-  const fmtHours = s => { const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h ? h.toLocaleString() + "h " + m + "m" : m + "m"; };
+  const fmtHours = s => { const t = Math.round(s / 60), h = Math.floor(t / 60), m = t % 60; return h ? h.toLocaleString() + "h " + m + "m" : m + "m"; }; // round once, so never "60m"
   // Normal first, then the rest by how many clears.
   const versionsText = v => Object.entries(v).sort((a, b) => (b[0] === "Normal") - (a[0] === "Normal") || b[1] - a[1]).map(([k, n]) => esc(k) + " " + n.toLocaleString()).join(" · ");
   // A card is a div whose "View guide" link stretches over it, so the
@@ -141,7 +141,7 @@
           // The full records live on raid.report and dungeon.report (same platform/id paths).
           '<p class="rr-links">Full record on <a href="https://raid.report/' + PLATFORM(type) + "/" + id + '" target="_blank" rel="noopener">raid.report<span class="sr-only"> (opens in a new tab)</span></a> · ' +
           '<a href="https://dungeon.report/' + PLATFORM(type) + "/" + id + '" target="_blank" rel="noopener">dungeon.report<span class="sr-only"> (opens in a new tab)</span></a>' +
-          ' · <a href="seals.html?p=' + type + "-" + id + '">Their seals\u00a0→</a></p></div>' +
+          ' · <a href="seals.html?p=' + type + "-" + id + '">Their seals\u00a0→</a> · <a href="pvp.html?p=' + type + "-" + id + '">Their PvP\u00a0→</a></p></div>' +
         '<dl class="rr-totals"><div><dt>Raid clears</dt><dd>' + raids.clears.toLocaleString() + "</dd></div><div><dt>Dungeon clears</dt><dd>" + dungeons.clears.toLocaleString() + "</dd></div>" +
           "<div><dt>Time in both</dt><dd>" + fmtHours(raids.seconds + dungeons.seconds) + '</dd></div><div id="rr-sherpa-total" hidden><dt>Sherpas</dt><dd></dd></div></dl>' +
         '<button type="button" class="rr-btn rr-copy" id="rr-copy">Copy link</button></section>' +

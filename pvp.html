@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.ico">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>/* Boot script: theme, light/dark mode, load guard. Generated from tools/boot-script.js; edit there and run node tools/sync-boot-script.js. */
+(function(){
+  var d = document.documentElement;
+  // Valid saved themes; a first visit gets a random subclass (not Cosmic).
+  var SUBCLASS_THEMES = ["solar", "void", "arc", "stasis", "strand", "prismatic"];
+  var THEMES = SUBCLASS_THEMES.concat(["cosmic", "aurora", "eclipse"]);
+  var theme = null, modePref = null, legacyMode = null;
+  try {
+    theme = localStorage.getItem("rallyflag_theme");
+    if (THEMES.indexOf(theme) < 0){
+      theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+      localStorage.setItem("rallyflag_theme", theme);
+    }
+    modePref = localStorage.getItem("rallyflag_mode_pref");
+    legacyMode = localStorage.getItem("rallyflag_mode");
+  } catch (e) {}
+  if (THEMES.indexOf(theme) < 0) theme = SUBCLASS_THEMES[Math.floor(Math.random() * SUBCLASS_THEMES.length)];
+  if (modePref !== "light" && modePref !== "dark"){
+    modePref = legacyMode === "light" ? "light"
+      : (window.matchMedia && matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  }
+  d.setAttribute("data-theme", theme);
+  d.setAttribute("data-mode", modePref);
+
+  d.classList.add("rf-boot");
+  var reveal = function(){ d.classList.remove("rf-boot"); };
+  document.addEventListener("DOMContentLoaded", function(){
+    Promise.race([
+      document.fonts ? document.fonts.ready : 0,
+      new Promise(function(r){ setTimeout(r, 400); })
+    ]).then(function(){ requestAnimationFrame(reveal); });
+  });
+  setTimeout(reveal, 2500);
+})();
+</script>
+<title>Crucible &amp; Trials - Rally Flag</title>
+<meta name="description" content="Any Destiny 2 player's Crucible and Trials of Osiris stats: K/D, win rate and flawless runs, per playlist.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Rally Flag">
+<meta property="og:title" content="Crucible &amp; Trials">
+<meta property="og:description" content="Any Destiny 2 player's Crucible and Trials of Osiris stats: K/D, win rate and flawless runs, per playlist.">
+<meta property="og:url" content="https://rallyflag.gg/pvp.html">
+<link rel="canonical" href="https://rallyflag.gg/pvp.html">
+<meta property="og:image" content="https://rallyflag.gg/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Rally Flag: Destiny 2 raid and dungeon guides, weapon god rolls, builds and live trackers">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Crucible &amp; Trials">
+<meta name="twitter:description" content="Any Destiny 2 player's Crucible and Trials of Osiris stats: K/D, win rate and flawless runs, per playlist.">
+<meta name="twitter:image" content="https://rallyflag.gg/assets/og-image.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://www.bungie.net">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/theme.css">
+<style>
+  /* Crucible & Trials (PvP section). Script: assets/pvp.js. Search, banner
+     and chips are the Raid & Dungeon Report's (same rr- classes). */
+  .rr-wrap{ max-width:1000px; margin:28px auto 0; padding:0 24px 90px; min-height:60vh; }
+  .rr-form{ display:flex; gap:10px; }
+  .rr-form input{ flex:1; min-width:0; background:var(--panel); border:1px solid var(--panel-border); color:var(--text); font-family:var(--font-sans); font-size:15px; padding:13px 16px; border-radius:10px; outline:none; transition:border-color 0.2s ease; }
+  .rr-form input:focus{ border-color:var(--accent); }
+  .rr-form input:focus-visible{ outline:2px solid var(--accent-text); outline-offset:1px; }
+  .rr-form input::placeholder{ color:var(--text-dimmer); }
+  .rr-btn{ display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:6px 18px; border-radius:10px; border:1px solid var(--accent-fill); background:var(--accent-fill); color:var(--on-accent); font:inherit; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
+  .rr-btn.ghost{ background:transparent; color:var(--accent-text); border-color:var(--edge); }
+  .rr-btn[hidden]{ display:none; }
+  .rr-suggest, .rr-recent{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; list-style:none; margin:10px 0 0; padding:0; }
+  .rr-suggest[hidden]{ display:none; }
+  .rr-recent-label{ font-size:13px; color:var(--text-dim); margin-right:2px; }
+  .rr-chip{ min-height:32px; padding:4px 12px; border-radius:999px; border:1px solid var(--edge); background:transparent; color:var(--text-dim); font:inherit; font-size:13px; font-weight:500; cursor:pointer; }
+  .rr-chip:hover, .rr-chip:focus-visible{ color:var(--text); border-color:var(--accent); }
+  .rr-clear{ min-height:32px; padding:4px 8px; border:0; background:transparent; color:var(--accent-text); font:inherit; font-size:13px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+  .rr-clear:hover, .rr-clear:focus-visible{ color:var(--text); }
+  .rr-status{ margin:22px 0 0; padding:12px 16px; border:1px solid var(--panel-border); border-radius:10px; background:var(--panel); color:var(--text-dim); font-size:14px; }
+  .rr-status.error{ border-color:var(--accent-text); color:var(--text); }
+
+  /* The player: their emblem as the banner. */
+  .rr-player{ position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:14px 28px; margin-top:24px; padding:22px; overflow:clip; isolation:isolate; }
+  /* The emblem as the banner's left edge: its icon square (left 96px) shown
+     whole and sharp next to the name, the rest fading out. */
+  .rr-emblem{ position:absolute; top:0; left:0; z-index:-1; width:474px; max-width:100%; height:96px; object-fit:cover; object-position:left center; opacity:0.5;
+    -webkit-mask-image:linear-gradient(90deg, #000 20%, transparent 60%); mask-image:linear-gradient(90deg, #000 20%, transparent 60%); }
+  .rr-player:has(.rr-emblem) .rr-who{ padding-left:96px; min-height:52px; }
+  @media (max-width:640px){ .rr-player:has(.rr-emblem) .rr-who{ padding-left:84px; } .rr-emblem{ height:84px; width:415px; } }
+  .rr-who{ min-width:0; flex:1 1 220px; }
+  .rr-who h2{ margin:0; font-family:'Oswald', sans-serif; font-weight:600; font-size:28px; line-height:1.15; color:var(--text); overflow-wrap:anywhere; }
+  .rr-links{ margin:4px 0 0; font-size:13px; color:var(--text-dim); }
+  .rr-links a{ color:var(--accent-text); white-space:nowrap; }
+  .rr-chars{ margin:4px 0 0; font-size:13.5px; color:var(--text-dim); }
+  .rr-totals{ display:flex; flex-wrap:wrap; gap:10px 28px; margin:0; }
+  .rr-totals dt, .rr-meta dt{ font-size:13px; color:var(--text-dim); }
+  .rr-totals dd{ margin:2px 0 0; font-family:'Oswald', sans-serif; font-weight:600; font-size:24px; color:var(--text); font-variant-numeric:tabular-nums; }
+  .rr-copy{ min-height:36px; font-size:13px; padding:4px 14px; background:transparent; color:var(--accent-text); border-color:var(--edge); }
+
+  .rr-h{ margin:36px 0 6px; font-family:'Oswald', sans-serif; font-weight:600; font-size:20px; letter-spacing:0.04em; text-transform:uppercase; color:var(--text); }
+  .pv-sub{ margin:0 0 14px; max-width:75ch; font-size:14px; color:var(--text-dim); }
+  /* One card per playlist: its icon and name, K/D large, then the rest. */
+  .pv-grid{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); grid-auto-rows:1fr; gap:16px; list-style:none; margin:0; padding:0; }
+  @media (max-width:900px){ .pv-grid{ grid-template-columns:repeat(2, minmax(0, 1fr)); } }
+  .pv-card{ display:flex; flex-direction:column; padding:18px 20px 16px; }
+  .pv-mode{ display:flex; align-items:center; gap:10px; margin:0 0 10px; font-family:'Oswald', sans-serif; font-weight:600; font-size:18px; color:var(--text); }
+  .pv-mode img{ width:28px; height:28px; flex:none; border-radius:6px; background:#1a1f2b; padding:3px; }
+  .pv-big{ margin:0; font-size:14px; color:var(--text-dim); }
+  .pv-big b{ font-family:'Oswald', sans-serif; font-weight:600; font-size:30px; line-height:1; color:var(--accent-text); font-variant-numeric:tabular-nums; margin-right:4px; }
+  .pv-card.none .pv-big b{ color:var(--text-dim); }
+  .pv-stats{ display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px 12px; margin:12px 0 0; }
+  .pv-stats dt, .pv-tiles dt{ font-size:13px; color:var(--text-dim); }
+  .pv-stats dd{ margin:1px 0 0; font-size:14px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; }
+  /* Records and Trials: number tiles. */
+  .pv-tiles{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:12px; margin:0; }
+  .pv-tiles > div{ padding:14px 16px; }
+  .pv-tiles dd{ margin:4px 0 0; font-family:'Oswald', sans-serif; font-weight:600; font-size:26px; line-height:1.1; color:var(--text); font-variant-numeric:tabular-nums; }
+  .pv-tiles .pv-note{ display:block; margin-top:3px; font-family:var(--font-sans); font-size:13px; font-weight:400; color:var(--text-dim); }
+  .pv-h3{ margin:22px 0 10px; font-size:15px; font-weight:600; color:var(--text); }
+  .rr-note{ margin:30px 0 0; max-width:75ch; font-size:13px; color:var(--text-dim); }
+  @media (max-width:640px){
+    .rr-wrap{ padding:0 16px 70px; }
+    .rr-form{ flex-wrap:wrap; }
+    .rr-form input{ flex:1 0 100%; }
+    .rr-btn{ flex:1; }
+    .pv-grid{ grid-template-columns:minmax(0, 1fr); gap:12px; }
+    .pv-tiles{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
+  }
+</style>
+</head>
+<body data-nav-group="pvp">
+
+<div id="site-nav"></div>
+
+<main id="main-content" tabindex="-1">
+
+<div class="hero">
+  <div class="eyebrow">Destiny 2 · PvP</div>
+  <h1 class="title">Crucible &amp; Trials</h1>
+  <p class="subtitle">K/D, win rate and flawless runs in the Crucible and Trials of Osiris, for you or any player.</p>
+</div>
+
+<div class="rr-wrap">
+  <form class="rr-form" id="rr-form" role="search">
+    <input type="search" id="rr-q" name="player" aria-label="Bungie name, like Guardian#1234" placeholder="Bungie name, like Guardian#1234" autocomplete="off" spellcheck="false">
+    <button type="submit" class="rr-btn">Look up</button>
+    <button type="button" class="rr-btn ghost" id="rr-mine" hidden>Show mine</button>
+  </form>
+  <ul class="rr-suggest" id="rr-suggest" aria-label="Matching players" hidden></ul>
+  <div class="rr-recent" id="rr-recent"></div>
+  <div id="rr-out"></div>
+  <p class="sr-only" id="rr-live" aria-live="polite"></p>
+</div>
+
+</main>
+
+<footer>
+  <div>Unofficial fan project. Not affiliated with or endorsed by Bungie.</div>
+</footer>
+
+<script src="assets/nav.js"></script>
+<script src="assets/api-keys.js"></script>
+<script src="assets/oauth.js"></script>
+<script src="assets/pvp.js"></script>
+</body>
+</html>

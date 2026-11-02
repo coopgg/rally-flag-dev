@@ -66,6 +66,13 @@
         { label: "Codes", href: "codes.html", group: "codes" },
         { label: "Tools", href: "tools.html", group: "tools" }
       ]
+    },
+    {
+      // PvP, last: Rally Flag is mainly PvE.
+      label: "PvP",
+      items: [
+        { label: "Crucible & Trials", href: "pvp.html", group: "pvp" }
+      ]
     }
   ];
   // The Locker is live everywhere (launched 2026-10-28). Pages that link

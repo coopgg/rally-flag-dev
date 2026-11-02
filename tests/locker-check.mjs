@@ -1636,7 +1636,7 @@ await section("Report", async () => {
   check("report: sherpas: a teammate's first clear with this player counts, earlier clears elsewhere don't", await p.textContent('[data-sherpas="prophecy"] dd') === "3" &&
     await p.isHidden('[data-sherpas="vault-of-glass"]') && await p.textContent("#rr-sherpa-total dd") === "3", await p.textContent("#rr-sherpa"));
   check("report: raids with no guide are listed as retired", /Crown of Sorrow 1 clear · fastest 1h 30m/.test(await p.textContent(".rr-retired")));
-  check("report: links to the same player's seals", await p.locator('.rr-links a[href="seals.html?p=3-4611686018400000999"]').count() === 1);
+  check("report: links to the same player's seals and PvP", await p.locator('.rr-links a[href="seals.html?p=3-4611686018400000999"]').count() === 1 && await p.locator('.rr-links a[href="pvp.html?p=3-4611686018400000999"]').count() === 1);
   check("report: links to the player's full record on raid.report and dungeon.report", await p.locator('.rr-links a[href="https://raid.report/pc/4611686018400000999"]').count() === 1 && await p.locator('.rr-links a[href="https://dungeon.report/pc/4611686018400000999"]').count() === 1);
   check("report: sherpas say they're Rally Flag's own count", /can differ slightly from raid\.report/.test(await p.textContent("#rr-sherpa")));
   check("report: the page says what Bungie's numbers count", /checkpoint/.test(await p.textContent(".rr-note")));
@@ -1658,6 +1658,43 @@ await section("Report", async () => {
 });
 
 // ---------- God Rolls page ↔ Locker ----------
+// ---------- Crucible & Trials (PvP section) ----------
+await section("PvP", async () => {
+  const P = "4611686018400000777";
+  const ok = r => ({ status: 200, contentType: "application/json", body: JSON.stringify({ ErrorCode: 1, Response: r }) });
+  const st = (entered, won, kills, deaths, assists, kd, secs) => ({ allTime: { activitiesEntered: { basic: { value: entered } }, activitiesWon: { basic: { value: won } }, kills: { basic: { value: kills } }, deaths: { basic: { value: deaths } },
+    assists: { basic: { value: assists } }, killsDeathsRatio: { basic: { value: kd, displayValue: kd.toFixed(2) } }, killsDeathsAssists: { basic: { value: (kills + assists / 2) / deaths } }, bestSingleGameKills: { basic: { value: 25 } }, secondsPlayed: { basic: { value: secs } } } });
+  const metric = n => ({ objectiveProgress: { progress: n } });
+  const p = await open({ url: BASE + "pvp.html", ready: "#rr-form" });
+  const ctx = p.context_;
+  await ctx.route(/SearchDestinyPlayerByBungieName/, r => r.fulfill(ok([{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }])));
+  await ctx.route(new RegExp("/Profile/" + P + "/\\?components=100,200,1100"), r => r.fulfill(ok({ profile: { data: { userInfo: { bungieGlobalDisplayName: "Pvpguard", bungieGlobalDisplayNameCode: 7 } } },
+    characters: { data: { "1": { characterId: "1", classType: 1, light: 2000, dateLastPlayed: "2026-10-30T00:00:00Z" } } },
+    // Trials: 20 flawless tickets (Season 10 to Episode 2) + 3 passages (Episode 3 on) = 23 flawless; 500 wins since Season 10.
+    metrics: { data: { metrics: { 1765255052: metric(20), 3273582723: metric(3), 1365664208: metric(500), 3157801630: metric(321) } } } })));
+  let statsUrl = "";
+  await ctx.route(new RegExp("/Account/" + P + "/Character/0/Stats/"), r => { statsUrl = r.request().url();
+    r.fulfill(ok({ allPvP: st(1000, 550, 9000, 8000, 3000, 1.125, 1206000), pvpCompetitive: st(400, 240, 4000, 3000, 1000, 1.333, 400000), rumble: st(20, 2, 300, 250, 10, 1.2, 9000), trials_of_osiris: st(50, 20, 200, 300, 50, 0.667, 30000) })); });
+  await p.fill("#rr-q", "Pvpguard#7"); await p.click("#rr-form [type=submit]"); await p.waitForSelector("#rr-name");
+  const text = sel => p.innerText(sel).then(t => t.replace(/\s+/g, " ").trim());
+  check("pvp: a lookup reads every character's stats at once (character 0) for each playlist and Trials", /\/Character\/0\/Stats\/\?modes=5,69,70,10,19,12,48,84/.test(statsUrl), statsUrl);
+  check("pvp: the banner has matches, K/D, win rate and flawless (tickets + passages)", /Crucible matches 1,000 K\/D 1\.13 Win rate 55\.0% Flawless 23/.test(await text(".rr-totals")), await text(".rr-totals"));
+  const cards = await p.$$eval(".pv-card", cs => cs.map(c => c.innerText.replace(/\s+/g, " ")));
+  check("pvp: a card per playlist, with K/D, matches, win rate, KDA, kills and time (past 100h in hours)", cards.length === 8 && /All Crucible 1\.13 K\/D Matches 1,000 Win rate 55\.0%.*Time played 335h/.test(cards[0]), cards[0]);
+  check("pvp: playlists with no matches say so", /Quickplay No matches yet/.test(cards[2]), cards[2]);
+  check("pvp: Rumble (free-for-all) says first place, not win rate", /Rumble.*First place 10\.0%/.test(cards[6]), cards[6]);
+  check("pvp: Trials counters come from Bungie's metrics; a missing one shows a dash", /Flawless 23.*Wins 500/.test(await p.$$eval(".pv-tiles", t => t[1].innerText.replace(/\s+/g, " "))) && /Gold medals 321/.test(await text(".pv-tiles")) && /Undefeated matches –/.test(await text(".pv-tiles")), await text(".pv-tiles"));
+  check("pvp: links to trials.report, crucible.report and their raid & dungeon report", await p.locator('.rr-links a[href="https://trials.report/report/3/' + P + '"]').count() === 1 &&
+    await p.locator('.rr-links a[href="https://crucible.report/report/3/' + P + '"]').count() === 1 && await p.locator('.rr-links a[href="report.html?p=3-' + P + '"]').count() === 1);
+  check("pvp: the menu has a PvP section with Crucible & Trials", await p.evaluate(() => [...document.querySelectorAll(".nav-menu-section-label")].some(l => /PvP/.test(l.textContent)) || /Crucible &amp; Trials|Crucible & Trials/.test(document.getElementById("site-nav").innerHTML)));
+  check("pvp: the URL carries the player and it's under Recent", /\?p=3-4611686018400000777$/.test(p.url()) && /Pvpguard#0007/.test(await text("#rr-recent")));
+  let v = await axe(p); check("pvp: passes axe", !v.length, v.join(", "));
+  await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
+  check("pvp (phone): one card per row, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".pv-card")].slice(0, 2).map(x => x.getBoundingClientRect()); return c[1].top > c[0].bottom && document.documentElement.scrollWidth <= innerWidth; }));
+  check("pvp: no script errors", !p.errors.length, p.errors.join("; "));
+  await ctx.close();
+});
+
 await section("God Rolls", async () => {
   // The page and the Locker's God Rolls tab read the same profile: "Find in Locker" is on exactly the cards with a copy.
   const g = await open({ real: true, url: BASE + "god-rolls.html", ready: "#weapon-grid .weapon-card" });

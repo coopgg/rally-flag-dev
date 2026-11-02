@@ -30,7 +30,7 @@
 
   const load = src => new Promise((resolve, reject) => { const s = document.createElement("script"); s.src = src; s.onload = resolve; s.onerror = reject; document.head.appendChild(s); });
   const fmtTime = ms => { const s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60; return h ? h + "h " + String(m).padStart(2, "0") + "m" : m + ":" + String(sec).padStart(2, "0"); };
-  const fmtHours = s => { const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h ? h.toLocaleString() + "h " + m + "m" : m + "m"; };
+  const fmtHours = s => { const t = Math.round(s / 60), h = Math.floor(t / 60), m = t % 60; return h ? h.toLocaleString() + "h " + m + "m" : m + "m"; }; // round once, so never "60m"
 
   async function api(path, authed){
     const res = authed ? await RallyFlagAuth.authedFetch(path) : await fetch("https://www.bungie.net" + path, { headers: { "X-API-Key": window.RallyFlagAPI.BUNGIE_API_KEY } });
