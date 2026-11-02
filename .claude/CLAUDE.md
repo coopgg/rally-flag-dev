@@ -15,7 +15,7 @@ a session.
 dev-only files, so apply only the reviewed commit range:
 
 ```bash
-git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
+git -C rally-flag-dev diff --binary <last-synced-dev-sha> <reviewed-dev-sha> -- . \
   ':(exclude)debug.html' ':(exclude)clan-admin.html' ':(exclude)discord-bot' \
   ':(exclude)api-debug.html' ':(exclude)xur-debug.html' ':(exclude).claude' \
   ':(exclude)skills-lock.json' ':(exclude).gitignore' ':(exclude)tools' \
@@ -23,7 +23,8 @@ git -C rally-flag-dev diff <last-synced-dev-sha> <reviewed-dev-sha> -- . \
 git -C rally-flag apply --reject /tmp/promote.patch
 ```
 
-Nothing should reject; a reject means prod and dev drifted — stop and look.
+(`--binary` carries new or changed images, e.g. `assets/art/*.jpg`; without it
+git refuses them.) Nothing should reject; a reject means prod and dev drifted — stop and look.
 After applying, `diff -rq` the two trees: the only differences should be
 `CNAME`, `.gitignore` and the dev-only files above. (The Locker's
 files were excluded too until it launched on 2026-10-28.) (Until 2026-10-17,
