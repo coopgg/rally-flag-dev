@@ -95,6 +95,13 @@
     return { profile, by, deleted: (account.characters || []).filter(c => c.deleted).length };
   }
 
+  // A status message in place of the report, also read out by #rr-live
+  // (#rr-out itself isn't a live region: it would read out the whole report).
+  function say(html){
+    $("rr-out").innerHTML = html;
+    const live = $("rr-live"); if (live){ live.textContent = ""; setTimeout(() => { live.textContent = $("rr-out").textContent; }, 50); }
+  }
+
   // ---------------- drawing ----------------
   const fmtTime = ms => { const s = Math.round(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60; return h ? h + "h " + String(m).padStart(2, "0") + "m" : m + ":" + String(sec).padStart(2, "0"); };
   const fmtHours = s => { const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h ? h.toLocaleString() + "h " + m + "m" : m + "m"; };
@@ -130,11 +137,11 @@
     $("rr-out").innerHTML =
       '<section class="rr-player panel-card" aria-labelledby="rr-name">' + (chars[0] && chars[0].emblemBackgroundPath ? '<img class="rr-emblem" src="' + esc(img(chars[0].emblemBackgroundPath)) + '" alt="">' : "") +
         '<div class="rr-who"><h2 id="rr-name" tabindex="-1">' + esc(name) + "</h2>" +
-          '<p class="rr-chars">' + chars.map(c => esc(CLASSES[c.classType] || "Guardian") + " " + c.light).join(" · ") + (r.deleted ? " · " + r.deleted + " deleted" : "") + "</p>" +
+          '<p class="rr-chars">' + chars.map(c => esc(CLASSES[c.classType] || "Guardian") + "\u00a0" + c.light).join(" · ") + (r.deleted ? " · " + r.deleted + " deleted" : "") + "</p>" +
           // The full records live on raid.report and dungeon.report (same platform/id paths).
           '<p class="rr-links">Full record on <a href="https://raid.report/' + PLATFORM(type) + "/" + id + '" target="_blank" rel="noopener">raid.report<span class="sr-only"> (opens in a new tab)</span></a> · ' +
           '<a href="https://dungeon.report/' + PLATFORM(type) + "/" + id + '" target="_blank" rel="noopener">dungeon.report<span class="sr-only"> (opens in a new tab)</span></a>' +
-          ' · <a href="seals.html?p=' + type + "-" + id + '">Their seals →</a></p></div>' +
+          ' · <a href="seals.html?p=' + type + "-" + id + '">Their seals\u00a0→</a></p></div>' +
         '<dl class="rr-totals"><div><dt>Raid clears</dt><dd>' + raids.clears.toLocaleString() + "</dd></div><div><dt>Dungeon clears</dt><dd>" + dungeons.clears.toLocaleString() + "</dd></div>" +
           "<div><dt>Time in both</dt><dd>" + fmtHours(raids.seconds + dungeons.seconds) + '</dd></div><div id="rr-sherpa-total" hidden><dt>Sherpas</dt><dd></dd></div></dl>' +
         '<button type="button" class="rr-btn rr-copy" id="rr-copy">Copy link</button></section>' +
@@ -146,6 +153,7 @@
       '<p class="rr-note">Clears and time played are Bungie\'s own numbers, across every character (deleted ones too), and count runs started from a checkpoint. ' +
         "Fastest is the fastest full clear (started from the beginning) and Average the middle clear time, leaving out runs quicker than that (checkpoint runs), as raid.report shows them; both open the run there. " +
         "Full clears are counted with sherpas.</p>";
+    const live = $("rr-live"); if (live) live.textContent = name + "'s raid and dungeon report is ready.";
     $("rr-copy").addEventListener("click", () => {
       const url = location.origin + location.pathname + "?p=" + type + "-" + id;
       (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => { $("rr-copy").textContent = "Link copied"; }, () => { $("rr-copy").textContent = url; });
@@ -251,7 +259,7 @@
       const word = b => el.dataset.kind === "raid" ? b.replace(/^(Solo|Duo|Trio) Flawless$/, "Flawless $1") : b;
       el.innerHTML = shown.map(b => '<span class="rr-badge' + (/flawless/i.test(b) ? " gold" : "") + '">' + word(b) + "</span>").join("");
     });
-    evenBars();
+    cancelAnimationFrame(evenJob); evenJob = requestAnimationFrame(evenBars); // one layout read per frame
   }
   // Every badge bar in a grid as tall as its tallest (a second row of badges
   // on one card would otherwise push its name below its neighbours'). Again on resize.
@@ -423,7 +431,7 @@
     if (saved){
       showSherpas(saved.counts, saved.total); showFull(saved.full);
       sherpaButton(box, "Sherpas and full clears counted " + new Date(saved.at).toLocaleDateString() + " from " + saved.clears.toLocaleString() + " clears. " + SHERPA_NOTE, "Update", type, id, clears, job);
-    } else sherpaButton(box, "Sherpas (runs where a teammate got their first clear) and full clears (started from the beginning, not a checkpoint). Counting reads every clear and each teammate's history: 10–20 minutes the first time for busy players, quick after that. You can stop and pick it up later.", "Count sherpas and full clears", type, id, clears, job);
+    } else sherpaButton(box, "Sherpas (a teammate's first clear) and full clears (started from the beginning). The first count takes 10 to 20 minutes for busy players, then it's quick. You can stop and pick it up later.", "Count sherpas and full clears", type, id, clears, job);
   }
   async function countSherpas(type, id, clears, job){
     const box = $("rr-sherpa");
@@ -501,7 +509,7 @@
     const job = ++loading;
     suggestJob++; // a suggestion search still running doesn't reopen the list
     $("rr-suggest").hidden = true;
-    $("rr-out").innerHTML = '<p class="rr-status" role="status">Adding up clears across every character…</p>';
+    say('<p class="rr-status">Adding up clears across every character…</p>');
     if (push) history.pushState({ p }, "", "?p=" + p);
     try {
       const r = await report(m[1], m[2]);
@@ -510,20 +518,20 @@
       badges(m[1], m[2], job);
       const h = $("rr-name"); if (h && push) h.focus();
     } catch (e){
-      if (job === loading) $("rr-out").innerHTML = '<p class="rr-status error" role="status">Couldn\'t load this player (' + esc(e.message) + ").</p>";
+      if (job === loading) say('<p class="rr-status error">Couldn\'t load this player (' + esc(e.message) + ").</p>");
     }
   }
   async function submit(e){
     e.preventDefault();
     const text = $("rr-q").value.trim();
     if (!text) return;
-    if (!/#\d{1,4}$/.test(text)){ suggest(text); $("rr-out").innerHTML = '<p class="rr-status" role="status">Add the 4-digit code after the name (Name#1234), or pick a match below the box.</p>'; return; }
-    $("rr-out").innerHTML = '<p class="rr-status" role="status">Looking for ' + esc(text) + "…</p>";
+    if (!/#\d{1,4}$/.test(text)){ suggest(text); say('<p class="rr-status">Add the 4-digit code after the name (Name#1234), or pick a match below the box.</p>'); return; }
+    say('<p class="rr-status">Looking for ' + esc(text) + "…</p>");
     try {
       const m = await findExact(text);
-      if (!m) { $("rr-out").innerHTML = '<p class="rr-status error" role="status">No Destiny player called ' + esc(text) + ". Check the name and the code.</p>"; return; }
+      if (!m) { say('<p class="rr-status error">No Destiny player called ' + esc(text) + ". Check the name and the code.</p>"); return; }
       show(m.membershipType + "-" + m.membershipId, true);
-    } catch (err){ $("rr-out").innerHTML = '<p class="rr-status error" role="status">The search didn\'t work (' + esc(err.message) + ").</p>"; }
+    } catch (err){ say('<p class="rr-status error">The search didn\'t work (' + esc(err.message) + ").</p>"); }
   }
   async function mine(){
     try {
@@ -531,7 +539,7 @@
       const list = (j.Response && j.Response.destinyMemberships) || [];
       const me = list.find(x => x.membershipId === j.Response.primaryMembershipId) || pick(list);
       if (me) show(me.membershipType + "-" + me.membershipId, true);
-    } catch (e){ $("rr-out").innerHTML = '<p class="rr-status error" role="status">Couldn\'t find your account (' + esc(e.message) + ").</p>"; }
+    } catch (e){ say('<p class="rr-status error">Couldn\'t find your account (' + esc(e.message) + ").</p>"); }
   }
 
   function start(){

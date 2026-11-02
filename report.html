@@ -67,13 +67,14 @@
   .rr-form{ display:flex; gap:10px; }
   .rr-form input{ flex:1; min-width:0; background:var(--panel); border:1px solid var(--panel-border); color:var(--text); font-family:var(--font-sans); font-size:15px; padding:13px 16px; border-radius:10px; outline:none; transition:border-color 0.2s ease; }
   .rr-form input:focus{ border-color:var(--accent); }
+  .rr-form input:focus-visible{ outline:2px solid var(--accent-text); outline-offset:1px; }
   .rr-form input::placeholder{ color:var(--text-dimmer); }
   .rr-btn{ display:inline-flex; align-items:center; justify-content:center; min-height:44px; padding:6px 18px; border-radius:10px; border:1px solid var(--accent-fill); background:var(--accent-fill); color:var(--on-accent); font:inherit; font-size:14px; font-weight:600; cursor:pointer; white-space:nowrap; }
   .rr-btn.ghost{ background:transparent; color:var(--accent-text); border-color:var(--edge); }
   .rr-btn[hidden]{ display:none; }
   .rr-suggest, .rr-recent{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; list-style:none; margin:10px 0 0; padding:0; }
   .rr-suggest[hidden]{ display:none; }
-  .rr-recent-label{ font-size:12.5px; color:var(--text-dim); margin-right:2px; }
+  .rr-recent-label{ font-size:13px; color:var(--text-dim); margin-right:2px; }
   .rr-chip{ min-height:32px; padding:4px 12px; border-radius:999px; border:1px solid var(--edge); background:transparent; color:var(--text-dim); font:inherit; font-size:13px; font-weight:500; cursor:pointer; }
   .rr-chip:hover, .rr-chip:focus-visible{ color:var(--text); border-color:var(--accent); }
   .rr-clear{ min-height:32px; padding:4px 8px; border:0; background:transparent; color:var(--accent-text); font:inherit; font-size:13px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
@@ -83,8 +84,6 @@
 
   /* The player: their emblem as the banner. */
   .rr-player{ position:relative; display:flex; flex-wrap:wrap; align-items:center; gap:14px 28px; margin-top:24px; padding:22px; overflow:clip; isolation:isolate; }
-  /* The emblem at its own size (Bungie's are 474×96) in the top-left corner,
-     fading out to the right, so it never stretches or sits under the numbers. */
   /* The emblem as the banner's left edge: its icon square (left 96px) shown
      whole and sharp next to the name, the rest fading out. */
   .rr-emblem{ position:absolute; top:0; left:0; z-index:-1; width:474px; max-width:100%; height:96px; object-fit:cover; object-position:left center; opacity:0.5;
@@ -94,10 +93,10 @@
   .rr-who{ min-width:0; flex:1 1 220px; }
   .rr-who h2{ margin:0; font-family:'Oswald', sans-serif; font-weight:600; font-size:28px; line-height:1.15; color:var(--text); overflow-wrap:anywhere; }
   .rr-links{ margin:4px 0 0; font-size:13px; color:var(--text-dim); }
-  .rr-links a{ color:var(--accent-text); }
+  .rr-links a{ color:var(--accent-text); white-space:nowrap; }
   .rr-chars{ margin:4px 0 0; font-size:13.5px; color:var(--text-dim); }
   .rr-totals{ display:flex; flex-wrap:wrap; gap:10px 28px; margin:0; }
-  .rr-totals dt, .rr-meta dt{ font-size:12px; color:var(--text-dim); }
+  .rr-totals dt, .rr-meta dt{ font-size:13px; color:var(--text-dim); }
   .rr-totals dd{ margin:2px 0 0; font-family:'Oswald', sans-serif; font-weight:600; font-size:24px; color:var(--text); font-variant-numeric:tabular-nums; }
   .rr-copy{ min-height:36px; font-size:13px; padding:4px 14px; background:transparent; color:var(--accent-text); border-color:var(--edge); }
 
@@ -127,7 +126,7 @@
   .rr-clears b{ font-family:'Oswald', sans-serif; font-weight:600; font-size:30px; line-height:1; color:var(--accent-text); font-variant-numeric:tabular-nums; margin-right:2px; }
   .rr-meta{ display:flex; gap:18px; margin:10px 0 0; }
   .rr-meta dd{ margin:1px 0 0; font-size:14px; font-weight:600; color:var(--text); font-variant-numeric:tabular-nums; }
-  .rr-line{ margin:8px 0 0; font-size:12.5px; color:var(--text-dim); line-height:1.45; }
+  .rr-line{ margin:8px 0 0; font-size:13px; color:var(--text-dim); line-height:1.45; }
   /* Two lines kept for every card (some dungeons list five versions), so cards line up. */
   .rr-card .rr-line{ min-height:calc(2 * 1.45em); display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .rr-badges{ display:flex; flex-wrap:wrap; justify-content:flex-end; align-content:flex-start; gap:4px; min-height:34px; padding:6px 10px;
@@ -179,7 +178,8 @@
   </form>
   <ul class="rr-suggest" id="rr-suggest" aria-label="Matching players" hidden></ul>
   <div class="rr-recent" id="rr-recent"></div>
-  <div id="rr-out" aria-live="polite"></div>
+  <div id="rr-out"></div>
+  <p class="sr-only" id="rr-live" aria-live="polite"></p>
 </div>
 
 </main>
