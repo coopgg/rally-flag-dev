@@ -219,6 +219,22 @@
       el.innerHTML = shown.map(b => '<span class="rr-badge' + (/flawless/i.test(b) ? " gold" : "") + '">' + b + "</span>").join("");
     });
   }
+  // Each dungeon's own solo flawless triumph (DestinyRecordDefinition). A
+  // second source for Solo Flawless: some runs that earned it read as
+  // started from a checkpoint in their carnage report (the owner's Grasp of
+  // Avarice), and the triumph is what the game itself shows.
+  const SOLO_FLAWLESS_TRIUMPH = {
+    "shattered-throne": 3205009787, "pit-of-heresy": 3950599483, "prophecy": 3191784400, "grasp-of-avarice": 3718971745,
+    "duality": 4126703847, "spire-of-the-watcher": 4032136335, "ghosts-of-the-deep": 2105117002, "warlords-ruin": 238037026,
+    "vespers-host": 1553599507, "sundered-doctrine": 28261116, "equilibrium": 1204858125
+  };
+  async function triumphBadges(type, id, add){
+    const P = await api("/Destiny2/" + type + "/Profile/" + id + "/?components=900").catch(() => null);
+    if (!P) return;
+    const prof = ((P.profileRecords || {}).data || {}).records || {}, chars = Object.values(((P.characterRecords || {}).data) || {});
+    const earned = h => [prof[h]].concat(chars.map(c => (c.records || {})[h])).some(r => r && !(r.state & 4));
+    for (const slug in SOLO_FLAWLESS_TRIUMPH) if (earned(SOLO_FLAWLESS_TRIUMPH[slug])) add(slug, "Solo Flawless");
+  }
   async function badges(type, id, job){
     const MAP = window.RaidActivities || {}, REL = window.RaidReleases || {};
     const progress = t => { const el = $("rr-progress"); if (el && job === loading) el.textContent = t; };
@@ -227,6 +243,8 @@
     const lists = await pool((account.characters || []).flatMap(c => [[c.characterId, 4], [c.characterId, 82]]), 4, ([c, mode]) => runHistory(type, id, c, mode));
     if (job !== loading) return;
     const found = new Map(), add = (slug, b) => { if (!found.has(slug)) found.set(slug, new Set()); found.get(slug).add(b); };
+    await triumphBadges(type, id, add);
+    if (job !== loading) return;
     const candidates = [], seen = new Set(), clears = [];
     for (const a of lists.flat()){
       const d = a.activityDetails || {}, m = MAP[d.referenceId] || MAP[d.directorActivityHash], v = a.values || {}, n = k => ((v[k] || {}).basic || {}).value || 0;

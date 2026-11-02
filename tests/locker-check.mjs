@@ -1558,6 +1558,8 @@ await section("Report", async () => {
   const ctx = p.context_;
   await ctx.route(/\/User\/Search\/GlobalName\/0\//, r => r.fulfill(ok({ searchResults: [{ bungieGlobalDisplayName: "Testguard", bungieGlobalDisplayNameCode: 42, destinyMemberships: [{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }] }] })));
   await ctx.route(/SearchDestinyPlayerByBungieName/, r => { const b = JSON.parse(r.request().postData()); r.fulfill(ok(b.displayNameCode === 42 ? [{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }] : [])); });
+  // Solo flawless triumphs: Prophecy's earned on a character (the run reports alone wouldn't show it).
+  await ctx.route(new RegExp("/Profile/" + P + "/\\?components=900$"), r => r.fulfill(ok({ profileRecords: { data: { records: {} } }, characterRecords: { data: { [C1]: { records: { 3191784400: { state: 67 } } } } } })));
   await ctx.route(new RegExp("/Profile/" + P + "/\\?components=100,200"), r => r.fulfill(ok({ profile: { data: { userInfo: { bungieGlobalDisplayName: "Testguard", bungieGlobalDisplayNameCode: 42 } } },
     characters: { data: { [C1]: { characterId: C1, classType: 0, light: 2010, dateLastPlayed: "2026-10-30T00:00:00Z" } } } })));
   await ctx.route(new RegExp("/Account/" + P + "/Stats/\\?groups=1"), r => r.fulfill(ok({ characters: [{ characterId: C1, deleted: false }, { characterId: C2, deleted: true }] })));
@@ -1602,7 +1604,7 @@ await section("Report", async () => {
   const badgesOf = slug => p.$$eval('[data-badges="' + slug + '"] .rr-badge', b => b.map(x => x.textContent).join(", "));
   check("report: badges: a fresh solo flawless on day two is Solo Flawless and Contest (Contest covers Week One)", await badgesOf("vault-of-glass") === "Solo Flawless, Contest", await badgesOf("vault-of-glass"));
   check("report: badges: an Epic run counts Week One from the Epic launch", await badgesOf("the-desert-perpetual") === "Week One", await badgesOf("the-desert-perpetual"));
-  check("report: badges: a duo with a death is Duo, a deathless full team is Flawless, checkpoint runs (even at phase 0) and a dungeon trio are nothing", await badgesOf("prophecy") === "Duo, Flawless", await badgesOf("prophecy"));
+  check("report: badges: an earned solo flawless triumph shows Solo Flawless (and covers Duo and Flawless)", await badgesOf("prophecy") === "Solo Flawless", await badgesOf("prophecy"));
   check("report: badges: carnage reports only for runs that could count", pgcrCalls.sort().join() === "901,902,903,904,906", pgcrCalls.join());
   await p.click("#rr-sherpa-go");
   await p.waitForFunction(() => /sherpas? across/.test(document.getElementById("rr-sherpa").textContent), null, { timeout: 30000 }).catch(() => {});
