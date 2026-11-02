@@ -1634,7 +1634,7 @@ await section("Report", async () => {
   check("report: badges: run reports are kept, so a second look fetches none", !pgcrCalls.length && await badgesOf("vault-of-glass") === "Flawless Solo, Week One", pgcrCalls.join());
   check("report: a shared link opens the same report, and it's under Recent", await p.textContent("#rr-name") === "Testguard#0042" && /Testguard#0042/.test(await p.textContent("#rr-recent")));
   await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
-  check("report (phone): two cards per row, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".rr-card")].slice(0, 2).map(x => x.getBoundingClientRect().top); return c[0] === c[1] && document.documentElement.scrollWidth <= innerWidth; }));
+  check("report (phone): one card per row, full width, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".rr-card")].slice(0, 2).map(x => x.getBoundingClientRect()); return c[1].top > c[0].bottom && c[0].width > innerWidth - 40 && document.documentElement.scrollWidth <= innerWidth; }));
   check("report: no script errors", !p.errors.length, p.errors.join("; "));
   await ctx.close();
 });
