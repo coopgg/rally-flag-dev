@@ -102,13 +102,14 @@
   const versionsText = v => Object.entries(v).sort((a, b) => (b[0] === "Normal") - (a[0] === "Normal") || b[1] - a[1]).map(([k, n]) => esc(k) + " " + n.toLocaleString()).join(" · ");
   function card(item, kind, e){
     const none = !e || !e.clears;
-    return '<a class="activity-card panel-card rr-card' + (none ? " none" : "") + '" href="' + window.rallyFlagGuideHref(kind, item.slug) + '">' + window.rallyFlagArtThumb(item) +
+    return '<a class="activity-card panel-card rr-card' + (none ? " none" : "") + '" href="' + window.rallyFlagGuideHref(kind, item.slug) + '">' +
+      // Badges sit on the art, so a card's height never depends on how many it has.
+      '<div class="rr-art">' + window.rallyFlagArtThumb(item) + '<div class="rr-badges" data-badges="' + esc(item.slug) + '"></div></div>' +
       '<div class="activity-name">' + esc(item.name) + "</div>" +
       '<div class="rr-clears"><b>' + (none ? 0 : e.clears.toLocaleString()) + "</b> " + ((e && e.clears) === 1 ? "clear" : "clears") + "</div>" +
       (none ? '<p class="rr-line">' + (e && e.seconds ? "Played " + fmtHours(e.seconds) + ", no clear yet" : "No clears yet") + "</p>"
         : '<dl class="rr-meta"><div><dt>Fastest</dt><dd>' + (e.fastest ? fmtTime(e.fastest) : "–") + "</dd></div><div><dt>Time played</dt><dd>" + fmtHours(e.seconds) + '</dd></div><div data-sherpas="' + esc(item.slug) + '" hidden><dt>Sherpas</dt><dd></dd></div></dl>' +
           '<p class="rr-line">' + versionsText(e.versions) + "</p>") +
-      '<div class="rr-badges" data-badges="' + esc(item.slug) + '"></div>' +
       '<div class="activity-arrow">View guide →</div></a>';
   }
   function render(r, type, id){
