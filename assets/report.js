@@ -147,15 +147,16 @@
 
   // ---------------- badges ----------------
   // From the player's run history (raid mode 4, dungeon mode 82, every
-  // character): Contest / Day One / Week One by date (raid-releases.js) or
-  // Bungie's "Contest" versions. Solo, duo, trio and flawless need each
+  // character): one timing badge per card (Contest / Day One / Week One…),
+  // by raid.report's and dungeon.report's own rules (raid-releases.js: the
+  // first rule the player's first clear, or a triumph, meets). Solo, duo, trio and flawless need each
   // run's carnage report (who was in it, any deaths, started from the
   // beginning), fetched only for completed runs that could count (this
   // player didn't die, or three players or fewer; two for dungeons, whose
   // fireteam is three, so Trio is a raid badge only) and kept in IndexedDB,
   // since a finished run's report never changes.
   const STATS = "https://stats.bungie.net/Platform";
-  const BADGE_ORDER = ["Solo Flawless", "Solo", "Duo Flawless", "Duo", "Trio Flawless", "Trio", "Flawless", "Day One", "Contest", "Week One"];
+  const BADGE_ORDER = ["Solo Flawless", "Solo", "Duo Flawless", "Duo", "Trio Flawless", "Trio", "Flawless", "Challenge Day One", "Contest Day One", "Day One", "Challenge", "Contest", "Week One"];
   function store(){
     return new Promise((resolve, reject) => {
       // Version 2: the "fresh" rule changed; 3: summaries keep the team (for
@@ -213,11 +214,8 @@
       // behind any low-man flawless.
       const SIZES = ["Solo", "Duo", "Trio"], rank = b => [SIZES.indexOf(b.replace(" Flawless", "")), / Flawless$/.test(b)];
       const beaten = b => { const [n, f] = rank(b); return n >= 0 && [...set].some(o => { const [m, g] = rank(o); return o !== b && m >= 0 && m <= n && (g || !f); }); };
-      // Week One hides behind Contest or Day One (those clears were in week one too), as raid.report does.
-      const shown = set ? BADGE_ORDER.filter(b => set.has(b) && !beaten(b) && !(b === "Flawless" && SIZES.some(x => set.has(x + " Flawless"))) &&
-        !(b === "Week One" && (set.has("Contest") || set.has("Day One"))) &&
-        // A Day One clear was in the contest window too; dungeon.report shows Day One only.
-        !(b === "Contest" && set.has("Day One"))) : [];
+      // Timing badges: badges() adds at most one per card.
+      const shown = set ? BADGE_ORDER.filter(b => set.has(b) && !beaten(b) && !(b === "Flawless" && SIZES.some(x => set.has(x + " Flawless")))) : [];
       el.innerHTML = shown.map(b => '<span class="rr-badge' + (/flawless/i.test(b) ? " gold" : "") + '">' + b + "</span>").join("");
     });
   }
@@ -230,12 +228,27 @@
     "duality": 4126703847, "spire-of-the-watcher": 4032136335, "ghosts-of-the-deep": 2105117002, "warlords-ruin": 238037026,
     "vespers-host": 1553599507, "sundered-doctrine": 28261116, "equilibrium": 1204858125
   };
+  // Returns earned(recordHash) for the timing badges' triumphs too.
   async function triumphBadges(type, id, add){
     const P = await api("/Destiny2/" + type + "/Profile/" + id + "/?components=900").catch(() => null);
-    if (!P) return;
+    if (!P) return () => false;
     const prof = ((P.profileRecords || {}).data || {}).records || {}, chars = Object.values(((P.characterRecords || {}).data) || {});
-    const earned = h => [prof[h]].concat(chars.map(c => (c.records || {})[h])).some(r => r && !(r.state & 4));
+    // As raid.report: every objective complete, redeemed, or not "objective not completed".
+    const done = r => !!r && ((r.objectives || []).length && r.objectives.every(o => o.complete) || (r.state & 1) || !(r.state & 4));
+    const earned = h => [prof[h]].concat(chars.map(c => (c.records || {})[h])).some(done);
     for (const slug in SOLO_FLAWLESS_TRIUMPH) if (earned(SOLO_FLAWLESS_TRIUMPH[slug])) add(slug, "Solo Flawless");
+    return earned;
+  }
+  // The one timing badge: the first rule whose clear (that version's, or any
+  // version's) ended within its hours of launch, or whose triumph is earned.
+  function timingBadge(rel, first, earned){
+    const start = Date.parse(rel.start);
+    for (const [label, hours, hash, record] of rel.badges || []){
+      const end = hash ? first[hash] : first.any;
+      if (end && end - start < hours * 36e5) return label;
+      if (record && earned(record)) return label;
+    }
+    return null;
   }
   async function badges(type, id, job){
     const MAP = window.RaidActivities || {}, REL = window.RaidReleases || {};
@@ -245,27 +258,24 @@
     const lists = await pool((account.characters || []).flatMap(c => [[c.characterId, 4], [c.characterId, 82]]), 4, ([c, mode]) => runHistory(type, id, c, mode));
     if (job !== loading) return;
     const found = new Map(), add = (slug, b) => { if (!found.has(slug)) found.set(slug, new Set()); found.get(slug).add(b); };
-    await triumphBadges(type, id, add);
+    const earned = await triumphBadges(type, id, add);
     if (job !== loading) return;
-    const candidates = [], seen = new Set(), clears = [];
+    const candidates = [], seen = new Set(), clears = [], firsts = {};
     for (const a of lists.flat()){
       const d = a.activityDetails || {}, m = MAP[d.referenceId] || MAP[d.directorActivityHash], v = a.values || {}, n = k => ((v[k] || {}).basic || {}).value || 0;
       if (!m || !m[0] || n("completed") !== 1 || n("completionReason") !== 0 || seen.has(d.instanceId)) continue;
       seen.add(d.instanceId);
-      // An Epic version (The Desert Perpetual) counts from its own launch.
-      const slug = m[0], rel = REL[slug] && /^epic/i.test(m[2]) && REL[slug].epic ? REL[slug].epic : REL[slug], t = Date.parse(a.period);
+      const slug = m[0], t = Date.parse(a.period);
       clears.push({ id: d.instanceId, slug, kind: m[1], t });
-      if (/contest/i.test(m[2])) add(slug, "Contest");
-      if (rel){
-        const hours = (t - Date.parse(rel.start)) / 36e5;
-        if (hours >= 0 && hours < (rel.dayOne || 0)) add(slug, "Day One");
-        if (hours >= 0 && hours < (rel.contest || 0)) add(slug, "Contest");
-        if (hours >= 0 && hours < 168) add(slug, "Week One");
-      }
+      // Earliest clear end, any version and per version (timing badges count the end, as raid.report).
+      const end = t + n("activityDurationSeconds") * 1000, f = firsts[slug] || (firsts[slug] = {}), h = d.referenceId;
+      if (!f.any || end < f.any) f.any = end;
+      if (!f[h] || end < f[h]) f[h] = end;
       // Dungeons are three-player activities, so only solo and duo count as low-man there.
       const most = m[1] === "dungeon" ? 2 : 3;
       if (n("deaths") === 0 || n("playerCount") <= most) candidates.push({ id: d.instanceId, slug, most });
     }
+    for (const slug in REL){ const b = timingBadge(REL[slug], firsts[slug] || {}, earned); if (b) add(slug, b); }
     showBadges(found);
     let done = 0;
     progress("Checking " + candidates.length.toLocaleString() + " runs for solo, duo, trio and flawless clears… 0%");

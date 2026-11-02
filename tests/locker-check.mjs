@@ -1559,24 +1559,28 @@ await section("Report", async () => {
   await ctx.route(/\/User\/Search\/GlobalName\/0\//, r => r.fulfill(ok({ searchResults: [{ bungieGlobalDisplayName: "Testguard", bungieGlobalDisplayNameCode: 42, destinyMemberships: [{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }] }] })));
   await ctx.route(/SearchDestinyPlayerByBungieName/, r => { const b = JSON.parse(r.request().postData()); r.fulfill(ok(b.displayNameCode === 42 ? [{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }] : [])); });
   // Solo flawless triumphs: Prophecy's earned on a character (the run reports alone wouldn't show it).
-  await ctx.route(new RegExp("/Profile/" + P + "/\\?components=900$"), r => r.fulfill(ok({ profileRecords: { data: { records: {} } }, characterRecords: { data: { [C1]: { records: { 3191784400: { state: 67 } } } } } })));
+  await ctx.route(new RegExp("/Profile/" + P + "/\\?components=900$"), r => r.fulfill(ok({ profileRecords: { data: { records: {} } }, characterRecords: { data: { [C1]: { records: { 3191784400: { state: 67 }, 781401026: { state: 67 } } } } } })));
   await ctx.route(new RegExp("/Profile/" + P + "/\\?components=100,200"), r => r.fulfill(ok({ profile: { data: { userInfo: { bungieGlobalDisplayName: "Testguard", bungieGlobalDisplayNameCode: 42 } } },
     characters: { data: { [C1]: { characterId: C1, classType: 0, light: 2010, dateLastPlayed: "2026-10-30T00:00:00Z" } } } })));
   await ctx.route(new RegExp("/Account/" + P + "/Stats/\\?groups=1"), r => r.fulfill(ok({ characters: [{ characterId: C1, deleted: false }, { characterId: C2, deleted: true }] })));
   await ctx.route(/\/Character\/(\d+)\/Stats\/AggregateActivityStats\//, r => r.fulfill(ok({ activities: AGG[r.request().url().match(/Character\/(\d+)\//)[1]] || [] })));
   // Run history and carnage reports for the badges. VoG: a fresh solo flawless
-  // run on day two (Contest, Week One); Prophecy: a duo with a death, a full
+  // run on day two (Week One: raid.report gives VoG no Contest badge); Prophecy: a duo with a death, a full
   // fireteam flawless, a checkpoint solo (no badge) and a deathy six-player
   // run (not even fetched).
-  // Dungeons, timed as dungeon.report: Equilibrium (13 Dec 2025 17:00 UTC) 6h in is Day One only;
-  // Sundered Doctrine (7 Feb 2025 17:00 UTC) 30h in is Contest. Neither needs a carnage report.
-  const EQ = 2727361621, SD = 3834447244;
-  const run = (id, hash, period, players, deaths) => ({ period, activityDetails: { referenceId: hash, directorActivityHash: hash, instanceId: id, mode: 4 },
-    values: { completed: { basic: { value: 1 } }, completionReason: { basic: { value: 0 } }, playerCount: { basic: { value: players } }, deaths: { basic: { value: deaths } } } });
-  // Plus an Epic Desert Perpetual clear four days after the Epic launch (27 Sept 2025): Week One from its own date.
+  // Timing badges, by dungeon.report's rules (raid-releases.js), none needing a carnage report:
+  // Equilibrium (13 Dec 2025 17:00 UTC) Normal 6h in: Day One (Contest needs the Contest version).
+  // Sundered Doctrine Normal 30h in: Week One by date, but its Contest triumph (Unsundered) is
+  // earned, and Contest comes first in its list. Vesper's Host's Contest version 20h in: Contest
+  // Day One. Duality started 23h in but ended 25h in (2h run): Week One (the end counts).
+  const EQ = 2727361621, SD = 3834447244, VH_CONTEST = 1915770060, DUALITY = 2823159265;
+  const run = (id, hash, period, players, deaths, secs = 0) => ({ period, activityDetails: { referenceId: hash, directorActivityHash: hash, instanceId: id, mode: 4 },
+    values: { completed: { basic: { value: 1 } }, completionReason: { basic: { value: 0 } }, playerCount: { basic: { value: players } }, deaths: { basic: { value: deaths } }, activityDurationSeconds: { basic: { value: secs } } } });
+  // Plus an Epic Desert Perpetual clear after its first weekly reset: no timing badge.
   const HIST = { [C1 + ":4"]: [run("901", 3711931140, "2021-05-23T20:00:00Z", 1, 0), run("908", 3817322389, "2025-10-01T00:00:00Z", 6, 1)],
     [C2 + ":82"]: [run("902", 1077850348, "2024-01-01T00:00:00Z", 2, 1), run("903", 1077850348, "2024-02-01T00:00:00Z", 3, 0), run("904", 1077850348, "2024-03-01T00:00:00Z", 1, 0), run("905", 1077850348, "2024-04-01T00:00:00Z", 6, 4)],
-    [C1 + ":82"]: [run("906", 1077850348, "2024-05-01T00:00:00Z", 2, 0), run("907", 1077850348, "2024-06-01T00:00:00Z", 3, 2), run("909", EQ, "2025-12-13T23:00:00Z", 6, 2), run("910", SD, "2025-02-08T23:00:00Z", 6, 2)] };
+    [C1 + ":82"]: [run("906", 1077850348, "2024-05-01T00:00:00Z", 2, 0), run("907", 1077850348, "2024-06-01T00:00:00Z", 3, 2), run("909", EQ, "2025-12-13T23:00:00Z", 6, 2), run("910", SD, "2025-02-08T23:00:00Z", 6, 2),
+      run("911", VH_CONTEST, "2024-10-12T13:00:00Z", 6, 2), run("912", DUALITY, "2022-05-28T16:00:00Z", 6, 2, 7200)] };
   const entry = (m, d) => ({ player: { destinyUserInfo: { membershipId: m, membershipType: 3 } }, values: { deaths: { basic: { value: d } }, completed: { basic: { value: 1 } } } });
   const PGCR = { 901: { activityWasStartedFromBeginning: true, entries: [entry(P, 0)] }, 902: { startingPhaseIndex: 0, entries: [entry(P, 1), entry("2", 0)] },
     903: { startingPhaseIndex: 0, entries: [entry(P, 0), entry("2", 0), entry("3", 0), entry("4", 0), entry("5", 0), entry("6", 0)] }, 904: { startingPhaseIndex: 2, entries: [entry(P, 0)] },
@@ -1605,10 +1609,12 @@ await section("Report", async () => {
   check("report: every guide has a card in the guides' art style, uncleared ones greyed", await p.locator(".rr-card").count() === 22 && await p.locator(".rr-card .art-thumb").count() === 22 && await p.locator(".rr-card.none").count() === 20);
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
   const badgesOf = slug => p.$$eval('[data-badges="' + slug + '"] .rr-badge', b => b.map(x => x.textContent).join(", "));
-  check("report: badges: a fresh solo flawless on day two is Solo Flawless and Contest (Contest covers Week One)", await badgesOf("vault-of-glass") === "Solo Flawless, Contest", await badgesOf("vault-of-glass"));
-  check("report: badges: a dungeon clear in its first 24h is Day One (not also Contest)", await badgesOf("equilibrium") === "Day One", await badgesOf("equilibrium"));
-  check("report: badges: a dungeon clear 24-48h in is Contest", await badgesOf("sundered-doctrine") === "Contest", await badgesOf("sundered-doctrine"));
-  check("report: badges: an Epic run counts Week One from the Epic launch", await badgesOf("the-desert-perpetual") === "Week One", await badgesOf("the-desert-perpetual"));
+  check("report: badges: a fresh solo flawless on day two is Solo Flawless and Week One (VoG has no Contest badge)", await badgesOf("vault-of-glass") === "Solo Flawless, Week One", await badgesOf("vault-of-glass"));
+  check("report: badges: a Normal dungeon clear in its first 24h is Day One, not Contest", await badgesOf("equilibrium") === "Day One", await badgesOf("equilibrium"));
+  check("report: badges: an earned Contest triumph is Contest (one timing badge only)", await badgesOf("sundered-doctrine") === "Contest", await badgesOf("sundered-doctrine"));
+  check("report: badges: a Contest version clear in its first 24h is Contest Day One", await badgesOf("vespers-host") === "Contest Day One", await badgesOf("vespers-host"));
+  check("report: badges: a run that ends after 24h isn't Day One", await badgesOf("duality") === "Week One", await badgesOf("duality"));
+  check("report: badges: a clear after the first weekly reset gets no timing badge", await badgesOf("the-desert-perpetual") === "", await badgesOf("the-desert-perpetual"));
   check("report: badges: an earned solo flawless triumph shows Solo Flawless (and covers Duo and Flawless)", await badgesOf("prophecy") === "Solo Flawless", await badgesOf("prophecy"));
   check("report: badges: carnage reports only for runs that could count", pgcrCalls.sort().join() === "901,902,903,904,906", pgcrCalls.join());
   await p.click("#rr-sherpa-go");
@@ -1625,7 +1631,7 @@ await section("Report", async () => {
   await p.reload(); await p.waitForSelector("#rr-name");
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
   check("report: sherpas: the last count shows straight away on a later visit", await p.textContent('[data-sherpas="prophecy"] dd') === "3" && /Sherpas counted/.test(await p.textContent("#rr-sherpa")));
-  check("report: badges: run reports are kept, so a second look fetches none", !pgcrCalls.length && await badgesOf("vault-of-glass") === "Solo Flawless, Contest", pgcrCalls.join());
+  check("report: badges: run reports are kept, so a second look fetches none", !pgcrCalls.length && await badgesOf("vault-of-glass") === "Solo Flawless, Week One", pgcrCalls.join());
   check("report: a shared link opens the same report, and it's under Recent", await p.textContent("#rr-name") === "Testguard#0042" && /Testguard#0042/.test(await p.textContent("#rr-recent")));
   await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
   check("report (phone): two cards per row, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".rr-card")].slice(0, 2).map(x => x.getBoundingClientRect().top); return c[0] === c[1] && document.documentElement.scrollWidth <= innerWidth; }));
