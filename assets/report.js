@@ -100,17 +100,22 @@
   const fmtHours = s => { const h = Math.floor(s / 3600), m = Math.round(s % 3600 / 60); return h ? h.toLocaleString() + "h " + m + "m" : m + "m"; };
   // Normal first, then the rest by how many clears.
   const versionsText = v => Object.entries(v).sort((a, b) => (b[0] === "Normal") - (a[0] === "Normal") || b[1] - a[1]).map(([k, n]) => esc(k) + " " + n.toLocaleString()).join(" · ");
+  // A card is a div whose "View guide" link stretches over it, so the
+  // Fastest / Average times can link to the run on raid.report or
+  // dungeon.report (a link can't sit inside a link).
   function card(item, kind, e){
-    const none = !e || !e.clears;
-    return '<a class="activity-card panel-card rr-card' + (none ? " none" : "") + '" href="' + window.rallyFlagGuideHref(kind, item.slug) + '">' +
+    const none = !e || !e.clears, slug = esc(item.slug);
+    return '<div class="activity-card panel-card rr-card' + (none ? " none" : "") + '">' +
       // Badges in a bar under the art (one row kept even when empty, so cards line up).
       '<div class="rr-art">' + window.rallyFlagArtThumb(item) + '<div class="rr-badges" data-badges="' + esc(item.slug) + '" data-kind="' + kind + '"></div></div>' +
       '<div class="activity-name">' + esc(item.name) + "</div>" +
-      '<div class="rr-clears"><b>' + (none ? 0 : e.clears.toLocaleString()) + "</b> " + ((e && e.clears) === 1 ? "clear" : "clears") + "</div>" +
+      '<div class="rr-clears"><b>' + (none ? 0 : e.clears.toLocaleString()) + "</b> " + ((e && e.clears) === 1 ? "clear" : "clears") + '<span class="rr-full" data-full="' + slug + '" hidden></span></div>' +
       (none ? '<p class="rr-line">' + (e && e.seconds ? "Played " + fmtHours(e.seconds) + ", no clear yet" : "No clears yet") + "</p>"
-        : '<dl class="rr-meta"><div><dt>Fastest</dt><dd>' + (e.fastest ? fmtTime(e.fastest) : "–") + "</dd></div><div><dt>Time played</dt><dd>" + fmtHours(e.seconds) + '</dd></div><div data-sherpas="' + esc(item.slug) + '" hidden><dt>Sherpas</dt><dd></dd></div></dl>' +
+        // Fastest starts as Bungie's (can be a checkpoint run) until the run history finds the fastest full clear.
+        : '<dl class="rr-meta"><div><dt>Fastest</dt><dd data-fastest="' + slug + '">' + (e.fastest ? fmtTime(e.fastest) : "–") + '</dd></div><div data-average="' + slug + '" hidden><dt>Average</dt><dd></dd></div>' +
+          "<div><dt>Time played</dt><dd>" + fmtHours(e.seconds) + '</dd></div><div data-sherpas="' + slug + '" hidden><dt>Sherpas</dt><dd></dd></div></dl>' +
           '<p class="rr-line">' + versionsText(e.versions) + "</p>") +
-      '<div class="activity-arrow">View guide →</div></a>';
+      '<a class="activity-arrow rr-guide" href="' + window.rallyFlagGuideHref(kind, item.slug) + '">View guide<span class="sr-only">: ' + esc(item.name) + "</span> →</a></div>";
   }
   function render(r, type, id){
     const idx = window.ActivityIndex, ud = (r.profile.profile && r.profile.profile.data && r.profile.profile.data.userInfo) || {};
@@ -138,11 +143,35 @@
       '<h2 class="rr-h">Raids</h2>' + grid(idx.raids, "raid") +
       '<h2 class="rr-h">Dungeons</h2>' + grid(idx.dungeons, "dungeon") +
       (retired.length ? '<h2 class="rr-h">Retired raids</h2><ul class="rr-retired">' + retired.map(e => "<li><b>" + esc(e.name) + "</b> " + e.clears.toLocaleString() + (e.clears === 1 ? " clear" : " clears") + (e.fastest ? " · fastest " + fmtTime(e.fastest) : "") + "</li>").join("") + "</ul>" : "") +
-      '<p class="rr-note">Clears and times are Bungie\'s own numbers, across every character (deleted ones too). Clears count runs started from a checkpoint, and the fastest time can be one of those.</p>';
+      '<p class="rr-note">Clears and time played are Bungie\'s own numbers, across every character (deleted ones too), and count runs started from a checkpoint. ' +
+        "Fastest is the fastest full clear (started from the beginning) and Average the middle clear time, leaving out runs quicker than that (checkpoint runs), as raid.report shows them; both open the run there. " +
+        "Full clears are counted with sherpas.</p>";
     $("rr-copy").addEventListener("click", () => {
       const url = location.origin + location.pathname + "?p=" + type + "-" + id;
       (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => { $("rr-copy").textContent = "Link copied"; }, () => { $("rr-copy").textContent = url; });
     });
+  }
+
+  // A run on raid.report / dungeon.report (their run page).
+  const runLink = (kind, id, text) => '<a class="rr-run" href="https://' + (kind === "dungeon" ? "dungeon" : "raid") + ".report/pgcr/" + esc(id) + '" target="_blank" rel="noopener">' + text + '<span class="sr-only"> (run on ' + (kind === "dungeon" ? "dungeon" : "raid") + ".report, opens in a new tab)</span></a>";
+  function showTime(attr, slug, kind, run){
+    const el = document.querySelector("[data-" + attr + '="' + slug + '"]');
+    if (!el || !run) return;
+    const dd = el.tagName === "DD" ? el : el.querySelector("dd");
+    dd.innerHTML = runLink(kind, run.id, fmtTime(run.dur * 1000));
+    el.hidden = false;
+  }
+  // The fastest clear that started from the beginning: run reports, fastest
+  // first, until one is fresh (saved, so later looks fetch none).
+  async function fastestFull(list, live){
+    const sorted = list.filter(c => c.dur > 0).sort((a, b) => a.dur - b.dur);
+    if (!sorted.length) return undefined; // no times to go on: keep Bungie's
+    for (let i = 0; i < sorted.length && i < 120 && live(); i += 4){
+      const batch = sorted.slice(i, i + 4), rs = await Promise.all(batch.map(c => runOf(c.id).catch(() => null)));
+      const k = rs.findIndex(r => r && r.fresh);
+      if (k >= 0) return batch[k];
+    }
+    return null;
   }
 
   // ---------------- badges ----------------
@@ -291,9 +320,11 @@
     for (const a of lists.flat()){
       const d = a.activityDetails || {}, m = MAP[d.referenceId] || MAP[d.directorActivityHash], v = a.values || {}, n = k => ((v[k] || {}).basic || {}).value || 0;
       if (!m || !m[0] || n("completed") !== 1 || n("completionReason") !== 0 || seen.has(d.instanceId)) continue;
+      // As dungeon.report: a dungeon clear with no kills and no assists (stood idle) doesn't count.
+      if (m[1] === "dungeon" && !n("kills") && !n("assists")) continue;
       seen.add(d.instanceId);
       const slug = m[0], t = Date.parse(a.period);
-      clears.push({ id: d.instanceId, slug, kind: m[1], t });
+      clears.push({ id: d.instanceId, slug, kind: m[1], t, dur: n("activityDurationSeconds") });
       // Earliest clear end, any version and per version (timing badges count the end, as raid.report).
       const end = t + n("activityDurationSeconds") * 1000, f = firsts[slug] || (firsts[slug] = {}), h = d.referenceId;
       if (!f.any || end < f.any) f.any = end;
@@ -305,6 +336,8 @@
     }
     for (const slug in REL){ const b = timingBadge(REL[slug], firsts[slug] || {}, earned); if (b) add(slug, b); }
     showBadges(found);
+    const bySlug = {};
+    for (const c of clears) (bySlug[c.slug] || (bySlug[c.slug] = [])).push(c);
     let done = 0;
     progress("Checking " + candidates.length.toLocaleString() + " runs for solo, duo, trio, flawless and feats… 0%");
     await pool(candidates, 6, async c => {
@@ -323,6 +356,22 @@
     });
     if (job !== loading) return;
     showBadges(found);
+    progress("Finding fastest full clears…");
+    await pool(Object.keys(bySlug), 3, async slug => {
+      const run = await fastestFull(bySlug[slug], () => job === loading);
+      if (job !== loading) return;
+      const dd = document.querySelector('[data-fastest="' + slug + '"]');
+      if (run) showTime("fastest", slug, run.kind, run);
+      else if (run === null && dd) dd.textContent = "–"; // every clear started from a checkpoint
+      // Average, as raid.report: the middle of the clears at least as long as
+      // the fastest full clear (so quick checkpoint runs, like boss farming,
+      // don't drag it down), linked to that run.
+      if (run){
+        const l = bySlug[slug].filter(c => c.dur >= run.dur).sort((a, b) => a.dur - b.dur);
+        showTime("average", slug, run.kind, l[Math.floor(l.length / 2)]);
+      }
+    });
+    if (job !== loading) return;
     progress("Badges from " + seen.size.toLocaleString() + " clears. Solo, duo, trio and flawless count only runs started from the beginning.");
     sherpaPanel(type, id, clears, job);
   }
@@ -356,6 +405,10 @@
     return firsts;
   }
   const sumOf = counts => Object.values(counts).reduce((a, b) => a + b, 0);
+  function showFull(full){
+    if (!full) return;
+    document.querySelectorAll("[data-full]").forEach(el => { const n = full[el.dataset.full]; el.hidden = n == null; el.textContent = n == null ? "" : " · " + n.toLocaleString() + " full"; });
+  }
   function showSherpas(counts, total){
     document.querySelectorAll("[data-sherpas]").forEach(el => { const n = counts[el.dataset.sherpas] || 0; el.hidden = !n; el.querySelector("dd").textContent = n.toLocaleString(); });
     const t = $("rr-sherpa-total"); if (t){ t.hidden = total == null; t.querySelector("dd").textContent = (total || 0).toLocaleString(); }
@@ -368,9 +421,9 @@
     const box = $("rr-sherpa"), saved = await cacheGet(type + "-" + id, "sherpa");
     if (job !== loading || !box) return;
     if (saved){
-      showSherpas(saved.counts, saved.total);
-      sherpaButton(box, "Sherpas counted " + new Date(saved.at).toLocaleDateString() + " from " + saved.clears.toLocaleString() + " clears. " + SHERPA_NOTE, "Update sherpas", type, id, clears, job);
-    } else sherpaButton(box, "Sherpas: runs where a teammate got their first clear. Counting reads every clear and each teammate's history: 10–20 minutes the first time for busy players, quick after that. You can stop and pick it up later.", "Count sherpas", type, id, clears, job);
+      showSherpas(saved.counts, saved.total); showFull(saved.full);
+      sherpaButton(box, "Sherpas and full clears counted " + new Date(saved.at).toLocaleDateString() + " from " + saved.clears.toLocaleString() + " clears. " + SHERPA_NOTE, "Update", type, id, clears, job);
+    } else sherpaButton(box, "Sherpas (runs where a teammate got their first clear) and full clears (started from the beginning, not a checkpoint). Counting reads every clear and each teammate's history: 10–20 minutes the first time for busy players, quick after that. You can stop and pick it up later.", "Count sherpas and full clears", type, id, clears, job);
   }
   async function countSherpas(type, id, clears, job){
     const box = $("rr-sherpa");
@@ -385,8 +438,11 @@
       if (!live()) return null;
       const r = await runOf(c.id).catch(() => null);
       if (++done % 10 === 0) status("Reading your clears… " + done.toLocaleString() + " of " + clears.length.toLocaleString());
-      return r && Object.assign({}, c, { team: r.team || [] });
+      return r && Object.assign({}, c, { team: r.team || [], fresh: r.fresh });
     });
+    // Full clears per raid/dungeon (only once every clear was read).
+    let full = null;
+    if (live()){ full = {}; for (const r of runs) if (r) full[r.slug] = (full[r.slug] || 0) + (r.fresh ? 1 : 0); showFull(full); }
     // 2. Each teammate's earliest run with this player, per raid/dungeon.
     const pairs = new Map();
     for (const r of runs){
@@ -417,10 +473,11 @@
     if (job !== loading) return;
     const total = sumOf(counts);
     showSherpas(counts, total);
-    if (sherpaStop) return sherpaButton(box, "Stopped. The work so far is kept, so counting again picks up from here.", "Count sherpas", type, id, clears, job);
-    cachePut(type + "-" + id, { at: Date.now(), counts, total, clears: clears.length }, "sherpa");
-    sherpaButton(box, total.toLocaleString() + (total === 1 ? " sherpa" : " sherpas") + " across " + clears.length.toLocaleString() + " clears and " + list.length.toLocaleString() + " teammates" +
-      (skipped ? " (" + skipped + " teammates' histories didn't load and aren't counted)" : "") + ". " + SHERPA_NOTE, "Update sherpas", type, id, clears, job);
+    if (sherpaStop) return sherpaButton(box, "Stopped. The work so far is kept, so counting again picks up from here.", "Count sherpas and full clears", type, id, clears, job);
+    cachePut(type + "-" + id, { at: Date.now(), counts, total, clears: clears.length, full }, "sherpa");
+    const fullTotal = full ? sumOf(full) : 0;
+    sherpaButton(box, total.toLocaleString() + (total === 1 ? " sherpa" : " sherpas") + " and " + fullTotal.toLocaleString() + " full clears across " + clears.length.toLocaleString() + " clears and " + list.length.toLocaleString() + " teammates" +
+      (skipped ? " (" + skipped + " teammates' histories didn't load and aren't counted)" : "") + ". " + SHERPA_NOTE, "Update", type, id, clears, job);
   }
 
   // ---------------- recent lookups ----------------
@@ -432,7 +489,8 @@
   }
   function renderRecent(){
     const list = recent();
-    $("rr-recent").innerHTML = list.length ? '<span class="rr-recent-label">Recent</span>' + list.map(x => '<button type="button" class="rr-chip" data-p="' + esc(x.p) + '" data-name="' + esc(x.name) + '">' + esc(x.name) + "</button>").join("") : "";
+    $("rr-recent").innerHTML = list.length ? '<span class="rr-recent-label">Recent</span>' + list.map(x => '<button type="button" class="rr-chip" data-p="' + esc(x.p) + '" data-name="' + esc(x.name) + '">' + esc(x.name) + "</button>").join("") +
+      '<button type="button" class="rr-clear" id="rr-recent-clear">Clear<span class="sr-only"> recent searches</span></button>' : "";
   }
 
   // ---------------- flow ----------------
@@ -485,6 +543,11 @@
     $("rr-q").addEventListener("input", e => { clearTimeout(t); t = setTimeout(() => suggest(e.target.value), 300); });
     $("rr-mine").addEventListener("click", mine);
     document.addEventListener("click", e => {
+      if (e.target.closest("#rr-recent-clear")){
+        try { localStorage.removeItem(RECENT_KEY); } catch (err){}
+        renderRecent(); $("rr-q").focus();
+        return;
+      }
       const b = e.target.closest(".rr-chip[data-p]");
       if (!b) return;
       $("rr-q").value = b.dataset.name;

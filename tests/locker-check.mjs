@@ -1574,13 +1574,19 @@ await section("Report", async () => {
   // earned, and Contest comes first in its list. Vesper's Host's Contest version 20h in: Contest
   // Day One. Duality started 23h in but ended 25h in (2h run): Week One (the end counts).
   const EQ = 2727361621, SD = 3834447244, VH_CONTEST = 1915770060, DUALITY = 2823159265;
-  const run = (id, hash, period, players, deaths, secs = 0) => ({ period, activityDetails: { referenceId: hash, directorActivityHash: hash, instanceId: id, mode: 4 },
-    values: { completed: { basic: { value: 1 } }, completionReason: { basic: { value: 0 } }, playerCount: { basic: { value: players } }, deaths: { basic: { value: deaths } }, activityDurationSeconds: { basic: { value: secs } } } });
+  const run = (id, hash, period, players, deaths, secs = 0, kills = 10) => ({ period, activityDetails: { referenceId: hash, directorActivityHash: hash, instanceId: id, mode: 4 },
+    values: { completed: { basic: { value: 1 } }, completionReason: { basic: { value: 0 } }, playerCount: { basic: { value: players } }, deaths: { basic: { value: deaths } }, activityDurationSeconds: { basic: { value: secs } },
+      kills: { basic: { value: kills } }, assists: { basic: { value: 0 } } } });
+  // VoG: the solo flawless 901 took 30:00; a faster 20:00 run (913) started from a checkpoint and a 40:00
+  // one (915) is too, so Fastest (full clears only) is 30:00 and Average (the middle of runs at least that
+  // long, as raid.report) 40:00: the quick checkpoint run is left out. Warlord's Ruin: a day-one clear with
+  // no kills and no assists (914) doesn't count, as dungeon.report.
   // Plus an Epic Desert Perpetual clear after its first weekly reset: no timing badge.
-  const HIST = { [C1 + ":4"]: [run("901", 3711931140, "2021-05-23T20:00:00Z", 1, 0), run("908", 3817322389, "2025-10-01T00:00:00Z", 6, 1)],
-    [C2 + ":82"]: [run("902", 1077850348, "2024-01-01T00:00:00Z", 2, 1), run("903", 1077850348, "2024-02-01T00:00:00Z", 3, 0), run("904", 1077850348, "2024-03-01T00:00:00Z", 1, 0), run("905", 1077850348, "2024-04-01T00:00:00Z", 6, 4)],
+  const HIST = { [C1 + ":4"]: [run("901", 3711931140, "2021-05-23T20:00:00Z", 1, 0, 1800), run("908", 3817322389, "2025-10-01T00:00:00Z", 6, 1), run("913", 3711931140, "2021-06-23T20:00:00Z", 6, 2, 1200), run("915", 3711931140, "2021-07-23T20:00:00Z", 6, 2, 2400)],
+    [C2 + ":82"]: [run("902", 1077850348, "2024-01-01T00:00:00Z", 2, 1, 2400), run("903", 1077850348, "2024-02-01T00:00:00Z", 3, 0), run("904", 1077850348, "2024-03-01T00:00:00Z", 1, 0), run("905", 1077850348, "2024-04-01T00:00:00Z", 6, 4)],
     [C1 + ":82"]: [run("906", 1077850348, "2024-05-01T00:00:00Z", 2, 0), run("907", 1077850348, "2024-06-01T00:00:00Z", 3, 2), run("909", EQ, "2025-12-13T23:00:00Z", 6, 2), run("910", SD, "2025-02-08T23:00:00Z", 6, 2),
-      run("911", VH_CONTEST, "2024-10-12T13:00:00Z", 6, 2), run("912", DUALITY, "2022-05-28T16:00:00Z", 6, 2, 7200)] };
+      run("911", VH_CONTEST, "2024-10-12T13:00:00Z", 6, 2), run("912", DUALITY, "2022-05-28T16:00:00Z", 6, 2, 7200),
+      run("914", 2004855007, "2023-12-01T20:00:00Z", 3, 0, 3600, 0)] };
   const entry = (m, d) => ({ player: { destinyUserInfo: { membershipId: m, membershipType: 3 } }, values: { deaths: { basic: { value: d } }, completed: { basic: { value: 1 } } } });
   const PGCR = { 901: { activityWasStartedFromBeginning: true, entries: [entry(P, 0)] }, 902: { startingPhaseIndex: 0, entries: [entry(P, 1), entry("2", 0)] },
     903: { startingPhaseIndex: 0, entries: [entry(P, 0), entry("2", 0), entry("3", 0), entry("4", 0), entry("5", 0), entry("6", 0)] }, 904: { startingPhaseIndex: 2, entries: [entry(P, 0)] },
@@ -1588,6 +1594,7 @@ await section("Report", async () => {
     906: { activityWasStartedFromBeginning: false, startingPhaseIndex: 0, entries: [entry(P, 0), entry("2", 0)] },
     907: { startingPhaseIndex: 0, entries: [entry(P, 1), entry("8", 1), entry("9", 0)] },
     // Equilibrium with every feat on (dungeon.report's All Feats; its triumph above is unearned).
+    912: { activityWasStartedFromBeginning: true, entries: [entry(P, 2)] }, 913: { activityWasStartedFromBeginning: false, entries: [entry(P, 2)] }, 915: { activityWasStartedFromBeginning: false, entries: [entry(P, 2)] },
     909: { activityWasStartedFromBeginning: true, selectedSkullHashes: [525411852, 251257575, 2392637702, 991354116, 2673088233, 790421403], entries: [entry(P, 1)] } };
   for (const id in PGCR) PGCR[id].period = { 901: "2021-05-23T20:00:00Z", 902: "2024-01-01T00:00:00Z", 903: "2024-02-01T00:00:00Z", 904: "2024-03-01T00:00:00Z", 906: "2024-05-01T00:00:00Z", 907: "2024-06-01T00:00:00Z" }[id];
   // Sherpas: teammates' own histories (one character each, "77" + their id). 2's first
@@ -1606,8 +1613,8 @@ await section("Report", async () => {
   await p.fill("#rr-q", "Testguard#42"); await p.click("#rr-form [type=submit]"); await p.waitForSelector("#rr-name");
   check("report: a lookup adds every character, deleted ones too (retired raids count toward raid clears)", /\?p=3-4611686018400000999$/.test(p.url()) && await p.textContent("#rr-name") === "Testguard#0042" &&
     /Raid clears11\s*Dungeon clears4/.test((await p.textContent(".rr-totals")).replace(/\s+/g, " ").replace(/ (?=\d)/g, "")) && /1 deleted/.test(await p.textContent(".rr-chars")), await p.textContent(".rr-totals"));
-  const vog = p.locator('.rr-card[href="raid-vault-of-glass.html"]');
-  check("report: a raid card has clears, fastest, time and versions", (await vog.locator(".rr-clears b").textContent()) === "10" && /Fastest\s*35:00/.test(await vog.textContent()) && /Time played\s*10h 50m/.test(await vog.textContent()) && /Normal 8 · Master 2/.test(await vog.textContent()));
+  const vog = p.locator('.rr-card:has(a[href="raid-vault-of-glass.html"])');
+  check("report: a raid card has clears, fastest, time and versions", (await vog.locator(".rr-clears b").textContent()) === "10" && /Fastest\s*(35|30):00/.test(await vog.textContent()) && /Time played\s*10h 50m/.test(await vog.textContent()) && /Normal 8 · Master 2/.test(await vog.textContent()));
   check("report: every guide has a card in the guides' art style, uncleared ones greyed", await p.locator(".rr-card").count() === 22 && await p.locator(".rr-card .art-thumb").count() === 22 && await p.locator(".rr-card.none").count() === 20);
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
   const badgesOf = slug => p.$$eval('[data-badges="' + slug + '"] .rr-badge', b => b.map(x => x.textContent).join(", "));
@@ -1617,9 +1624,13 @@ await section("Report", async () => {
   check("report: badges: an earned Contest triumph is Contest (one timing badge only)", await badgesOf("sundered-doctrine") === "Contest", await badgesOf("sundered-doctrine"));
   check("report: badges: a Contest version clear in its first 24h is Contest Day One", await badgesOf("vespers-host") === "Contest Day One", await badgesOf("vespers-host"));
   check("report: badges: a run that ends after 24h isn't Day One", await badgesOf("duality") === "Week One", await badgesOf("duality"));
+  check("report: badges: a dungeon clear with no kills and no assists doesn't count", await badgesOf("warlords-ruin") === "", await badgesOf("warlords-ruin"));
+  check("report: Fastest is the fastest full clear and Average the middle clear time, each linking to the run on raid.report", await vog.locator('[data-fastest] a').getAttribute("href") === "https://raid.report/pgcr/901" &&
+    /^30:00/.test(await vog.locator("[data-fastest]").textContent()) && /^40:00/.test(await vog.locator("[data-average] dd").textContent()) && await vog.locator('[data-average] a').getAttribute("href") === "https://raid.report/pgcr/915", await vog.locator(".rr-meta").textContent());
+  check("report: dungeon runs link to dungeon.report", await p.locator('[data-fastest="prophecy"] a').getAttribute("href") === "https://dungeon.report/pgcr/902");
   check("report: badges: a clear after the first weekly reset gets no timing badge", await badgesOf("the-desert-perpetual") === "", await badgesOf("the-desert-perpetual"));
   check("report: badges: an earned solo flawless triumph shows Solo Flawless (and covers Duo and Flawless)", await badgesOf("prophecy") === "Solo Flawless", await badgesOf("prophecy"));
-  check("report: badges: carnage reports only for runs that could count", pgcrCalls.sort().join() === "901,902,903,904,906,909", pgcrCalls.join());
+  check("report: badges: carnage reports only for runs that could count", pgcrCalls.sort().join() === "901,902,903,904,906,909,912,913,915", pgcrCalls.join());
   await p.click("#rr-sherpa-go");
   await p.waitForFunction(() => /sherpas? across/.test(document.getElementById("rr-sherpa").textContent), null, { timeout: 30000 }).catch(() => {});
   check("report: sherpas: a teammate's first clear with this player counts, earlier clears elsewhere don't", await p.textContent('[data-sherpas="prophecy"] dd') === "3" &&
@@ -1633,9 +1644,13 @@ await section("Report", async () => {
   pgcrCalls.length = 0;
   await p.reload(); await p.waitForSelector("#rr-name");
   await p.waitForFunction(() => /^Badges from/.test(document.getElementById("rr-progress").textContent), null, { timeout: 30000 });
-  check("report: sherpas: the last count shows straight away on a later visit", await p.textContent('[data-sherpas="prophecy"] dd') === "3" && /Sherpas counted/.test(await p.textContent("#rr-sherpa")));
+  check("report: sherpas: the last count shows straight away on a later visit", await p.textContent('[data-sherpas="prophecy"] dd') === "3" && /Sherpas and full clears counted/.test(await p.textContent("#rr-sherpa")) &&
+    await p.textContent('[data-full="prophecy"]') === " · 3 full");
   check("report: badges: run reports are kept, so a second look fetches none", !pgcrCalls.length && await badgesOf("vault-of-glass") === "Flawless Solo, Week One", pgcrCalls.join());
   check("report: a shared link opens the same report, and it's under Recent", await p.textContent("#rr-name") === "Testguard#0042" && /Testguard#0042/.test(await p.textContent("#rr-recent")));
+  await p.click("#rr-recent-clear");
+  check("report: Clear empties the recent searches and forgets them", await p.textContent("#rr-recent") === "" &&
+    await p.evaluate(() => localStorage.getItem("rallyflag_report_recent")) === null);
   await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
   check("report (phone): one card per row, full width, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".rr-card")].slice(0, 2).map(x => x.getBoundingClientRect()); return c[1].top > c[0].bottom && c[0].width > innerWidth - 40 && document.documentElement.scrollWidth <= innerWidth; }));
   check("report: no script errors", !p.errors.length, p.errors.join("; "));
