@@ -105,13 +105,13 @@
 
   <h2>rallyflag.gg (the website)</h2>
   <ul>
-    <li>The site itself is static pages plus client-side JavaScript. The one exception is the Locker preview, which uses two small Cloudflare services described in its own section below.</li>
+    <li>The site itself is static pages plus client-side JavaScript. The one exception is the Locker, which uses two small Cloudflare services described in its own section below.</li>
     <li>Pages that show Destiny data (raids, dungeons, builds, etc.) call Bungie's public API directly from your browser using a shared, non-personal API key. No account or personal info is required to use them.</li>
     <li>The optional "sign in with Bungie.net" feature on <a href="vendors.html">Vendors</a> uses Bungie's own OAuth login to show your loadouts. The resulting access token is kept in your browser's <code>sessionStorage</code> only — it's never sent to us, because there's no "us" to send it to. It's cleared automatically when you close the tab. (The Locker is different; see below.)</li>
     <li>We use <a href="https://www.cloudflare.com/web-analytics/" target="_blank" rel="noopener">Cloudflare Web Analytics</a> to see aggregate traffic (page views, referrers, rough location by country). It's cookieless and doesn't fingerprint or track you individually — Cloudflare's own privacy policy covers exactly what it collects. We don't run any other analytics, tracking pixels, or advertising on the site.</li>
   </ul>
 
-  <h2>Locker (preview)</h2>
+  <h2>Locker</h2>
   <p>The Locker shows your weapons and armor after you sign in with Bungie.net, and lets you move, equip and save loadouts. Here's what it keeps and where.</p>
   <ul>
     <li><strong>In your browser:</strong> your sign-in token, farming mode and a short note of your recent moves (<code>sessionStorage</code>, cleared when the tab closes); your tags (Favorite, Junk and the rest), PvE/PvP marks, item notes, weapon wish lists, saved loadouts and layout choices (<code>localStorage</code>); and a trimmed copy of Bungie's public item database (IndexedDB) so the page loads faster next time.</li>
@@ -125,7 +125,7 @@
       <li><strong>Perk insights from Clarity (when offered, on unless you switch them off under Tools):</strong> the first time you tap a perk, the Locker downloads <a href="https://d2clarity.com">Clarity</a>'s community perk descriptions from GitHub (<code>raw.githubusercontent.com</code>) and keeps them in your browser (IndexedDB). Each visit it checks a small version file there and downloads them again only when Clarity has published an update. Nothing about you or your gear is sent.</li>
     <li><strong>New items:</strong> to mark items that are new since your last visit, the Locker keeps the ids of the items it has shown you in your browser (<code>localStorage</code>).</li>
   </ul>
-  <h2>Your Week (preview)</h2>
+  <h2>Your Week</h2>
   <p>Your Week shows your progress against this week's rotation after you sign in with Bungie.net. It reads your season pass, milestones, bounties, quests, seals and each character's raid and dungeon activity history from Bungie when you open the page. None of that is stored or sent anywhere else; only a trimmed copy of Bungie's public definitions (names and objective texts) is kept in your browser (IndexedDB) so the page loads faster next time.</p>
 
   <h2>Changes</h2>

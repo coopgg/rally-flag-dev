@@ -99,7 +99,7 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   stay `align-items:start` and reserve the variable bits instead (fixed line
   counts / min-heights). New card content that can vary in length needs the
   same treatment or the grid stops matching.
-- **Locker (live on rallyflag.gg since 2026-10-28, Preview).** `locker.html` + `assets/locker.js` show the
+- **Locker (live on rallyflag.gg since 2026-10-28).** `locker.html` + `assets/locker.js` show the
   signed-in player's weapons/armor (one GetProfile call) with God Roll
   matches and armor set progress. `assets/locker-worker.js` downloads
   Bungie's DestinyInventoryItemLiteDefinition (~3MB gz), trims it to ~6MB
@@ -172,7 +172,7 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
 - **Seals & Triumphs** (`seals.html` + `assets/seals.js`, HANDOFF item 87):
   any player's seals from public profile components; definitions from Your
   Week's worker (bump its SCHEMA when the stored shape changes).
-- **Your Week (live on rallyflag.gg since 2026-10-22, Preview).** `your-week.html` + `assets/your-week.js`
+- **Your Week (live on rallyflag.gg since 2026-10-22).** `your-week.html` + `assets/your-week.js`
   (+ `your-week-worker.js` for Bungie's definitions, `your-week-demo.json`
   for `?demo`, built by `tools/build-your-week-demo.js`): the signed-in
   player's week against This Week's rotation (featured raids/dungeons with

@@ -1,5 +1,5 @@
 /* ============================================================
-   Your Week (your-week.html, dev-only preview): the signed-in player's
+   Your Week (your-week.html): the signed-in player's
    week against Rally Flag's rotation. This week's featured raids and
    dungeons (assets/featured-rotation-data.js) with each character's clears
    since the weekly reset (activity history), the season pass, milestones,

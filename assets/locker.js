@@ -1,5 +1,5 @@
 /* ============================================================
-   Locker (dev-only preview, stage 2: move / equip / lock / postmaster).
+   Locker: gear, moves / equips / locks / postmaster, loadouts.
 
    Shows every weapon and armor piece across the signed-in player's
    characters and vault, Rally Flag style: God Roll matches from
