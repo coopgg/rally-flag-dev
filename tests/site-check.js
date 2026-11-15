@@ -336,7 +336,7 @@ async function checkLinks(links){
   if (LIVE) pages = await livePages();
   console.log(`Checking ${LIVE || ROOT}: ${pages.length} pages × ${COMBOS.length} views…`);
   if (!LIVE) checkGeneratedPages();
-  const browser = await chromium.launch();
+  const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {}) /* PW_CHROMIUM: a preinstalled browser when Playwright's own build isn't there */;
   const links = [];
   await Promise.all(COMBOS.map((combo, i) => checkCombo(browser, combo, i === 0 ? links : null)));
   if (process.env.THEMES) await checkThemes(browser);

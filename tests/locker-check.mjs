@@ -88,7 +88,7 @@ const SyncWorker = await loadWorker("tools/sync-worker/worker.js");
 const RelayWorker = await loadWorker("tools/dim-relay/worker.js");
 
 // ---------- browser helpers ----------
-const browser = await chromium.launch();
+const browser = await chromium.launch(process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {}) /* PW_CHROMIUM: a preinstalled browser when Playwright's own build isn't there */;
 // opts: { real } signs in with a fake session and mocks Bungie's profile and
 // actions; { env } is the sync service's database (shared = two devices).
 const CLARITY_FIX = { version: 1, perks: {} };
@@ -1658,6 +1658,27 @@ await section("Report", async () => {
 });
 
 // ---------- God Rolls page ↔ Locker ----------
+// ---------- Clickjacking guard (nav.js) ----------
+await section("Frames", async () => {
+  const p = await open({ url: BASE + "faq.html", ready: "main" });
+  const ctx = p.context_;
+  const host = (url, html) => ctx.route(url, r => r.fulfill({ status: 200, contentType: "text/html", body: html }));
+  await host("https://evil.example/", '<!DOCTYPE html><title>x</title><iframe id="f" src="' + BASE + 'faq.html" width="1000" height="700"></iframe>');
+  await p.goto("https://evil.example/"); await p.waitForTimeout(2500);
+  const f = p.frame({ url: BASE + "faq.html" });
+  const st = await f.evaluate(() => ({ alert: (document.querySelector('[role="alert"]') || {}).textContent || "", inert: !!document.querySelector("main").closest("[inert]"),
+    link: (document.querySelector('[role="alert"] a') || {}).target, top: document.elementFromPoint(innerWidth / 2, innerHeight / 2).closest('[role="alert"]') !== null }));
+  check("frames: inside another site, a page is inert behind a notice that opens it in its own tab", /can't be used inside another website/.test(st.alert) && st.inert && st.link === "_blank" && st.top, JSON.stringify(st));
+  // Our own page framing ours is fine.
+  await p.goto(BASE + "faq.html"); await p.waitForSelector("main");
+  await p.evaluate(b => { const i = document.createElement("iframe"); i.src = b + "codes.html"; i.width = 900; i.height = 600; document.body.appendChild(i); }, BASE);
+  await p.waitForTimeout(2500);
+  const own = await p.frame({ url: BASE + "codes.html" }).evaluate(() => ({ alert: !!document.querySelector('[role="alert"]'), inert: !!document.querySelector("main").closest("[inert]") }));
+  check("frames: a frame of our own page isn't blocked", !own.alert && !own.inert, JSON.stringify(own));
+  check("frames: a normal visit isn't blocked", !(await p.evaluate(() => !!document.querySelector("main").closest("[inert]"))));
+  await ctx.close();
+});
+
 // ---------- Crucible & Trials (PvP section) ----------
 await section("PvP", async () => {
   const P = "4611686018400000777";

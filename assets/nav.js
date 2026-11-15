@@ -346,6 +346,35 @@
     }
   }
 
+  // Clickjacking guard. GitHub Pages can't send X-Frame-Options or a CSP
+  // frame-ancestors header, so a page loaded inside another site's frame
+  // (where buttons could be hidden under a decoy) is made inert, with only
+  // a link to open it in its own tab. Frames of our own pages are fine.
+  function framedByOtherSite(){
+    if (window.top === window.self) return false;
+    try { return window.top.location.origin !== window.location.origin; } catch (e){ return true; } // cross-origin parents can't be read
+  }
+  function blockForeignFrame(){
+    if (!framedByOtherSite()) return false;
+    for (const el of document.body.children) el.inert = true;
+    const box = document.createElement("div");
+    box.setAttribute("role", "alert");
+    box.style.cssText = "position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;background:var(--bg, #0a0d14);color:var(--text, #fff);font:16px/1.5 var(--font-sans, sans-serif);";
+    const link = document.createElement("a");
+    link.href = window.location.href; link.target = "_blank"; link.rel = "noopener";
+    link.textContent = "Open Rally Flag";
+    link.style.cssText = "color:var(--accent-text, #7dd3fc);font-weight:600;";
+    const msg = document.createElement("p");
+    msg.style.margin = "0";
+    msg.textContent = "Rally Flag can't be used inside another website.";
+    box.append(msg, link);
+    document.body.appendChild(box);
+    // Anything a page adds later (toasts, dialogs) is inert too.
+    new MutationObserver(list => { for (const m of list) for (const n of m.addedNodes) if (n !== box && n.nodeType === 1) n.inert = true; }).observe(document.body, { childList: true });
+    document.documentElement.classList.remove("rf-boot"); // show the notice at once
+    return true;
+  }
+
   // Cloudflare Web Analytics — cookieless, no visitor data stored beyond
   // aggregate counts (matches privacy.html's existing "no stored user
   // data" claim). Only loads on the real domain so dev/testing traffic
@@ -523,6 +552,7 @@
 
   watchForMaintenance();
   setupPWA();
+  blockForeignFrame();
   setupAnalytics();
   buildNav();
   applyTheme(getStoredTheme());
