@@ -292,7 +292,7 @@
     current = { weapon, hash: null };
     document.body.classList.add("wl-detail-on");
     $("wl-search-view").hidden = true; $("wl-detail").hidden = false;
-    $("wl-detail").innerHTML = '<p class="wl-status" role="status">Loading ' + esc(weapon.name) + "…</p>";
+    $("wl-detail").innerHTML = window.rallyFlagSkeleton({ html: "Loading " + esc(weapon.name) + "…", heading: false, cards: 0, rows: 8 });
     document.title = weapon.name + " - Weapon Lookup - Rally Flag";
     window.scrollTo(0, 0);
     let defs;

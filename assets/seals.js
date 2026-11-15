@@ -38,7 +38,13 @@
       w.postMessage({ apiKey: API_KEY });
     });
   }
-  const status = (t, error) => { $("sl-out").innerHTML = t ? '<p class="sl-status' + (error ? " error" : "") + '" role="status">' + esc(t) + "</p>" : ""; };
+  // While loading, a skeleton; its status line takes the progress steps.
+  const status = (t, error) => {
+    const line = !error && t && /…$/.test(t) && document.querySelector("#sl-out .skel-text"); // progress steps only
+    if (line){ line.textContent = t; return; }
+    $("sl-out").innerHTML = t ? '<p class="sl-status' + (error ? " error" : "") + '" role="status">' + esc(t) + "</p>" : "";
+  };
+  const loadingSkeleton = t => { $("sl-out").innerHTML = window.rallyFlagSkeleton({ html: esc(t), art: false, cards: 6 }); };
 
   // ---------------- finding a player (as on the Raid & Dungeon Report) ----------------
   const pick = list => list.find(m => m.crossSaveOverride && m.crossSaveOverride === m.membershipType) || list.find(m => !m.crossSaveOverride) || list[0];
@@ -138,6 +144,7 @@
     suggestJob++; $("sl-suggest").hidden = true;
     if (push) history.pushState({ p }, "", "?p=" + p);
     try {
+      loadingSkeleton(DEFS ? "Reading seals and triumphs…" : "Getting Bungie's seal list…");
       if (!DEFS){ DEFS = await loadDefs(); }
       status("Reading seals and triumphs…");
       const P = await api("/Destiny2/" + m[1] + "/Profile/" + m[2] + "/?components=100,200,700,900");

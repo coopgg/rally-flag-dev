@@ -291,6 +291,15 @@ main:focus{ outline:none; }
    by script only, so pages without JavaScript never hide anything. */
 .rf-boot main, .rf-boot footer{ visibility:hidden; }
 
+/* Page-to-page cross-fade (cross-document view transitions: Chrome/Edge,
+   Safari 18.2+; others switch pages as before). The incoming page is a live
+   view, so content that .rf-boot holds back fades in when it's revealed.
+   Only without a reduced-motion preference. */
+@media (prefers-reduced-motion: no-preference){
+  @view-transition{ navigation: auto; }
+  ::view-transition-old(root), ::view-transition-new(root){ animation-duration:180ms; }
+}
+
 /* ---------- Keyboard focus for custom controls ----------
    Filter chips (<button class="chip">) and expandable card headers
    ([role="button"]) on God Rolls, Builds, Armor Sets and Artifacts. */
@@ -489,3 +498,22 @@ a.panel-card:hover, a.panel-card:focus-visible, .featured-card:hover{
 .surge-chip.icon-only{ width:26px; padding:0; justify-content:center; }
 .surge-solar{ background:#a8461a; } .surge-arc{ background:#1f6a85; } .surge-void{ background:#6b3fa0; } .surge-stasis{ background:#3b5bb5; } .surge-strand{ background:#1d6e40; }
 .surge-note{ font-size:12.5px; color:var(--text-dim); }
+
+/* Skeleton loaders (window.rallyFlagSkeleton in nav.js): grey shapes where
+   the content will go while Bungie answers, with the status line above. */
+.skel{ background:color-mix(in srgb, var(--text) 9%, transparent); border-radius:6px; }
+@media (prefers-reduced-motion: no-preference){
+  .skel{ animation:skel-pulse 1.4s ease-in-out infinite; }
+  @keyframes skel-pulse{ 50%{ opacity:0.45; } }
+}
+.skel-text{ margin:22px 0 12px; font-size:14px; color:var(--text-dim); }
+.skel-banner{ height:118px; margin-bottom:28px; border-radius:14px; }
+.skel-heading{ width:140px; height:20px; margin:0 0 14px; }
+.skel-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(260px, 1fr)); gap:16px; }
+.skel-card{ overflow:hidden; padding:0 0 16px; }
+.skel-card .skel-art{ aspect-ratio:16/9; border-radius:0; margin-bottom:14px; }
+.skel-line{ height:12px; margin:10px 18px 0; }
+.skel-line.big{ height:26px; width:35%; }
+.skel-line.w80{ width:80%; } .skel-line.w60{ width:60%; } .skel-line.w40{ width:40%; }
+.skel-rows .skel-line{ margin:12px 0 0; }
+

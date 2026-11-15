@@ -194,7 +194,7 @@
     const job = ++loading;
     suggestJob++;
     $("rr-suggest").hidden = true;
-    say('<p class="rr-status">Reading Crucible and Trials stats…</p>');
+    say(window.rallyFlagSkeleton({ html: "Reading Crucible and Trials stats…", grid: "pv-grid" }));
     if (push) history.pushState({ p }, "", "?p=" + p);
     try {
       const r = await load(m[1], m[2]);
@@ -235,9 +235,16 @@
     $("rr-q").addEventListener("input", e => { clearTimeout(t); t = setTimeout(() => suggest(e.target.value), 300); });
     $("rr-mine").addEventListener("click", mine);
     document.addEventListener("click", e => {
+      // Clear forgets them at once, with Undo in their place until the next lookup.
       if (e.target.closest("#rr-recent-clear")){
+        const was = recent();
         try { localStorage.removeItem(RECENT_KEY); } catch (err){}
-        renderRecent(); $("rr-q").focus();
+        $("rr-recent").innerHTML = '<span class="rr-recent-label">Recent searches cleared.</span><button type="button" class="rr-clear" id="rr-recent-undo">Undo</button>';
+        $("rr-recent-undo").addEventListener("click", () => {
+          try { localStorage.setItem(RECENT_KEY, JSON.stringify(was)); } catch (err){}
+          renderRecent(); const first = $("rr-recent").querySelector(".rr-chip"); if (first) first.focus();
+        });
+        $("rr-recent-undo").focus();
         return;
       }
       const b = e.target.closest(".rr-chip[data-p]");

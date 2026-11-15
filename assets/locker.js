@@ -2198,10 +2198,18 @@
       input.addEventListener("keydown", e => { if (e.key === "Escape"){ e.preventDefault(); close(); } });
     }
     box.querySelectorAll("[data-lo-del]").forEach(b => b.addEventListener("click", () => {
-      // Two taps: the first asks, the second deletes.
-      if (b.dataset.confirm !== "1"){ b.dataset.confirm = "1"; b.firstChild.textContent = "Tap again to delete"; return; }
-      writeLoadouts(readLoadouts().filter(x => x.id !== b.dataset.loDel));
-      renderLoadoutCount(); renderLoadouts(); toast("Loadout deleted.", "ok");
+      // Deletes at once, with Undo in the toast for 8 seconds (puts it back in
+      // its place; its new timestamp outranks the deletion, so sync keeps it).
+      const list = readLoadouts(), at = list.findIndex(x => x.id === b.dataset.loDel), gone = list[at];
+      if (!gone) return;
+      writeLoadouts(list.filter(x => x.id !== gone.id));
+      renderLoadoutCount(); renderLoadouts();
+      toast("Deleted " + gone.name + ".", "ok", null, { label: "Undo", run: () => {
+        const now = readLoadouts();
+        if (now.some(x => x.id === gone.id)) return;
+        now.splice(Math.min(at, now.length), 0, gone);
+        writeLoadouts(now); renderLoadoutCount(); renderLoadouts(); toast("Put " + gone.name + " back.", "ok");
+      } });
     }));
     box.querySelectorAll("[data-pick]").forEach(b => b.addEventListener("click", () => {
       const slot = loReview.slots.find(x => x.k === +b.dataset.pickSlot);
@@ -3387,7 +3395,8 @@
     if (inside) dlg.appendChild(t);
   }
   let toastTimer = 0;
-  function toast(text, kind, err){
+  // action: { label, run } adds a button (e.g. Undo) and keeps the toast up longer.
+  function toast(text, kind, err, action){
     const t = $("locker-toast");
     // A modal popup makes the rest of the page inert, so while it's open
     // the message lives inside it (its button must stay clickable).
@@ -3402,9 +3411,15 @@
       b.addEventListener("click", () => { RallyFlagAuth.signOut(); RallyFlagAuth.signIn(location.pathname); });
       t.appendChild(b);
     }
+    if (action){
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "toast-action"; b.textContent = action.label;
+      b.addEventListener("click", () => { clearTimeout(toastTimer); t.className = "locker-toast"; action.run(); });
+      t.appendChild(b);
+    }
     t.className = "locker-toast show " + kind + (t.querySelector("button") ? " has-action" : "");
     clearTimeout(toastTimer);
-    if (kind !== "busy") toastTimer = setTimeout(() => { t.className = "locker-toast"; }, kind === "error" ? (err && err.scope ? 20000 : 9000) : 3500);
+    if (kind !== "busy") toastTimer = setTimeout(() => { t.className = "locker-toast"; }, kind === "error" ? (err && err.scope ? 20000 : 9000) : action ? 8000 : 3500);
   }
 
   // Postmaster names for things outside the trimmed database (engrams,

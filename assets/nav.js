@@ -375,6 +375,40 @@
     return true;
   }
 
+  // Skeleton loader markup for pages waiting on Bungie: the status line
+  // (html, already escaped; a live status) above grey shapes of what's
+  // coming: a banner, a heading and a grid of cards (with art), or rows.
+  window.rallyFlagSkeleton = ({ html = "Loading…", banner = true, heading = true, cards = 6, art = true, grid = "skel-grid", rows = 0 } = {}) => {
+    const card = '<div class="skel-card panel-card">' + (art ? '<div class="skel skel-art"></div>' : '<div class="skel skel-line w40" style="margin-top:18px"></div>') +
+      '<div class="skel skel-line big"></div><div class="skel skel-line w80"></div><div class="skel skel-line w60"></div></div>';
+    return '<div class="skel-wrap" aria-busy="true"><p class="skel-text" role="status">' + html + "</p>" +
+      '<div aria-hidden="true">' + (banner ? '<div class="skel skel-banner"></div>' : "") + (heading && (cards || rows) ? '<div class="skel skel-heading"></div>' : "") +
+      (cards ? '<div class="' + grid + '">' + card.repeat(cards) + "</div>" : "") +
+      (rows ? '<div class="skel-rows">' + Array.from({ length: rows }, (_, i) => '<div class="skel skel-line ' + ["w80", "w60", "w40"][i % 3] + '"></div>').join("") + "</div>" : "") + "</div></div>";
+  };
+
+  // Faster page changes (Chrome/Edge; others ignore it): hovering or
+  // pressing a link to one of our pages starts loading it. Plain content
+  // pages are prerendered (ready to show at once); pages that look up a
+  // player, need sign-in or call Bungie on load are only prefetched (the
+  // HTML), so nothing runs for a page that isn't opened.
+  const LIVE_PAGES = ["locker", "your-week", "report", "pvp", "seals", "weapons", "oauth-callback", "this-week", "index", "tracker", "vendors", "distortions"];
+  function setupSpeculation(){
+    if (!(HTMLScriptElement.supports && HTMLScriptElement.supports("speculationrules"))) return;
+    const root = new URL("./", document.baseURI).pathname; // the site's folder (404.html sets <base>)
+    const ours = { href_matches: { pathname: root + "*" }, relative_to: "document" };
+    const notNewTab = { not: { selector_matches: "[target=_blank], [download], [rel~=nofollow]" } };
+    const live = { or: [{ href_matches: { pathname: root } }].concat(LIVE_PAGES.map(p => ({ href_matches: { pathname: root + p + ".html" } }))) };
+    const rules = {
+      prerender: [{ where: { and: [ours, notNewTab, { not: live }] }, eagerness: "moderate" }],
+      prefetch: [{ where: { and: [ours, notNewTab, live] }, eagerness: "moderate" }]
+    };
+    const s = document.createElement("script");
+    s.type = "speculationrules";
+    s.textContent = JSON.stringify(rules);
+    document.head.appendChild(s);
+  }
+
   // Cloudflare Web Analytics — cookieless, no visitor data stored beyond
   // aggregate counts (matches privacy.html's existing "no stored user
   // data" claim). Only loads on the real domain so dev/testing traffic
@@ -553,6 +587,7 @@
   watchForMaintenance();
   setupPWA();
   blockForeignFrame();
+  setupSpeculation();
   setupAnalytics();
   buildNav();
   applyTheme(getStoredTheme());

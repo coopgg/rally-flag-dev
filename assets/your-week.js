@@ -76,7 +76,7 @@
     if (loading) return;
     if (DATA && !force && Date.now() - loadedAt < 120000) return draw();
     loading = true;
-    if (!DATA) showStatus('<p>Loading your week from Bungie.net… <span id="yw-note"></span></p>');
+    if (!DATA) $("yw-status").innerHTML = window.rallyFlagSkeleton({ html: 'Loading your week from Bungie.net… <span id="yw-note"></span>', banner: false, cards: 4 });
     else draw();
     try {
       const [defs, data] = await Promise.all([DEFS || loadDefs(), loadData()]);

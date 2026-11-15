@@ -961,7 +961,7 @@ await section("Loadouts", async () => {
   await p.click('[data-lo-edit="' + kit + '"]'); await p.click("#ed-weapons"); await p.click("#ed-save");
   const wo2 = await p.evaluate(id => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.id === id), kit);
   check("weapons only: the editor's button turns a loadout into one", wo2.cls === 3 && wo2.items.length === 3 && !wo2.mods.length && !wo2.subclass, JSON.stringify([wo2.items.length, wo2.cls]));
-  for (const x of [wo.id, kit]){ await p.click('[data-lo-pick="r-' + x + '"]'); await p.click('[data-lo-del="' + x + '"]'); await p.click('[data-lo-del="' + x + '"]'); }
+  for (const x of [wo.id, kit]){ await p.click('[data-lo-pick="r-' + x + '"]'); await p.click('[data-lo-del="' + x + '"]'); }
   await p.click('[data-lo-pick="r-' + id + '"]');
   // Editor: with an exotic of a kind in the loadout, other slots of that kind offer no exotic.
   await p.click("#tab-gear"); await p.fill("#locker-search", "is:exotic"); await p.waitForTimeout(400);
@@ -1004,10 +1004,14 @@ await section("Loadouts", async () => {
   await p.click('[data-opt-save="0"]');
   const optSaved = await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).slice(-1)[0]);
   check("optimizer: Save as loadout stores the 5 pieces", optSaved.items.length === 5 && /^Optimized /.test(optSaved.name) && (await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).length)) === before + 1);
-  await p.click('[data-lo-del="' + optSaved.id + '"]'); await p.click('[data-lo-del="' + optSaved.id + '"]');
+  await p.click('[data-lo-del="' + optSaved.id + '"]');
   await p.click('[data-lo-pick="r-' + id + '"]');
-  const del = p.locator("[data-lo-del]").first(); await del.click(); await del.click();
-  check("loadouts: two-tap delete", await p.locator('[data-lo-pick^="r-"]').count() === 0);
+  const del = p.locator("[data-lo-del]").first(); await del.click();
+  check("loadouts: one tap deletes, with Undo in the toast", await p.locator('[data-lo-pick^="r-"]').count() === 0 && /^Deleted /.test(await p.textContent("#locker-toast")) && await p.isVisible("#locker-toast .toast-action"));
+  await p.click("#locker-toast .toast-action");
+  check("loadouts: Undo puts the loadout back", await p.locator('[data-lo-pick^="r-"]').count() === 1 && /Put .* back/.test(await p.textContent("#locker-toast")));
+  await p.locator("[data-lo-del]").first().click();
+  check("loadouts: deleting again sticks", await p.locator('[data-lo-pick^="r-"]').count() === 0);
   check("loadouts: no script errors", !p.errors.length, p.errors.join("; "));
   await p.context_.close();
 });
@@ -1332,7 +1336,7 @@ await section("Sync", async () => {
   await comeBack(B);
   check("sync: notes reach the other device", await B.evaluate(id => /note: synced note/.test(document.querySelector('#buckets .item-tile[data-id="' + id + '"]').getAttribute("aria-label")), item));
   // Both change at once: B deletes the loadout, A saves another.
-  await B.click('[data-lo-pick^="r-"]'); const del = B.locator("[data-lo-del]").first(); await del.click(); await del.click(); await B.waitForTimeout(2000);
+  await B.click('[data-lo-pick^="r-"]'); const del = B.locator("[data-lo-del]").first(); await del.click(); await B.waitForTimeout(2000);
   await A.click("#tab-loadouts"); await A.fill("#lo-name", "Second"); await A.click('[data-lo-save="' + TITAN + '"]'); await A.waitForTimeout(2200);
   const names = p => p.evaluate(() => [...document.querySelectorAll('[data-lo-pick^="r-"]')].map(x => x.textContent.trim().replace(/\s*\(.*$/, "")).sort().join());
   await comeBack(B);
@@ -1649,8 +1653,10 @@ await section("Report", async () => {
   check("report: badges: run reports are kept, so a second look fetches none", !pgcrCalls.length && await badgesOf("vault-of-glass") === "Flawless Solo, Week One", pgcrCalls.join());
   check("report: a shared link opens the same report, and it's under Recent", await p.textContent("#rr-name") === "Testguard#0042" && /Testguard#0042/.test(await p.textContent("#rr-recent")));
   await p.click("#rr-recent-clear");
-  check("report: Clear empties the recent searches and forgets them", await p.textContent("#rr-recent") === "" &&
-    await p.evaluate(() => localStorage.getItem("rallyflag_report_recent")) === null);
+  check("report: Clear empties the recent searches and forgets them, with Undo", /Recent searches cleared/.test(await p.textContent("#rr-recent")) && await p.locator("#rr-recent .rr-chip").count() === 0 &&
+    await p.evaluate(() => localStorage.getItem("rallyflag_report_recent")) === null && await p.evaluate(() => document.activeElement.id) === "rr-recent-undo");
+  await p.click("#rr-recent-undo");
+  check("report: Undo brings the recent searches back", /Testguard#0042/.test(await p.textContent("#rr-recent")) && await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_report_recent")).length) === 1);
   await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
   check("report (phone): one card per row, full width, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".rr-card")].slice(0, 2).map(x => x.getBoundingClientRect()); return c[1].top > c[0].bottom && c[0].width > innerWidth - 40 && document.documentElement.scrollWidth <= innerWidth; }));
   check("report: no script errors", !p.errors.length, p.errors.join("; "));
