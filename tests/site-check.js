@@ -288,6 +288,15 @@ function checkGeneratedPages(){
   // The bare templates ("not found" without ?slug) stay out of search results.
   for (const t of ["raid-guide.html", "dungeon-guide.html"]) if (!/<meta name="robots" content="noindex">/.test(fs.readFileSync(path.join(ROOT, t), "utf8"))) bad.push(t + ": template lost its noindex");
   record(`each of the ${guides.length} guide pages has its own preview tags`, guides.length > 0 && !bad.length, bad.join("; "));
+  // Quick search (nav.js): its index is current and every result is a real page.
+  try {
+    if (fs.existsSync(path.join(ROOT, "tools", "build-search-index.js"))) execFileSync(process.execPath, [path.join(ROOT, "tools", "build-search-index.js"), "--check"], { stdio: "pipe" });
+    const w = {}; new Function("window", fs.readFileSync(path.join(ROOT, "assets", "search-index.js"), "utf8"))(w);
+    const missing = w.RallyFlagSearchIndex.map(e => e[2].replace(/[?#].*$/, "")).filter((f, i, a) => a.indexOf(f) === i && !fs.existsSync(path.join(ROOT, f)));
+    record(`the quick search index is up to date and its ${w.RallyFlagSearchIndex.length} results point at real pages`, !missing.length, missing.join(", "));
+  } catch (e){
+    record("the quick search index is up to date and its results point at real pages", false, String(e.stderr || e.message).trim().replace(/\s*\n\s*/g, "; "));
+  }
 }
 
 async function checkRedirects(browser){

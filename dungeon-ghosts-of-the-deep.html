@@ -162,6 +162,7 @@
 </footer>
 
 <script src="assets/game-terms.js"></script>
+<script src="assets/art-tints.js"></script>
 <script src="assets/nav.js"></script>
 <script src="assets/dungeons-data.js"></script>
 <script src="assets/sets-data.js"></script>
@@ -190,7 +191,8 @@
   if (dungeon.art){
     const hero = document.getElementById("hero");
     hero.classList.add("has-art");
-    hero.insertAdjacentHTML("afterbegin", '<div class="hero-art"><img src="' + window.rallyFlagArtUrl(dungeon.art) + '" alt="" fetchpriority="high"></div>');
+    const tint = window.rallyFlagArtTint(dungeon.art); // its colour shows until the art loads
+    hero.insertAdjacentHTML("afterbegin", '<div class="hero-art"' + (tint ? ' style="background-color:' + tint + '"' : "") + '><img src="' + window.rallyFlagArtUrl(dungeon.art) + '" alt="" fetchpriority="high"></div>');
   }
 
 

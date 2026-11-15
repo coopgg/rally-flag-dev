@@ -517,3 +517,28 @@ a.panel-card:hover, a.panel-card:focus-visible, .featured-card:hover{
 .skel-line.w80{ width:80%; } .skel-line.w60{ width:60%; } .skel-line.w40{ width:40%; }
 .skel-rows .skel-line{ margin:12px 0 0; }
 
+
+/* Quick search (nav.js setupQuickSearch): a modal box near the top. */
+.qs{ width:min(640px, calc(100vw - 32px)); max-height:min(70vh, 640px); margin:10vh auto auto; padding:0; border:1px solid var(--panel-border); border-radius:14px;
+  background:var(--bg); color:var(--text); box-shadow:0 24px 60px rgba(0, 0, 0, 0.45); overflow:hidden; }
+.qs::backdrop{ background:rgba(4, 6, 12, 0.55); }
+.qs-box{ display:flex; flex-direction:column; max-height:inherit; }
+.qs-field{ display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--panel-border); color:var(--text-dim); }
+.qs-field input{ flex:1; min-width:0; border:0; background:transparent; color:var(--text); font:inherit; font-size:17px; padding:6px 0; outline:none; }
+.qs-field input::-webkit-search-cancel-button{ display:none; }
+.qs-field:focus-within{ box-shadow:inset 0 -2px 0 var(--accent-text); }
+html .qs-field input:focus-visible{ outline:none; } /* the field's underline shows focus */
+.qs-close{ min-height:36px; padding:4px 12px; border:1px solid var(--panel-border); border-radius:8px; background:transparent; color:var(--text-dim); font:inherit; font-size:13px; cursor:pointer; }
+.qs-close:hover, .qs-close:focus-visible{ color:var(--text); border-color:var(--accent); }
+.qs-heading{ margin:10px 16px 2px; font-size:13px; color:var(--text-dim); }
+.qs-list{ list-style:none; margin:0; padding:6px; overflow-y:auto; overscroll-behavior:contain; }
+.qs-item{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; min-height:44px; padding:10px 12px; border-radius:8px; color:var(--text); text-decoration:none; }
+.qs-item:hover, .qs-item:focus-visible{ background:var(--accent-dim); outline:none; box-shadow:inset 0 0 0 1px var(--accent); }
+.qs-title{ min-width:0; overflow-wrap:anywhere; font-weight:500; }
+.qs-kind{ flex:none; font-size:13px; color:var(--text-dim); }
+.qs-more .qs-title{ color:var(--accent-text); }
+.qs-help{ margin:0; padding:8px 16px 10px; border-top:1px solid var(--panel-border); font-size:13px; color:var(--text-dim); }
+@media (max-width:640px){
+  .qs{ width:100vw; max-width:100vw; max-height:85vh; margin:0 0 auto; border-radius:0 0 14px 14px; }
+  .qs-help{ display:none; }
+}

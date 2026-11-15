@@ -99,6 +99,7 @@
   const DISCORD_INVITE_URL = "https://discord.gg/9rp2QAfNZs";
   // Inline SVG (not an <img>) so it recolors with currentColor like the
   // rest of the nav buttons in both light and dark mode, no extra asset.
+  const SEARCH_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5 21 21"/></svg>';
   const DISCORD_ICON_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z"/></svg>';
 
   const KOFI_URL = "https://ko-fi.com/coopgg";
@@ -154,10 +155,13 @@
   // the 16:9 card thumbnail. A path without a leading "/" is a local file
   // (assets/art/). No art → the name's initials.
   window.rallyFlagArtUrl = path => !path ? "" : path.charAt(0) === "/" ? "https://www.bungie.net" + path : path;
+  // The art's average colour (assets/art-tints.js, tools/build-art-tints.py),
+  // shown behind it while it loads; "" when the page didn't load the tints.
+  window.rallyFlagArtTint = path => (path && window.RallyFlagArtTints && /^#[0-9a-f]{6}$/.test(window.RallyFlagArtTints[path] || "")) ? window.RallyFlagArtTints[path] : "";
   window.rallyFlagArtThumb = (item, eager) => {
-    const url = window.rallyFlagArtUrl(item.art);
+    const url = window.rallyFlagArtUrl(item.art), tint = window.rallyFlagArtTint(item.art);
     const initials = item.name.replace(/^The /, "").split(/\s+/).map(w => w[0]).join("").slice(0, 2);
-    return '<div class="art-thumb">' + (url
+    return '<div class="art-thumb"' + (tint ? ' style="background-color:' + tint + '"' : "") + ">" + (url
       ? '<img src="' + url + '" alt=""' + (eager ? '' : ' loading="lazy"') + '>'
       : '<div class="art-fallback" aria-hidden="true">' + initials + '</div>') + '</div>';
   };
@@ -375,6 +379,114 @@
     return true;
   }
 
+  // ---------------- quick search ----------------
+  // "/" (Ctrl/⌘+K anywhere, and the only key on the Locker, whose own "/"
+  // focuses its search box) or the bar's search button opens a box that
+  // finds any page in the menu, raid or dungeon guide and encounter, God
+  // Roll weapon, build, armor set or code (assets/search-index.js,
+  // tools/build-search-index.js, loaded the first time it opens), plus a
+  // "Search all weapons" link into Weapon Lookup. Results are real links
+  // (Ctrl/⌘-click opens a tab); arrows move between them.
+  const EXTRA_PAGES = [["Home", "index.html"], ["FAQ", "faq.html"], ["Privacy", "privacy.html"], ["Raids", "raids.html"], ["Dungeons", "dungeons.html"]];
+  const fold = t => String(t).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[’']/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  let qsEntries = null;
+  function qsList(){
+    if (qsEntries && !(window.RallyFlagSearchIndex && !qsEntries.full)) return qsEntries;
+    const pages = NAV_ITEMS.filter(i => i.group !== "debug").map(i => [i.label, "Page", i.href, ""]).concat(EXTRA_PAGES.filter(([, h]) => !NAV_ITEMS.some(i => i.href === h)).map(([l, h]) => [l, "Page", h, ""]));
+    qsEntries = pages.concat(window.RallyFlagSearchIndex || []).map(([title, kind, url, words]) => ({ title, kind, url, t: fold(title), w: fold(words + " " + kind) }));
+    qsEntries.full = !!window.RallyFlagSearchIndex;
+    return qsEntries;
+  }
+  // Every word typed must start a word of the title or its extra words;
+  // title matches rank first, then pages and guides.
+  function qsFind(q){
+    const terms = fold(q).split(" ").filter(Boolean);
+    if (!terms.length) return [];
+    const starts = (text, term) => (" " + text).includes(" " + term);
+    const out = [];
+    for (const e of qsList()){
+      if (!terms.every(t => starts(e.t, t) || starts(e.w, t))) continue;
+      let score = terms.filter(t => starts(e.t, t)).length * 10;
+      if (e.t.startsWith(terms.join(" "))) score += 25;
+      if (e.t === terms.join(" ")) score += 40;
+      if (e.kind === "Page") score += 6; else if (/guide$/.test(e.kind)) score += 4;
+      out.push([score, e]);
+    }
+    return out.sort((a, b) => b[0] - a[0] || a[1].title.length - b[1].title.length).slice(0, 12).map(x => x[1]);
+  }
+  function qsEsc(s){ return String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+  function qsRender(){
+    const q = $qs("qs-input").value.trim(), hits = q ? qsFind(q) : qsList().filter(e => e.kind === "Page");
+    const weapons = q.length >= 2 ? '<li><a class="qs-item qs-more" href="weapons.html?q=' + encodeURIComponent(q) + '"><span class="qs-title">Search all weapons for “' + qsEsc(q) + '”</span><span class="qs-kind">Weapon Lookup</span></a></li>' : "";
+    $qs("qs-list").innerHTML = hits.map(e => '<li><a class="qs-item" href="' + qsEsc(e.url) + '"><span class="qs-title">' + qsEsc(e.title) + '</span><span class="qs-kind">' + qsEsc(e.kind) + "</span></a></li>").join("") + weapons;
+    $qs("qs-heading").textContent = q ? "" : "Pages";
+    $qs("qs-heading").hidden = !!q;
+    $qs("qs-status").textContent = q ? (hits.length ? hits.length + (hits.length === 1 ? " result" : " results") : "No matches") + (weapons ? ", and a weapon search" : "") : "";
+  }
+  const $qs = id => document.getElementById(id);
+  function qsLoadIndex(){
+    if (window.RallyFlagSearchIndex || $qs("qs-index")) return;
+    const s = document.createElement("script");
+    s.id = "qs-index"; s.src = "assets/search-index.js";
+    s.onload = () => { qsEntries = null; if ($qs("qs") && $qs("qs").open) qsRender(); };
+    document.head.appendChild(s);
+  }
+  function qsBuild(){
+    if ($qs("qs")) return;
+    const d = document.createElement("dialog");
+    d.className = "qs"; d.id = "qs"; d.setAttribute("aria-label", "Search Rally Flag");
+    d.innerHTML = '<div class="qs-box">' +
+      '<div class="qs-field">' + SEARCH_ICON_SVG + '<input type="search" id="qs-input" aria-label="Search Rally Flag" aria-describedby="qs-help" placeholder="Raids, encounters, weapons, builds, codes…" autocomplete="off" spellcheck="false" enterkeyhint="go">' +
+      '<button type="button" class="qs-close" id="qs-close">Close</button></div>' +
+      '<p class="qs-heading" id="qs-heading">Pages</p>' +
+      '<ul class="qs-list" id="qs-list"></ul>' +
+      '<p class="qs-help" id="qs-help">↑ ↓ to move, Enter to open, Esc to close</p>' +
+      '<p class="sr-only" id="qs-status" aria-live="polite"></p></div>';
+    document.body.appendChild(d);
+    const input = $qs("qs-input");
+    input.addEventListener("input", qsRender);
+    const items = () => [...d.querySelectorAll(".qs-item")];
+    d.addEventListener("keydown", e => {
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp" && !(e.key === "Enter" && e.target === input)) return;
+      const list = items(), at = list.indexOf(document.activeElement);
+      if (e.key === "Enter"){ if (list[0]){ e.preventDefault(); list[0].click(); } return; }
+      e.preventDefault();
+      if (e.key === "ArrowDown") (list[at + 1] || list[0] || input).focus();
+      else if (at <= 0) input.focus(); else list[at - 1].focus();
+    });
+    // A plain click on a result closes the box (a same-page #link needs it);
+    // a click outside the box closes it too.
+    d.addEventListener("click", e => {
+      if (e.target === d) return d.close();
+      const a = e.target.closest(".qs-item");
+      if (a && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.button === 0) d.close();
+    });
+    $qs("qs-close").addEventListener("click", () => d.close());
+    d.addEventListener("close", () => { const b = $qs("nav-search-btn"); if (b && d.dataset.from === "button") b.focus(); });
+  }
+  function qsOpen(from){
+    qsBuild(); qsLoadIndex();
+    const d = $qs("qs");
+    if (d.open) return;
+    d.dataset.from = from || "";
+    $qs("qs-input").value = ""; qsRender();
+    d.showModal(); $qs("qs-input").focus();
+  }
+  function setupQuickSearch(){
+    if (document.body.getAttribute("data-nav") === "standalone") return;
+    const btn = $qs("nav-search-btn");
+    if (btn) btn.addEventListener("click", () => qsOpen("button"));
+    const onLocker = !!document.getElementById("locker-app");
+    document.addEventListener("keydown", e => {
+      const t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+      const ctrlK = (e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k";
+      const slash = e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey && !typing && !onLocker;
+      if (!ctrlK && !slash) return;
+      if (document.querySelector("dialog[open]:not(#qs)")) return; // another popup is open
+      e.preventDefault(); qsOpen("key");
+    });
+  }
+
   // Skeleton loader markup for pages waiting on Bungie: the status line
   // (html, already escaped; a live status) above grey shapes of what's
   // coming: a banner, a heading and a grid of cards (with art), or rows.
@@ -460,6 +572,7 @@
         '</div>' +
         '<div class="nav-right-wrap">' +
           (standalone ? "" :
+            '<button type="button" class="nav-icon-btn" id="nav-search-btn" aria-haspopup="dialog" aria-label="Search Rally Flag" title="Search (/ or Ctrl+K)">' + SEARCH_ICON_SVG + "</button>" +
             '<a class="nav-icon-btn" href="' + DISCORD_INVITE_URL + '" target="_blank" rel="noopener" title="Join the Discord">' + DISCORD_ICON_SVG + '</a>' +
             '<a class="nav-icon-btn" href="' + KOFI_URL + '" target="_blank" rel="noopener" title="Support us on Ko-fi">' + KOFI_ICON_SVG + '</a>') +
           '<div class="nav-menu-wrap">' +
@@ -590,6 +703,7 @@
   setupSpeculation();
   setupAnalytics();
   buildNav();
+  setupQuickSearch();
   applyTheme(getStoredTheme());
   applyModePref(getStoredModePref());
   // In Auto, follow the device live (e.g. an OS that switches at sunset).

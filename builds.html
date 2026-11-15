@@ -624,6 +624,17 @@
   });
 
   render();
+  // A link to one build (builds.html#build-<slug>, e.g. from the quick
+  // search) opens that card and brings it into view.
+  function openLinked(){
+    const m = /^#build-([a-z0-9-]+)$/.exec(location.hash), card = m && document.getElementById("build-" + m[1]), build = m && BUILDS.find(b => b.slug === m[1]);
+    if (!card || !build) return;
+    setCardExpanded(card, build, true);
+    card.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    const head = card.querySelector(".build-head"); if (head) head.focus({ preventScroll: true });
+  }
+  openLinked();
+  window.addEventListener("hashchange", openLinked);
 })();
 </script>
 

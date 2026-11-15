@@ -1685,6 +1685,36 @@ await section("Frames", async () => {
   await ctx.close();
 });
 
+// ---------- Quick search (nav.js) ----------
+await section("Quick search", async () => {
+  const p = await open({ url: BASE + "faq.html", ready: "main" });
+  const results = () => p.$$eval("#qs-list .qs-item", l => l.map(a => a.getAttribute("href")));
+  await p.keyboard.press("/");
+  check("quick search: / opens it with the cursor in the box, listing pages", await p.evaluate(() => document.getElementById("qs").open && document.activeElement.id === "qs-input") && (await results()).includes("this-week.html"));
+  await p.keyboard.type("atheon"); await p.waitForFunction(() => window.RallyFlagSearchIndex, null, { timeout: 10000 }); await p.waitForTimeout(200);
+  const r = await results();
+  check("quick search: finds an encounter and an armor set, plus a weapon search", r.includes("raid-vault-of-glass.html#encounter-atheon-time-s-conflux") && r.includes("armor-set-bonuses.html?highlight=atheons-memory") && r[r.length - 1] === "weapons.html?q=atheon" && /results/.test(await p.textContent("#qs-status")), r.join(" "));
+  await p.keyboard.press("ArrowDown"); await p.keyboard.press("ArrowDown");
+  check("quick search: arrows move through the results", await p.evaluate(() => document.activeElement.classList.contains("qs-item") && document.activeElement === document.querySelectorAll(".qs-item")[1]));
+  let v = await axe(p); check("quick search: passes axe while open", !v.length, v.join(", "));
+  await p.keyboard.press("Escape");
+  check("quick search: Escape closes it", !(await p.evaluate(() => document.getElementById("qs").open)));
+  await p.click("#nav-search-btn"); await p.fill("#qs-input", "weakened prey"); await p.keyboard.press("Enter");
+  await p.waitForURL(/builds\.html#build-weakened-prey$/); await p.waitForTimeout(800);
+  check("quick search: the search button works, and Enter opens the top result (a build card, opened)", await p.evaluate(() => document.getElementById("build-weakened-prey").classList.contains("expanded")));
+  await p.keyboard.press("Control+k");
+  check("quick search: Ctrl+K opens it too", await p.evaluate(() => document.getElementById("qs").open));
+  check("quick search: no script errors", !p.errors.length, p.errors.join("; "));
+  await p.context_.close();
+  // The Locker keeps "/" for its own search; Ctrl+K still opens the quick search.
+  const L = await open({ url: BASE + "locker.html?demo", ready: "#locker-app:not([hidden])" });
+  await L.keyboard.press("/");
+  check("quick search: on the Locker, / still goes to the Locker's search", await L.evaluate(() => document.activeElement.id === "locker-search" && !(document.getElementById("qs") || {}).open));
+  await L.evaluate(() => document.activeElement.blur()); await L.keyboard.press("Control+k");
+  check("quick search: on the Locker, Ctrl+K opens it", await L.evaluate(() => !!(document.getElementById("qs") || {}).open));
+  await L.context_.close();
+});
+
 // ---------- Crucible & Trials (PvP section) ----------
 await section("PvP", async () => {
   const P = "4611686018400000777";
