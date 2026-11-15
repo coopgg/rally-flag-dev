@@ -37,12 +37,12 @@ function loadData(file, globalName){
 
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-// Previews show ~200 characters; cut at a word boundary.
+// Google shows about 155-160 characters of a description; cut at a word.
 function describe(item, kindLabel){
   const text = (item.summary || "").replace(/\s+/g, " ").trim();
   if (!text) return "Everything you need for the " + item.name + " " + kindLabel.toLowerCase() + " in Destiny 2: encounters, armor set bonuses and puzzle solvers.";
-  if (text.length <= 200) return text;
-  return text.slice(0, 197).replace(/\s+\S*$/, "") + "…";
+  if (text.length <= 158) return text;
+  return text.slice(0, 155).replace(/[\s,;:]+\S*$/, "") + "…";
 }
 
 // Bungie art paths start with "/"; anything else is a file on this site.
@@ -81,6 +81,21 @@ function buildPage(template, kind, kindLabel, item){
   html = replaceOnce(html, /<meta name="twitter:title" content="[^"]*">/, '<meta name="twitter:title" content="' + esc(title) + '">', "twitter:title");
   html = replaceOnce(html, /<meta name="twitter:description" content="[^"]*">/, '<meta name="twitter:description" content="' + esc(desc) + '">', "twitter:description");
   html = replaceOnce(html, /<meta name="twitter:image" content="[^"]*">/, '<meta name="twitter:image" content="' + esc(image) + '">', "twitter:image");
+  // Structured data for search engines: breadcrumbs (Rally Flag › Raids ›
+  // <name>), shown in results in place of the bare URL, and the guide as an
+  // Article about Destiny 2. "<" is escaped so the JSON can't end the script.
+  const listPage = SITE + kind + "s.html";
+  const ld = { "@context": "https://schema.org", "@graph": [
+    { "@type": "BreadcrumbList", "itemListElement": [
+      { "@type": "ListItem", position: 1, name: "Rally Flag", item: SITE },
+      { "@type": "ListItem", position: 2, name: kindLabel + "s", item: listPage },
+      { "@type": "ListItem", position: 3, name: item.name, item: url }] },
+    { "@type": "Article", headline: title, description: desc, image: [image], url, mainEntityOfPage: url, inLanguage: "en",
+      about: { "@type": "VideoGame", name: "Destiny 2" },
+      author: { "@type": "Organization", name: "Rally Flag", url: SITE },
+      publisher: { "@type": "Organization", name: "Rally Flag", url: SITE, logo: { "@type": "ImageObject", url: SITE + "assets/icon-512.png" } } }
+  ] };
+  html = replaceOnce(html, /<\/head>/, '<script type="application/ld+json">' + JSON.stringify(ld).replace(/</g, "\\u003c") + "</script>\n</head>", "head end");
   // The name is in the page before any script runs (search engines, no-JS).
   html = replaceOnce(html, new RegExp('(<h1 class="title" id="' + kind + '-title">)…(</h1>)'), "$1" + esc(item.name) + "$2", "h1");
   return { file, html };

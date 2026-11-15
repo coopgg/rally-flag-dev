@@ -284,7 +284,19 @@ function checkGeneratedPages(){
     if (/og-image\.png$/.test(tag("og:image")) && !/pantheon/.test(f)) bad.push(f + ": generic og:image");
     if (canonical !== "https://rallyflag.gg/" + f) bad.push(f + ": canonical " + canonical);
     if (/<meta name="robots"[^>]*noindex/.test(html)) bad.push(f + ": noindex (the template's tag wasn't stripped)");
+    // Structured data: breadcrumbs and the Article, valid JSON.
+    try {
+      const ld = JSON.parse((html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/) || [])[1] || "null");
+      const types = ((ld && ld["@graph"]) || []).map(x => x["@type"]);
+      if (!types.includes("BreadcrumbList") || !types.includes("Article")) bad.push(f + ": structured data missing (" + types.join(",") + ")");
+    } catch (e){ bad.push(f + ": structured data isn't valid JSON"); }
   }
+  // Home names the site (WebSite + Organization) for search results.
+  try {
+    const home = fs.readFileSync(path.join(ROOT, "index.html"), "utf8"), ld = JSON.parse((home.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/) || [])[1] || "null");
+    const types = ((ld && ld["@graph"]) || []).map(x => x["@type"]);
+    if (!types.includes("WebSite") || !types.includes("Organization")) bad.push("index.html: WebSite/Organization structured data missing");
+  } catch (e){ bad.push("index.html: structured data isn't valid JSON"); }
   // The bare templates ("not found" without ?slug) stay out of search results.
   for (const t of ["raid-guide.html", "dungeon-guide.html"]) if (!/<meta name="robots" content="noindex">/.test(fs.readFileSync(path.join(ROOT, t), "utf8"))) bad.push(t + ": template lost its noindex");
   record(`each of the ${guides.length} guide pages has its own preview tags`, guides.length > 0 && !bad.length, bad.join("; "));
