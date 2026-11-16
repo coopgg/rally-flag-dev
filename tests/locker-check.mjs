@@ -1724,11 +1724,20 @@ await section("PvP", async () => {
   const metric = n => ({ objectiveProgress: { progress: n } });
   const p = await open({ url: BASE + "pvp.html", ready: "#rr-form" });
   const ctx = p.context_;
+  // A Saturday during Trials (Friday 17:00 UTC to Tuesday 17:00 UTC).
+  await p.clock.install({ time: new Date("2026-11-14T12:00:00Z") }); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
+  check("pvp: the Trials card says it's live and when it ends, before any lookup", /Live now/.test(await p.innerText("#pv-weekend")) && /ends in 3 days 5 h/.test(await p.innerText("#pv-weekend")), await p.innerText("#pv-weekend"));
+  // This weekend's match (on Endless Vale) and last weekend's (Meltdown, not counted).
+  await ctx.route(/\/Character\/1\/Stats\/Activities\/\?mode=84/, r => r.fulfill(ok({ activities: [
+    { period: "2026-11-14T02:00:00Z", activityDetails: { referenceId: 111, instanceId: "1", mode: 84 } },
+    { period: "2026-11-07T02:00:00Z", activityDetails: { referenceId: 222, instanceId: "2", mode: 84 } }] })));
+  await ctx.route(/Manifest\/DestinyActivityDefinition\/(111|222)\//, r => r.fulfill(ok({ displayProperties: { name: /111/.test(r.request().url()) ? "Endless Vale" : "Meltdown" } })));
   await ctx.route(/SearchDestinyPlayerByBungieName/, r => r.fulfill(ok([{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }])));
-  await ctx.route(new RegExp("/Profile/" + P + "/\\?components=100,200,1100"), r => r.fulfill(ok({ profile: { data: { userInfo: { bungieGlobalDisplayName: "Pvpguard", bungieGlobalDisplayNameCode: 7 } } },
+  await ctx.route(new RegExp("/Profile/" + P + "/\\?components=100,200,204,1100"), r => r.fulfill(ok({ profile: { data: { userInfo: { bungieGlobalDisplayName: "Pvpguard", bungieGlobalDisplayNameCode: 7 } } },
     characters: { data: { "1": { characterId: "1", classType: 1, light: 2000, dateLastPlayed: "2026-10-30T00:00:00Z" } } },
+    characterActivities: { data: { "1": { availableActivities: [{ activityHash: 2723561970, isVisible: true }] } } },
     // Trials: 20 flawless tickets (Season 10 to Episode 2) + 3 passages (Episode 3 on) = 23 flawless; 500 wins since Season 10.
-    metrics: { data: { metrics: { 1765255052: metric(20), 3273582723: metric(3), 1365664208: metric(500), 3157801630: metric(321) } } } })));
+    metrics: { data: { metrics: { 1765255052: metric(20), 3273582723: metric(3), 1365664208: metric(500), 3157801630: metric(321), 3046315288: metric(4), 3787323274: metric(3), 1876673954: metric(0), 2091173752: metric(17) } } } })));
   let statsUrl = "";
   await ctx.route(new RegExp("/Account/" + P + "/Character/0/Stats/"), r => { statsUrl = r.request().url();
     r.fulfill(ok({ allPvP: st(1000, 550, 9000, 8000, 3000, 1.125, 1206000), pvpCompetitive: st(400, 240, 4000, 3000, 1000, 1.333, 400000), rumble: st(20, 2, 300, 250, 10, 1.2, 9000), trials_of_osiris: st(50, 20, 200, 300, 50, 0.667, 30000) })); });
@@ -1741,14 +1750,20 @@ await section("PvP", async () => {
   check("pvp: every playlist card has art, as the raid cards: Bungie's playlist art, the Crucible crest for All Crucible and Quickplay", await p.$$eval(".pv-card .art-thumb img", i => i.map(x => x.getAttribute("src"))).then(l => l.length === 8 && new Set(l).size === 7 && l[0] === "assets/art/crucible.jpg" && l[2] === l[0] && l.filter((u, i) => i !== 0 && i !== 2).every(u => /^https:\/\/www\.bungie\.net\/img\/destiny_content\/pgcr\/[a-z_]+\.jpg$/.test(u)) && /trials\.jpg$/.test(l[7])));
   check("pvp: playlists with no matches say so", /Quickplay No matches yet/.test(cards[2]), cards[2]);
   check("pvp: Rumble (free-for-all) says first place, not win rate", /Rumble.*First place 10\.0%/.test(cards[6]), cards[6]);
-  check("pvp: Trials counters come from Bungie's metrics; a missing one shows a dash", /Flawless .*23 Wins 500/.test(await p.$$eval(".pv-tiles", t => t[1].innerText.replace(/\s+/g, " "))) && /Gold medals 321/.test(await text(".pv-tiles")) && /Undefeated matches –/.test(await text(".pv-tiles")), await text(".pv-tiles"));
+  check("pvp: Trials counters come from Bungie's metrics; a missing one shows a dash", /Flawless .*23 Wins 500/.test(await p.$$eval("#rr-out .pv-tiles", t => t[1].innerText.replace(/\s+/g, " "))) && /Gold medals 321/.test(await text("#rr-out .pv-tiles")) && /Undefeated matches –/.test(await text("#rr-out .pv-tiles")), await text("#rr-out .pv-tiles"));
   check("pvp: links to trials.report, crucible.report and their raid & dungeon report", await p.locator('.rr-links a[href="https://trials.report/report/3/' + P + '"]').count() === 1 &&
     await p.locator('.rr-links a[href="https://crucible.report/report/3/' + P + '"]').count() === 1 && await p.locator('.rr-links a[href="report.html?p=3-' + P + '"]').count() === 1);
   check("pvp: the menu has a PvP section with Crucible & Trials", await p.evaluate(() => [...document.querySelectorAll(".nav-menu-section-label")].some(l => /PvP/.test(l.textContent)) || /Crucible &amp; Trials|Crucible & Trials/.test(document.getElementById("site-nav").innerHTML)));
+  await p.waitForFunction(() => /Maps they've played/.test(document.getElementById("pv-weekend").innerText), null, { timeout: 10000 }).catch(() => {});
+  const wk = (await p.innerText("#pv-weekend")).replace(/\s+/g, " ");
+  check("pvp: the Trials card shows the player's weekend: weekly counters and this weekend's maps only", /Pvpguard#0007's weekend/.test(wk) && /Wins 4 Best win streak 3 Best flawless streak 0 Opponents defeated 17/.test(wk) && /played this weekend: Endless Vale\./.test(wk) && !/Meltdown/.test(wk) && !/may be off/.test(wk), wk);
   check("pvp: the URL carries the player and it's under Recent", /\?p=3-4611686018400000777$/.test(p.url()) && /Pvpguard#0007/.test(await text("#rr-recent")));
   let v = await axe(p); check("pvp: passes axe", !v.length, v.join(", "));
   await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
   check("pvp (phone): one card per row, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".pv-card")].slice(0, 2).map(x => x.getBoundingClientRect()); return c[1].top > c[0].bottom && document.documentElement.scrollWidth <= innerWidth; }));
+  // A Wednesday: between weekends.
+  await p.clock.setSystemTime(new Date("2026-11-18T12:00:00Z")); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
+  check("pvp: between weekends the card says when Trials starts next", /Next weekend starts/.test(await p.innerText("#pv-weekend")) && /in 2 days 5 h/.test(await p.innerText("#pv-weekend")), await p.innerText("#pv-weekend"));
   check("pvp: no script errors", !p.errors.length, p.errors.join("; "));
   await ctx.close();
 });

@@ -53,7 +53,9 @@
     flawlessTickets: 1765255052, flawlessPassages: 3273582723, flawlessGildings: 4112712479,
     trialsStreakSeason: 957196641, trialsShutoutSeason: 3364207969, flawlessStreak: 1076064058,
     goldMedals: 3157801630, undefeated: 3212106215, annihilation: 2573000632, gloryStreak: 1289569072,
-    crucibleGildings: 1250683514, ironGold: 1196938828, crucibleDefeats: 811894228
+    crucibleGildings: 1250683514, ironGold: 1196938828, crucibleDefeats: 811894228,
+    // This week's Trials (reset at the weekly reset, Tuesday).
+    wkWins: 3046315288, wkStreak: 3787323274, wkFlawlessStreak: 1876673954, wkDefeats: 2091173752
   };
 
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -99,7 +101,7 @@
   async function load(type, id){
     const modes = MODES.concat([TRIALS_MODE]).map(m => m[1]).join(",");
     const [profile, stats] = await Promise.all([
-      api("/Destiny2/" + type + "/Profile/" + id + "/?components=100,200,1100"),
+      api("/Destiny2/" + type + "/Profile/" + id + "/?components=100,200,204,1100"),
       api("/Destiny2/" + type + "/Account/" + id + "/Character/0/Stats/?modes=" + modes + "&periodType=AllTime")
     ]);
     return { profile, stats };
@@ -134,6 +136,63 @@
   // A note sits under the label, so every tile's number stays at the bottom, in line.
   const tile = (label, n, note) => '<div class="panel-card"><dt>' + esc(label) + (note ? '<span class="pv-note">' + esc(note) + "</span>" : "") + "</dt><dd>" + (n == null ? "–" : num(n)) + "</dd></div>";
 
+  // ---------------- Trials this weekend ----------------
+  // Trials of Osiris runs from Friday's reset to Tuesday's (17:00 UTC). The
+  // card above the results shows that at once (live and when it ends, or
+  // when it starts), and after a lookup that player's weekend: Bungie's
+  // weekly Trials counters, whether Bungie lists Trials as open for them
+  // (component 204), and the maps they've played since Friday (maps rotate
+  // between matches now, so there's no single weekend map).
+  // Saint-14's rewards need a signed-in vendor read and aren't shown.
+  const TRIALS_ACTIVITIES = [2723561970]; // "Trials of Osiris: Matchmade"
+  const HOUR = 3600e3, DAY = 24 * HOUR;
+  function trialsWindow(now = Date.now()){
+    const d = new Date(now), back = (d.getUTCDay() - 5 + 7) % 7; // days since Friday
+    let start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - back, 17);
+    if (start > now) start -= 7 * DAY; // Friday before 17:00 UTC
+    const end = start + 4 * DAY;
+    return now < end ? { live: true, start, end } : { live: false, start: start + 7 * DAY, end: end + 7 * DAY };
+  }
+  const WHEN = new Intl.DateTimeFormat(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" });
+  function until(ms){
+    const m = Math.max(1, Math.round(ms / 60e3)), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mm = m % 60;
+    return d ? d + (d === 1 ? " day " : " days ") + h + " h" : h ? h + " h " + mm + " min" : mm + " min";
+  }
+  let weekendPlayer = null; // { name, ms, listed, maps } after a lookup
+  function renderWeekend(){
+    const box = $("pv-weekend");
+    if (!box) return;
+    const w = trialsWindow(), now = Date.now();
+    const status = w.live
+      ? '<p class="pv-wk-status"><span class="pv-live">Live now</span> until ' + esc(WHEN.format(w.end)) + " <span class=\"pv-wk-in\">(ends in " + until(w.end - now) + ")</span></p>"
+      : '<p class="pv-wk-status">Next weekend starts ' + esc(WHEN.format(w.start)) + " <span class=\"pv-wk-in\">(in " + until(w.start - now) + ")</span></p>";
+    let player = "";
+    const pl = weekendPlayer;
+    if (pl){
+      const listed = pl.listed === false && w.live ? '<p class="pv-wk-note">Bungie doesn\'t list Trials as open for ' + esc(pl.name) + " right now; it may be off this weekend.</p>" : "";
+      // No matches yet this weekend: one line instead of four zeros.
+      const none = pl.maps && !pl.maps.length && !metric(pl.ms, M.wkWins) && !metric(pl.ms, M.wkDefeats);
+      player = w.live
+        ? '<h3 class="pv-h3">' + esc(pl.name) + "'s weekend</h3>" + listed +
+          (none ? "" : '<dl class="pv-tiles pv-wk-tiles">' + tile("Wins", metric(pl.ms, M.wkWins)) + tile("Best win streak", metric(pl.ms, M.wkStreak)) +
+            tile("Best flawless streak", metric(pl.ms, M.wkFlawlessStreak)) + tile("Opponents defeated", metric(pl.ms, M.wkDefeats)) + "</dl>") +
+          '<p class="pv-wk-maps">' + (pl.maps == null ? "Checking the maps they've played…" : pl.maps.length ? "Maps they've played this weekend: " + pl.maps.map(esc).join(", ") + "." : "They haven't played Trials this weekend yet.") + "</p>"
+        : '<p class="pv-wk-note">' + esc(pl.name) + "'s weekend counters start again when Trials returns.</p>";
+    }
+    box.innerHTML = '<div class="pv-wk-art">' + window.rallyFlagArtThumb({ art: TRIALS_MODE[4], name: "Trials of Osiris" }) + "</div>" +
+      '<div class="pv-wk-body"><h2 class="pv-wk-h" id="pv-weekend-h">Trials of Osiris this weekend</h2>' + status +
+      '<p class="pv-wk-note">Trials runs Friday to Tuesday, reset to reset. Maps rotate between matches, so there\'s no single map for the weekend.</p>' + player + "</div>";
+  }
+  // The maps a player has played in Trials since this weekend began.
+  async function weekendMaps(type, id, chars, job){
+    const w = trialsWindow();
+    if (!w.live) return [];
+    const lists = await Promise.all(chars.map(c => api("/Destiny2/" + type + "/Account/" + id + "/Character/" + c.characterId + "/Stats/Activities/?mode=84&count=25").catch(() => ({}))));
+    const hashes = [...new Set(lists.flatMap(l => (l.activities || []).filter(a => Date.parse(a.period) >= w.start).map(a => a.activityDetails.referenceId)))];
+    const names = await Promise.all(hashes.map(h => api("/Destiny2/Manifest/DestinyActivityDefinition/" + h + "/").then(d => d.displayProperties.name).catch(() => null)));
+    return names.filter(Boolean);
+  }
+
   function render(r, type, id){
     const ud = (r.profile.profile && r.profile.profile.data && r.profile.profile.data.userInfo) || {};
     const name = ud.bungieGlobalDisplayName ? ud.bungieGlobalDisplayName + "#" + String(ud.bungieGlobalDisplayNameCode || 0).padStart(4, "0") : ud.displayName || "Guardian";
@@ -167,6 +226,13 @@
       '<p class="rr-note">All numbers are Bungie\'s own. Bungie\'s Trials match stats (the card above) cover only part of most players\' history, so they can show far fewer wins than the Wins counter; ' +
         'trials.report and crucible.report keep the complete match history. Win rate is matches won out of matches played.</p>';
     const live = $("rr-live"); if (live) live.textContent = name + "'s Crucible and Trials stats are ready.";
+    // This weekend, for this player.
+    const acts = Object.values(((r.profile.characterActivities || {}).data) || {});
+    const listed = acts.length ? acts.some(c => (c.availableActivities || []).some(a => TRIALS_ACTIVITIES.includes(a.activityHash) && a.isVisible)) : null;
+    weekendPlayer = { key: type + "-" + id, name, ms, listed, maps: null };
+    renderWeekend();
+    const me = weekendPlayer;
+    weekendMaps(type, id, chars, null).then(maps => { if (weekendPlayer === me){ me.maps = maps; renderWeekend(); } }).catch(() => { if (weekendPlayer === me){ me.maps = []; renderWeekend(); } });
     $("rr-copy").addEventListener("click", () => {
       const url = location.origin + location.pathname + "?p=" + type + "-" + id;
       (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => { $("rr-copy").textContent = "Link copied"; }, () => { $("rr-copy").textContent = url; });
@@ -228,6 +294,8 @@
 
   function start(){
     renderRecent();
+    renderWeekend();
+    setInterval(renderWeekend, 60e3); // the countdown, and the switch between live and next
     const signedIn = window.RallyFlagAuth && RallyFlagAuth.isSignedIn();
     $("rr-mine").hidden = !signedIn;
     $("rr-form").addEventListener("submit", submit);
