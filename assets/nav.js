@@ -294,7 +294,7 @@
     if (!section || !window.RallyFlagAuth) return;
 
     if (RallyFlagAuth.isSignedIn()){
-      const name = RallyFlagAuth.getDisplayName() || "Signed in";
+      const name = String(RallyFlagAuth.getDisplayName() || "Signed in").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
       section.innerHTML =
         '<div class="nav-menu-section-label">Bungie.net</div>' +
         '<div class="nav-auth-signed-in">' +

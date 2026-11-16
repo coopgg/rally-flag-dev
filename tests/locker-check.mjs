@@ -638,6 +638,14 @@ await section("DIM extras", async () => {
     Object.keys((await p.evaluate(() => JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).find(x => x.name === "DIM out"))).cosmetics).length > 0);
   await importAndSave(p, url);
   check("dim link: and it imports back", /DIM out saved/.test(await toastText(p)), await toastText(p));
+  // A DIM link is whatever its maker typed: an id built to break out of an attribute, HTML in the name.
+  const evil = Object.assign({}, j, { id: 'x" onmouseover="window.__pwn=1" data-x="', name: '<img src=x onerror="window.__pwn=2">Evil', classType: '"><b>' });
+  if (evil.equipped[0]) evil.equipped = [Object.assign({}, evil.equipped[0], { id: '1" onclick="window.__pwn=3' })].concat(evil.equipped.slice(1));
+  await importAndSave(p, "https://app.destinyitemmanager.com/loadouts?loadout=" + encodeURIComponent(JSON.stringify(evil)));
+  await p.waitForTimeout(300);
+  const pwn = await p.evaluate(() => ({ pwn: window.__pwn || 0, attrs: document.querySelectorAll("#view-loadouts [onmouseover], #view-loadouts [onclick], #view-loadouts img[onerror]").length,
+    ids: JSON.parse(localStorage.getItem("rallyflag_locker_loadouts:demo")).map(x => x.id) }));
+  check("dim link: a crafted DIM link can't inject markup (ids keep id characters, the name is text)", !pwn.pwn && !pwn.attrs && pwn.ids.every(id => /^[A-Za-z0-9_-]+$/.test(id)) && /<img src=x/.test(await p.textContent("#view-loadouts")), JSON.stringify(pwn));
   // Materials and currencies.
   await p.click("#tab-gear"); await p.click("#materials-btn");
   check("materials: the button lists materials and currencies with totals", await p.evaluate(() => document.getElementById("item-dialog").dataset.view) === "materials" && await p.locator(".mat-row").count() >= 8 && /\d/.test(await p.textContent(".mat-row .mat-qty")));

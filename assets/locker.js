@@ -680,7 +680,19 @@
   // the one-Exotic rule can't block a swap. Subclass and mods aren't
   // included yet.
   const loadoutKey = () => "rallyflag_locker_loadouts:" + (PROFILE_PATH.split("/").pop() || "demo");
-  function readLoadouts(){ try { return JSON.parse(localStorage.getItem(loadoutKey()) || "[]"); } catch (e){ return []; } }
+  // DIM's socket and bucket maps, numbers only: { socket index: plug hash }, { bucket: [hashes] }.
+  const isNum = h => Number.isInteger(h) && h > 0 && h < 2 ** 32;
+  function numMap(o){ const out = {}; if (o && typeof o === "object") for (const k in o) if (/^\d{1,2}$/.test(k) && isNum(o[k])) out[k] = o[k]; return out; }
+  function numLists(o){ const out = {}; if (o && typeof o === "object") for (const k in o) if (/^\d{1,10}$/.test(k) && Array.isArray(o[k])) out[k] = o[k].filter(isNum).slice(0, 10); return out; }
+  // Loadout ids go into attributes (data-lo-…), so only id characters are
+  // kept, whatever a DIM link, a synced copy or old storage held.
+  const safeLoId = id => String(id == null ? "" : id).replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64) || "lo";
+  function readLoadouts(){
+    try {
+      const list = JSON.parse(localStorage.getItem(loadoutKey()) || "[]");
+      return Array.isArray(list) ? list.filter(lo => lo && typeof lo === "object").map(lo => { const id = safeLoId(lo.id); return id === lo.id ? lo : Object.assign({}, lo, { id }); }) : [];
+    } catch (e){ return []; }
+  }
   function setLoadoutsRaw(list){ try { localStorage.setItem(loadoutKey(), JSON.stringify(list)); } catch (e){} }
   // Every change stamps the loadouts it touched (`at`) and notes deletions,
   // so copies from two devices can be merged (see sync below).
@@ -1190,13 +1202,14 @@
     const sub = all.find(x => DB.items[x.hash] && /Subclass$/.test(DB.items[x.hash].y || ""));
     const art = all.find(x => DB.items[x.hash] && DB.items[x.hash].y === "Artifact" && x.socketOverrides);
     return {
-      id: "dim-" + (json.id || Date.now().toString(36)), name: String(json.name || "DIM loadout").slice(0, 60), cls: json.classType == null ? 3 : json.classType,
-      items: gear.map(x => ({ id: String(x.id || ""), hash: x.hash })),
-      dim: { id: json.id || "" },
-      subclass: sub ? { hash: sub.hash, sockets: sub.socketOverrides || {} } : null,
-      artifact: art ? { hash: art.hash, sockets: art.socketOverrides } : null,
-      mods: (params.mods || []).filter(h => DB.items[h] && DB.items[h].k),
-      cosmetics: params.modsByBucket || {}
+      // Everything here was written by whoever made the DIM link: ids keep id characters only.
+      id: safeLoId("dim-" + (json.id || Date.now().toString(36))), name: String(json.name || "DIM loadout").slice(0, 60), cls: [0, 1, 2, 3].includes(json.classType) ? json.classType : 3,
+      items: gear.map(x => ({ id: /^\d{1,20}$/.test(String(x.id || "")) ? String(x.id) : "", hash: x.hash })),
+      dim: { id: String(json.id || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 64) },
+      subclass: sub ? { hash: sub.hash, sockets: numMap(sub.socketOverrides) } : null,
+      artifact: art ? { hash: art.hash, sockets: numMap(art.socketOverrides) } : null,
+      mods: (Array.isArray(params.mods) ? params.mods : []).filter(h => DB.items[h] && DB.items[h].k),
+      cosmetics: numLists(params.modsByBucket)
     };
   }
 

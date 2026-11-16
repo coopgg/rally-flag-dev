@@ -157,6 +157,12 @@ window.RallyFlagAuth = (function(){
   // If this tab started a sign-in that finished somewhere else (see
   // HANDOFF_KEY above), take that sign-in over. Returns true if it did.
   function adoptHandoff(){
+    // The handoff holds a token in localStorage (which outlives the tab):
+    // drop it once it's past its 10 minutes, from whichever page sees it.
+    try {
+      const old = JSON.parse(sharedGet(HANDOFF_KEY) || "null");
+      if (old && !(Date.now() - old.at <= HANDOFF_TTL_MS)) sharedRemove(HANDOFF_KEY);
+    } catch (e) { sharedRemove(HANDOFF_KEY); }
     let awaitingSince = 0;
     try { awaitingSince = Number(sessionStorage.getItem(AWAITING_KEY)) || 0; } catch (e) {}
     if (!awaitingSince || isSignedIn()) return false;
@@ -170,6 +176,7 @@ window.RallyFlagAuth = (function(){
     }
     try { sessionStorage.removeItem(AWAITING_KEY); } catch (e) {}
     try { sessionStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(handoff.auth)); } catch (e) { return false; }
+    sharedRemove(HANDOFF_KEY); // adopted: the copy in localStorage isn't needed any more
     return isSignedIn();
   }
 
@@ -311,7 +318,8 @@ window.RallyFlagAuth = (function(){
 
   // Only ever redirect to a path on this site ("/..." but not "//host").
   function safeReturnTo(path){
-    return typeof path === "string" && path.startsWith("/") && !path.startsWith("//") ? path : "index.html";
+    // A path on this site only: "//host" and "/\\host" both mean another site to a browser.
+    return typeof path === "string" && /^\/(?![\/\\])/.test(path) && !/[\\\s]/.test(path) ? path : "index.html";
   }
 
   function getLastReturnTo(){

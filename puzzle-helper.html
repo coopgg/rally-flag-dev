@@ -1304,6 +1304,8 @@
       return cb ? cb.checked : true;
     }
 
+    // Player names are other people's text (Steam names can hold anything).
+    const escHtml = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
     async function renderPlayerCard(container, displayName, profile){
       const card = document.createElement("div");
       card.className = "ft-player-card panel-card";
@@ -1312,7 +1314,7 @@
       const className = character ? FT_CLASS_NAMES[character.classType] || "" : "";
       const emblemPath = character && character.emblemBackgroundPath ? FT_BUNGIE_ROOT + character.emblemBackgroundPath : null;
       card.innerHTML =
-        '<div class="ft-player-name">' + displayName + '</div>' +
+        '<div class="ft-player-name">' + escHtml(displayName) + '</div>' +
         '<div class="ft-player-class">' + className + '</div>' +
         (emblemPath ? '<img class="ft-player-emblem" src="' + emblemPath + '" alt="">' : '') +
         '<div class="ft-gear-grid">' +
