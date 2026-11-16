@@ -63,7 +63,7 @@
   const wait = ms => new Promise(r => setTimeout(r, ms));
   async function api(path, body){
     for (let tries = 0; ; tries++){
-      const res = await fetch(BUNGIE + "/Platform" + path, body ? { method: "POST", headers: { "X-API-Key": API_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) } : { headers: { "X-API-Key": API_KEY } });
+      const res = await fetch(/^https:/.test(path) ? path : BUNGIE + "/Platform" + path, body ? { method: "POST", headers: { "X-API-Key": API_KEY, "Content-Type": "application/json" }, body: JSON.stringify(body) } : { headers: { "X-API-Key": API_KEY } });
       const j = await res.json().catch(() => ({}));
       if (j.ErrorStatus === "SystemDisabled") throw new Error("Bungie's servers are down for maintenance");
       if ((res.status === 429 || j.ThrottleSeconds > 0) && tries < 4){ await wait(Math.max(1, j.ThrottleSeconds || 2) * 1000 * (tries + 1)); continue; }
@@ -204,10 +204,84 @@
     return d ? d + (d === 1 ? " day " : " days ") + h + " h" : h ? h + " h " + mm + " min" : mm + " min";
   }
   let weekendPlayer = null; // { name, ms, listed, maps } after a lookup
+
+  // ---------------- this weekend's maps ----------------
+  // Since June 2026 each Trials weekend has three maps, mixed between
+  // matches (one map a weekend before that). Bungie only lists the playlist,
+  // so the maps come from match history: start from players we know play
+  // Trials, and if they haven't played this weekend, from the players in
+  // their latest match, until three maps turn up. Kept in localStorage for
+  // the weekend (the set doesn't change), rechecked while it's short.
+  const WEEKEND_MAPS = 3, POOL_KEY = "rallyflag_trials_maps", SEED_KEY = "rallyflag_trials_seed";
+  const SEED_PLAYERS = [[2, "4611686018446797442"]];
+  let pool = null; // { start, maps: [names], at, busy }
+  const store = { get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e){ return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e){} } };
+  const mapNames = {};
+  const mapName = h => mapNames[h] || (mapNames[h] = api("/Destiny2/Manifest/DestinyActivityDefinition/" + h + "/").then(d => d.displayProperties.name || null).catch(() => null));
+  async function findWeekendMaps(w){
+    const found = new Set(pool.maps), seen = new Set(), queue = [];
+    const add = (t, id) => { if (!seen.has(id)){ seen.add(id); queue.push([t, id]); } };
+    const seed = store.get(SEED_KEY); if (seed) add(seed[0], seed[1]);
+    SEED_PLAYERS.forEach(([t, id]) => add(t, id));
+    let players = 0, reports = 0;
+    while (queue.length && found.size < WEEKEND_MAPS && players < 14){
+      const [t, id] = queue.shift(); players++;
+      const prof = await api("/Destiny2/" + t + "/Profile/" + id + "/?components=200").catch(() => null);
+      const chars = Object.values((prof && prof.characters && prof.characters.data) || {}).sort((a, b) => Date.parse(b.dateLastPlayed) - Date.parse(a.dateLastPlayed));
+      if (!chars.length) continue;
+      // Only characters played since Friday's reset can have this weekend's matches; else the latest one, to find who they played with.
+      const look = chars.filter(c => Date.parse(c.dateLastPlayed) >= w.start);
+      const lists = await Promise.all((look.length ? look : chars.slice(0, 1)).map(c =>
+        api("/Destiny2/" + t + "/Account/" + id + "/Character/" + c.characterId + "/Stats/Activities/?mode=84&count=" + (look.length ? 25 : 1)).then(r => r.activities || []).catch(() => [])));
+      const runs = lists.flat().sort((a, b) => Date.parse(b.period) - Date.parse(a.period));
+      const fresh = runs.filter(a => Date.parse(a.period) >= w.start);
+      if (fresh.length) store.set(SEED_KEY, [t, id]);
+      for (const n of await Promise.all(fresh.map(a => mapName(a.activityDetails.referenceId)))) if (n) found.add(n);
+      if (runs[0] && found.size < WEEKEND_MAPS && reports < 5){
+        reports++;
+        const pg = await api("https://stats.bungie.net/Platform/Destiny2/Stats/PostGameCarnageReport/" + runs[0].activityDetails.instanceId + "/").catch(() => null);
+        for (const e of (pg && pg.entries) || []){ const u = e.player && e.player.destinyUserInfo; if (u && u.membershipId) add(u.membershipType, u.membershipId); }
+      }
+    }
+    return [...found].sort();
+  }
+  function weekendPool(){
+    const w = trialsWindow();
+    if (!w.live){ pool = null; return; }
+    if (!pool || pool.start !== w.start){
+      const saved = store.get(POOL_KEY);
+      pool = saved && saved.start === w.start ? Object.assign(saved, { busy: false }) : { start: w.start, maps: [], at: 0, busy: false };
+    }
+    // Complete sets stay for the weekend; a short one is rechecked after 20 minutes.
+    if (pool.busy || pool.maps.length >= WEEKEND_MAPS || Date.now() - pool.at < 20 * 60e3) return;
+    pool.busy = true;
+    const mine = pool;
+    findWeekendMaps(w).then(maps => { mine.maps = maps; }).catch(() => {}).finally(() => {
+      mine.busy = false; mine.at = Date.now();
+      store.set(POOL_KEY, { start: mine.start, maps: mine.maps, at: mine.at });
+      if (pool === mine) renderWeekend();
+    });
+  }
+  // A lookup's own maps count too.
+  function addPoolMaps(maps){
+    if (!pool || !maps || !maps.length || pool.maps.length >= WEEKEND_MAPS) return;
+    const all = [...new Set(pool.maps.concat(maps))].sort();
+    if (all.length !== pool.maps.length){ pool.maps = all; store.set(POOL_KEY, { start: pool.start, maps: all, at: pool.at }); }
+  }
+  function poolLine(){
+    if (!pool) return "";
+    const m = pool.maps, list = m.length > 1 ? m.slice(0, -1).map(esc).join(", ") + " and " + esc(m[m.length - 1]) : m.map(esc).join("");
+    const text = m.length >= WEEKEND_MAPS ? "This weekend's maps: " + list + "."
+      : m.length ? "This weekend's maps so far: " + list + (pool.busy ? " (still looking…)" : " (the rest show once more matches are played).")
+      : pool.busy || !pool.at ? "Finding this weekend's maps…"
+      : "This weekend's maps show once the first matches are played.";
+    return '<p class="pv-wk-pool">' + text + "</p>";
+  }
   function renderWeekend(){
     const box = $("pv-weekend");
     if (!box) return;
     const now = Date.now(), w = trialsWindow(now);
+    weekendPool();
     const status = w.skipped
       ? '<p class="pv-wk-status"><span class="pv-off">Off this weekend</span> It\'s an Iron Banner week, and Trials doesn\'t run alongside it.</p>' +
         '<p class="pv-wk-note">Next Trials weekend starts ' + esc(WHEN_DATE.format(w.start)) + ' <span class="pv-wk-in">(in ' + until(w.start - now) + ")</span>.</p>"
@@ -229,7 +303,8 @@
     }
     box.innerHTML = '<div class="pv-wk-art">' + window.rallyFlagArtThumb({ art: TRIALS_MODE[4], name: "Trials of Osiris" }) + "</div>" +
       '<div class="pv-wk-body"><h3 class="pv-wk-h" id="pv-weekend-h">Trials of Osiris this weekend</h3>' + status +
-      '<p class="pv-wk-note">Trials runs Friday to Tuesday, reset to reset, except in Iron Banner weeks. Maps rotate between matches, so there\'s no single map for the weekend.</p>' + player + "</div>";
+      poolLine() +
+      '<p class="pv-wk-note">Trials runs Friday to Tuesday, reset to reset, except in Iron Banner weeks. Each weekend has three maps, mixed between matches.</p>' + player + "</div>";
     renderIronBanner();
   }
   function renderIronBanner(){
@@ -308,7 +383,7 @@
     weekendPlayer = { key: type + "-" + id, name, ms, listed, ibListed, maps: null };
     renderWeekend();
     const me = weekendPlayer;
-    weekendMaps(type, id, chars, null).then(maps => { if (weekendPlayer === me){ me.maps = maps; renderWeekend(); } }).catch(() => { if (weekendPlayer === me){ me.maps = []; renderWeekend(); } });
+    weekendMaps(type, id, chars, null).then(maps => { addPoolMaps(maps); if (weekendPlayer === me){ me.maps = maps; renderWeekend(); } }).catch(() => { if (weekendPlayer === me){ me.maps = []; renderWeekend(); } });
     $("rr-copy").addEventListener("click", () => {
       const url = location.origin + location.pathname + "?p=" + type + "-" + id;
       (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(() => { $("rr-copy").textContent = "Link copied"; }, () => { $("rr-copy").textContent = url; });

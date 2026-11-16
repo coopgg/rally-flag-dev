@@ -1724,8 +1724,24 @@ await section("PvP", async () => {
   const metric = n => ({ objectiveProgress: { progress: n } });
   const p = await open({ url: BASE + "pvp.html", ready: "#rr-form" });
   const ctx = p.context_;
-  // A Saturday during Trials (Friday 17:00 UTC to Tuesday 17:00 UTC).
+  // This weekend's three maps, before any lookup: the seed player hasn't played since Friday,
+  // so the card follows their latest match to a player who has (and remembers them as the next seed).
+  const SEED = "4611686018446797442", ACTIVE = "4611686018400000888", poolCalls = [];
+  await ctx.route(new RegExp("/Profile/" + SEED + "/\\?components=200$"), r => { poolCalls.push("seed"); r.fulfill(ok({ characters: { data: { "9": { characterId: "9", dateLastPlayed: "2026-11-10T00:00:00Z" } } } })); });
+  await ctx.route(/\/Character\/9\/Stats\/Activities\/\?mode=84&count=1$/, r => r.fulfill(ok({ activities: [{ period: "2026-11-09T20:00:00Z", activityDetails: { referenceId: 222, instanceId: "50", mode: 84 } }] })));
+  await ctx.route(/stats\.bungie\.net\/Platform\/Destiny2\/Stats\/PostGameCarnageReport\/50\//, r => { poolCalls.push("pgcr"); r.fulfill(ok({ entries: [{ player: { destinyUserInfo: { membershipType: 2, membershipId: SEED } } }, { player: { destinyUserInfo: { membershipType: 3, membershipId: ACTIVE } } }] })); });
+  await ctx.route(new RegExp("/Profile/" + ACTIVE + "/\\?components=200$"), r => r.fulfill(ok({ characters: { data: { "8": { characterId: "8", dateLastPlayed: "2026-11-14T11:00:00Z" } } } })));
+  await ctx.route(/\/Character\/8\/Stats\/Activities\/\?mode=84&count=25$/, r => r.fulfill(ok({ activities: [301, 302, 301, 303].map((h, i) => ({ period: "2026-11-14T0" + i + ":00:00Z", activityDetails: { referenceId: h, instanceId: "6" + i, mode: 84 } })) })));
+  await ctx.route(/Manifest\/DestinyActivityDefinition\/30[123]\//, r => r.fulfill(ok({ displayProperties: { name: { 301: "Widow's Court", 302: "Pacifica", 303: "Javelin-4" }[r.request().url().match(/30[123]/)[0]] } })));
+  // A Saturday during Trials (Friday 17:00 UTC to Tuesday 17:00 UTC). (Forget maps the first load found for real.)
+  await p.waitForFunction(() => !/Finding this weekend/.test(document.getElementById("pv-weekend").innerText), null, { timeout: 60000 }).catch(() => {});
+  await p.evaluate(() => { localStorage.removeItem("rallyflag_trials_maps"); localStorage.removeItem("rallyflag_trials_seed"); });
   await p.clock.install({ time: new Date("2026-11-14T12:00:00Z") }); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
+  await p.waitForFunction(() => /This weekend's maps:/.test(document.getElementById("pv-weekend").innerText), null, { timeout: 10000 }).catch(() => {});
+  check("pvp: the Trials card names this weekend's three maps before any lookup", /This weekend's maps: Javelin-4, Pacifica and Widow's Court\./.test(await p.innerText("#pv-weekend")) && /Each weekend has three maps, mixed between matches/.test(await p.innerText("#pv-weekend")), await p.innerText("#pv-weekend"));
+  check("pvp: …found through the seed's latest match, and the active player is the next seed", poolCalls.join() === "seed,pgcr" && await p.evaluate(a => (JSON.parse(localStorage.getItem("rallyflag_trials_seed")) || [])[1] === a, ACTIVE), poolCalls.join());
+  await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
+  check("pvp: the weekend's maps are kept for the weekend (no lookups on the next visit)", poolCalls.length === 2 && /This weekend's maps: Javelin-4/.test(await p.innerText("#pv-weekend")), poolCalls.join());
   check("pvp: the Iron Banner card gives the next expected week (every 4 weeks from 20 Oct), before any lookup", /Next expected Tuesday, Nov 17/.test(await p.innerText("#pv-ib")) && /in 3 days 5 h/.test(await p.innerText("#pv-ib")), await p.innerText("#pv-ib"));
   check("pvp: the Trials card says it's live and when it ends, before any lookup", /Live now/.test(await p.innerText("#pv-weekend")) && /ends in 3 days 5 h/.test(await p.innerText("#pv-weekend")), await p.innerText("#pv-weekend"));
   // This weekend's match (on Endless Vale) and last weekend's (Meltdown, not counted).
