@@ -208,12 +208,20 @@
   // ---------------- this weekend's maps ----------------
   // Since June 2026 each Trials weekend has three maps, mixed between
   // matches (one map a weekend before that). Bungie only lists the playlist,
-  // so the maps come from match history: start from players we know play
-  // Trials, and if they haven't played this weekend, from the players in
-  // their latest match, until three maps turn up. Kept in localStorage for
-  // the weekend (the set doesn't change), rechecked while it's short.
+  // so the maps come from match history. No player is built in: it starts
+  // from players this browser knows (the last one who had matches, then
+  // recent lookups here and on the Raid & Dungeon Report), and if they
+  // haven't played this weekend, from the players in their latest match,
+  // until three maps turn up. Kept in localStorage for the weekend (the set
+  // doesn't change), rechecked while it's short.
   const WEEKEND_MAPS = 3, POOL_KEY = "rallyflag_trials_maps", SEED_KEY = "rallyflag_trials_seed";
-  const SEED_PLAYERS = [[2, "4611686018446797442"]];
+  function knownPlayers(){
+    const out = [], seed = store.get(SEED_KEY);
+    if (seed) out.push(seed);
+    for (const k of [RECENT_KEY, "rallyflag_report_recent"])
+      for (const r of store.get(k) || []){ const m = /^(\d+)-(\d+)$/.exec(r && r.p || ""); if (m) out.push([+m[1], m[2]]); }
+    return out;
+  }
   let pool = null; // { start, maps: [names], at, busy }
   const store = { get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch (e){ return null; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e){} } };
   const mapNames = {};
@@ -221,8 +229,7 @@
   async function findWeekendMaps(w){
     const found = new Set(pool.maps), seen = new Set(), queue = [];
     const add = (t, id) => { if (!seen.has(id)){ seen.add(id); queue.push([t, id]); } };
-    const seed = store.get(SEED_KEY); if (seed) add(seed[0], seed[1]);
-    SEED_PLAYERS.forEach(([t, id]) => add(t, id));
+    knownPlayers().forEach(([t, id]) => add(t, id));
     let players = 0, reports = 0;
     while (queue.length && found.size < WEEKEND_MAPS && players < 14){
       const [t, id] = queue.shift(); players++;
@@ -253,7 +260,7 @@
       pool = saved && saved.start === w.start ? Object.assign(saved, { busy: false }) : { start: w.start, maps: [], at: 0, busy: false };
     }
     // Complete sets stay for the weekend; a short one is rechecked after 20 minutes.
-    if (pool.busy || pool.maps.length >= WEEKEND_MAPS || Date.now() - pool.at < 20 * 60e3) return;
+    if (pool.busy || pool.maps.length >= WEEKEND_MAPS || Date.now() - pool.at < 20 * 60e3 || !knownPlayers().length) return;
     pool.busy = true;
     const mine = pool;
     findWeekendMaps(w).then(maps => { mine.maps = maps; }).catch(() => {}).finally(() => {
@@ -264,16 +271,19 @@
   }
   // A lookup's own maps count too.
   function addPoolMaps(maps){
-    if (!pool || !maps || !maps.length || pool.maps.length >= WEEKEND_MAPS) return;
-    const all = [...new Set(pool.maps.concat(maps))].sort();
+    if (!pool || pool.maps.length >= WEEKEND_MAPS) return;
+    // A lookup is a new place to start from: search again now if the set is short.
+    const all = [...new Set(pool.maps.concat(maps || []))].sort();
     if (all.length !== pool.maps.length){ pool.maps = all; store.set(POOL_KEY, { start: pool.start, maps: all, at: pool.at }); }
+    if (pool.maps.length < WEEKEND_MAPS && !pool.busy) pool.at = 0;
   }
   function poolLine(){
     if (!pool) return "";
     const m = pool.maps, list = m.length > 1 ? m.slice(0, -1).map(esc).join(", ") + " and " + esc(m[m.length - 1]) : m.map(esc).join("");
     const text = m.length >= WEEKEND_MAPS ? "This weekend's maps: " + list + "."
       : m.length ? "This weekend's maps so far: " + list + (pool.busy ? " (still looking…)" : " (the rest show once more matches are played).")
-      : pool.busy || !pool.at ? "Finding this weekend's maps…"
+      : pool.busy ? "Finding this weekend's maps…"
+      : !pool.at && !knownPlayers().length ? "Look up a player to see this weekend's maps."
       : "This weekend's maps show once the first matches are played.";
     return '<p class="pv-wk-pool">' + text + "</p>";
   }

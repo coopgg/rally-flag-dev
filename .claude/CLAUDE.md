@@ -188,8 +188,8 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   Bungie's public stats (Character/0 = every character) and metrics;
   Bungie's Trials match stats are incomplete, so Trials leads with metrics. Trials
   and Iron Banner cards (items 117-119, 121): Trials is off in Iron Banner
-  weeks; this weekend's three maps come from match history (seed player →
-  PGCR players).
+  weeks; this weekend's three maps come from match history (players this browser
+  looked up → PGCR players; no player ids in the code).
 - **Seals & Triumphs** (`seals.html` + `assets/seals.js`, HANDOFF item 87):
   any player's seals from public profile components; definitions from Your
   Week's worker (bump its SCHEMA when the stored shape changes).
