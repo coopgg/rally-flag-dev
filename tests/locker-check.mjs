@@ -763,6 +763,7 @@ await section("Master surges", async () => {
 await section("Item popup layout", async () => {
   const p = await open({ hash: "#gear" });
   await p.click("#buckets .item-tile[data-id]");
+  await p.waitForFunction(() => !document.getAnimations().some(a => a.playState === "running" && a.animationName === "rf-pop")); // the popup's entrance (it scales in)
   const box = sel => p.$eval(sel, e => { const r = e.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height }; });
   const body = await box("#item-dialog .dlg-body"), side = await box("#item-dialog .dlg-side"), info = await box("#plug-info");
   check("popup: on desktop the item is on the left, the actions and details panel on the right", side.x >= body.x + body.w - 2 && await p.isVisible('#item-dialog [data-act="equip"]') && await p.isHidden("#act-toggle"));
