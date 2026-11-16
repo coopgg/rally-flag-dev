@@ -142,6 +142,9 @@ async function open(opts = {}){
   await context.route(RELAY + "**", r => opts.relay ? r.fulfill(json(opts.relay)) : viaWorker(RelayWorker, r, {}));
   const page = await context.newPage();
   page.errors = []; page.on("pageerror", e => page.errors.push(process.env.DEBUG ? e.stack : e.message));
+  // Something the Content-Security-Policy blocked is a broken feature too.
+  // (Not axe's own fetch() of the Google Fonts stylesheet: visitors never make it.)
+  page.on("console", m => { const t = m.text(); if (m.type() === "error" && /Content Security Policy/.test(t) && !/^Connecting to 'https:\/\/fonts\.googleapis\.com\//.test(t)) page.errors.push(t.slice(0, 200)); });
   page.calls = calls; page.context_ = context; page.clarityCalls = clarityCalls;
   await page.goto(opts.url || BASE + "locker.html" + (opts.real ? "" : "?demo") + (opts.hash || ""));
   if (!opts.down && !opts.signedOut) await page.waitForSelector(opts.ready || "#locker-app:not([hidden])", { timeout: 120000 });

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /* ============================================================
    Stamps tools/boot-script.js into the inline boot <script> at the top of
-   every page's <head>, then rebuilds the generated guide pages (they're
-   copied from the guide templates).
+   every page's <head>, with the site's Content-Security-Policy <meta>
+   right before it (CSP below), then rebuilds the generated guide pages
+   (they're copied from the guide templates).
      node tools/sync-boot-script.js           update every page
      node tools/sync-boot-script.js --check   exit 1 if any page differs
    No dependencies; Node 18+.
@@ -18,6 +19,29 @@ const source = fs.readFileSync(path.join(__dirname, "boot-script.js"), "utf8").t
 // one-line pointer back to the source.
 const code = source.replace(/^\/\*[\s\S]*?\*\/\s*/, "");
 const block = "<script>/* Boot script: theme, light/dark mode, load guard. Generated from tools/boot-script.js; edit there and run node tools/sync-boot-script.js. */\n" + code + "\n</script>";
+// Content-Security-Policy (HANDOFF item 126). GitHub Pages can't send
+// headers, so it's a <meta> before the first script. A light policy: our
+// inline scripts stay allowed (no hashes to keep up), but scripts load only
+// from this site (plus Cloudflare's analytics beacon on rallyflag.gg), and
+// the page only talks to the hosts it really uses, so injected code can't
+// pull in a payload or send data anywhere else. New outside host (an API,
+// images, an embed) → add it here and re-run.
+const CSP = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: https://www.bungie.net https://images.steamusercontent.com https://raw.githubusercontent.com",
+  "connect-src 'self' https://www.bungie.net https://stats.bungie.net https://raw.githubusercontent.com https://rallyflag-sync.rallyflag.workers.dev https://rallyflag-dim.rallyflag.workers.dev https://cloudflareinsights.com",
+  "frame-src 'self' https://player.twitch.tv",
+  "worker-src 'self'",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'"
+].join("; ");
+const cspMeta = '<meta http-equiv="Content-Security-Policy" content="' + CSP + '">';
+const CSP_RE = /<meta http-equiv="Content-Security-Policy" content="[^"]*">\n?/;
 // Matches this generated block and the older one-line version it replaced.
 const BOOT_RE = /<script>\/\* (?:Boot script:|Apply the saved theme)[\s\S]*?<\/script>/;
 
@@ -31,9 +55,10 @@ for (const f of fs.readdirSync(ROOT).filter(f => f.endsWith(".html")).sort()){
   if (!matches) continue; // pages without the boot script (dev-only tools)
   if (matches.length !== 1) throw new Error(f + ": expected one boot script, found " + matches.length);
   pages++;
-  if (matches[0] === block) continue;
-  if (CHECK){ console.error("stale boot script: " + f); stale++; }
-  else { fs.writeFileSync(file, html.replace(BOOT_RE, () => block)); written++; }
+  const want = cspMeta + "\n" + block;
+  if (html.includes(want) && (html.match(new RegExp(CSP_RE.source, "g")) || []).length === 1) continue;
+  if (CHECK){ console.error("stale boot script or CSP: " + f); stale++; }
+  else { fs.writeFileSync(file, html.replace(new RegExp(CSP_RE.source, "g"), "").replace(BOOT_RE, () => want)); written++; }
 }
 
 const build = path.join(__dirname, "build-guide-pages.js");

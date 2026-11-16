@@ -51,6 +51,10 @@ deleted again; if a promotion range spans them, their add+delete cancels out.)
   file would block first paint on a request). Keep its logic in sync with
   `getStoredTheme` / `getStoredModePref` / `resolveMode` in `assets/nav.js`.
   New page: copy the boot `<script>` block from any page, then run the sync.
+  The same sync stamps the Content-Security-Policy `<meta>` just before it
+  (policy in `tools/sync-boot-script.js`, HANDOFF item 126): a new outside
+  host (API, images, embed) must be added there or the browser blocks it,
+  and the site checks fail on any blocked request.
 - **Pages fill content from script at the end of `<body>`.** `.rf-boot` keeps
   `<main>` and `<footer>` laid out but invisible until DOMContentLoaded +
   web fonts (fonts capped at 400ms; 2.5s fallback). New pages need: the boot

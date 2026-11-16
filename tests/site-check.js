@@ -5,7 +5,7 @@
    Serves the working tree *at the dev origin* (the Bungie API key is
    origin-locked, so live data only works there) and loads every public
    page in headless Chromium at desktop/phone × dark/light, checking:
-     - no script errors
+     - no script errors (and nothing blocked by the Content-Security-Policy)
      - no axe-core violations (WCAG 2.0/2.1/2.2 A+AA, best practices)
      - no sideways scroll
      - no broken images (any image answered 4xx/5xx, or a local one
@@ -108,6 +108,10 @@ async function newContext(browser, combo, opts = {}){
   const context = await browser.newContext({ viewport: { width: combo.width, height: combo.height }, serviceWorkers: "block", ...opts });
   await context.addInitScript(([mode, theme]) => {
     try { localStorage.setItem("rallyflag_theme", theme); localStorage.setItem("rallyflag_mode_pref", mode); } catch (e) {}
+    // Anything the Content-Security-Policy blocks (tools/sync-boot-script.js):
+    // a blocked script, image or request is a broken feature, so it counts as an error.
+    window.__csp = [];
+    document.addEventListener("securitypolicyviolation", e => window.__csp.push("CSP blocked " + e.effectiveDirective + ": " + (e.blockedURI || "inline")));
     // Layout shift since navigation start, read back after the page settles.
     window.__cls = 0;
     try {
@@ -194,6 +198,9 @@ async function checkCombo(browser, combo, linkSink){
       const links = [...document.querySelectorAll("a[href]")].map(a => a.getAttribute("href"));
       return { hscroll, broken, small, links };
     });
+    // Before axe: it fetch()es cross-site stylesheets (Google Fonts) to read
+    // their rules, which connect-src rightly blocks but visitors never do.
+    errors.push(...await page.evaluate(() => window.__csp || []));
     await page.addScriptTag({ content: AXE });
     const violations = await page.evaluate(async () =>
       (await axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"] }))
