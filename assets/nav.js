@@ -490,6 +490,15 @@
   // Skeleton loader markup for pages waiting on Bungie: the status line
   // (html, already escaped; a live status) above grey shapes of what's
   // coming: a banner, a heading and a grid of cards (with art), or rows.
+  // One beat on something that just worked (theme.css "Motion"; skipped
+  // when the visitor asks for less motion, as the CSS only runs then).
+  window.rallyFlagPulse = el => {
+    if (!el) return;
+    el.classList.remove("rf-pulse"); void el.offsetWidth; el.classList.add("rf-pulse");
+    el.addEventListener("animationend", function done(e){
+      if (e.target === el){ el.classList.remove("rf-pulse"); el.removeEventListener("animationend", done); }
+    });
+  };
   window.rallyFlagSkeleton = ({ html = "Loading…", banner = true, heading = true, cards = 6, art = true, grid = "skel-grid", rows = 0 } = {}) => {
     const card = '<div class="skel-card panel-card">' + (art ? '<div class="skel skel-art"></div>' : '<div class="skel skel-line w40" style="margin-top:18px"></div>') +
       '<div class="skel skel-line big"></div><div class="skel skel-line w80"></div><div class="skel skel-line w60"></div></div>';

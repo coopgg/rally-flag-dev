@@ -3417,6 +3417,8 @@
       b.addEventListener("click", () => { clearTimeout(toastTimer); t.className = "locker-toast"; action.run(); });
       t.appendChild(b);
     }
+    // Restart the marker's one-beat confirm for each new message.
+    if (t.classList.contains("show")){ t.classList.remove("ok", "error", "busy"); void t.offsetWidth; }
     t.className = "locker-toast show " + kind + (t.querySelector("button") ? " has-action" : "");
     clearTimeout(toastTimer);
     if (kind !== "busy") toastTimer = setTimeout(() => { t.className = "locker-toast"; }, kind === "error" ? (err && err.scope ? 20000 : 9000) : action ? 8000 : 3500);
@@ -4463,7 +4465,9 @@
       k >= 0 ? rolls.splice(k, 1) : rolls.push({ groups: chaseGroups(r) });
       saveWish(name, rolls);
       renderItems(); renderChase();
-      $("chase-list").querySelector('[data-chase-wish="' + r.w.slug + '"]').focus();
+      const wb = $("chase-list").querySelector('[data-chase-wish="' + r.w.slug + '"]');
+      wb.focus();
+      if (k < 0 && window.rallyFlagPulse) window.rallyFlagPulse(wb);
       toast(k >= 0 ? "Taken off your wish list." : "On your wish list: copies with this roll get the wish-list mark.", "ok");
     });
     document.querySelector(".view-tabs").addEventListener("click", e => {

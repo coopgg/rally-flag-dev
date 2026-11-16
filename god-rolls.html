@@ -603,7 +603,9 @@
     el.querySelector("button").addEventListener("click", () => {
       if (!toggleWish(weapon)) return;
       renderActions(weapon);
-      el.querySelector("button").focus();
+      const b = el.querySelector("button");
+      b.focus();
+      if (b.getAttribute("aria-pressed") === "true" && window.rallyFlagPulse) window.rallyFlagPulse(b);
     });
   }
   // Another tab (the Locker) changed the wish list.

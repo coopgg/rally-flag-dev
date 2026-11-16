@@ -269,6 +269,61 @@ nav.site-nav{
 }
 .nav-auth-signout:hover{ color:var(--accent-bright); }
 
+/* ---------- Lit buttons ----------
+   Solid accent buttons (the page's main action) are lit from above
+   instead of carrying one flat shadow: a light line on the top edge, a
+   darker inset on the bottom edge, a tight contact shadow where it meets
+   the page and a soft glow in the theme's own colour. Ghost/outline
+   buttons and on/off chips stay flat. */
+:root{
+  --lit-shadow: inset 0 1px 0 rgba(255,255,255,0.35), inset 0 -2px 0 rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.4), 0 8px 24px -6px var(--glow);
+  --lit-shadow-hover: inset 0 1px 0 rgba(255,255,255,0.4), inset 0 -2px 0 rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.4), 0 10px 28px -6px var(--glow);
+  --lit-shadow-press: inset 0 1px 0 rgba(255,255,255,0.2), inset 0 1px 3px rgba(0,0,0,0.25), 0 1px 1px rgba(0,0,0,0.3);
+}
+.rr-btn:not(.ghost), .sl-btn:not(.ghost), .yw-btn:not(.ghost), .locker-btn:not(.ghost), .feature-cta,
+.vend-signin-btn, .callback-retry, .nf-home, .skip-link, .toast-action{
+  box-shadow:var(--lit-shadow);
+  transition:box-shadow .15s ease, filter .15s ease;
+}
+@media (hover:hover){
+  .rr-btn:not(.ghost):not(:disabled):hover, .sl-btn:not(.ghost):not(:disabled):hover, .yw-btn:not(.ghost):hover, .locker-btn:not(.ghost):not(:disabled):hover,
+  .feature-cta:hover, .vend-signin-btn:hover, .callback-retry:hover, .nf-home:hover, .toast-action:hover{ box-shadow:var(--lit-shadow-hover); }
+}
+.rr-btn:not(.ghost):not(:disabled):active, .sl-btn:not(.ghost):not(:disabled):active, .yw-btn:not(.ghost):active, .locker-btn:not(.ghost):not(:disabled):active,
+.feature-cta:active, .vend-signin-btn:active, .callback-retry:active, .nf-home:active, .toast-action:active{ box-shadow:var(--lit-shadow-press); }
+@media (prefers-reduced-motion:reduce){
+  .rr-btn, .sl-btn, .yw-btn, .locker-btn, .feature-cta, .vend-signin-btn, .callback-retry, .nf-home, .toast-action{ transition:none; }
+}
+
+/* ---------- Motion ----------
+   Small, quick and only when the visitor hasn't asked for less motion:
+   - press: buttons dip to 97% while held (an animation on `scale`, so it
+     never fights a page's own `transform` or `transition`); dragged
+     Locker tiles are left alone.
+   - pop: menus and pop-ups ease out from 95% at the edge they open from
+     (180-200ms); closing stays instant.
+   - pulse: one beat on something that just worked (rallyFlagPulse() in
+     nav.js), with its icon fading in from a blur. Never a bounce. */
+@media (prefers-reduced-motion:no-preference){
+  :where(button:not(:disabled):not([draggable="true"]), .rr-btn, .feature-cta, .nf-home, a.yw-btn, a.locker-btn, a.vend-signin-btn, .weapon-act, .chip):active{
+    animation:rf-press 0.1s ease-out forwards;
+  }
+  @keyframes rf-press{ to{ scale:0.97; } }
+  .nav-links-panel.open{ transform-origin:top left; animation:rf-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+  .nav-menu-panel.open{ transform-origin:top right; animation:rf-pop 0.18s cubic-bezier(0.16, 1, 0.3, 1); }
+  dialog.qs[open]{ transform-origin:top center; animation:rf-pop 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+  @keyframes rf-pop{ from{ opacity:0; scale:0.95; } }
+  @keyframes rf-rise{ from{ opacity:0; translate:0 16px; } }
+  .rf-pulse{ animation:rf-pulse 0.45s cubic-bezier(0.16, 1, 0.3, 1); }
+  @keyframes rf-pulse{
+    0%{ scale:1; box-shadow:0 0 0 0 var(--glow); }
+    35%{ scale:1.05; }
+    100%{ scale:1; box-shadow:0 0 0 10px transparent; }
+  }
+  .rf-pulse svg{ animation:rf-icon-in 0.25s ease-out; }
+  @keyframes rf-icon-in{ from{ opacity:0; scale:0.6; filter:blur(2px); } }
+}
+
 /* ---------- Skip link + main landmark ----------
    The skip link (injected by nav.js) sits off-screen until it gets
    keyboard focus. <main tabindex="-1"> only takes focus from the skip
