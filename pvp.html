@@ -126,10 +126,13 @@
   .pv-h3{ margin:22px 0 10px; font-size:15px; font-weight:600; color:var(--text); }
   .rr-note{ margin:30px 0 0; max-width:75ch; font-size:13px; color:var(--text-dim); }
   /* Trials this weekend: its art beside the status (stacked on phones). */
-  .pv-weekend{ display:grid; grid-template-columns:minmax(0, 240px) minmax(0, 1fr); margin:22px 0 0; padding:0; overflow:hidden; }
+  /* This week in PvP: Trials and Iron Banner side by side (stacked on phones), art across the top. */
+  .pv-events .rr-h{ margin-top:28px; }
+  .pv-events-grid{ display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; } /* one height per row */
+  @media (max-width:900px){ .pv-events-grid{ grid-template-columns:minmax(0, 1fr); } }
+  .pv-weekend{ padding:0; overflow:hidden; }
   .pv-weekend:empty{ display:none; }
-  .pv-wk-art{ position:relative; overflow:hidden; min-height:150px; }
-  .pv-wk-art .art-thumb{ position:absolute; inset:0; aspect-ratio:auto; border-bottom:0; } /* fills its column at any height */
+  .pv-wk-art .art-thumb{ aspect-ratio:16/6; }
   .pv-wk-body{ padding:18px 22px 20px; min-width:0; }
   .pv-wk-h{ margin:0 0 6px; font-family:'Oswald', sans-serif; font-weight:600; font-size:20px; color:var(--text); }
   .pv-wk-status{ margin:0; font-size:15px; color:var(--text); }
@@ -144,9 +147,6 @@
     .rr-btn{ flex:1; }
     .pv-grid{ grid-template-columns:minmax(0, 1fr); gap:12px; }
     .pv-tiles{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
-    .pv-weekend{ grid-template-columns:minmax(0, 1fr); }
-    .pv-wk-art{ min-height:0; }
-    .pv-wk-art .art-thumb{ position:relative; inset:auto; aspect-ratio:16/9; }
     .pv-wk-body{ padding:14px 16px 16px; }
   }
 </style>
@@ -171,7 +171,13 @@
   </form>
   <ul class="rr-suggest" id="rr-suggest" aria-label="Matching players" hidden></ul>
   <div class="rr-recent" id="rr-recent"></div>
-  <section class="pv-weekend panel-card" id="pv-weekend" aria-labelledby="pv-weekend-h"></section>
+  <section class="pv-events" aria-labelledby="pv-events-h">
+    <h2 class="rr-h" id="pv-events-h">This week in PvP</h2>
+    <div class="pv-events-grid">
+      <article class="pv-weekend panel-card" id="pv-weekend" aria-labelledby="pv-weekend-h"></article>
+      <article class="pv-weekend panel-card" id="pv-ib" aria-labelledby="pv-ib-h"></article>
+    </div>
+  </section>
   <div id="rr-out"></div>
   <p class="sr-only" id="rr-live" aria-live="polite"></p>
 </div>

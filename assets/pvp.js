@@ -55,7 +55,9 @@
     goldMedals: 3157801630, undefeated: 3212106215, annihilation: 2573000632, gloryStreak: 1289569072,
     crucibleGildings: 1250683514, ironGold: 1196938828, crucibleDefeats: 811894228,
     // This week's Trials (reset at the weekly reset, Tuesday).
-    wkWins: 3046315288, wkStreak: 3787323274, wkFlawlessStreak: 1876673954, wkDefeats: 2091173752
+    wkWins: 3046315288, wkStreak: 3787323274, wkFlawlessStreak: 1876673954, wkDefeats: 2091173752,
+    // Iron Banner: this season's wins and defeats; rank-up packages earned (lifetime).
+    ibWinsSeason: 429382583, ibDefeatsSeason: 2161492053, ibRank: 902410069
   };
 
   const wait = ms => new Promise(r => setTimeout(r, ms));
@@ -153,6 +155,29 @@
     const end = start + 4 * DAY;
     return now < end ? { live: true, start, end } : { live: false, start: start + 7 * DAY, end: end + 7 * DAY };
   }
+  // Iron Banner has no fixed weekday schedule in Bungie's data. This season it
+  // has run every 4 weeks, Tuesday reset to Tuesday reset (2026-06-30, 07-28,
+  // 08-25, 09-22, 10-20 in players' match history), so the card shows the
+  // next one as "expected" from that rhythm, and a lookup confirms it: the
+  // player's activity list (component 204) has an Iron Banner playlist while
+  // it's on. New season with a different rhythm → change IRON_BANNER.
+  const IRON_BANNER = { anchor: Date.UTC(2026, 9, 20, 17), everyDays: 28, lengthDays: 7 };
+  // Iron Banner playlists in DestinyActivityDefinition: mode 19, and mode 88
+  // ("Rift") ones with Iron Banner art or name (Control/Eruption/Fortress/Tribute: Matchmade).
+  const IB_ACTIVITIES = [27283751, 1214397515, 1224098789, 1683791010, 1698629738, 1701316080, 1760483344, 1813796524, 2014552458, 2319065780, 2363676487, 2393304349,
+    2454074184, 2570433546, 2684393063, 2870733370, 2888503916, 2955009825, 2965669871, 3008000924, 3283279668, 3616746132, 3700942889, 3753505781];
+  function ironBannerWindow(now = Date.now()){
+    const period = IRON_BANNER.everyDays * DAY, k = Math.floor((now - IRON_BANNER.anchor) / period);
+    const start = IRON_BANNER.anchor + k * period, end = start + IRON_BANNER.lengthDays * DAY;
+    return now < end ? { live: true, start, end } : { live: false, start: start + period, end: end + period };
+  }
+  // The next Tuesday reset after now (when a confirmed-but-unexpected Iron Banner ends).
+  function nextTuesdayReset(now = Date.now()){
+    const d = new Date(now), ahead = (2 - d.getUTCDay() + 7) % 7;
+    let t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + ahead, 17);
+    return t <= now ? t + 7 * DAY : t;
+  }
+  const WHEN_DATE = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const WHEN = new Intl.DateTimeFormat(undefined, { weekday: "long", hour: "numeric", minute: "2-digit" });
   function until(ms){
     const m = Math.max(1, Math.round(ms / 60e3)), d = Math.floor(m / 1440), h = Math.floor(m % 1440 / 60), mm = m % 60;
@@ -173,15 +198,42 @@
       // No matches yet this weekend: one line instead of four zeros.
       const none = pl.maps && !pl.maps.length && !metric(pl.ms, M.wkWins) && !metric(pl.ms, M.wkDefeats);
       player = w.live
-        ? '<h3 class="pv-h3">' + esc(pl.name) + "'s weekend</h3>" + listed +
+        ? '<h4 class="pv-h3">' + esc(pl.name) + "'s weekend</h4>" + listed +
           (none ? "" : '<dl class="pv-tiles pv-wk-tiles">' + tile("Wins", metric(pl.ms, M.wkWins)) + tile("Best win streak", metric(pl.ms, M.wkStreak)) +
             tile("Best flawless streak", metric(pl.ms, M.wkFlawlessStreak)) + tile("Opponents defeated", metric(pl.ms, M.wkDefeats)) + "</dl>") +
           '<p class="pv-wk-maps">' + (pl.maps == null ? "Checking the maps they've played…" : pl.maps.length ? "Maps they've played this weekend: " + pl.maps.map(esc).join(", ") + "." : "They haven't played Trials this weekend yet.") + "</p>"
         : '<p class="pv-wk-note">' + esc(pl.name) + "'s weekend counters start again when Trials returns.</p>";
     }
     box.innerHTML = '<div class="pv-wk-art">' + window.rallyFlagArtThumb({ art: TRIALS_MODE[4], name: "Trials of Osiris" }) + "</div>" +
-      '<div class="pv-wk-body"><h2 class="pv-wk-h" id="pv-weekend-h">Trials of Osiris this weekend</h2>' + status +
+      '<div class="pv-wk-body"><h3 class="pv-wk-h" id="pv-weekend-h">Trials of Osiris this weekend</h3>' + status +
       '<p class="pv-wk-note">Trials runs Friday to Tuesday, reset to reset. Maps rotate between matches, so there\'s no single map for the weekend.</p>' + player + "</div>";
+    renderIronBanner();
+  }
+  function renderIronBanner(){
+    const box = $("pv-ib");
+    if (!box) return;
+    const now = Date.now(), pl = weekendPlayer, exp = ironBannerWindow();
+    // A lookup's activity list overrules the expected dates either way.
+    const confirmedOn = pl && pl.ibListed === true, missing = pl && pl.ibListed === false && exp.live;
+    let status;
+    if (confirmedOn){
+      const end = exp.live ? exp.end : nextTuesdayReset();
+      status = '<p class="pv-wk-status"><span class="pv-live">Live now</span> until ' + esc(WHEN.format(end)) + ' <span class="pv-wk-in">(ends in ' + until(end - now) + ")</span></p>";
+    } else if (exp.live && !missing){
+      status = '<p class="pv-wk-status"><span class="pv-live">Live now</span> until ' + esc(WHEN.format(exp.end)) + ' <span class="pv-wk-in">(ends in ' + until(exp.end - now) + ")</span></p>";
+    } else {
+      const next = exp.live ? ironBannerWindow(exp.end + 1) : exp;
+      status = '<p class="pv-wk-status">Next expected ' + esc(WHEN_DATE.format(next.start)) + ' <span class="pv-wk-in">(in ' + until(next.start - now) + ")</span></p>";
+    }
+    const note = missing ? '<p class="pv-wk-note">Expected this week, but Bungie doesn\'t list Iron Banner as open for ' + esc(pl.name) + "; the dates may have shifted.</p>"
+      : confirmedOn ? '<p class="pv-wk-note">Confirmed: Bungie lists Iron Banner as open for ' + esc(pl.name) + ".</p>"
+      : pl && pl.ibListed === false ? '<p class="pv-wk-note">Not running right now, and Bungie\'s list for ' + esc(pl.name) + " agrees. It has run every 4 weeks this season, for a week from Tuesday\'s reset; Bungie doesn\'t publish the dates, so the next one is expected.</p>"
+      : '<p class="pv-wk-note">It has run every 4 weeks this season, for a week from Tuesday\'s reset. Bungie doesn\'t publish the dates, so these are expected; look someone up to check Bungie\'s own list.</p>';
+    const player = pl ? '<h4 class="pv-h3">' + esc(pl.name) + "'s Iron Banner</h4>" +
+      '<dl class="pv-tiles pv-wk-tiles">' + tile("Wins this season", metric(pl.ms, M.ibWinsSeason)) + tile("Opponents defeated", metric(pl.ms, M.ibDefeatsSeason), "This season") +
+      tile("Gold medals", metric(pl.ms, M.ironGold)) + tile("Rank-ups", metric(pl.ms, M.ibRank)) + "</dl>" : "";
+    box.innerHTML = '<div class="pv-wk-art">' + window.rallyFlagArtThumb({ art: "/img/destiny_content/pgcr/iron_banner.jpg", name: "Iron Banner" }) + "</div>" +
+      '<div class="pv-wk-body"><h3 class="pv-wk-h" id="pv-ib-h">Iron Banner</h3>' + status + note + player + "</div>";
   }
   // The maps a player has played in Trials since this weekend began.
   async function weekendMaps(type, id, chars, job){
@@ -229,7 +281,8 @@
     // This weekend, for this player.
     const acts = Object.values(((r.profile.characterActivities || {}).data) || {});
     const listed = acts.length ? acts.some(c => (c.availableActivities || []).some(a => TRIALS_ACTIVITIES.includes(a.activityHash) && a.isVisible)) : null;
-    weekendPlayer = { key: type + "-" + id, name, ms, listed, maps: null };
+    const ibListed = acts.length ? acts.some(c => (c.availableActivities || []).some(a => IB_ACTIVITIES.includes(a.activityHash) && a.isVisible)) : null;
+    weekendPlayer = { key: type + "-" + id, name, ms, listed, ibListed, maps: null };
     renderWeekend();
     const me = weekendPlayer;
     weekendMaps(type, id, chars, null).then(maps => { if (weekendPlayer === me){ me.maps = maps; renderWeekend(); } }).catch(() => { if (weekendPlayer === me){ me.maps = []; renderWeekend(); } });

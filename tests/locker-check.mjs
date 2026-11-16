@@ -1726,6 +1726,7 @@ await section("PvP", async () => {
   const ctx = p.context_;
   // A Saturday during Trials (Friday 17:00 UTC to Tuesday 17:00 UTC).
   await p.clock.install({ time: new Date("2026-11-14T12:00:00Z") }); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
+  check("pvp: the Iron Banner card gives the next expected week (every 4 weeks from 20 Oct), before any lookup", /Next expected Tuesday, Nov 17/.test(await p.innerText("#pv-ib")) && /in 3 days 5 h/.test(await p.innerText("#pv-ib")), await p.innerText("#pv-ib"));
   check("pvp: the Trials card says it's live and when it ends, before any lookup", /Live now/.test(await p.innerText("#pv-weekend")) && /ends in 3 days 5 h/.test(await p.innerText("#pv-weekend")), await p.innerText("#pv-weekend"));
   // This weekend's match (on Endless Vale) and last weekend's (Meltdown, not counted).
   await ctx.route(/\/Character\/1\/Stats\/Activities\/\?mode=84/, r => r.fulfill(ok({ activities: [
@@ -1735,9 +1736,10 @@ await section("PvP", async () => {
   await ctx.route(/SearchDestinyPlayerByBungieName/, r => r.fulfill(ok([{ membershipType: 3, membershipId: P, crossSaveOverride: 0 }])));
   await ctx.route(new RegExp("/Profile/" + P + "/\\?components=100,200,204,1100"), r => r.fulfill(ok({ profile: { data: { userInfo: { bungieGlobalDisplayName: "Pvpguard", bungieGlobalDisplayNameCode: 7 } } },
     characters: { data: { "1": { characterId: "1", classType: 1, light: 2000, dateLastPlayed: "2026-10-30T00:00:00Z" } } },
-    characterActivities: { data: { "1": { availableActivities: [{ activityHash: 2723561970, isVisible: true }] } } },
+    // Trials listed, and Iron Banner too (off its expected weeks: Bungie's list wins).
+    characterActivities: { data: { "1": { availableActivities: [{ activityHash: 2723561970, isVisible: true }, { activityHash: 2870733370, isVisible: true }] } } },
     // Trials: 20 flawless tickets (Season 10 to Episode 2) + 3 passages (Episode 3 on) = 23 flawless; 500 wins since Season 10.
-    metrics: { data: { metrics: { 1765255052: metric(20), 3273582723: metric(3), 1365664208: metric(500), 3157801630: metric(321), 3046315288: metric(4), 3787323274: metric(3), 1876673954: metric(0), 2091173752: metric(17) } } } })));
+    metrics: { data: { metrics: { 1765255052: metric(20), 3273582723: metric(3), 1365664208: metric(500), 3157801630: metric(321), 3046315288: metric(4), 3787323274: metric(3), 1876673954: metric(0), 2091173752: metric(17), 429382583: metric(12), 2161492053: metric(150), 1196938828: metric(2), 902410069: metric(40) } } } })));
   let statsUrl = "";
   await ctx.route(new RegExp("/Account/" + P + "/Character/0/Stats/"), r => { statsUrl = r.request().url();
     r.fulfill(ok({ allPvP: st(1000, 550, 9000, 8000, 3000, 1.125, 1206000), pvpCompetitive: st(400, 240, 4000, 3000, 1000, 1.333, 400000), rumble: st(20, 2, 300, 250, 10, 1.2, 9000), trials_of_osiris: st(50, 20, 200, 300, 50, 0.667, 30000) })); });
@@ -1757,12 +1759,15 @@ await section("PvP", async () => {
   await p.waitForFunction(() => /Maps they've played/.test(document.getElementById("pv-weekend").innerText), null, { timeout: 10000 }).catch(() => {});
   const wk = (await p.innerText("#pv-weekend")).replace(/\s+/g, " ");
   check("pvp: the Trials card shows the player's weekend: weekly counters and this weekend's maps only", /Pvpguard#0007's weekend/.test(wk) && /Wins 4 Best win streak 3 Best flawless streak 0 Opponents defeated 17/.test(wk) && /played this weekend: Endless Vale\./.test(wk) && !/Meltdown/.test(wk) && !/may be off/.test(wk), wk);
+  const ib = (await p.innerText("#pv-ib")).replace(/\s+/g, " ");
+  check("pvp: a lookup where Bungie lists Iron Banner makes it live (confirmed), with the player's Iron Banner counters", /Live now/.test(ib) && /Confirmed: Bungie lists Iron Banner as open for Pvpguard#0007/.test(ib) && /Wins this season 12 .*Opponents defeated This season 150 Gold medals 2 Rank-ups 40/.test(ib), ib);
   check("pvp: the URL carries the player and it's under Recent", /\?p=3-4611686018400000777$/.test(p.url()) && /Pvpguard#0007/.test(await text("#rr-recent")));
   let v = await axe(p); check("pvp: passes axe", !v.length, v.join(", "));
   await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
   check("pvp (phone): one card per row, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".pv-card")].slice(0, 2).map(x => x.getBoundingClientRect()); return c[1].top > c[0].bottom && document.documentElement.scrollWidth <= innerWidth; }));
   // A Wednesday: between weekends.
   await p.clock.setSystemTime(new Date("2026-11-18T12:00:00Z")); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
+  check("pvp: in an expected Iron Banner week the card says it's live until next Tuesday", /Live now/.test(await p.innerText("#pv-ib")) && /ends in 6 days 5 h/.test(await p.innerText("#pv-ib")), await p.innerText("#pv-ib"));
   check("pvp: between weekends the card says when Trials starts next", /Next weekend starts/.test(await p.innerText("#pv-weekend")) && /in 2 days 5 h/.test(await p.innerText("#pv-weekend")), await p.innerText("#pv-weekend"));
   check("pvp: no script errors", !p.errors.length, p.errors.join("; "));
   await ctx.close();
