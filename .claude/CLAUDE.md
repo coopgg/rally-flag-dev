@@ -3,6 +3,9 @@
 Static Destiny 2 companion site (plain HTML/CSS/JS, no build step). Current
 status and next steps live in `.claude/HANDOFF.md`; read it at the start of
 a session.
+The design system (look, tokens, type, components, motion, voice, the
+new-page checklist) is in `.claude/DESIGN.md`; read it before building or
+restyling anything visible.
 
 ## Two repos, two sites
 
