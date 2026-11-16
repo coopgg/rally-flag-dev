@@ -148,12 +148,32 @@
   // Saint-14's rewards need a signed-in vendor read and aren't shown.
   const TRIALS_ACTIVITIES = [2723561970]; // "Trials of Osiris: Matchmade"
   const HOUR = 3600e3, DAY = 24 * HOUR;
-  function trialsWindow(now = Date.now()){
+  // Trials and Iron Banner never run in the same week (none of 59 Trials
+  // matches since June fell in an Iron Banner week), so a weekend inside an
+  // Iron Banner week is skipped: `skipped` is that weekend's start, and
+  // start/end are the next real Trials weekend. `ibListed` is a lookup's
+  // answer for this week (true/false), which overrules the expected dates.
+  function ibListedNow(){ return weekendPlayer ? weekendPlayer.ibListed : undefined; }
+  function trialsWindow(now = Date.now(), ibListed = ibListedNow()){
     const d = new Date(now), back = (d.getUTCDay() - 5 + 7) % 7; // days since Friday
     let start = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - back, 17);
     if (start > now) start -= 7 * DAY; // Friday before 17:00 UTC
-    const end = start + 4 * DAY;
-    return now < end ? { live: true, start, end } : { live: false, start: start + 7 * DAY, end: end + 7 * DAY };
+    let w = now < start + 4 * DAY ? { live: true, start, end: start + 4 * DAY } : { live: false, start: start + 7 * DAY, end: start + 11 * DAY };
+    let skipped = null;
+    // An Iron Banner week runs Tuesday to Tuesday, so it covers that whole
+    // Friday-Tuesday weekend. thisWeek: t falls before the coming reset.
+    const reset = nextTuesdayReset(now), thisWeek = t => t < reset && t >= reset - 7 * DAY;
+    const ibWeek = t => {
+      // Bungie listing Trials itself for this week wins.
+      if (thisWeek(t) && weekendPlayer && weekendPlayer.listed === true) return false;
+      if (thisWeek(t) && typeof ibListed === "boolean") return ibListed;
+      const ib = ironBannerWindow(t); return ib.live && t >= ib.start;
+    };
+    for (let i = 0; i < 6 && ibWeek(w.start + HOUR); i++){
+      skipped = skipped || w.start;
+      w = { live: false, start: w.start + 7 * DAY, end: w.end + 7 * DAY };
+    }
+    return Object.assign(w, { skipped });
   }
   // Iron Banner has no fixed weekday schedule in Bungie's data. This season it
   // has run every 4 weeks, Tuesday reset to Tuesday reset (2026-06-30, 07-28,
@@ -187,8 +207,11 @@
   function renderWeekend(){
     const box = $("pv-weekend");
     if (!box) return;
-    const w = trialsWindow(), now = Date.now();
-    const status = w.live
+    const now = Date.now(), w = trialsWindow(now);
+    const status = w.skipped
+      ? '<p class="pv-wk-status"><span class="pv-off">Off this weekend</span> It\'s an Iron Banner week, and Trials doesn\'t run alongside it.</p>' +
+        '<p class="pv-wk-note">Next Trials weekend starts ' + esc(WHEN_DATE.format(w.start)) + ' <span class="pv-wk-in">(in ' + until(w.start - now) + ")</span>.</p>"
+      : w.live
       ? '<p class="pv-wk-status"><span class="pv-live">Live now</span> until ' + esc(WHEN.format(w.end)) + " <span class=\"pv-wk-in\">(ends in " + until(w.end - now) + ")</span></p>"
       : '<p class="pv-wk-status">Next weekend starts ' + esc(WHEN.format(w.start)) + " <span class=\"pv-wk-in\">(in " + until(w.start - now) + ")</span></p>";
     let player = "";
@@ -206,7 +229,7 @@
     }
     box.innerHTML = '<div class="pv-wk-art">' + window.rallyFlagArtThumb({ art: TRIALS_MODE[4], name: "Trials of Osiris" }) + "</div>" +
       '<div class="pv-wk-body"><h3 class="pv-wk-h" id="pv-weekend-h">Trials of Osiris this weekend</h3>' + status +
-      '<p class="pv-wk-note">Trials runs Friday to Tuesday, reset to reset. Maps rotate between matches, so there\'s no single map for the weekend.</p>' + player + "</div>";
+      '<p class="pv-wk-note">Trials runs Friday to Tuesday, reset to reset, except in Iron Banner weeks. Maps rotate between matches, so there\'s no single map for the weekend.</p>' + player + "</div>";
     renderIronBanner();
   }
   function renderIronBanner(){

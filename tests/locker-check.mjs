@@ -1768,6 +1768,12 @@ await section("PvP", async () => {
   // A Wednesday: between weekends.
   await p.clock.setSystemTime(new Date("2026-11-18T12:00:00Z")); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
   check("pvp: in an expected Iron Banner week the card says it's live until next Tuesday", /Live now/.test(await p.innerText("#pv-ib")) && /ends in 6 days 5 h/.test(await p.innerText("#pv-ib")), await p.innerText("#pv-ib"));
+  // Trials and Iron Banner never share a week: this weekend is off, the next one is Friday Nov 27.
+  const off = (await p.innerText("#pv-weekend")).replace(/\s+/g, " ");
+  check("pvp: in an Iron Banner week the Trials card says it's off this weekend and when it's back", /Off this weekend/.test(off) && /Iron Banner week/.test(off) && /Next Trials weekend starts .*Nov 27/.test(off) && /in 9 days 5 h/.test(off) && !/Live now/.test(off), off);
+  v = await axe(p); check("pvp: passes axe (Trials off, Iron Banner on)", !v.length, v.join(", "));
+  // An ordinary Wednesday after it: between weekends.
+  await p.clock.setSystemTime(new Date("2026-11-25T12:00:00Z")); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
   check("pvp: between weekends the card says when Trials starts next", /Next weekend starts/.test(await p.innerText("#pv-weekend")) && /in 2 days 5 h/.test(await p.innerText("#pv-weekend")), await p.innerText("#pv-weekend"));
   check("pvp: no script errors", !p.errors.length, p.errors.join("; "));
   await ctx.close();
