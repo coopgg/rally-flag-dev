@@ -205,6 +205,8 @@ async function checkCombo(browser, combo, linkSink){
     const violations = await page.evaluate(async () =>
       (await axe.run(document, { runOnly: ["wcag2a", "wcag2aa", "wcag21aa", "wcag22aa", "best-practice"] }))
         .violations.map(v => v.id + "×" + v.nodes.length + " (" + v.nodes.slice(0, 2).map(n => n.target.join(" ")).join("; ") + ")"));
+    // Drop what axe itself set off, or a same-document visit (the Locker's #tabs) would report it next.
+    await page.evaluate(() => { window.__csp = []; });
 
     if (errors.length) problems.errors.push(pg + ": " + errors.join(" | "));
     if (violations.length) problems.axe.push(pg + ": " + violations.join(", "));
