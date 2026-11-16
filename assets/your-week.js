@@ -155,7 +155,7 @@
     // a link to its guide with the same chips.
     const rest = (label, kind, slugs, list) => {
       const tiles = list.filter(x => !slugs.includes(x.slug)).map(item =>
-        '<li><a class="yw-tile" href="' + window.rallyFlagGuideHref(kind, item.slug) + '">' + (item.art ? '<img src="' + esc(window.rallyFlagArtUrl(item.art)) + '" alt="" loading="lazy">' : "") +
+        '<li><a class="yw-tile" href="' + window.rallyFlagGuideHref(kind, item.slug) + '">' + (item.art ? '<img' + (window.rallyFlagArtTint(item.art) ? ' style="background-color:' + window.rallyFlagArtTint(item.art) + '"' : "") + ' src="' + esc(window.rallyFlagArtUrl(item.art)) + '" alt="" loading="lazy">' : "") +
           '<span class="yw-tile-name">' + esc(item.name) + "</span>" + clearsHtml(item) + "</a></li>").join("");
       return tiles ? '<div class="tw-subsection-label">' + label + '</div><ul class="yw-tiles">' + tiles + "</ul>" : "";
     };

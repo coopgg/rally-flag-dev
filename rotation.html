@@ -40,11 +40,11 @@
 })();
 </script>
 <title>Rotation - Rally Flag</title>
-<meta name="description" content="The full Destiny 2 Distortion rotation schedule, hour by hour, in your own timezone.">
+<meta name="description" content="The full Destiny 2 Distortion rotation, hour by hour and two cycles ahead, shown in your own timezone so you can plan which destination to farm next.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Rally Flag">
 <meta property="og:title" content="Rotation">
-<meta property="og:description" content="The full Destiny 2 Distortion rotation schedule, hour by hour, in your own timezone.">
+<meta property="og:description" content="The full Destiny 2 Distortion rotation, hour by hour and two cycles ahead, shown in your own timezone so you can plan which destination to farm next.">
 <meta property="og:url" content="https://rallyflag.gg/rotation.html">
 <link rel="canonical" href="https://rallyflag.gg/rotation.html">
 <meta property="og:image" content="https://rallyflag.gg/assets/og-image.png">
@@ -53,7 +53,7 @@
 <meta property="og:image:alt" content="Rally Flag: Destiny 2 raid and dungeon guides, weapon god rolls, builds and live trackers">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Rotation">
-<meta name="twitter:description" content="The full Destiny 2 Distortion rotation schedule, hour by hour, in your own timezone.">
+<meta name="twitter:description" content="The full Destiny 2 Distortion rotation, hour by hour and two cycles ahead, shown in your own timezone so you can plan which destination to farm next.">
 <meta name="twitter:image" content="https://rallyflag.gg/assets/og-image.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -130,6 +130,7 @@
   <p>Rotation order is community-observed and may drift if Bungie changes it. Verify against your in-game Director.</p>
 </footer>
 
+<script src="assets/art-tints.js"></script>
 <script src="assets/nav.js"></script>
 <script src="assets/rotation-data.js"></script>
 <script>
@@ -159,7 +160,7 @@
           (showDay ? '<span class="day">' + day + '</span>' : '') +
           (i === 0 ? "Now" : D.fmtTime(slotStart)) +
         '</div>' +
-        '<div class="rotation-dest">' + (dest.art ? '<img class="rotation-thumb" src="' + window.rallyFlagArtUrl(dest.art) + '" alt="" loading="lazy">' : '') + '<span>' + dest.name + '</span></div>' +
+        '<div class="rotation-dest">' + (dest.art ? '<img class="rotation-thumb"' + (window.rallyFlagArtTint(dest.art) ? ' style="background-color:' + window.rallyFlagArtTint(dest.art) + '"' : "") + ' src="' + window.rallyFlagArtUrl(dest.art) + '" alt="" loading="lazy">' : '') + '<span>' + dest.name + '</span></div>' +
         '<a class="rotation-loot" href="armor-set-bonuses.html?highlight=' + dest.slug + '">' + dest.loot + '</a>';
       list.appendChild(row);
     }

@@ -1806,9 +1806,11 @@ await section("God Rolls", async () => {
   await perk.click();
   check("god rolls: tapping it again closes it", await g.isHidden("#perkinfo-blast-furnace") && await perk.getAttribute("aria-pressed") === "false");
   check("god rolls: a perk's name shows on hover", await op() === 1 && (await tip.textContent()).length > 2);
-  await g.mouse.move(0, 0); await perk.focus(); await g.waitForTimeout(250);
-  const hidden1 = await op(); await g.keyboard.press("Escape"); await g.waitForTimeout(250);
-  check("god rolls: …and on focus, and Escape hides it", hidden1 === 1 && await op() === 0);
+  // Waits for the tooltip's fade to settle instead of a fixed pause (newer Chromium can lag a frame).
+  const settle = want => tip.evaluate((t, w) => new Promise(r => { const end = Date.now() + 2000; (function poll(){ const o = +getComputedStyle(t).opacity; if (o === w || Date.now() > end) r(o); else requestAnimationFrame(poll); })(); }), want);
+  await g.mouse.move(0, 0); await perk.focus();
+  const shown = await settle(1); await g.keyboard.press("Escape"); const hidden = await settle(0);
+  check("god rolls: …and on focus, and Escape hides it", shown === 1 && hidden === 0, "focus " + shown + ", after Escape " + hidden);
   check("god rolls: the perk's name is its accessible name", (await perk.evaluate(b => b.textContent)).trim() === (await tip.textContent()).trim());
   check("god rolls: no script errors", !g.errors.length && !L.errors.length, g.errors.concat(L.errors).join("; "));
   await g.context_.close();

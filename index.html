@@ -321,6 +321,7 @@
   <p>Destiny data and set bonus text sourced from public game data. Data, icons and activity art © Bungie.</p>
 </footer>
 
+<script src="assets/art-tints.js"></script>
 <script src="assets/nav.js"></script>
 <script src="assets/activity-index.js"></script>
 <script src="assets/featured-rotation-data.js"></script>
@@ -341,7 +342,7 @@
   const art = window.rallyFlagArtUrl, S = window.RallyFlagSurges;
   document.getElementById("feature").innerHTML =
     '<a class="feature-main" href="' + window.rallyFlagGuideHref("raid", raid.slug) + '">' +
-      (raid.art ? '<div class="feature-art"><img src="' + art(raid.art) + '" alt="" fetchpriority="high"></div>' : '') +
+      (raid.art ? '<div class="feature-art"' + (window.rallyFlagArtTint(raid.art) ? ' style="background-color:' + window.rallyFlagArtTint(raid.art) + '"' : "") + '><img src="' + art(raid.art) + '" alt="" fetchpriority="high"></div>' : '') +
       '<div class="feature-body"><div class="feature-kicker">Featured raid this week</div>' +
       '<div class="feature-name">' + raid.name + '</div>' +
       '<div class="feature-meta">' + raid.encounterCount + ' encounters · rotates in ' + days + 'd ' + hours + 'h</div>' +
