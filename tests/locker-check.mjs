@@ -1766,7 +1766,8 @@ await section("PvP", async () => {
   await p.setViewportSize({ width: 390, height: 900 }); await p.waitForTimeout(300);
   check("pvp (phone): one card per row, no sideways scroll", await p.evaluate(() => { const c = [...document.querySelectorAll(".pv-card")].slice(0, 2).map(x => x.getBoundingClientRect()); return c[1].top > c[0].bottom && document.documentElement.scrollWidth <= innerWidth; }));
   // A Wednesday: between weekends.
-  await p.clock.setSystemTime(new Date("2026-11-18T12:00:00Z")); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
+  // (No player: the mock lists Trials and Iron Banner both, which Bungie never does.)
+  await p.clock.setSystemTime(new Date("2026-11-18T12:00:00Z")); await p.goto(BASE + "pvp.html"); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
   check("pvp: in an expected Iron Banner week the card says it's live until next Tuesday", /Live now/.test(await p.innerText("#pv-ib")) && /ends in 6 days 5 h/.test(await p.innerText("#pv-ib")), await p.innerText("#pv-ib"));
   // Trials and Iron Banner never share a week: this weekend is off, the next one is Friday Nov 27.
   const off = (await p.innerText("#pv-weekend")).replace(/\s+/g, " ");
