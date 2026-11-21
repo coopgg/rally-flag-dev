@@ -269,6 +269,20 @@ nav.site-nav{
 }
 .nav-auth-signout:hover{ color:var(--accent-bright); }
 
+/* ---------- Tinted greys (preview 2026-11-21, HANDOFF item 129) ----------
+   The six subclass themes sat on a neutral near-black (and light grey):
+   their background and card borders now lean 4% toward the theme colour,
+   as Cosmic, Aurora and Eclipse already do with their own backgrounds.
+   Roll back by reverting the commit that added this block. */
+:root[data-mode="dark"]:not([data-theme="cosmic"]):not([data-theme="aurora"]):not([data-theme="eclipse"]){
+  --bg: color-mix(in srgb, var(--accent) 4%, #07080a);
+  --panel-border: color-mix(in srgb, var(--accent) 8%, rgba(255,255,255,0.09));
+}
+:root[data-mode="light"]:not([data-theme="cosmic"]):not([data-theme="aurora"]):not([data-theme="eclipse"]){
+  --bg: color-mix(in srgb, var(--accent) 4%, #f3f4f7);
+  --panel-border: color-mix(in srgb, var(--accent) 8%, rgba(0,0,0,0.12));
+}
+
 /* ---------- Lit buttons ----------
    Solid accent buttons (the page's main action) are lit from above
    instead of carrying one flat shadow: a light line on the top edge, a
