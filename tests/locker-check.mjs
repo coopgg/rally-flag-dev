@@ -803,7 +803,7 @@ await section("Item popup layout", async () => {
   // The pinned header is opaque: what scrolls under it doesn't show through.
   const headBg = await q.evaluate(() => { const d = document.getElementById("item-dialog"); d.scrollTop = 400; const h = d.querySelector(".dlg-head"), r = h.getBoundingClientRect(), c = getComputedStyle(h);
     const top = document.elementFromPoint(r.left + r.width / 2, r.top + 8); d.scrollTop = 0; return { color: c.backgroundColor, inHead: !!(top && top.closest(".dlg-head")) }; });
-  check("popup: the pinned header is solid, so the item scrolls under it", /^rgb\(/.test(headBg.color) && headBg.inHead, JSON.stringify(headBg));
+  check("popup: the pinned header is solid, so the item scrolls under it", /^(rgb\([^,]+,[^,]+,[^,]+\)|color\(srgb [\d.e-]+ [\d.e-]+ [\d.e-]+\))$/.test(headBg.color) && headBg.inHead, JSON.stringify(headBg));
   await q.keyboard.press("Escape"); await q.waitForTimeout(200);
   check("popup: closing it unlocks the page", !(await q.evaluate(() => document.getElementById("item-dialog").open)) && !(await q.evaluate(() => document.documentElement.classList.contains("dlg-lock"))));
   check("popup layout: no script errors", !p.errors.length && !q.errors.length, p.errors.concat(q.errors).join("; "));
