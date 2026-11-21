@@ -572,7 +572,7 @@
   const HAS_LOCKER = !!(window.rallyFlagHasLocker && window.rallyFlagHasLocker());
   const WISH_KEY = "rallyflag_locker_wishes", WISH_TIME_KEY = "rallyflag_locker_tag_times";
   const SHOWN = {};
-  const CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12.5 10 17.5 19 7"></polyline></svg>';
+  const CHECK_SVG = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12.5 10 17.5 19 7"></polyline></svg>';
   const readJson = key => { try { return JSON.parse(localStorage.getItem(key) || "{}") || {}; } catch (e){ return {}; } };
   function wishGroups(perks){
     return perks.filter(Boolean).map(n => { const m = /^(?:tier \d+|masterworked):\s*(.+)$/i.exec(n); return [m ? "Masterwork: " + m[1] : n]; });

@@ -524,6 +524,11 @@
   .tile-badges{ position:absolute; top:2px; right:2px; display:flex; gap:2px; }
   .tile-badges .tile-badge{ position:static; }
   .tile-badge.fav{ background:#ff8fb1; }
+  .tile-badge.fav, .tile-badge.community{ display:flex; align-items:center; justify-content:center; }
+  /* Filled means chosen: the Favorite heart fills on a tagged tile and on its pressed tag button. */
+  .tile-badge.on .fill-on, .act-btn.tag[aria-pressed="true"] .fill-on{ fill:currentColor; }
+  .callout-ico{ display:inline-flex; align-items:center; gap:5px; }
+  .callout-ico .ico{ width:14px; height:14px; }
   .tile-badge.tag-junk, .tile-badge.tag-keep, .tile-badge.tag-infuse, .tile-badge.tag-archive, .tile-badge.note{ display:flex; align-items:center; justify-content:center; }
   .tile-badge.tag-junk{ background:#c9ced8; }
   .tile-badge.tag-keep{ background:#8fd4ff; }
@@ -568,10 +573,10 @@
   /* PvE / PvP marks: bottom right, clear of the tier pips, tag badges and Power line. */
   .tile-use{ position:absolute; right:2px; bottom:calc(var(--bar) + 2px); display:flex; gap:2px; }
   .tile-use .tile-badge{ position:static; display:flex; align-items:center; justify-content:center; width:18px; min-width:0; padding:0; }
-  .tile-use .ico{ width:12px; height:12px; stroke-width:2.4; }
+  .tile-use .ico{ width:12px; height:12px; stroke-width:2.67; }
   .tile-badge.use-pve{ background:#9fd8a4; }
   .tile-badge.use-pvp{ background:#ff9e7a; }
-  .tile-badges .ico{ width:12px; height:12px; stroke-width:2.4; }
+  .tile-badges .ico{ width:12px; height:12px; stroke-width:2.67; } /* 1.33px drawn, like every line icon */
   .chip-select{ appearance:auto; padding-right:10px; color:var(--text); background:var(--panel); font:inherit; font-size:13px; }
   .note-row input{ flex:1; min-width:0; padding:7px 10px; border-radius:8px; border:1px solid var(--panel-border); background:var(--bg); color:var(--text); font:inherit; font-size:14px; }
   .ico{ flex-shrink:0; vertical-align:-3px; }
@@ -993,7 +998,7 @@
         <button class="chip" type="button" data-kind="flag" data-value="dupes" aria-pressed="false">Duplicates</button>
         <select class="chip chip-select" id="tag-filter" aria-label="Show items with this tag">
           <option value="">All tags</option>
-          <option value="favorite">♥ Favorite</option>
+          <option value="favorite">Favorite</option>
           <option value="keep">Keep</option>
           <option value="junk">Junk</option>
           <option value="infuse">Infuse</option>

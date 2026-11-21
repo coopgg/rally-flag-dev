@@ -55,7 +55,10 @@
   const ICON_NOTE = svg('<path d="M4 20h4L19 9l-4-4L4 16z"/>');
   // DIM's tags. Junk sorts last and is what Junk cleanup sends; Favorite
   // and Keep protect an item when farming or loadouts need room.
-  const TAG_LIST = [["favorite", "Favorite", "♥"], ["keep", "Keep", ICON_KEEP], ["junk", "Junk", ICON_TRASH], ["infuse", "Infuse", ICON_INFUSE], ["archive", "Archive", ICON_ARCHIVE]];
+  // Favorite: a line heart like the other tag icons, filled when it's the item's tag (.on / pressed).
+  const ICON_FAV = svg('<path class="fill-on" d="M12 20.5 4.6 13.3a4.6 4.6 0 0 1 6.5-6.5l.9.9.9-.9a4.6 4.6 0 0 1 6.5 6.5z"/>');
+  const ICON_THUMB = svg('<path d="M7 11v9H4v-9zM7 11l4-7c1.5 0 2.5 1 2.2 2.6L12.6 10H19a2 2 0 0 1 2 2.3l-1.2 6A2 2 0 0 1 17.8 20H7"/>');
+  const TAG_LIST = [["favorite", "Favorite", ICON_FAV], ["keep", "Keep", ICON_KEEP], ["junk", "Junk", ICON_TRASH], ["infuse", "Infuse", ICON_INFUSE], ["archive", "Archive", ICON_ARCHIVE]];
   // PvE / PvP marks, apart from tags: an item can be Favorite and PvP, or
   // both PvE and PvP. USE[id] is "pve", "pvp" or "both".
   const ICON_PVE = svg('<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>');
@@ -442,8 +445,8 @@
     const d = COMMUNITY.data, days = d ? Math.floor((Date.now() - d.at) / 864e5) : 0;
     row.innerHTML = '<span class="farm-label">Community rolls</span><button type="button" class="farm-btn" id="community-on" aria-pressed="' + COMMUNITY.on + '">Voltron</button>' +
       '<span class="farm-note" aria-live="polite">' + esc(communityBusy ? "Reading the list (the first time each week it downloads about 28MB)…" : communityErr ? "Couldn't load it: " + communityErr :
-        COMMUNITY.on && d ? d.count.toLocaleString() + " rolls for your weapons · updated " + (days ? days + " day" + (days === 1 ? "" : "s") + " ago" : "today") + ". Matching weapons get a 👍." :
-        "DIM's community wish list (Voltron): weapons with a recommended roll get a 👍. About a 28MB download, at most once a week.") + "</span>" +
+        COMMUNITY.on && d ? d.count.toLocaleString() + " rolls for your weapons · updated " + (days ? days + " day" + (days === 1 ? "" : "s") + " ago" : "today") + ". Matching weapons get a thumbs-up." :
+        "DIM's community wish list (Voltron): weapons with a recommended roll get a thumbs-up. About a 28MB download, at most once a week.") + "</span>" +
       (COMMUNITY.on && d && !communityBusy ? '<button type="button" class="farm-btn" id="community-update">Update now</button>' : "");
   }
   function wireCommunity(){
@@ -3051,8 +3054,8 @@
       // Wish list: a bar along the top edge, as full as the match (green = all of it).
       (wish && wish.n ? '<span class="tile-wish' + (wish.full ? " full" : "") + '" style="--w:' + Math.round(wish.n / wish.total * 100) + '%" aria-hidden="true"></span>' : "") +
       (NOTES[item.id] ? '<span class="tile-note" aria-hidden="true"></span>' : "") +
-      (item.roll && item.roll.full || tag || NEW.has(item.id) || community ? '<span class="tile-badges" aria-hidden="true">' + (NEW.has(item.id) ? '<span class="tile-new"></span>' : "") + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : community ? '<span class="tile-badge community">👍</span>' : "") +
-        (tag === "favorite" ? '<span class="tile-badge fav">♥</span>' : tag ? '<span class="tile-badge tag-' + tag + '">' + (TAG_LIST.find(t => t[0] === tag) || [, , ""])[2] + "</span>" : "") + "</span>" : "") +
+      (item.roll && item.roll.full || tag || NEW.has(item.id) || community ? '<span class="tile-badges" aria-hidden="true">' + (NEW.has(item.id) ? '<span class="tile-new"></span>' : "") + (item.roll && item.roll.full ? '<span class="tile-badge">★</span>' : community ? '<span class="tile-badge community">' + ICON_THUMB + "</span>" : "") +
+        (tag === "favorite" ? '<span class="tile-badge fav on">' + ICON_FAV + '</span>' : tag ? '<span class="tile-badge tag-' + tag + '">' + (TAG_LIST.find(t => t[0] === tag) || [, , ""])[2] + "</span>" : "") + "</span>" : "") +
       '<span class="tile-power">' + (dmg && dmg.i && d.t === 3 ? '<img src="' + esc(img(dmg.i)) + '" alt="" width="12" height="12">' : "") +
         (d.t === 2 ? '<span class="tile-total">' + statTotal(item) + "</span>" : "") + (item.power || "") + "</span>" +
     "</button>";
@@ -3922,7 +3925,7 @@
     const comm = communityMatch(item);
     if (comm){
       const n = (COMMUNITY.data.notes || [])[comm.map(r => r.n).find(x => x >= 0)] || "";
-      notes += '<div class="callout"><span><strong>👍 Community roll</strong> <span class="muted">' + esc(comm.length === 1 ? "1 recommended roll matches" : comm.length + " recommended rolls match") + (n ? ": " + esc(n.length > 160 ? n.slice(0, 157) + "…" : n) : "") + "</span></span></div>";
+      notes += '<div class="callout"><span><strong class="callout-ico">' + ICON_THUMB + 'Community roll</strong> <span class="muted">' + esc(comm.length === 1 ? "1 recommended roll matches" : comm.length + " recommended rolls match") + (n ? ": " + esc(n.length > 160 ? n.slice(0, 157) + "…" : n) : "") + "</span></span></div>";
     }
     if (item.set){
       const p = item.setProgress, ours = item.set.ours;
