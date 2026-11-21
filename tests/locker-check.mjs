@@ -1737,6 +1737,8 @@ await section("PvP", async () => {
   const p = await open({ url: BASE + "pvp.html", ready: "#rr-form" });
   const ctx = p.context_;
   // This weekend's three maps. No player is built in: a fresh browser asks for a lookup.
+  // (On a Trials Saturday: on other days, like Iron Banner weeks, the card says it's off instead.)
+  await p.clock.install({ time: new Date("2026-11-14T12:00:00Z") }); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
   check("pvp: with no known players the Trials card asks for a lookup (no player built in)", /Look up a player to see this weekend's maps\./.test(await p.innerText("#pv-weekend")) && !/4611686018446797442/.test(await p.evaluate(() => fetch("assets/pvp.js").then(r => r.text()))), await p.innerText("#pv-weekend"));
   // A recent lookup who hasn't played since Friday: the card follows their latest match to a
   // player who has (and remembers them as the next place to start).
@@ -1749,7 +1751,7 @@ await section("PvP", async () => {
   await ctx.route(/Manifest\/DestinyActivityDefinition\/30[123]\//, r => r.fulfill(ok({ displayProperties: { name: { 301: "Widow's Court", 302: "Pacifica", 303: "Javelin-4" }[r.request().url().match(/30[123]/)[0]] } })));
   // A Saturday during Trials (Friday 17:00 UTC to Tuesday 17:00 UTC).
   await p.evaluate(s => localStorage.setItem("rallyflag_report_recent", JSON.stringify([{ name: "Seedling#0001", p: "2-" + s }])), SEED);
-  await p.clock.install({ time: new Date("2026-11-14T12:00:00Z") }); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
+  await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
   await p.waitForFunction(() => /This weekend's maps:/.test(document.getElementById("pv-weekend").innerText), null, { timeout: 10000 }).catch(() => {});
   check("pvp: the Trials card names this weekend's three maps before any lookup", /This weekend's maps: Javelin-4, Pacifica and Widow's Court\./.test(await p.innerText("#pv-weekend")) && /Each weekend has three maps, mixed between matches/.test(await p.innerText("#pv-weekend")), await p.innerText("#pv-weekend"));
   check("pvp: …found through the seed's latest match, and the active player is the next seed", poolCalls.join() === "seed,pgcr" && await p.evaluate(a => (JSON.parse(localStorage.getItem("rallyflag_trials_seed")) || [])[1] === a, ACTIVE), poolCalls.join());
