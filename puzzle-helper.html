@@ -241,16 +241,26 @@
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.12em;
     color:var(--accent-text); text-transform:uppercase; margin:32px 0 14px; text-align:center;
   }
-  .ft-player-grid{
-    display:flex; flex-wrap:wrap; justify-content:center; gap:14px;
+  /* Fireteam board: a group per class, a column per player, a row per gear slot. */
+  .ft-player-grid{ display:flex; flex-wrap:wrap; justify-content:center; align-items:flex-start; gap:14px; }
+  .ft-class{ padding:12px 14px 14px; min-width:0; max-width:100%; }
+  .ft-class-h{ margin:0 0 10px; padding-bottom:8px; border-bottom:1px solid var(--panel-border); text-align:center;
+    font-family:'Oswald', sans-serif; font-weight:600; font-size:15px; letter-spacing:0.06em; text-transform:uppercase; color:var(--text); }
+  .ft-class-n{ font-family:var(--font-sans); font-weight:500; font-size:12px; letter-spacing:0; color:var(--text-dim); }
+  .ft-cols{ display:grid; grid-template-columns:repeat(var(--n), minmax(0, 64px)); gap:10px; justify-content:center; }
+  .ft-col{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .ft-name{ font-family:'Oswald', sans-serif; font-weight:500; font-size:13px; color:var(--text); text-align:center;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; padding-bottom:2px; }
+  .ft-name.searched{ color:var(--accent-text); }
+  .ft-gear-slot{ position:relative; aspect-ratio:1/1; border-radius:4px; overflow:hidden; background:var(--panel); border:2px solid var(--panel-border); }
+  .ft-gear-slot img{ display:block; width:100%; height:100%; object-fit:cover; }
+  .ft-gear-slot.legendary{ border-color:#7b4fb8; }
+  .ft-gear-slot.exotic{ border-color:#d9b33c; }
+  @media (max-width:640px){
+    .ft-class{ padding:10px 8px 12px; }
+    .ft-cols{ gap:6px; }
+    .ft-name{ font-size:12px; }
   }
-  .ft-player-card{ flex:0 1 150px; padding:12px; text-align:center; }
-  .ft-player-name{ font-family:'Oswald', sans-serif; font-weight:700; font-size:13px; color:var(--text); }
-  .ft-player-class{ font-size:12px; color:var(--text-dimmer); font-family:'JetBrains Mono', monospace; margin-bottom:8px; }
-  .ft-player-emblem{ width:100%; border-radius:4px; display:block; margin-bottom:8px; }
-  .ft-gear-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:5px; }
-  .ft-gear-slot{ aspect-ratio:1/1; border-radius:3px; overflow:hidden; background:var(--panel-border); }
-  .ft-gear-slot img{ width:100%; height:100%; object-fit:cover; display:block; }
   .ft-gear-slot.ft-hidden-slot{ display:none; }
   .ft-loading-state{
     text-align:center; padding:20px; color:var(--text-dimmer);
@@ -1290,14 +1300,12 @@
       return map;
     }
 
-    async function fetchItemIcon(hash){
-      try {
-        const def = await apiGet("/Platform/Destiny2/Manifest/DestinyInventoryItemDefinition/" + hash + "/");
-        return def.displayProperties && def.displayProperties.icon ? FT_BUNGIE_ROOT + def.displayProperties.icon : null;
-      } catch (err){
-        console.warn("Icon fetch failed for hash " + hash + ":", err.message);
-        return null;
-      }
+    // One definition lookup per item (icon, name, rarity), shared by every player wearing it.
+    const defCache = {};
+    function itemDef(hash){
+      return defCache[hash] || (defCache[hash] = apiGet("/Platform/Destiny2/Manifest/DestinyInventoryItemDefinition/" + hash + "/")
+        .then(d => ({ icon: d.displayProperties && d.displayProperties.icon ? FT_BUNGIE_ROOT + d.displayProperties.icon : null, name: (d.displayProperties && d.displayProperties.name) || "", tier: d.inventory ? d.inventory.tierType : 0 }))
+        .catch(err => { console.warn("Item lookup failed for hash " + hash + ":", err.message); return null; }));
     }
 
     function slotVisible(slot){
@@ -1307,33 +1315,41 @@
 
     // Player names are other people's text (Steam names can hold anything).
     const escHtml = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-    async function renderPlayerCard(container, displayName, profile){
-      const card = document.createElement("div");
-      card.className = "ft-player-card panel-card";
-      const charId = mostRecentCharacterId(profile);
-      const character = charId ? profile.characters.data[charId] : null;
-      const className = character ? FT_CLASS_NAMES[character.classType] || "" : "";
-      const emblemPath = character && character.emblemBackgroundPath ? FT_BUNGIE_ROOT + character.emblemBackgroundPath : null;
-      card.innerHTML =
-        '<div class="ft-player-name">' + escHtml(displayName) + '</div>' +
-        '<div class="ft-player-class">' + className + '</div>' +
-        (emblemPath ? '<img class="ft-player-emblem" src="' + emblemPath + '" alt="">' : '') +
-        '<div class="ft-gear-grid">' +
-          FT_SLOT_ORDER.map(slot => '<div class="ft-gear-slot' + (slotVisible(slot) ? '' : ' ft-hidden-slot') + '" data-ft-gear-slot="' + slot + '"></div>').join("") +
-        '</div>';
-      container.appendChild(card);
+    const FT_SLOT_LABELS = { helmet: "Helmet", arms: "Arms", chest: "Chest", legs: "Legs", classitem: "Class item", ghost: "Ghost" };
+    const FT_CLASS_ORDER = [1, 0, 2]; // Hunter, Titan, Warlock
 
-      if (!charId) return;
-      const equip = buildEquipMap(profile, charId);
-      for (const slot of FT_SLOT_ORDER){
-        const hash = equip[slot];
-        if (!hash) continue;
-        const icon = await fetchItemIcon(hash);
-        if (icon){
-          const slotEl = card.querySelector('.ft-gear-slot[data-ft-gear-slot="' + slot + '"]');
-          if (slotEl) slotEl.innerHTML = '<img src="' + icon + '" alt="">';
-        }
-      }
+    // The whole fireteam at once: one group per class (Hunter, Titan,
+    // Warlock), a column per player (name on top), a row per gear slot in
+    // the same order for everyone, so matching pieces line up across.
+    // players: [{ name, profile, searched }]
+    function renderBoard(players){
+      const rows = players.map(pl => {
+        const charId = mostRecentCharacterId(pl.profile);
+        const character = charId ? pl.profile.characters.data[charId] : null;
+        return Object.assign({}, pl, { cls: character ? character.classType : -1, equip: charId ? buildEquipMap(pl.profile, charId) : {} });
+      });
+      const groups = FT_CLASS_ORDER.concat([-1]).map(c => [c, rows.filter(r => r.cls === c)]).filter(([, list]) => list.length);
+      allGrid.innerHTML = groups.map(([c, list]) => {
+        const cls = FT_CLASS_NAMES[c] || "Unknown class";
+        return '<section class="ft-class panel-card" aria-label="' + cls + 's">' +
+          '<h2 class="ft-class-h">' + cls + ' <span class="ft-class-n">' + list.length + '</span></h2>' +
+          '<div class="ft-cols" style="--n:' + list.length + '">' +
+          list.map(r => '<div class="ft-col" role="group" aria-label="' + escHtml(r.name) + ", " + cls + '">' +
+            '<div class="ft-name' + (r.searched ? ' searched' : '') + '" title="' + escHtml(r.name) + '">' + escHtml(r.name) + (r.searched ? '<span class="sr-only"> (the player you searched)</span>' : '') + '</div>' +
+            FT_SLOT_ORDER.map(slot => '<div class="ft-gear-slot' + (slotVisible(slot) ? '' : ' ft-hidden-slot') + '" data-ft-gear-slot="' + slot + '"' + (r.equip[slot] ? ' data-hash="' + r.equip[slot] + '"' : '') + ' title="' + FT_SLOT_LABELS[slot] + '"></div>').join("") +
+          '</div>').join("") +
+          '</div></section>';
+      }).join("");
+      // Icons fill in as their definitions arrive.
+      allGrid.querySelectorAll(".ft-gear-slot[data-hash]").forEach(el => {
+        itemDef(el.dataset.hash).then(d => {
+          if (!d || !d.icon || !el.isConnected) return;
+          const label = FT_SLOT_LABELS[el.dataset.ftGearSlot] + ": " + d.name;
+          el.classList.add(d.tier === 6 ? "exotic" : d.tier === 5 ? "legendary" : "other");
+          el.title = label;
+          el.innerHTML = '<img src="' + escHtml(d.icon) + '" alt="' + escHtml(label) + '" loading="lazy">';
+        });
+      });
     }
 
     document.querySelectorAll(".ft-settings-row input").forEach(cb => {
@@ -1356,31 +1372,25 @@
       try {
         const { membershipId, membershipType } = await resolvePlayer(name);
         const profile = await getProfile(membershipId, membershipType);
-
-        allGrid.innerHTML = "";
-        await renderPlayerCard(allGrid, profile.profile.data.userInfo.bungieGlobalDisplayName || name, profile);
+        const players = [{ name: profile.profile.data.userInfo.bungieGlobalDisplayName || name, profile, searched: true }];
 
         const transitory = profile.profileTransitoryData && profile.profileTransitoryData.data;
         const partyMembers = (transitory && transitory.partyMembers) || [];
         const others = partyMembers.filter(m => String(m.membershipId) !== String(membershipId));
-
-        if (!others.length){
-          statusNote.textContent = "Not currently in a fireteam with anyone else.";
-          return;
-        }
-
-        for (const member of others){
+        const found = await Promise.all(others.map(async member => {
           try {
             const linked = await apiGet("/Platform/Destiny2/-1/Profile/" + member.membershipId + "/LinkedProfiles/");
-            const memberProfileInfo = linked.profiles && linked.profiles[0];
-            if (!memberProfileInfo) continue;
-            const memberName = memberProfileInfo.bungieGlobalDisplayName || memberProfileInfo.displayName;
-            const memberProfile = await getProfile(memberProfileInfo.membershipId, memberProfileInfo.membershipType);
-            await renderPlayerCard(allGrid, memberName, memberProfile);
+            const info = linked.profiles && linked.profiles[0];
+            if (!info) return null;
+            return { name: info.bungieGlobalDisplayName || info.displayName, profile: await getProfile(info.membershipId, info.membershipType), searched: false };
           } catch (err){
             console.warn("Fireteam member fetch failed:", err.message);
+            return null;
           }
-        }
+        }));
+        players.push(...found.filter(Boolean));
+        renderBoard(players);
+        statusNote.textContent = others.length ? "" : "Not currently in a fireteam with anyone else.";
       } catch (err){
         allGrid.innerHTML = "";
         showError(err.message);

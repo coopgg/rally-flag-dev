@@ -1696,6 +1696,41 @@ await section("Report", async () => {
 
 // ---------- God Rolls page ↔ Locker ----------
 // ---------- Clickjacking guard (nav.js) ----------
+// ---------- Verity Fireteam Fashion (puzzle-helper.html) ----------
+await section("Fireteam", async () => {
+  const p = await open({ url: BASE + "puzzle-helper.html?tool=verity-solver", ready: "[data-panel=\"fireteam\"]" });
+  const ctx = p.context_;
+  const ok = r => ({ status: 200, contentType: "application/json", body: JSON.stringify({ ErrorCode: 1, Response: r }) });
+  const chars = DEMO.characters.data, eqp = DEMO.characterEquipment.data;
+  const gearOf = cls => eqp[Object.keys(chars).find(k => chars[k].classType === cls)].items;
+  // Five players; one name is HTML (Steam names can be anything).
+  const team = [["Searcher", 1], ["Hunt2", 1], ['<img src=x onerror="window.__pwn=1">', 2], ["Tank", 0], ["Hunt3", 1]].map(([n, c], i) => ({ n, c, id: "461168601840000020" + i }));
+  const prof = pl => ({ profile: { data: { userInfo: { bungieGlobalDisplayName: pl.n } } }, characters: { data: { "1": { characterId: "1", classType: pl.c, dateLastPlayed: "2026-11-22T10:00:00Z" } } },
+    characterEquipment: { data: { "1": { items: gearOf(pl.c) } } }, profileTransitoryData: { data: { partyMembers: team.map(t => ({ membershipId: t.id })) } } });
+  await ctx.route(/SearchDestinyPlayerByBungieName/, r => r.fulfill(ok([{ membershipType: 3, membershipId: team[0].id, crossSaveOverride: 3 }])));
+  await ctx.route(/\/LinkedProfiles\//, r => { const t = team.find(x => r.request().url().includes(x.id)); r.fulfill(ok({ profiles: [{ membershipId: t.id, membershipType: 3, bungieGlobalDisplayName: t.n }] })); });
+  await ctx.route(/\/Destiny2\/3\/Profile\/\d+\/\?components=/, r => { const t = team.find(x => r.request().url().includes(x.id)); r.fulfill(ok(prof(t))); });
+  await ctx.route(/Manifest\/DestinyInventoryItemDefinition\/(\d+)\//, r => { const h = r.request().url().match(/Definition\/(\d+)/)[1];
+    r.fulfill(ok({ displayProperties: { name: "Item " + h, icon: "/common/destiny2_content/icons/x.jpg" }, inventory: { tierType: h.endsWith("7") ? 6 : 5 } })); });
+  await ctx.route(/bungie\.net\/common\/destiny2_content\/icons\//, r => r.fulfill({ status: 200, contentType: "image/svg+xml", body: '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8"/>' }));
+  await p.click('[data-panel="fireteam"]');
+  await p.fill("#ft-search-input", "Searcher#0001"); await p.click("#ft-search-btn");
+  await p.waitForSelector(".ft-class"); await p.waitForTimeout(1200);
+  const b = await p.evaluate(() => ({ groups: [...document.querySelectorAll(".ft-class-h")].map(h => h.textContent.replace(/\s+/g, " ").trim()),
+    cols: [...document.querySelectorAll(".ft-class")].map(g => [...g.querySelectorAll(".ft-name")].map(n => n.textContent)),
+    rows: [...document.querySelector(".ft-col").querySelectorAll(".ft-gear-slot")].map(x => x.dataset.ftGearSlot).join(),
+    imgs: document.querySelectorAll(".ft-gear-slot img").length, alt: (document.querySelector(".ft-gear-slot img") || {}).alt,
+    searched: (document.querySelector(".ft-name.searched") || {}).textContent, pwn: window.__pwn || 0, injected: document.querySelectorAll("#ft-all-grid img[onerror]").length }));
+  check("fireteam: one group per class (Hunter, Titan, Warlock) with a count, the searched player first and marked", b.groups.join("|") === "Hunter 3|Titan 1|Warlock 1" && b.cols[0][0].startsWith("Searcher") && /the player you searched/.test(b.searched), JSON.stringify(b));
+  check("fireteam: every column has the same six slots in order, with item icons named for screen readers", b.rows === "helmet,arms,chest,legs,classitem,ghost" && b.imgs >= 20 && /^Helmet: Item \d+$/.test(b.alt), JSON.stringify(b));
+  check("fireteam: a player name made of HTML shows as text", !b.pwn && !b.injected && b.cols[2][0] === '<img src=x onerror="window.__pwn=1">', JSON.stringify(b.cols));
+  await p.click('.ft-settings-row input[data-ft-slot="ghost"]');
+  check("fireteam: unticking a slot hides that row for everyone", await p.evaluate(() => [...document.querySelectorAll('.ft-gear-slot[data-ft-gear-slot="ghost"]')].every(x => getComputedStyle(x).display === "none")));
+  const v = await axe(p); check("fireteam: passes axe", !v.length, v.join(", "));
+  check("fireteam: no script errors", !p.errors.length, p.errors.join("; "));
+  await ctx.close();
+});
+
 await section("Frames", async () => {
   const p = await open({ url: BASE + "faq.html", ready: "main" });
   const ctx = p.context_;
