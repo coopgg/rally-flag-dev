@@ -153,9 +153,17 @@
   }
   .featured-link:hover{ text-decoration:underline; }
 
+  /* Iron Banner week: the same art as the Crucible page's Iron Banner card,
+     beside the text (above it on phones). */
   .ib-banner{
-    padding:16px 18px; margin-bottom:16px;
+    display:grid; grid-template-columns:minmax(0, 280px) minmax(0, 1fr); margin-bottom:16px; padding:0; overflow:hidden;
     border-left:3px solid var(--accent); background:var(--accent-dim);
+  }
+  .ib-banner-art .art-thumb{ height:100%; min-height:120px; aspect-ratio:auto; border-radius:0; }
+  .ib-banner-body{ padding:16px 18px; align-self:center; }
+  @media (max-width:640px){
+    .ib-banner{ grid-template-columns:1fr; }
+    .ib-banner-art .art-thumb{ aspect-ratio:21/9; min-height:0; height:auto; }
   }
   .ib-banner-label{
     font-family:'JetBrains Mono', monospace; font-size:12px; letter-spacing:0.1em;
@@ -354,9 +362,12 @@
     }).join("");
     slotEl.innerHTML =
       '<div class="ib-banner panel-card">' +
-        '<div class="ib-banner-label">Event · Ends at Weekly Reset</div>' +
-        '<div class="ib-banner-name">Iron Banner is active this week</div>' +
-        '<div class="set-links">' + armorLinksHtml + '</div>' +
+        '<div class="ib-banner-art">' + window.rallyFlagArtThumb({ art: "/img/destiny_content/pgcr/iron_banner.jpg", name: "Iron Banner" }) + '</div>' +
+        '<div class="ib-banner-body">' +
+          '<div class="ib-banner-label">Event · Ends at Weekly Reset</div>' +
+          '<div class="ib-banner-name">Iron Banner is active this week</div>' +
+          '<div class="set-links">' + armorLinksHtml + '</div>' +
+        '</div>' +
       '</div>';
   }
 

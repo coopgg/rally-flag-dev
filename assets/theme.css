@@ -309,6 +309,43 @@ nav.site-nav{
   .rr-btn, .sl-btn, .yw-btn, .locker-btn, .feature-cta, .vend-signin-btn, .callback-retry, .nf-home, .toast-action{ transition:none; }
 }
 
+/* ---------- Text fields ----------
+   Focus line: a 2px line in the theme colour grows from the centre of a
+   text box's bottom edge while you type in it. Drawn as a background
+   layer so it works on every page's own input styles (their `background`
+   shorthand would reset it, hence !important on these longhands only).
+   Keyboard focus rings stay as each page draws them. */
+input:is([type="text"], [type="search"], [type="url"], [type="email"]), textarea{
+  background-image:linear-gradient(var(--accent-text), var(--accent-text)) !important;
+  background-repeat:no-repeat !important;
+  background-position:50% 100% !important;
+  background-size:0% 2px !important;
+}
+input:is([type="text"], [type="search"], [type="url"], [type="email"]):focus, textarea:focus{ background-size:100% 2px !important; }
+@media (prefers-reduced-motion:no-preference){
+  input:is([type="text"], [type="search"], [type="url"], [type="email"]), textarea{
+    transition:background-size 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease, color 0.2s ease !important;
+  }
+}
+/* Floating label (the Bungie-name lookups): the label sits inside the box
+   and floats up, smaller, once you're typing or the box has text; the
+   format hint ("Guardian#1234") shows only while it's focused and empty.
+   Markup: <div class="rf-float"><input placeholder="hint"><label for>…</label></div> */
+.rf-float{ position:relative; display:flex; flex:1; min-width:0; }
+div.rf-float > input{ flex:1; min-width:0; padding-top:21px; padding-bottom:5px; }
+div.rf-float > input::placeholder{ color:transparent; }
+div.rf-float > input:focus::placeholder{ color:var(--text-dimmer); }
+.rf-float > label{
+  position:absolute; left:17px; top:50%; translate:0 -50%; max-width:calc(100% - 34px);
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis; pointer-events:none;
+  font-size:15px; color:var(--text-dimmer); transform-origin:left center;
+}
+.rf-float > input:is(:focus, :not(:placeholder-shown)) + label{ top:15px; font-size:12px; }
+.rf-float > input:focus + label{ color:var(--accent-text); }
+@media (prefers-reduced-motion:no-preference){
+  .rf-float > label{ transition:top 0.18s cubic-bezier(0.16, 1, 0.3, 1), font-size 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.18s ease; }
+}
+
 /* ---------- Switch (rallyFlagSwitch in nav.js) ----------
    For settings that are simply on or off. Off: an outlined 52x32 track
    with a small grey knob. On: the track fills with the theme colour and

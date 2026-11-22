@@ -146,7 +146,7 @@
   @media (max-width:640px){
     .rr-wrap{ padding:0 16px 70px; }
     .rr-form{ flex-wrap:wrap; }
-    .rr-form input{ flex:1 0 100%; }
+    .rr-form .rf-float{ flex:1 0 100%; }
     .rr-btn{ flex:1; }
     .pv-grid{ grid-template-columns:minmax(0, 1fr); gap:12px; }
     .pv-tiles{ grid-template-columns:repeat(2, minmax(0, 1fr)); }
@@ -167,7 +167,7 @@
 
 <div class="rr-wrap">
   <form class="rr-form" id="rr-form" role="search">
-    <input type="search" id="rr-q" name="player" aria-label="Bungie name, like Guardian#1234" placeholder="Bungie name, like Guardian#1234" autocomplete="off" spellcheck="false">
+    <div class="rf-float"><input type="search" id="rr-q" name="player" placeholder="Guardian#1234" autocomplete="off" spellcheck="false"><label for="rr-q">Bungie name</label></div>
     <button type="submit" class="rr-btn">Look up</button>
     <button type="button" class="rr-btn ghost" id="rr-mine" hidden>Show mine</button>
   </form>

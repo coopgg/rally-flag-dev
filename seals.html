@@ -118,7 +118,7 @@
   @media (max-width:640px){
     .sl-wrap{ padding:0 16px 70px; }
     .sl-form{ flex-wrap:wrap; }
-    .sl-form input{ flex:1 0 100%; }
+    .sl-form .rf-float{ flex:1 0 100%; }
     .sl-btn{ flex:1; }
   }
 </style>
@@ -136,7 +136,7 @@
 
 <div class="sl-wrap">
   <form class="sl-form" id="sl-form" role="search">
-    <input type="search" id="sl-q" name="player" aria-label="Bungie name, like Guardian#1234" placeholder="Bungie name, like Guardian#1234" autocomplete="off" spellcheck="false">
+    <div class="rf-float"><input type="search" id="sl-q" name="player" placeholder="Guardian#1234" autocomplete="off" spellcheck="false"><label for="sl-q">Bungie name</label></div>
     <button type="submit" class="sl-btn">Look up</button>
     <button type="button" class="sl-btn ghost" id="sl-mine" hidden>Show mine</button>
   </form>

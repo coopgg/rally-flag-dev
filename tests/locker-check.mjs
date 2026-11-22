@@ -1755,6 +1755,11 @@ await section("PvP", async () => {
   const metric = n => ({ objectiveProgress: { progress: n } });
   const p = await open({ url: BASE + "pvp.html", ready: "#rr-form" });
   const ctx = p.context_;
+  // The lookup box: a real label ("Bungie name") that floats up while typing; the format hint shows only when focused.
+  const lab = async () => p.evaluate(() => { const i = document.getElementById("rr-q"), l = i.labels[0]; return { name: l.textContent, size: getComputedStyle(l).fontSize, hint: getComputedStyle(i, "::placeholder").color }; });
+  const l0 = await lab(); await p.focus("#rr-q"); await p.waitForTimeout(300); const l1 = await lab();
+  check("pvp: the lookup box has a visible label that floats up (smaller) on focus", l0.name === "Bungie name" && l0.size === "15px" && l1.size === "12px" && l0.hint !== l1.hint, JSON.stringify([l0, l1]));
+  await p.locator("main h1").click();
   // This weekend's three maps. No player is built in: a fresh browser asks for a lookup.
   // (On a Trials Saturday: on other days, like Iron Banner weeks, the card says it's off instead.)
   await p.clock.install({ time: new Date("2026-11-14T12:00:00Z") }); await p.reload(); await p.waitForSelector("#pv-weekend .pv-wk-h"); await p.waitForTimeout(800);
