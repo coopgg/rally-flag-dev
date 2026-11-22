@@ -256,7 +256,7 @@
   }
   // Credits under the perks, with the switch.
   function clarityCredits(){
-    return '<p class="wl-clarity" id="wl-clarity"><button type="button" class="wl-btn" id="wl-clarity-on" aria-pressed="' + CLARITY.on + '">Clarity notes ' + (CLARITY.on ? "on" : "off") + "</button>" +
+    return '<p class="wl-clarity" id="wl-clarity">' + window.rallyFlagSwitch({ id: "wl-clarity-on", on: CLARITY.on, label: "Clarity notes" }) +
       '<span>Perk numbers come from <a href="' + CLARITY_SITE + '"' + CL_TAB + ">Clarity" + CL_NEW + "</a>, a community research project (not part of Rally Flag). " +
       'Spot a mistake? Tell <a href="' + CLARITY_DISCORD + '"' + CL_TAB + ">Clarity's Discord" + CL_NEW + '</a>. You can <a href="' + CLARITY_KOFI + '"' + CL_TAB + ">support them on Ko-fi" + CL_NEW + "</a>.</span></p>";
   }

@@ -443,7 +443,7 @@
     const row = $("community-row");
     if (!row) return;
     const d = COMMUNITY.data, days = d ? Math.floor((Date.now() - d.at) / 864e5) : 0;
-    row.innerHTML = '<span class="farm-label">Community rolls</span><button type="button" class="farm-btn" id="community-on" aria-pressed="' + COMMUNITY.on + '">Voltron</button>' +
+    row.innerHTML = window.rallyFlagSwitch({ id: "community-on", on: COMMUNITY.on, label: "Community rolls" }) +
       '<span class="farm-note" aria-live="polite">' + esc(communityBusy ? "Reading the list (the first time each week it downloads about 28MB)…" : communityErr ? "Couldn't load it: " + communityErr :
         COMMUNITY.on && d ? d.count.toLocaleString() + " rolls for your weapons · updated " + (days ? days + " day" + (days === 1 ? "" : "s") + " ago" : "today") + ". Matching weapons get a thumbs-up." :
         "DIM's community wish list (Voltron): weapons with a recommended roll get a thumbs-up. About a 28MB download, at most once a week.") + "</span>" +
@@ -537,7 +537,7 @@
     const row = $("clarity-row");
     if (!row) return;
     if (!CLARITY_ALLOWED){ row.hidden = true; return; }
-    row.innerHTML = '<span class="farm-label">Perk insights</span><button type="button" class="farm-btn" id="clarity-on" aria-pressed="' + CLARITY.on + '">Clarity</button>' +
+    row.innerHTML = window.rallyFlagSwitch({ id: "clarity-on", on: CLARITY.on, label: "Perk insights" }) +
       '<span class="farm-note">' + (CLARITY.job ? "Loading Clarity's descriptions… " : CLARITY.err ? "Couldn't load them: " + esc(CLARITY.err) + ". " : "") +
         'Tap a perk to see its real numbers from <a href="' + CLARITY_SITE + '"' + CL_TAB + ">Clarity" + CL_NEW + "</a>, a community research project (not part of Rally Flag)." +
         ' Feedback on their descriptions goes to <a href="' + CLARITY_DISCORD + '"' + CL_TAB + ">Clarity's Discord" + CL_NEW + '</a>; you can <a href="' + CLARITY_KOFI + '"' + CL_TAB + ">support them on Ko-fi" + CL_NEW + "</a>.</span>";
@@ -3400,6 +3400,44 @@
     document.documentElement.classList.toggle("dlg-lock", !drawer);
     fitDrawer();
   }
+  // Phones: drag the popup down by its header to close it, like a native
+  // sheet. A quick flick (over 0.5px/ms) or a drag past half its height
+  // closes it; anything less springs back. It follows the finger with no
+  // easing while held. The inside still scrolls as before (only the
+  // header, which has the grab handle, starts a drag).
+  function wireSheetSwipe(dlg){
+    let drag = null;
+    const reset = () => { dlg.style.transition = ""; dlg.style.translate = ""; };
+    dlg.addEventListener("touchstart", e => {
+      drag = null;
+      if (isWide() || e.touches.length !== 1 || !dlg.matches(":modal") || !e.target.closest(".dlg-head") || e.target.closest("button, a, input, select")) return;
+      drag = { y: e.touches[0].clientY, t: performance.now(), dy: 0, h: dlg.getBoundingClientRect().height, last: [] };
+      dlg.style.transition = "none";
+    }, { passive: true });
+    dlg.addEventListener("touchmove", e => {
+      if (!drag) return;
+      drag.dy = Math.max(0, e.touches[0].clientY - drag.y);
+      const now = performance.now(); drag.last.push([now, drag.dy]); while (drag.last.length > 1 && now - drag.last[0][0] > 100) drag.last.shift();
+      dlg.style.translate = "0 " + drag.dy + "px";
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+    const end = () => {
+      if (!drag) return;
+      const d = drag; drag = null;
+      const [t0, y0] = d.last[0] || [d.t, 0], v = (d.dy - y0) / Math.max(1, performance.now() - t0); // px/ms over the last 100ms
+      const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (v > 0.5 || d.dy > d.h / 2){
+        if (reduce){ reset(); dlg.close(); return; }
+        dlg.style.transition = "translate 0.16s ease-in"; dlg.style.translate = "0 " + d.h + "px";
+        setTimeout(() => { reset(); dlg.close(); }, 160);
+      } else {
+        dlg.style.transition = reduce ? "none" : "translate 0.2s cubic-bezier(0.16, 1, 0.3, 1)"; dlg.style.translate = "";
+        setTimeout(reset, 220);
+      }
+    };
+    dlg.addEventListener("touchend", end);
+    dlg.addEventListener("touchcancel", end);
+  }
   function fitDrawer(){
     const dlg = $("item-dialog");
     document.body.style.paddingBottom = dlg.open && dlg.classList.contains("drawer") ? dlg.offsetHeight + "px" : "";
@@ -4500,6 +4538,7 @@
     });
     // Click on the backdrop closes the dialog.
     $("item-dialog").addEventListener("click", e => { if (e.target === e.currentTarget) e.currentTarget.close(); });
+    wireSheetSwipe($("item-dialog"));
     $("item-dialog").addEventListener("close", e => {
       if (e.currentTarget.open) return; // reopened as a drawer or a popup (showDialog)
       document.body.appendChild($("locker-toast"));

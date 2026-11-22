@@ -720,7 +720,9 @@ await section("Clarity", async () => {
   // Credits in Tools, and the off switch.
   if (await p.isHidden("#tools-panel")) await p.click("#tools-btn");
   check("clarity: the Tools row credits Clarity with their site, Discord and Ko-fi", await p.locator('#clarity-row a[href="https://d2clarity.com"]').count() === 1 && await p.locator('#clarity-row a[href="https://d2clarity.com/discord"]').count() === 1 && await p.locator('#clarity-row a[href="https://url.d2clarity.com/ko-fi"]').count() === 1);
+  check("clarity: the setting is a switch, announced as on", await p.getAttribute("#clarity-on", "role") === "switch" && await p.getAttribute("#clarity-on", "aria-checked") === "true" && /Perk insights/.test(await p.textContent("#clarity-on")));
   await p.click("#clarity-on");
+  check("clarity: tapping the switch turns it off (and keeps focus on it)", await p.getAttribute("#clarity-on", "aria-checked") === "false" && await p.evaluate(() => document.activeElement.id) === "clarity-on");
   await p.click('#buckets .item-tile[data-id]'); await p.locator("#item-dialog [data-plug]:not(.mod-sq)").nth(2).click(); await p.waitForTimeout(500);
   check("clarity: turning it off hides the descriptions and is remembered", !await p.locator("#plug-info .clarity").count() && await p.evaluate(() => localStorage.getItem("rallyflag_locker_clarity")) === "off");
   await p.keyboard.press("Escape"); await p.click("#clarity-on");
@@ -806,6 +808,23 @@ await section("Item popup layout", async () => {
   check("popup: the pinned header is solid, so the item scrolls under it", /^(rgb\([^,]+,[^,]+,[^,]+\)|color\(srgb [\d.e-]+ [\d.e-]+ [\d.e-]+\))$/.test(headBg.color) && headBg.inHead, JSON.stringify(headBg));
   await q.keyboard.press("Escape"); await q.waitForTimeout(200);
   check("popup: closing it unlocks the page", !(await q.evaluate(() => document.getElementById("item-dialog").open)) && !(await q.evaluate(() => document.documentElement.classList.contains("dlg-lock"))));
+  // Swipe down to close (phones): drag the header. Real touch events through CDP.
+  const cdp = await q.context_.newCDPSession(q);
+  const dragHead = async (dy, ms) => {
+    const r = await q.evaluate(() => { const h = document.querySelector("#item-dialog .dlg-head").getBoundingClientRect(); return { x: h.left + 60, y: h.top + 12 }; });
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [{ x: r.x, y: r.y }] });
+    const steps = Math.max(4, Math.round(ms / 15));
+    for (let i = 1; i <= steps; i++){ await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ x: r.x, y: r.y + dy * i / steps }] }); await q.waitForTimeout(ms / steps); }
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] }); await q.waitForTimeout(450);
+    return q.evaluate(() => document.getElementById("item-dialog").open);
+  };
+  await q.click("#buckets .item-tile[data-id]"); await q.waitForTimeout(400);
+  const handle = await q.evaluate(() => getComputedStyle(document.querySelector("#item-dialog .dlg-head"), "::after").width);
+  const afterSlow = await dragHead(80, 600), at = await q.evaluate(() => document.getElementById("item-dialog").style.translate);
+  check("popup: on a phone it has a grab handle, and a short slow drag springs back", handle === "36px" && afterSlow && !at, handle + " " + afterSlow + " " + at);
+  check("popup: a quick flick down closes it and unlocks the page", !(await dragHead(120, 60)) && !(await q.evaluate(() => document.documentElement.classList.contains("dlg-lock"))));
+  await q.click("#buckets .item-tile[data-id]"); await q.waitForTimeout(400);
+  check("popup: a slow drag past half its height closes it", !(await dragHead(420, 1500)));
   check("popup layout: no script errors", !p.errors.length && !q.errors.length, p.errors.concat(q.errors).join("; "));
   await q.context_.close();
 });

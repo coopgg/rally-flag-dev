@@ -499,6 +499,13 @@
       if (e.target === el){ el.classList.remove("rf-pulse"); el.removeEventListener("animationend", done); }
     });
   };
+  // An on/off switch (theme.css "Switch"): a real <button role="switch">,
+  // its label inside so the whole thing is one tap target and one name.
+  // Pages keep their own id/class to find it and re-render it after a tap.
+  window.rallyFlagSwitch = ({ id = "", cls = "", on = false, label = "" } = {}) =>
+    '<button type="button" role="switch" class="rf-switch' + (cls ? " " + cls : "") + '"' + (id ? ' id="' + id + '"' : "") + ' aria-checked="' + !!on + '">' +
+    '<span class="rf-switch-track" aria-hidden="true"><span class="rf-switch-thumb"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span></span>' +
+    (label ? '<span class="rf-switch-label">' + label + "</span>" : "") + "</button>";
   window.rallyFlagSkeleton = ({ html = "Loading…", banner = true, heading = true, cards = 6, art = true, grid = "skel-grid", rows = 0 } = {}) => {
     const card = '<div class="skel-card panel-card">' + (art ? '<div class="skel skel-art"></div>' : '<div class="skel skel-line w40" style="margin-top:18px"></div>') +
       '<div class="skel skel-line big"></div><div class="skel skel-line w80"></div><div class="skel skel-line w60"></div></div>';

@@ -309,6 +309,38 @@ nav.site-nav{
   .rr-btn, .sl-btn, .yw-btn, .locker-btn, .feature-cta, .vend-signin-btn, .callback-retry, .nf-home, .toast-action{ transition:none; }
 }
 
+/* ---------- Switch (rallyFlagSwitch in nav.js) ----------
+   For settings that are simply on or off. Off: an outlined 52x32 track
+   with a small grey knob. On: the track fills with the theme colour and
+   the knob grows, carrying a tick. Held: the knob grows a little more.
+   The knob glides (no overshoot: DESIGN.md "Motion"). */
+.rf-switch{
+  display:inline-flex; align-items:center; gap:10px; min-height:44px; padding:0; margin:0;
+  background:none; border:0; color:var(--text); font:inherit; font-size:14px; text-align:left; cursor:pointer;
+}
+.rf-switch-track{
+  position:relative; flex:none; box-sizing:border-box; width:52px; height:32px; border-radius:16px;
+  border:2px solid var(--text-dimmer); background:transparent;
+}
+.rf-switch-thumb{
+  position:absolute; top:50%; left:6px; width:16px; height:16px; translate:0 -50%; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; background:var(--text-dimmer); color:transparent;
+}
+.rf-switch-thumb svg{ width:14px; height:14px; }
+.rf-switch[aria-checked="true"] .rf-switch-track{ background:var(--accent-fill); border-color:var(--accent-fill); }
+.rf-switch[aria-checked="true"] .rf-switch-thumb{ left:22px; width:24px; height:24px; background:var(--on-accent); color:var(--accent-fill); }
+.rf-switch:active .rf-switch-thumb{ left:0; width:28px; height:28px; }
+.rf-switch[aria-checked="true"]:active .rf-switch-thumb{ left:20px; }
+.rf-switch:hover .rf-switch-track{ border-color:var(--accent-text); }
+.rf-switch[aria-checked="true"]:hover .rf-switch-track{ border-color:var(--accent-fill); }
+.rf-switch:focus-visible{ outline:none; }
+.rf-switch:focus-visible .rf-switch-track{ outline:2px solid var(--accent); outline-offset:2px; }
+.rf-switch:disabled{ cursor:default; opacity:0.6; }
+@media (prefers-reduced-motion:no-preference){
+  .rf-switch-track{ transition:background-color 0.2s ease, border-color 0.2s ease; }
+  .rf-switch-thumb{ transition:left 0.2s cubic-bezier(0.2, 0, 0, 1), width 0.15s ease, height 0.15s ease, background-color 0.2s ease, color 0.2s ease; }
+}
+
 /* ---------- Motion ----------
    Small, quick and only when the visitor hasn't asked for less motion:
    - press: buttons dip to 97% while held (an animation on `scale`, so it
@@ -319,7 +351,7 @@ nav.site-nav{
    - pulse: one beat on something that just worked (rallyFlagPulse() in
      nav.js), with its icon fading in from a blur. Never a bounce. */
 @media (prefers-reduced-motion:no-preference){
-  :where(button:not(:disabled):not([draggable="true"]), .rr-btn, .feature-cta, .nf-home, a.yw-btn, a.locker-btn, a.vend-signin-btn, .weapon-act, .chip):active{
+  :where(button:not(:disabled):not([draggable="true"]):not(.rf-switch), .rr-btn, .feature-cta, .nf-home, a.yw-btn, a.locker-btn, a.vend-signin-btn, .weapon-act, .chip):active{
     animation:rf-press 0.1s ease-out forwards;
   }
   @keyframes rf-press{ to{ scale:0.97; } }
