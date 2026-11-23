@@ -281,6 +281,14 @@ function checkGeneratedPages(){
   } catch (e){
     record("every page's boot script matches tools/boot-script.js", false, String(e.stderr || e.message).trim().replace(/\s*\n\s*/g, "; "));
   }
+  // The static copies for crawlers without JavaScript (tools/prerender.js).
+  if (fs.existsSync(path.join(ROOT, "tools", "prerender.js"))) try {
+    const out = execFileSync(process.execPath, [path.join(ROOT, "tools", "prerender.js"), "--check"], { stdio: "pipe", timeout: 600000 });
+    const skipped = String(out).match(/skipped [^\n]*/g);
+    record("prerendered copies (no-JavaScript content) are up to date", true, skipped ? skipped.join("; ") : "");
+  } catch (e){
+    record("prerendered copies (no-JavaScript content) are up to date", false, String(e.stderr || e.message).trim().replace(/\s*\n\s*/g, "; "));
+  }
   // What a link-preview bot sees: the raw HTML, no JavaScript.
   const bad = [];
   const guides = fs.readdirSync(ROOT).filter(f => GUIDE_RE.test(f));
@@ -293,6 +301,9 @@ function checkGeneratedPages(){
     if (/og-image\.png$/.test(tag("og:image")) && !/pantheon/.test(f)) bad.push(f + ": generic og:image");
     if (canonical !== "https://rallyflag.gg/" + f) bad.push(f + ": canonical " + canonical);
     if (/<meta name="robots"[^>]*noindex/.test(html)) bad.push(f + ": noindex (the template's tag wasn't stripped)");
+    // Without JavaScript the guide still has its content (tools/prerender.js).
+    const copy = (html.match(/<noscript id="prerendered">([\s\S]*?)<\/noscript>/) || [])[1] || "";
+    if (copy.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length < 200) bad.push(f + ": no prerendered content for crawlers without JavaScript");
     // Structured data: breadcrumbs and the Article, valid JSON.
     try {
       const ld = JSON.parse((html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/) || [])[1] || "null");

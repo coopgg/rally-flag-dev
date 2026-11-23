@@ -16,7 +16,11 @@
    the pages that only list them (Home, This Week, Raids, Dungeons), so
    they don't download the full guide text (~180KB).
 
-   Run after editing a guide template or raids-data.js / dungeons-data.js:
+   Also writes llms.txt (a plain-text site map for AI tools) from the same
+   data plus each page's meta description.
+
+   Run after editing a guide template or raids-data.js / dungeons-data.js
+   (or a listed page's description):
      node tools/build-guide-pages.js           write the pages
      node tools/build-guide-pages.js --check   exit 1 if any page is stale
    No dependencies; Node 18+.
@@ -107,14 +111,19 @@ const sets = [
 ];
 
 let stale = 0, written = 0;
+const PRERENDER_RE = /<noscript id="prerendered">[\s\S]*?<\/noscript>\n/;
 const expected = new Set();
 for (const [kind, kindLabel, items] of sets){
   const template = fs.readFileSync(path.join(ROOT, kind + "-guide.html"), "utf8");
   for (const item of items){
-    const { file, html } = buildPage(template, kind, kindLabel, item);
+    const built = buildPage(template, kind, kindLabel, item), file = built.file;
     expected.add(file);
     const target = path.join(ROOT, file);
     const current = fs.existsSync(target) ? fs.readFileSync(target, "utf8") : null;
+    // Keep the page's prerendered copy (tools/prerender.js writes it and
+    // checks it); this build only owns the rest of the page.
+    const kept = current && current.match(PRERENDER_RE);
+    const html = kept ? built.html.replace("</main>", kept[0] + "</main>") : built.html;
     if (current === html) continue;
     if (CHECK){ console.error("stale: " + file); stale++; }
     else { fs.writeFileSync(target, html); written++; }
@@ -144,6 +153,37 @@ for (const [kind, kindLabel, items] of sets){
   if (current !== js){
     if (CHECK){ console.error("stale: " + file); stale++; }
     else { fs.writeFileSync(target, js); written++; }
+  }
+}
+
+// llms.txt: a plain-text map of the site for AI tools (llmstxt.org;
+// experimental, not a ranking signal). Guides from the data, the other
+// pages with their own meta descriptions, so it never drifts.
+{
+  const metaDesc = f => {
+    const html = fs.readFileSync(path.join(ROOT, f), "utf8");
+    return ((html.match(/<meta name="description" content="([^"]*)"/) || [])[1] || "").replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+  };
+  const line = (f, name) => "- [" + name + "](" + SITE + (f === "index.html" ? "" : f) + "): " + metaDesc(f);
+  const guideLine = (kind, item, kindLabel) => "- [" + item.name + "](" + SITE + kind + "-" + item.slug + ".html): " + describe(item, kindLabel);
+  const groups = [
+    ["Weapons, builds and armor", [["god-rolls.html", "God Rolls"], ["builds.html", "Builds"], ["armor-set-bonuses.html", "Armor Set Bonuses"], ["artifacts.html", "Seasonal Artifacts"], ["weapons.html", "Weapon Lookup"]]],
+    ["This week in Destiny 2 (live)", [["this-week.html", "This Week"], ["rotation.html", "Rotation"], ["distortions.html", "Distortions"], ["vendors.html", "Vendors"], ["tracker.html", "Tracker"], ["public-events.html", "Public Events"], ["codes.html", "Redemption Codes"]]],
+    ["Player tools (look up any Bungie name)", [["report.html", "Raid & Dungeon Report"], ["pvp.html", "Crucible & Trials"], ["seals.html", "Seals & Triumphs"], ["puzzle-helper.html", "Puzzle Helper"], ["locker.html", "Locker"], ["your-week.html", "Your Week"]]],
+    ["Optional", [["faq.html", "Distortions FAQ"], ["tools.html", "Community tools"], ["privacy.html", "Privacy"], ["terms.html", "Terms"]]]
+  ];
+  const txt = "# Rally Flag\n\n> " + metaDesc("index.html") + "\n\n" +
+    "Rally Flag (https://rallyflag.gg/) is a free, fan-made Destiny 2 companion site. Guides are written by players from their own clears; live pages read Bungie's public API.\n\n" +
+    "## Raid guides\n\n" + sets[0][2].map(i => guideLine("raid", i, "Raid")).join("\n") + "\n\n" +
+    "## Dungeon guides\n\n" + sets[1][2].map(i => guideLine("dungeon", i, "Dungeon")).join("\n") + "\n\n" +
+    groups.map(([h, list]) => "## " + h + "\n\n" + list.map(([f, n]) => line(f, n)).join("\n")).join("\n\n") + "\n";
+  const file = "llms.txt";
+  expected.add(file);
+  const target = path.join(ROOT, file);
+  const current = fs.existsSync(target) ? fs.readFileSync(target, "utf8") : null;
+  if (current !== txt){
+    if (CHECK){ console.error("stale: " + file); stale++; }
+    else { fs.writeFileSync(target, txt); written++; }
   }
 }
 
